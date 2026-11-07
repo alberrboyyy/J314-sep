@@ -1,0 +1,5 @@
+# SYNTHÉTIQUE
+999.5 debut
+1001.5 doigt
+1004.0 retrait
+1004.5 doigt

@@ -16,7 +16,7 @@ echo "DTB    : $DTB"
 read -r -p "Confirmer le boot du kernel de test ? [oui/N] " ok
 [ "$ok" = "oui" ] || die "annulé."
 
-python3 "$M1N1_DIR/proxyclient/tools/chainload.py" -r "$M1N1_DIR/build/m1n1.bin"
+"$M1N1_PYTHON" "$M1N1_DIR/proxyclient/tools/chainload.py" -r "$M1N1_DIR/build/m1n1.bin"
 sleep 2
-python3 "$M1N1_DIR/proxyclient/tools/linux.py" \
+"$M1N1_PYTHON" "$M1N1_DIR/proxyclient/tools/linux.py" \
   "$LINUX_DIR/arch/arm64/boot/Image.gz" "$DTB" ${INITRAMFS:+"$INITRAMFS"} -b "$BOOTARGS"

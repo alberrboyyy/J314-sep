@@ -1,0 +1,121 @@
+TTY> Heap limit: 0x1000f718000 (128 MiB)
+m1n1 base: 0x10004410000
+Fetching ADT (0x0007C000 bytes)...
+Total region size: 0xae8000 bytes
+Copying SEPFW                         : 0x100048e4000..0x10004e5c000 -> 0x1000fcfc240 (0x578000 bytes)
+Copying preoslog                      : 0x10004e5c000..0x10004e9c000 -> 0x10010274240 (0x40000 bytes)
+Copying TrustCache                    : 0x10004e9c000..0x10004ef4000 -> 0x100102b4240 (0x58000 bytes)
+Loading kernel image (0x4d0004 bytes)...
+[0%....10%....20%....30%....40%....50%....60%....70%....80%....90%....100%]
+Adjusting addresses in ADT...
+Pushing ADT (492260 bytes)...
+Setting up bootargs...
+Copying stub...
+Entry point: 0x10004410800
+Reloading into stub at 0x10010310240
+TTY> Preparing to run next stage at 0x10010310240...
+Waiting for reconnection... ............................. Connected
+TTY> Initialized dockchannel UART at 0x292528000
+TTY> Device info:
+TTY>   Model: MacBookPro18,4
+TTY>   Target: J314c
+TTY>   Board-ID: 0x8
+TTY>   Chip-ID: 0x6001
+TTY> 
+TTY> CPU init (MIDR: 0x612f0280 smp_id:0x0)...
+TTY>   CPU part: 0x28 rev: 0x20
+TTY>   CPU: M1 Max Icestorm
+TTY> 
+TTY> boot_args at 0x10004ef4000
+TTY>   revision:     2
+TTY>   version:      2
+TTY>   virt_base:    0x1c18c000
+TTY>   phys_base:    0x1000218c000
+TTY>   mem_size:     0x7d7444000
+TTY>   top_of_kdata: 0x10004ef8000
+TTY>   video:
+TTY>     base:       0x107dfde4000
+TTY>     display:    0x1
+TTY>     stride:     0x2f40
+TTY>     width:      3024
+TTY>     height:     1964
+TTY>     depth:      30bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0x1e33c000
+TTY>   devtree_size: 0x7c000
+TTY>   cmdline:      64e_preview_abi
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x800000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v2.0.0-92-g70757dc7
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the GNU General Public License v2 or later
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: 13.5 (iBoot-8422.141.2)
+TTY> System FW version: 26.6.2 (mBoot-18000.161.10)
+TTY> Heap base: 0x10004ef8000
+TTY> Boot policy: sip0 = 127
+TTY> MCC: Initializing T6000 MCCs (8 instances)...
+TTY> MCC: Initialized T6000 MCCs (8 instances, 4 planes, 4 channels)
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x107d95d0000
+TTY> MMU: Unmapping TZ0 region at 0x107d95d8000..0x107db1e0000
+TTY> MMU: Unmapping TZ1 region at 0x107d95d0000..0x107d95d8000
+TTY> MMU: Unmapping TZ2 region at 0x107e6e28000..0x107ffe28000
+TTY> MMU: Adding Device-nGnRE mapping at 0x5a0000000 (0x20000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x5c0000000 (0x40000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x800000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xa00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xc00000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xe00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1000000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1200000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1400000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1600000000 (0x80000000)
+TTY> MMU: Adding Normal-NC mapping at 0x107fff24000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffefc000 (0x8000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffef8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffee4000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffee0000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffecc000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffec8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffeb4000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffeb0000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107ffe9c000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x107fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30900180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 2 @ 0x28e100000
+TTY> AIC: AIC2 with 1/8 dies, 1806/4096 IRQs, reg_size:0c004, config:02000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> AIC: Configuring 5 external interrupts
+TTY> Primary WDT register @ 0x2922b0000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x2922b802c
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 430 devices on 1 dies found.
+TTY> display: Display is internal
+TTY> display: Display is already initialized (3024x1964)
+TTY> fb init: 3024x1964 (30) [s=3024] @0x107dfde4000
+TTY> fb console: max rows 57, max cols 78
+TTY> fb: display logo
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j314c
+TTY> No more payloads at 0x100048e0000
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x702f80000 is a t6000
+TTY> USB0: initialized at 0x10004f24090
+TTY> dart: dart /arm-io/dart-usb1 at 0xb02f80000 is a t6000
+TTY> USB1: initialized at 0x10004f24560
+TTY> dart: dart /arm-io/dart-usb2 at 0xf02f80000 is a t6000
+TTY> USB2: initialized at 0x10004f24a60
+TTY> Running proxy...
+Proxy is alive again
