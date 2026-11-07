@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./tools/build_m1n1.sh:*)",
+      "Bash(./tools/boot_and_trace.sh:*)",
+      "Bash(./tools/reboot_mac.sh:*)",
+      "Bash(./tools/build_kernel.sh:*)",
+      "Bash(python3 analysis/:*)",
+      "Bash(git -C m1n1 status:*)",
+      "Bash(git -C m1n1 diff:*)",
+      "Bash(git -C m1n1 log:*)",
+      "Bash(git -C m1n1 add:*)",
+      "Bash(git -C m1n1 commit:*)",
+      "Bash(git -C m1n1 switch:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)"
+    ],
+    "ask": [
+      "Bash(./tools/boot_test_kernel.sh:*)",
+      "Bash(./pending/:*)",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "deny": [
+      "Bash(python3 m1n1/proxyclient/:*)",
+      "Bash(python m1n1/proxyclient/:*)",
+      "Bash(m1n1/proxyclient/:*)",
+      "Bash(sudo:*)",
+      "Bash(dd:*)",
+      "Bash(bputil:*)",
+      "Bash(kmutil:*)",
+      "Bash(csrutil:*)",
+      "Bash(nvram:*)",
+      "Bash(picocom:*)",
+      "Bash(screen:*)",
+      "Bash(git push:*)",
+      "Bash(git -C m1n1 push:*)",
+      "Bash(gh:*)",
+      "Bash(rm -rf:*)",
+      "Edit(traces/**)",
+      "Write(traces/**)"
+    ]
+  }
+}
