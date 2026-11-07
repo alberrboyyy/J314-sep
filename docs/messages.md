@@ -6,7 +6,8 @@ Direction : `>` AP → SEP, `<` SEP → AP.
 Statuts : `connu-doc` (doc publique Asahi / code m1n1 publié), `hypothèse`, `vérifié` (confirmé par expérience).
 Source : `doc-asahi`, `m1n1` (code public), `trace:<dossier>`, `kext` (phase 2 uniquement).
 Dans les colonnes « Vu » : `Lnnn` = numéro de ligne de `sep.log` de la trace citée ; `uart Lnnn` = ligne de `hv_uart.log`
-(log noyau macOS de la même capture). C1 = `traces/20261107-033436_c1-boot`.
+(log noyau macOS de la même capture). C1 = `traces/20261107-033436_c1-boot`. C3 = `traces/20261107-035930_c3-touchid`
+(rapport : `analysis/out/c3_report.md`, tentatives : `analysis/out/c3_lock_cycles.txt`).
 
 **Rien n'est `vérifié` dans ce fichier.** Les rôles supposés sont des interprétations de logs.
 
@@ -145,7 +146,7 @@ login = L681-710 (03:36:13-14) ; lock→unlock = L1042-1145 (03:36:58–03:37:00
 | 0x08 | > / < | 0xfc | 0x0b | 0 | 0 | L566 (03:35:32), L1133 (unlock) | ? | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | 0x70 | 0 | 0 | L701, L708 (login, chacune juste après une notif 0x01/0x28) ; L1137-1142 (unlock, 194 ms, suivie de `< TAG=0x03` L1143) | réaction à un passage « déverrouillé » ? (vu aux 2 déverrouillages, 3 occurrences) | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | 0x23, 0x06, 0x65, 0x07 | 0 | 0 | L1109, L1111, L1113 (+fragments), L1117 (1× chacune, unlock ; 0x23 = 6 ms, 0x07 = 19 ms) | préparation de la comparaison doigt ? | hypothèse | trace:C1 | 2026-11-07 |
-| 0x08 | > / < | 0xfc | 0x09 | 0 | 0 | L1119→L1126 (1×, 241 ms ; notif `0x01/0x08` L1125 avant la réponse, une 2e L1127 après) ; le message SKS « handle -501 » (L1124) tombe pendant | candidat principal « match Touch ID » (une seule occurrence) | hypothèse | trace:C1 | 2026-11-07 |
+| 0x08 | > / < | 0xfc | 0x09 | 0 | 0 | L1119→L1126 (1×, 241 ms ; notif `0x01/0x08` L1125 avant la réponse, une 2e L1127 après) ; le message SKS « handle -501 » (L1124) tombe pendant | candidat principal « comparaison Touch ID » ; **C3 : 20 occurrences**, 240-245 ms quand suivie d'un UNLOCKED (8×), 296-356 ms sinon (12×) — voir section C3 | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | 0x22, 0x21 | 0 | 0 | L1131, L1144 (1× chacune, unlock) | fin de séquence d'authentification ? | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | 0x6c | 0 | 0 | L1228 (+fragments « après » L1230-1233), L1240 (post-unlock, 03:37:15) | transfert après unlock (mise à jour de gabarit ?) | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | 0x37 | 0 | 0 | L1234 (6 ms), L1242→L1247 (382 ms) (post-unlock) | ? (la plus longue commande sbio vue) | hypothèse | trace:C1 | 2026-11-07 |
@@ -162,16 +163,34 @@ login = L681-710 (03:36:13-14) ; lock→unlock = L1042-1145 (03:36:58–03:37:00
 | 0x08 | < | 0x01 | 0x11 | 0 | 0x1f5 | L467 (pendant 0x71), L510 (juste après `> TAG=0x26`), L693 (login) — 3× | notification d'état pour 501 | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | > | 0x26 | 0x00 | 0 | 0x1f5 | L509 (1×, seul message AP→SEP hors 0xfc/0xfe/0xfd) | l'AP signale l'uid 501 au SEP ? (entre ancrages L454 et L550 ; même fenêtre que « BIO DROPPED … forcedBioRestrictionReason=2 », uart L2296) | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | < | 0x01 | 0x28 | 0x02 | 0x1f5 | L699, L705 (login, chacune suivie de `> 0xfc 0x70`) | « session/keybag 501 déverrouillé » ? | hypothèse | trace:C1 | 2026-11-07 |
-| 0x08 | < | 0x01 | 0x09 | 0x02 | 0x1f5 | L1042 (1×, 03:36:58.35, ~2-3 s après le lock, pendant l'écran verrouillé) | événement après lock (armement ? doigt détecté ?) | hypothèse | trace:C1 | 2026-11-07 |
-| 0x08 | < | 0x01 | 0x08 | 0x02 | 0x1f5 | L1125 (pendant 0x09), L1127 (après) — 2× | résultat de la comparaison ? | hypothèse | trace:C1 | 2026-11-07 |
+| 0x08 | < | 0x01 | 0x09 | 0x02 | 0x1f5 | L1042 (1×, 03:36:58.35, ~2-3 s après le lock, pendant l'écran verrouillé) | événement après lock (armement ?) ; **reproduit 10/10 verrouillages dans C3**, sans doigt (voir section C3) | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
+| 0x08 | < | 0x01 | 0x08 | 0x02 | 0x1f5 | L1125 (pendant 0x09), L1127 (après) — 2× | résultat « correspondance » ? **C3 : 2× dans chacun des 8 succès, 0 dans les 12 échecs** ; mais aussi 1× au déverrouillage mot de passe après blocage (C3 L5724) | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
 | 0x08 | < | 0x03 | 0x00 | 0 | 0 | L1143 (1×, fin de 0x70 à l'unlock) | fin d'opération ? | hypothèse | trace:C1 | 2026-11-07 |
+
+### SBIO (0x08) — C3 : lock, tentatives doigt, déverrouillage (C3 = `traces/20261107-035930_c3-touchid`)
+
+Vu : macOS a verrouillé 10 fois après le login (uart L3032 … L4978) et déverrouillé 8 fois au doigt, 2 fois au mot de passe.
+Les marques de `marks.txt` sont décalées par rapport aux actions (voir rapport §0) : les lignes ci-dessous sont rattachées aux
+états `LOCKED/UNLOCKED now=` de hv_uart, pas aux marques. Notation : `xx` = paire `> 0xfc TYPE=xx` / `< 0xfc TYPE=xx`
+(PARAM=0, DATA=0).
+
+| EP | Dir | Tag | Type | Param | Data | Vu (C3) | Rôle supposé | Statut | Source | Date |
+|----|-----|-----|------|-------|------|---------|--------------|--------|--------|------|
+| 0x08 | < puis > / < | 0x01 puis 0xfc | `<01/09` puis `2b 2b 7d 2b` | 0x02 / 0 | 0x1f5 / 0 | 10/10 verrouillages, `<01/09` à [−0.3 ; +2.3] s du `now=` (L1362, 2024, 2292, 2510, 2760, 3176, 3918, 4362, 4608, 5173), `2b…` ~0.6 s après (1er lock : `2b 36 2b 7d 2b`, L1405-1452) ; 2e `<01/09` à +10.6 s si l'écran reste verrouillé (L1464, L4714, L3462) ; C1 L1042 + L1049-1106 | « écran verrouillé, capteur armé » ; **reproduit 10 fois dans c3**, sans doigt (fenêtre 616-646 sans 0x23) | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
+| 0x08 | > / < | 0xfc + notifs | `23 06 65(<fe 0, >fd 0x10000) 07 09 [<01/08 P2] <fc09 [<01/08 P2] 1f 22 0b 70 <03 21` | — | — | 25 messages identiques bit à bit (dir/TAG/TYPE/PARAM/DATA) : L2147, 2391, 2602, 2861, 3553, 4109, 4461, 4966 et C1 L1109 ; chacun suivi d'UNLOCKED ≤ 2 s ; notif SKS `TAG=0x00 DATA=0xfffffe0b` pendant 0x09 (L2160, 2404, 2622, 2874, 3567, 4122, 4474, 4980) | déverrouillage Touch ID réussi ; **reproduit 8 fois dans c3** (+1 C1) ; absent des 2 déverrouillages mot de passe (L1675-1729, L5721-5760) et de 30 s de lock sans doigt | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
+| 0x08 | > / < | 0xfc + notifs | `23 06 65 07 09 <fc09 1f 22 70 <03 21` | — | — | 12× : L3281, 3340, 3495, 3526, 4861, 4888, 4927, 5264, 5338, 5363, 5394, 5418 ; jamais suivi d'UNLOCKED. Diffère du succès par : pas de `<01/08`, pas de `0b`, 0x09 = 296-356 ms, pas de notif SKS -501, `<03` ~0.3-0.4 s après la fin de 0x70 | tentative doigt rejetée ; **reproduit 12 fois dans c3** ; doigt utilisé inconnu (marques peu fiables) | hypothèse | trace:C3 | 2026-11-07 |
+| 0x08 | > / < | 0xfc | `23 06 65 07 22` | 0 | 0 | 2× : L4915, L4954 (28-29 ms, pas de 0x09), suivis 80 ms après d'une tentative complète | tentative abandonnée (acquisition inexploitable ?) | hypothèse | trace:C3 | 2026-11-07 |
+| 0x08 | < | 0x01 | 0x45 | 0x00 | 0x1f5 | L5432, L5433, L5435 (pendant 0x09 du 5e échec consécutif, à la place des `<01/08`), L5504 (1111.2, +10.6 s après le `<01/09` L5173) ; 4× dans **un seul** cycle de verrouillage | « trop d'échecs, biométrie bloquée » ? (un seul cycle : coïncidence possible) ; déverrouillage ensuite au mot de passe | hypothèse | trace:C3 | 2026-11-07 |
+| 0x08 | > / < | 0xfc | `6b 79 6c(2 tours) 37 33 36 6c 37` | 0 | 0 | ~15-16 s après chaque unlock doigt resté déverrouillé (L2734, 2998, 3758, 4334, 4582 : 5/5) ; L5813 6 s après l'unlock mot de passe post-blocage (s'arrête après 0x33) ; absent après pw_unlock ; C1 L1224 | tâche post-déverrouillage (mise à jour de gabarit ?) ; **reproduit 5 fois dans c3** | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
+| 0x08 | < puis > / < | 0x01 puis 0xfc | `<01/28 P2` → `70`, deux fois | 0x02 | 0x1f5 | login L701-713, pw_unlock L1677-1711, pw_after_bad L5723-5760 ; aussi dans les succès doigt via `70` | réaction au déverrouillage (commun mot de passe / doigt) ; **reproduit 3 fois dans c3** (+ C1 login) | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
+| 0x08 | — | — | aucun message | — | — | fp_prelogin (457.7-472.1) et idle1 : 0 message EP 0x08 de L585 à L683 ; fp_noprompt (1163.8-1193.8) : 0 message après L5826 | doigt sans demande de macOS → aucun trafic mailbox SBIO | hypothèse | trace:C3 | 2026-11-07 |
 
 ### SKS (0x12) — structure (aperçu, C1)
 
 | EP | Dir | Tag | Type | Param | Data | Vu (C1) | Rôle supposé | Statut | Source | Date |
 |----|-----|-----|------|-------|------|---------|--------------|--------|--------|------|
 | 0x12 | > | t | n | 0 | 0xLLLL0000 | 579 requêtes, L174… | TAG = commande ; TYPE = compteur de transaction (+1 à chaque requête, 3 écarts sur 579) ; bits 48-63 = longueur ? | hypothèse | trace:C1 | 2026-11-07 |
-| 0x12 | < | t\|0x80 | n | s | 0xLLLL0000 ou 0 | 579 réponses, toutes appariées (TAG\|0x80, même TYPE) | réponse ; PARAM≠0 (0xfd ×53, 0xfb ×5, 0xff, 0xfe, 0xed) toujours avec DATA=0 → code d'erreur ? | hypothèse | trace:C1 | 2026-11-07 |
+| 0x12 | < | t\|0x80 | n | s | 0xLLLL0000 ou 0 | 579 réponses, toutes appariées (TAG\|0x80, même TYPE) | réponse ; PARAM≠0 (0xfd ×53, 0xfb ×5, 0xff, 0xfe, 0xed) toujours avec DATA=0 → code d'erreur ? Réponses TAG 0x84/0x86 : PARAM=0xfd avant le 1er login, 0x00 après, sans exception (C1 L251→L695 ; C2a L247→L681 ; C3 12/12 0xfd L247-L688 puis 290/290 0x00 dès L697, bascule au UNLOCKED now=1794020513, uart L2748) — **reproduit dans 3 captures** | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
 | 0x12 | < | 0x00 | v | p | handle (int32) | L550, L639, L641, L697, L1124, L1624 | notification de changement d'état d'un keybag : DATA = « handle » du noyau, 5/5 correspondances (L550 ↔ uart L2332-2333 ; L639 ↔ L2615-2616 ; L641 (-6) ↔ L2619 ; L697/L1124 (-501) ↔ L2679 / L2784 ; L1624 ↔ L2987-2988) ; PARAM=1 pour les volumes (« Unlock notification for volume »), 0 sinon ; TYPE=1 en L697, 0 ailleurs | hypothèse | trace:C1 | 2026-11-07 |
 | 0x12 | < | 0x09 | 0 | 0 | 0 | L640, L1619 (2×, chaque fois à côté d'une notification de volume) | ? | hypothèse | trace:C1 | 2026-11-07 |
 

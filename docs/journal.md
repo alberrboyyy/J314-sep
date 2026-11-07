@@ -14,6 +14,54 @@ Format :
 
 ---
 
+## 2026-11-07 04:35 — tracer — Option SEP_SHMEM_DUMP (lecture unique de l'en-tête shmem SEP, validée par Albert)
+- Trace : — (aucune action hardware ; déclencheur choisi d'après traces/20261107-033436_c1-boot et
+  traces/20261107-035422_c3-touchid/sep.log L13 `> EP=0xfe TAG=0x01 TYPE=0x1c DATA=0x00000580`)
+- Fait : `hv/trace_sep_filtered.py` (rien dans m1n1). Désactivé par défaut. `SEP_SHMEM_DUMP=1` : au premier
+  `> EP=0xfe` TYPE 0x1c ou 0x18, IOVA = DATA<<12 (hypothèse m1n1 hw/sep.py), lecture de 0x4000 octets via
+  `/arm-io/dart-sep` → `<SEP_TRACE_OUT>.shmem_hdr.bin` + lignes `# shmem trigger|dart|hdr|table|entry|region|done`
+  dans sep.log ; erreurs → `# shmem_error ...`, le tracing continue. `SEP_SHMEM_DUMP_FULL=<octets>` : dump de
+  chaque région de la table (plafond par région, total ≤ 32 MiB). `SEP_SHMEM_WHEN=trigger|next`,
+  `SEP_SHMEM_SYNC_MAX` (défaut 64 messages AP→SEP sans déclencheur → abandon).
+- Vu (lecture du code m1n1, pas d'expérience) : en ASYNC le handler tourne dans `proxy.py reply()` pendant que le
+  guest tourne ; une commande proxy à ce moment ferait entrer m1n1 dans `hv_tick` → USER_INTERRUPT → shell HV.
+  Lecture mémoire possible seulement dans une exception (`hv.ctx` non nul). Donc avec SEP_SHMEM_DUMP=1, INBOX
+  (écritures AP→SEP seulement) est tracé en SYNC jusqu'à la lecture, puis repasse dans le mode normal.
+  En SYNC le handler tourne avant que m1n1 ne rejoue l'écriture INBOX1 : en mode `trigger` le SEP n'a pas
+  encore reçu le message EP=0xfe quand on lit.
+- Traduction DART refaite en lecture seule (TCR/TTBR par read32, PTE 8 octets, adresses vérifiées dans
+  [hv.ram_base, +ram_size)), compatibles dart,t8020/t6000 seulement ; stream 0 essayé d'abord, puis les autres
+  streams actifs. Aucune écriture SEP/DART/mémoire guest.
+- Vérifié hors ligne : py_compile ; test avec un faux hv/DART/RAM (scratchpad) : table décodée, régions plafonnées,
+  erreurs (contexte async, IOVA non mappée, PA hors RAM) → `# shmem_error`, retour au mode normal appelé.
+- Non testé : tout sur le matériel (compat et stream de dart-sep sous 13.5, DATA<<12, format de la table côté
+  macOS, mélange SYNC/ASYNC et bascule en cours de route, durée réelle, réaction du SEP à la pause).
+  `boot_and_trace.sh` n'écrit pas SEP_SHMEM_* dans meta.txt (seule la ligne `# trace_sep_filtered start ... shmem=`
+  de sep.log le note).
+- Incidents : aucun.
+
+## 2026-11-07 04:30 — analyste — Analyse de C3 (Touch ID : lock, mot de passe, bon/mauvais doigt)
+- Trace : traces/20261107-035930_c3-touchid/ (sep.log 5841 lignes, 887 msgs EP 0x08 ; hv_uart.log 5264 lignes ; marks.txt).
+  Capture avortée traces/20261107-035422_c3-touchid (login trop tôt, marque `abort_protocole_casse`) : notée, **non analysée**.
+- Fait : nouveau script `analysis/lock_cycles.py` (états `LOCKED/UNLOCKED now=` de hv_uart + découpage des tentatives SBIO
+  `0x23…0x21`) → `analysis/out/c3_lock_cycles.txt` ; `align_uart.py` → `analysis/out/c3_align.txt` ; rapport
+  `analysis/out/c3_report.md` ; section C3 ajoutée dans `docs/messages.md`. Aucune action hardware.
+- Vu :
+  - Marques décalées : 11 LOCKED / 11 UNLOCKED dans hv_uart (uart L2089…L5233) pour 6 `lock_*` marqués ; plusieurs actions
+    avant leur marque (LOCKED 616 vs `lock1` 596 ; unlock doigt 937-938 avant `fp_good_3`). Décalage Mac/PC < ~2 s
+    (ancrages CRC uart L3397 ↔ L2158, L2778 ↔ L727). Aucun événement « buttonIndex » (Ctrl+Cmd+Q).
+  - Chaque LOCKED (10/10) : `< 0x01/0x09 P2 0x1f5` puis `2b 2b 7d 2b` ; 30 s de lock sans doigt (616-646) : aucun 0x23.
+  - Séquence `23 06 65 07 09 … 1f 22 0b 70 <03 21` identique bit à bit 8 fois (L2147…L4966), = C1 L1109, chaque fois avant
+    un UNLOCKED. 12 tentatives sans UNLOCKED : pas de `<01/08`, pas de `0b`, 0x09 296-356 ms (vs 240-245). 2 abandons `23 06 65 07 22`.
+  - Le 5e échec consécutif (cycle 1100) porte `<01/45` ×3 ; puis déverrouillage au mot de passe (L5723-5760, avec un `<01/08`).
+  - fp_bad_1 a déverrouillé (L4966, UNLOCKED now=1097, uart L4942).
+  - fp_prelogin et fp_noprompt : 0 message SBIO. SKS TAG 0x84/0x86 : PARAM 0xfd → 0x00 au login (L688 → L697), comme C1 et C2a.
+  - Rafale `6b 79 6c 37 33 36 6c 37` ~15 s après chaque unlock doigt (5/5).
+- Interprété (hypothèses) : `<01/09` + `2b…` = armement au lock ; 0x09 = comparaison, `<01/08` = correspondance ; le verdict
+  succès/échec est visible dans le mailbox (pas seulement dans l'OOL) ; `<01/45` = blocage après 5 échecs (1 seul cycle).
+  Quel doigt a produit les échecs : inconnu (marques peu fiables). Rien en `vérifié`.
+- Incidents : aucun.
+
 ## 2026-11-07 03:50 — analyste — Analyse de C1 (boot + login mdp + lock + unlock doigt)
 - Trace : traces/20261107-033436_c1-boot/ (sep.log 1865 msgs tous EP, hv_uart.log 3045 lignes, lecture seule)
 - Fait : stats `analysis/parse_trace.py` ; nouveaux scripts `analysis/sbio_transactions.py` (paires 0xfc, fragments,
