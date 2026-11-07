@@ -1,0 +1,18 @@
+date: 20261107-043828
+name: c6-doigt-ool
+mode: auto
+timeout_s: 1200
+end_action: reboot
+m1n1_commit: 70757dc7
+trace_script: /home/albert/Desktop/sep-touchid/hv/trace_sep_filtered.py
+kernel: /home/albert/Desktop/sep-touchid/macos/kernel.macho
+bootargs: debug=0x14e serial=3 apcie=0xfffffffe -enable-kprintf-spam wdt=-1 clpc=0
+proxy_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00
+hv_uart_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if02
+end_reason: stop_requested
+proxy_back_after_reboot: yes
+lines: 934
+live_eps: none
+marks: 5
+sep_eps: all
+sep_lines: 2725

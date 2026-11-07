@@ -50,7 +50,14 @@ Variables d'environnement
   SEP_OOL_EPS      endpoints dont on lit les deux buffers OOL à chaque message, ex. "0x08".
                    Défaut vide = désactivé (comportement strictement identique à avant).
                    ACTIF => INBOX et OUTBOX tracés en SYNC pendant toute la session.
-  SEP_OOL_BYTES    octets lus au début de chaque buffer (défaut 0x4000, borné par la taille apprise).
+  SEP_OOL_BYTES    octets lus au début de chaque buffer (défaut 0x400, borné par la taille apprise).
+  SEP_OOL_FULL_TYPES  TYPE des messages pour lesquels le buffer est lu en entier (taille apprise),
+                   défaut "0x65,0x5b,0x5f,0x6d". Vide = jamais.
+  SEP_OOL_SPLIT_DIR  1 (défaut) : '>' lit seulement A, '<' seulement B. 0 : les deux à chaque message.
+  SEP_OOL_REVALIDATE_N  la traduction IOVA->PA est mise en cache par buffer ; refaite toutes les N
+                   lectures du buffer (défaut 64, 0 = jamais) -> `# ool remap` si elle a changé.
+                   Invalidée aussi à chaque erreur de lecture et à chaque CNTL TYPE 2/3/4/5 qui change
+                   IOVA ou taille.
   SEP_OOL_MAX_MB   plafond global des fichiers .bin écrits (défaut 64) ; au-delà : `# ool_cap`,
                    plus aucun .bin, les lignes `# ool` continuent.
 
@@ -92,23 +99,27 @@ Apprentissage (aucune valeur codée en dur) : messages `> EP=0x00` (CNTL) de TYP
 concerné étant PARAM. Hypothèse analyste (C4, non vérifiée) : TYPE 4 = taille et TYPE 2 = IOVA>>12 du
 buffer A ; TYPE 5 = taille et TYPE 3 = IOVA>>12 du buffer B. Ligne `# ool learn` à chaque valeur apprise.
 Pour chaque message (> et <) d'un EP de SEP_OOL_EPS dont un buffer est connu (IOVA et taille), lecture
-de min(SEP_OOL_BYTES, taille) octets de chaque buffer connu par SepDartReader (même traduction lecture
-seule que SEP_SHMEM_DUMP ; stream trouvé par find_sid au premier accès, puis mémorisé par buffer).
+de min(SEP_OOL_BYTES, taille) octets (taille entière si TYPE dans SEP_OOL_FULL_TYPES) du buffer de la
+direction (A pour '>', B pour '<' ; les deux si SEP_OOL_SPLIT_DIR=0) par SepDartReader (même traduction
+lecture seule que SEP_SHMEM_DUMP ; stream trouvé par find_sid au premier accès, puis mémorisé par buffer ;
+traduction en plages PA contiguës mise en cache, un readmem par plage contiguë).
 Moment de la lecture : '>' dans le hook INBOX1 AVANT que m1n1 ne rejoue l'écriture (le SEP n'a pas
 encore reçu le message) ; '<' dans le hook OUTBOX1 APRÈS la lecture matérielle (le message est dépilé,
 le SEP a pu continuer à écrire). Sortie, une ligne par buffer, juste après la ligne du message (même ts) :
   # ool <ts> seq=<n> EP=0x.. dir=> buf=A sha=<8 hex sha256> nz=<octets non nuls> changed=<plages>
-      len=0x.. elapsed_ms=..
+      len=0x.. elapsed_ms=.. full=0|1 xlat=hit|miss|reval rm=<nb readmem> [trunc=1] [file=]
+  trunc=1 : lecture partielle dont les 16 derniers octets ne sont pas tous nuls (contenu sans doute coupé).
+  La comparaison `changed` se fait entre lectures de même longueur (courte vs complète séparées).
+  En fin de session : `# ool_stats <ts> n= mean_ms= max_ms= total_ms= bytes= xlat= dir=>:... dir=<:...`.
   seq = numéro du message (compteur `seen`, tous EP confondus, 1 = premier). changed = plages
   `off+len` (hex) différentes du dump précédent du même buffer, `init` au premier, `none` sinon ;
   au plus 16 plages puis `,...(+N)`. Le contenu brut n'est écrit que s'il change (ou au premier dump) :
   `<SEP_TRACE_OUT>.ool/<seq 6 chiffres>_<ep 2 hex>_<buf>.bin`. Toute erreur -> `# ool_error ...`.
   La lecture a lieu même si SEP_EPS exclut l'EP (la ligne `# ool` existe alors sans ligne message).
-Coût : en SYNC chaque accès INBOX/OUTBOX = une exception guest remontée au PC (aller-retour USB),
-plus, pour les EP de SEP_OOL_EPS, ~4 commandes proxy de traduction + 1 readmem par page de 16 KiB et
-par buffer. Ordre de grandeur (extrapolé de C4 : 2.4 ms pour 0x4000 octets + traduction) : ~5 ms par
-message pour 2 buffers, soit ~0.1-0.2 s ajoutés sur une rafale SBIO de 25 messages. Non mesuré :
-voir `elapsed_ms`. Réduire SEP_OOL_BYTES diminue le coût du readmem, pas celui de la traduction.
+Coût : en SYNC chaque accès INBOX/OUTBOX = une exception guest remontée au PC (aller-retour USB).
+Avant ce changement (C5/C6, 2 buffers x 0x4000, 4 commandes de traduction + 1 readmem chacun) :
+1.86 ms par buffer mesuré, 3.7 ms par message. Avec cache de traduction et 0x400 octets : 1 readmem
+par buffer et par message (coût estimé, NON mesuré, voir `# ool_stats`).
 Risques : le SEP lit/écrit ces buffers de son côté ; pendant la lecture les CPU du guest sont arrêtés
 mais pas le SEP, donc un dump peut être incohérent (partiellement mis à jour). Le ralentissement peut
 déclencher des timeouts côté macOS ou SEP (non observé, non testé).
@@ -173,6 +184,8 @@ CNTL_EP = 0x00
 # TYPE CNTL -> (buffer, champ). Hypothèse analyste C4, non vérifiée.
 OOL_CNTL_TYPES = {0x02: ("A", "iova"), 0x04: ("A", "size"), 0x03: ("B", "iova"), 0x05: ("B", "size")}
 OOL_MAX_RANGES = 16
+# TYPE dont on lit le buffer en entier (contenu > 0x1000 observé dans C5/C6, voir docs/journal.md).
+OOL_FULL_TYPES_DEFAULT = "0x65,0x5b,0x5f,0x6d"
 
 
 def diff_ranges(old, new, chunk=64):
@@ -300,6 +313,41 @@ class SepDartReader:
             cur += n
         return b"".join(out)
 
+    def translate_runs(self, sid, iova, size):
+        """Traduction de [iova, iova+size) en plages PA contiguës [(pa, len), ...] (pages consécutives
+        dont les PA se suivent fusionnées). Chaque plage vérifiée dans la RAM. Lecture seule."""
+        runs = []
+        cur, end = iova, iova + size
+        while cur < end:
+            page = cur & ~(DART_PAGE - 1)
+            n = min(end, page + DART_PAGE) - cur
+            pa = self.translate_page(sid, page)
+            if pa is None:
+                raise ShmemError(f"page IOVA 0x{page:x} non mappée (sid {sid})")
+            pa += cur - page
+            if runs and runs[-1][0] + runs[-1][1] == pa:
+                runs[-1] = (runs[-1][0], runs[-1][1] + n)
+            else:
+                runs.append((pa, n))
+            cur += n
+        for pa, n in runs:
+            self._check(pa, n, "data")
+        return runs
+
+    def read_runs(self, runs, size):
+        """Lit les `size` premiers octets décrits par `runs` : un readmem par plage contiguë."""
+        out = []
+        left = size
+        for pa, n in runs:
+            if left <= 0:
+                break
+            k = min(n, left)
+            out.append(self.iface.readmem(pa, k))
+            left -= k
+        if left > 0:
+            raise ShmemError(f"plages traduites trop courtes (manque 0x{left:x} octets)")
+        return b"".join(out), len(out)
+
 
 def _decode_shmem_table(buf):
     """Décodage best-effort de la table <4sII + 4 octets> ; renvoie (entrées, fin, raison)."""
@@ -368,11 +416,14 @@ class SEPMailboxObserver(ADTDevTracer):
         self.shmem = dict(out_path=out_path, full_max=full_max, when=when, sync_max=sync_max,
                           done=False, pending=None, n_tx=0)
 
-    def enable_ool(self, eps, out_dir, nbytes=0x4000, max_bytes=64 << 20):
+    def enable_ool(self, eps, out_dir, nbytes=0x400, max_bytes=64 << 20, full_types=frozenset(),
+                   split_dir=True, revalidate_n=0):
         # Lecture à chaque message => les deux boîtes en SYNC pendant toute la session.
         self.mode = TraceMode.SYNC
         self.ool = dict(eps=eps, out_dir=out_dir, nbytes=nbytes, max_bytes=max_bytes, written=0,
-                        capped=False, bufs={}, prev={}, dart=None, warned=set())
+                        capped=False, bufs={}, prev={}, dart=None, warned=set(),
+                        full_types=full_types, split_dir=split_dir, revalidate_n=revalidate_n,
+                        stats={})   # stats[dir] = [n, total_ms, max_ms, octets, n_xlat]
 
     def start(self):
         base, size = self.dev.get_reg(0)
@@ -444,7 +495,7 @@ class SEPMailboxObserver(ADTDevTracer):
                 if tx and ep == CNTL_EP and typ in OOL_CNTL_TYPES:
                     self._ool_learn(param, typ, data, ts)
                 if ep in self.ool["eps"]:
-                    self._ool_dump(ep, d, ts)
+                    self._ool_dump(ep, d, ts, typ)
             except Exception as e:   # jamais d'exception vers shellwrap
                 self._write(f"# ool_error {ts:.6f} seq={self.n_seen} interne {type(e).__name__}: {e}\n")
 
@@ -461,19 +512,24 @@ class SEPMailboxObserver(ADTDevTracer):
         if target_ep not in st["eps"]:
             return
         buf, field = OOL_CNTL_TYPES[typ]
-        b = st["bufs"].setdefault((target_ep, buf), {"iova": None, "size": None, "sid": None})
+        b = st["bufs"].setdefault((target_ep, buf), {"iova": None, "size": None, "sid": None,
+                                                     "runs": None, "n_since_xlat": 0})
         val = data << 12 if field == "iova" else data
         if b[field] != val:
             b[field] = val
-            b["sid"] = None        # nouvelle IOVA ou taille : stream à retrouver
-            st["prev"].pop((target_ep, buf), None)
+            b["sid"] = None        # nouvelle IOVA ou taille : stream et traduction à refaire
+            b["runs"] = None
+            for k in [k for k in st["prev"] if k[:2] == (target_ep, buf)]:
+                del st["prev"][k]
             self._write(f"# ool learn {ts:.6f} seq={self.n_seen} EP=0x{target_ep:02x} buf={buf} "
                         f"{field}=0x{val:x} (CNTL TYPE=0x{typ:02x} DATA=0x{data:08x})\n")
 
-    def _ool_dump(self, ep, d, ts):
+    def _ool_dump(self, ep, d, ts, typ):
         st = self.ool
         seq = self.n_seen
-        known = [(name, st["bufs"].get((ep, name))) for name in ("A", "B")]
+        # split_dir : '>' -> A seulement, '<' -> B seulement (justification chiffrée : docs/journal.md).
+        names = (("A",) if d == ">" else ("B",)) if st["split_dir"] else ("A", "B")
+        known = [(name, st["bufs"].get((ep, name))) for name in names]
         known = [(n, b) for n, b in known if b and b["iova"] is not None and b["size"]]
         if not known:
             if ep not in st["warned"]:
@@ -486,22 +542,42 @@ class SEPMailboxObserver(ADTDevTracer):
             self._write(f"# ool_error {ts:.6f} seq={seq} EP=0x{ep:02x} contexte asynchrone, "
                         f"lecture impossible\n")
             return
+        full = typ in st["full_types"]
         for name, b in known:
             t0 = time.monotonic()
+            xlat = "hit"
             try:
                 if st["dart"] is None:
                     st["dart"] = SepDartReader(self.hv)
                 dart = st["dart"]
                 if b["sid"] is None:
                     b["sid"], _ = dart.find_sid(b["iova"])
-                n = min(st["nbytes"], b["size"])
-                blob = dart.read(b["sid"], b["iova"], n)
+                    b["runs"] = None
+                reval = (st["revalidate_n"] > 0 and b["runs"] is not None
+                         and b["n_since_xlat"] >= st["revalidate_n"])
+                if b["runs"] is None or reval:
+                    runs = dart.translate_runs(b["sid"], b["iova"], b["size"])
+                    if reval and runs != b["runs"]:
+                        self._write(f"# ool remap {ts:.6f} seq={seq} EP=0x{ep:02x} buf={name} "
+                                    f"old={self._fmt_runs(b['runs'])} new={self._fmt_runs(runs)}\n")
+                    xlat = "reval" if reval else "miss"
+                    b["runs"], b["n_since_xlat"] = runs, 0
+                b["n_since_xlat"] += 1
+                n = b["size"] if full else min(st["nbytes"], b["size"])
+                blob, n_rm = dart.read_runs(b["runs"], n)
             except Exception as e:
+                b["runs"] = None   # cache invalidé : traduction refaite à la prochaine lecture
                 self._write(f"# ool_error {ts:.6f} seq={seq} EP=0x{ep:02x} dir={d} buf={name} "
-                            f"iova=0x{b['iova']:x} {type(e).__name__}: {e}\n")
+                            f"iova=0x{b['iova']:x} {type(e).__name__}: {e} (cache traduction invalidé)\n")
                 continue
             elapsed = (time.monotonic() - t0) * 1000
-            key = (ep, name)
+            s = st["stats"].setdefault(d, [0, 0.0, 0.0, 0, 0])
+            s[0] += 1
+            s[1] += elapsed
+            s[2] = max(s[2], elapsed)
+            s[3] += len(blob)
+            s[4] += xlat != "hit"
+            key = (ep, name, len(blob))   # lecture courte et complète comparées séparément
             prev = st["prev"].get(key)
             if prev is None:
                 changed = "init"
@@ -511,10 +587,32 @@ class SEPMailboxObserver(ADTDevTracer):
             sha = hashlib.sha256(blob).hexdigest()[:8]
             nz = len(blob) - blob.count(0)
             line = (f"# ool {ts:.6f} seq={seq} EP=0x{ep:02x} dir={d} buf={name} sha={sha} nz={nz} "
-                    f"changed={changed} len=0x{len(blob):x} elapsed_ms={elapsed:.2f}")
+                    f"changed={changed} len=0x{len(blob):x} elapsed_ms={elapsed:.2f} "
+                    f"full={int(full)} xlat={xlat} rm={n_rm}")
+            if len(blob) < b["size"] and any(blob[-16:]):
+                line += " trunc=1"   # octets non nuls dans les 16 derniers lus : contenu sans doute coupé
             if changed != "none":
                 line += self._ool_save(seq, ep, name, blob)
             self._write(line + "\n")
+
+    @staticmethod
+    def _fmt_runs(runs):
+        return ",".join(f"0x{pa:x}+0x{n:x}" for pa, n in runs or [])
+
+    def _ool_stats_line(self):
+        st = self.ool
+        parts = []
+        tot = [0, 0.0, 0.0, 0, 0]
+        for d in (">", "<"):
+            s = st["stats"].get(d)
+            if not s:
+                continue
+            parts.append(f"dir={d}:n={s[0]},mean_ms={s[1] / s[0]:.2f},max_ms={s[2]:.2f},"
+                         f"bytes={s[3]},xlat={s[4]}")
+            tot = [tot[0] + s[0], tot[1] + s[1], max(tot[2], s[2]), tot[3] + s[3], tot[4] + s[4]]
+        mean = tot[1] / tot[0] if tot[0] else 0.0
+        return (f"# ool_stats {time.time():.6f} n={tot[0]} mean_ms={mean:.2f} max_ms={tot[2]:.2f} "
+                f"total_ms={tot[1]:.1f} bytes={tot[3]} xlat={tot[4]} {' '.join(parts)}\n")
 
     def _ool_save(self, seq, ep, name, blob):
         st = self.ool
@@ -632,6 +730,11 @@ class SEPMailboxObserver(ADTDevTracer):
 
     def close(self):
         try:
+            if self.ool is not None:
+                self.out.write(self._ool_stats_line())
+        except Exception:
+            pass
+        try:
             self.out.write(f"# end {time.time():.6f} seen={self.n_seen} logged={self.n_logged}\n")
             self.out.flush()
             self.out.close()
@@ -671,16 +774,21 @@ def _setup():
     ool_eps = _parse_eps(os.environ.get("SEP_OOL_EPS", ""))
     ool_txt = "off"
     if ool_eps:
-        nbytes = int(os.environ.get("SEP_OOL_BYTES", "0x4000") or "0x4000", 0)
+        nbytes = int(os.environ.get("SEP_OOL_BYTES", "0x400") or "0x400", 0)
         if nbytes <= 0:
             raise ValueError("SEP_OOL_BYTES doit être > 0")
         max_mb = int(os.environ.get("SEP_OOL_MAX_MB", "64") or "64", 0)
+        full_types = _parse_eps(os.environ.get("SEP_OOL_FULL_TYPES", OOL_FULL_TYPES_DEFAULT)) or frozenset()
+        split_dir = os.environ.get("SEP_OOL_SPLIT_DIR", "1").strip() not in ("", "0")
+        reval = int(os.environ.get("SEP_OOL_REVALIDATE_N", "64") or "0", 0)
         tracer.enable_ool(ool_eps, os.path.abspath(out_path) + ".ool", nbytes=nbytes,
-                          max_bytes=max(0, max_mb) << 20)
+                          max_bytes=max(0, max_mb) << 20, full_types=full_types,
+                          split_dir=split_dir, revalidate_n=max(0, reval))
         if mode_txt != "SYNC":
             mode_txt = "SYNC(forcé par SEP_OOL_EPS)"
         ool_txt = (f"on(eps={','.join(f'0x{e:02x}' for e in sorted(ool_eps))},bytes=0x{nbytes:x},"
-                   f"max_mb={max_mb})")
+                   f"full_types={','.join(f'0x{t:02x}' for t in sorted(full_types)) or '-'},"
+                   f"split_dir={int(split_dir)},revalidate_n={max(0, reval)},max_mb={max_mb})")
     base = tracer.start()
 
     eps_txt = "all" if eps is None else ",".join(f"0x{e:02x}" for e in sorted(eps))

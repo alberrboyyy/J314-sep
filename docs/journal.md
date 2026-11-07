@@ -14,6 +14,48 @@ Format :
 
 ---
 
+## 2026-11-07 — tracer — Lecture OOL allégée (SEP_OOL_BYTES=0x400, types complets, une direction, cache IOVA→PA)
+- Trace : — (aucune action hardware). Chiffres tirés de traces/20261107-043309_c5-ool-boot et
+  traces/20261107-043828_c6-doigt-ool (sep.log lignes `# ool`, fichiers sep.log.ool/*.bin), et de C3
+  (traces/20261107-035930_c3-touchid) pour la référence.
+- Constat (mesuré par la session principale) : latence requête→réponse SBIO 2.35 ms (C3, ASYNC, sans OOL) →
+  7.36 ms (C6, SYNC + SEP_OOL_EPS=0x08). Dans C6 le seul essai bon doigt a échoué (0x22 = abandon puis reprise,
+  0x09 sans notif 01/08, puis 01/45), puis macOS s'est mis en veille (cause non établie). Lien avec la lenteur :
+  possible, non établi.
+- Vu (C5/C6, ce que j'ai recompté) : `elapsed_ms` = 1.83-1.94 ms par buffer (max 2.44), identique pour A et B,
+  = 4 commandes de traduction + 1 readmem 0x4000 ; 2 buffers par message → ~3.7 ms, dont ~3.7 ms côté `>`
+  avant que le message n'atteigne le SEP. Taille de contenu (dumps C6, mesure session principale) : 136 vides,
+  234 < 0x400, 11 < 0x1000, 23 jusqu'à 0x4000 ; gros (>0x1000) : `> 0xfc|0xfd/0x65 A` (6+6), `> 0xfd/0x5b A` (3),
+  `< 0xfc|0xfd/0x5f B` (2+2), `> 0xfd/0x6d A` (2), `> 0xfc/0x5b A`, `> 0xfc/0x6d A`.
+  Recompte de la fin du contenu non nul dans les .bin : entre 0x400 et 0x1000 → `< B` TYPE 0x09 (0xcbe, 4/5),
+  0x45 (0xcbe, 1/3), 0x21 (0xcaa, 5/5), 0x54 (0xc0f) — ces réponses seront TRONQUÉES avec le défaut 0x400.
+- Vu (choix d'une seule direction) : `> B` = tout à zéro (sha 4fe7b59a = 0x4000 zéros) dans 71/73 (C5) et
+  141/143 (C6) cas ; les 2+2 autres ont `changed=none` (identiques à la lecture `<` B précédente). `< A` :
+  `changed=none` dans 78/78 (C5) et 156/162 (C6) ; les 6 autres sont une remise à zéro complète (sha 4fe7b59a).
+  Donc lire A seulement sur `>` et B seulement sur `<` n'aurait perdu aucun contenu non nul nouveau dans C5/C6 ;
+  seule perte : l'instant où A est remis à zéro (6 cas C6) et où B l'est (visible au `<` suivant).
+- Fait (`hv/trace_sep_filtered.py`, rien dans m1n1, non commité) : SEP_OOL_BYTES défaut 0x400 ;
+  SEP_OOL_FULL_TYPES (défaut 0x65,0x5b,0x5f,0x6d) = lecture de la taille apprise entière ; SEP_OOL_SPLIT_DIR
+  (défaut 1 : `>`→A, `<`→B ; 0 = ancien comportement) ; traduction IOVA→PA en plages contiguës mise en cache par
+  buffer (un readmem par plage contiguë ; invalidée sur erreur de lecture et sur CNTL 2/3/4/5 qui change
+  IOVA/taille ; revalidée toutes les SEP_OOL_REVALIDATE_N=64 lectures → `# ool remap` si changée) ; ligne
+  `# ool` + `full= xlat=hit|miss|reval rm= [trunc=1]` ; `changed` compare des lectures de même longueur ;
+  `# ool_stats` (n, mean/max/total ms, octets, nb traductions, par direction) avant `# end`.
+- Vérifié hors ligne : py_compile ; stubs m1n1 + faux DART t6000/RAM (scratchpad) : 1 readmem par lecture en
+  cache, fusion de 2 pages contiguës en 1 plage (3 pages → 2 readmem), remap détecté, erreur → cache invalidé,
+  `# ool_stats` cohérent.
+- Estimation (NON mesurée) : en supposant ~0.12 ms par commande proxy et ~1.3 ms pour readmem 0x4000 (déduit de
+  1.86 ms = 4 petites commandes + 1 gros readmem, répartition non mesurée), côté `>` : ~0.2 ms (TYPE courant)
+  ou ~1.4 ms (TYPE complet) au lieu de ~3.7 ms → latence SBIO attendue ~3.9 ms (types complets ~5 ms), pas
+  2.35 ms : le reste (~1.3 ms) vient des exceptions SYNC elles-mêmes, que ce changement ne touche pas.
+- Risques : avec le cache, un remappage de l'IOVA sans message CNTL ferait lire l'ancienne PA (toujours vérifiée
+  dans la RAM, lecture seule) jusqu'à la revalidation ; les réponses `< B` 0x09/0x21/0x45/0x54 sont coupées à
+  0x400 (`trunc=1`) sauf à les ajouter à SEP_OOL_FULL_TYPES (coût après dépilement de la réponse, pas sur la
+  latence requête→réponse).
+- Interprété (hypothèse, non vérifiée) : TYPE 0x65 (`>` A, 12 fois dans C6, contenu jusqu'à 0x4000, absent de
+  C5 sans doigt) = relais de données capteur AP→SEP. Repose sur une corrélation temporelle avec l'essai doigt.
+- Incidents : aucun (aucune action hardware).
+
 ## 2026-11-07 — tracer — Option SEP_OOL_EPS (lecture seule des buffers OOL par endpoint, validée par Albert)
 - Trace : — (aucune action hardware). Conçu d'après traces/20261107-042414_c4-shmem/sep.log L136-L144
   (`> EP=0x00 TAG=0x07 TYPE=0x04/0x02/0x05/0x03 PARAM=0x08 DATA=0x4000/0x54/0x4000/0x5c`) et L14-L23 (dart-sep
