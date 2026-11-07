@@ -1,0 +1,2 @@
+Dumps SYNTHÉTIQUES inventés pour analysis/tests/test_ool_view.py. Ce ne sont PAS des captures :
+aucun octet ne vient du Mac. sep.log.ool/notes.txt est un fichier hors format volontaire.

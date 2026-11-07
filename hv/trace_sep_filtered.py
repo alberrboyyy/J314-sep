@@ -47,6 +47,12 @@ Variables d'environnement
   SEP_SHMEM_WHEN   trigger (défaut) ou next : moment de la lecture, voir plus bas.
   SEP_SHMEM_SYNC_MAX  nombre max de messages AP->SEP tracés en SYNC en attendant le déclencheur
                    (défaut 64) ; au-delà : abandon, `# shmem_error`, retour au mode normal.
+  SEP_OOL_EPS      endpoints dont on lit les deux buffers OOL à chaque message, ex. "0x08".
+                   Défaut vide = désactivé (comportement strictement identique à avant).
+                   ACTIF => INBOX et OUTBOX tracés en SYNC pendant toute la session.
+  SEP_OOL_BYTES    octets lus au début de chaque buffer (défaut 0x4000, borné par la taille apprise).
+  SEP_OOL_MAX_MB   plafond global des fichiers .bin écrits (défaut 64) ; au-delà : `# ool_cap`,
+                   plus aucun .bin, les lignes `# ool` continuent.
 
 Lecture de la mémoire partagée (SEP_SHMEM_DUMP=1) -- lecture seule, une fois par boot
 -------------------------------------------------------------------------------------
@@ -80,6 +86,33 @@ par 8 octets, chaque adresse physique vérifiée dans [hv.ram_base, hv.ram_base+
 lecture. Aucune écriture : ni SEP, ni DART (pas d'invalidation TLB, pas d'ERROR clear), ni mémoire guest.
 Seuls compatibles gérés : dart,t8020 et dart,t6000 (format PTE de m1n1 hw/dart8020.py).
 
+Lecture des buffers OOL par endpoint (SEP_OOL_EPS) -- lecture seule, à chaque message
+-------------------------------------------------------------------------------------
+Apprentissage (aucune valeur codée en dur) : messages `> EP=0x00` (CNTL) de TYPE 2/3/4/5, l'endpoint
+concerné étant PARAM. Hypothèse analyste (C4, non vérifiée) : TYPE 4 = taille et TYPE 2 = IOVA>>12 du
+buffer A ; TYPE 5 = taille et TYPE 3 = IOVA>>12 du buffer B. Ligne `# ool learn` à chaque valeur apprise.
+Pour chaque message (> et <) d'un EP de SEP_OOL_EPS dont un buffer est connu (IOVA et taille), lecture
+de min(SEP_OOL_BYTES, taille) octets de chaque buffer connu par SepDartReader (même traduction lecture
+seule que SEP_SHMEM_DUMP ; stream trouvé par find_sid au premier accès, puis mémorisé par buffer).
+Moment de la lecture : '>' dans le hook INBOX1 AVANT que m1n1 ne rejoue l'écriture (le SEP n'a pas
+encore reçu le message) ; '<' dans le hook OUTBOX1 APRÈS la lecture matérielle (le message est dépilé,
+le SEP a pu continuer à écrire). Sortie, une ligne par buffer, juste après la ligne du message (même ts) :
+  # ool <ts> seq=<n> EP=0x.. dir=> buf=A sha=<8 hex sha256> nz=<octets non nuls> changed=<plages>
+      len=0x.. elapsed_ms=..
+  seq = numéro du message (compteur `seen`, tous EP confondus, 1 = premier). changed = plages
+  `off+len` (hex) différentes du dump précédent du même buffer, `init` au premier, `none` sinon ;
+  au plus 16 plages puis `,...(+N)`. Le contenu brut n'est écrit que s'il change (ou au premier dump) :
+  `<SEP_TRACE_OUT>.ool/<seq 6 chiffres>_<ep 2 hex>_<buf>.bin`. Toute erreur -> `# ool_error ...`.
+  La lecture a lieu même si SEP_EPS exclut l'EP (la ligne `# ool` existe alors sans ligne message).
+Coût : en SYNC chaque accès INBOX/OUTBOX = une exception guest remontée au PC (aller-retour USB),
+plus, pour les EP de SEP_OOL_EPS, ~4 commandes proxy de traduction + 1 readmem par page de 16 KiB et
+par buffer. Ordre de grandeur (extrapolé de C4 : 2.4 ms pour 0x4000 octets + traduction) : ~5 ms par
+message pour 2 buffers, soit ~0.1-0.2 s ajoutés sur une rafale SBIO de 25 messages. Non mesuré :
+voir `elapsed_ms`. Réduire SEP_OOL_BYTES diminue le coût du readmem, pas celui de la traduction.
+Risques : le SEP lit/écrit ces buffers de son côté ; pendant la lecture les CPU du guest sont arrêtés
+mais pas le SEP, donc un dump peut être incohérent (partiellement mis à jour). Le ralentissement peut
+déclencher des timeouts côté macOS ou SEP (non observé, non testé).
+
 Console : un seul print au démarrage (+ un en cas d'erreur d'écriture). Aucun print par message.
 
 NON TESTÉ SUR LE MATÉRIEL (écrit sans accès au Mac, vérifié uniquement par py_compile) :
@@ -92,9 +125,12 @@ NON TESTÉ SUR LE MATÉRIEL (écrit sans accès au Mac, vérifié uniquement par
 - TOUT le chemin SEP_SHMEM_DUMP : mélange SYNC (INBOX) / ASYNC (OUTBOX), bascule de mode en cours
   d'exécution, compatible et stream DART de dart-sep sous macOS 13.5, sémantique DATA<<12, format de
   la table côté macOS, durée de la lecture et réaction du SEP à cette pause.
+- TOUT le chemin SEP_OOL_EPS (non lancé sur le Mac) : sémantique CNTL TYPE 2/3/4/5, SYNC permanent des
+  deux boîtes, cohérence des dumps, durée réelle, tolérance de macOS/SEP au ralentissement.
 """
 
 import atexit
+import hashlib
 import os
 import re
 import struct
@@ -131,6 +167,54 @@ TTBR_VALID = 1 << 31
 TTBR_ADDR_MASK = (1 << 31) - 1
 # Champ OFFSET des PTE (m1n1 PTE_T8020 / PTE_T6000), adresse = OFFSET << 14.
 PTE_OFFSET = {"dart,t8020": (14, 39), "dart,t6000": (10, 39)}
+
+# --- buffers OOL (SEP_OOL_EPS) ----------------------------------------------------------------
+CNTL_EP = 0x00
+# TYPE CNTL -> (buffer, champ). Hypothèse analyste C4, non vérifiée.
+OOL_CNTL_TYPES = {0x02: ("A", "iova"), 0x04: ("A", "size"), 0x03: ("B", "iova"), 0x05: ("B", "size")}
+OOL_MAX_RANGES = 16
+
+
+def diff_ranges(old, new, chunk=64):
+    """Plages (off, len) où old et new diffèrent ; une longueur différente compte comme modifiée.
+    Comparaison par blocs de `chunk` octets, détail octet par octet seulement dans les blocs différents."""
+    n = min(len(old), len(new))
+    ranges = []
+    start = None
+    if old[:n] != new[:n]:
+        for c in range(0, n, chunk):
+            e = min(n, c + chunk)
+            if old[c:e] == new[c:e]:
+                if start is not None:
+                    ranges.append((start, c - start))
+                    start = None
+                continue
+            for i in range(c, e):
+                if old[i] != new[i]:
+                    if start is None:
+                        start = i
+                elif start is not None:
+                    ranges.append((start, i - start))
+                    start = None
+    if start is not None:
+        ranges.append((start, n - start))
+    if len(new) != len(old):
+        hi = max(len(old), len(new))
+        if ranges and ranges[-1][0] + ranges[-1][1] == n:
+            s0 = ranges.pop()[0]
+            ranges.append((s0, hi - s0))
+        else:
+            ranges.append((n, hi - n))
+    return ranges
+
+
+def fmt_ranges(ranges, limit=OOL_MAX_RANGES):
+    if not ranges:
+        return "none"
+    txt = ",".join(f"0x{o:x}+0x{l:x}" for o, l in ranges[:limit])
+    if len(ranges) > limit:
+        txt += f",...(+{len(ranges) - limit})"
+    return txt
 
 
 class ShmemError(Exception):
@@ -277,10 +361,18 @@ class SEPMailboxObserver(ADTDevTracer):
         self.epnames = {}
         # SEP_SHMEM_DUMP (voir docstring)
         self.shmem = None          # None = désactivé ; sinon dict de config/état
+        # SEP_OOL_EPS (voir docstring)
+        self.ool = None            # None = désactivé ; sinon dict de config/état
 
     def enable_shmem_dump(self, out_path, full_max=0, when="trigger", sync_max=64):
         self.shmem = dict(out_path=out_path, full_max=full_max, when=when, sync_max=sync_max,
                           done=False, pending=None, n_tx=0)
+
+    def enable_ool(self, eps, out_dir, nbytes=0x4000, max_bytes=64 << 20):
+        # Lecture à chaque message => les deux boîtes en SYNC pendant toute la session.
+        self.mode = TraceMode.SYNC
+        self.ool = dict(eps=eps, out_dir=out_dir, nbytes=nbytes, max_bytes=max_bytes, written=0,
+                        capped=False, bufs={}, prev={}, dart=None, warned=set())
 
     def start(self):
         base, size = self.dev.get_reg(0)
@@ -347,11 +439,102 @@ class SEPMailboxObserver(ADTDevTracer):
         if lines:
             self._write("".join(lines))
 
+        if self.ool is not None:
+            try:
+                if tx and ep == CNTL_EP and typ in OOL_CNTL_TYPES:
+                    self._ool_learn(param, typ, data, ts)
+                if ep in self.ool["eps"]:
+                    self._ool_dump(ep, d, ts)
+            except Exception as e:   # jamais d'exception vers shellwrap
+                self._write(f"# ool_error {ts:.6f} seq={self.n_seen} interne {type(e).__name__}: {e}\n")
+
         if tx and self.shmem is not None and not self.shmem["done"]:
             try:
                 self._shmem_step(ep, typ, data)
             except Exception as e:   # ne jamais faire planter le tracer (shellwrap -> shell HV)
                 self._shmem_finish(f"# shmem_error {time.time():.6f} interne {type(e).__name__}: {e}\n")
+
+    # --- SEP_OOL_EPS ---------------------------------------------------------------------
+
+    def _ool_learn(self, target_ep, typ, data, ts):
+        st = self.ool
+        if target_ep not in st["eps"]:
+            return
+        buf, field = OOL_CNTL_TYPES[typ]
+        b = st["bufs"].setdefault((target_ep, buf), {"iova": None, "size": None, "sid": None})
+        val = data << 12 if field == "iova" else data
+        if b[field] != val:
+            b[field] = val
+            b["sid"] = None        # nouvelle IOVA ou taille : stream à retrouver
+            st["prev"].pop((target_ep, buf), None)
+            self._write(f"# ool learn {ts:.6f} seq={self.n_seen} EP=0x{target_ep:02x} buf={buf} "
+                        f"{field}=0x{val:x} (CNTL TYPE=0x{typ:02x} DATA=0x{data:08x})\n")
+
+    def _ool_dump(self, ep, d, ts):
+        st = self.ool
+        seq = self.n_seen
+        known = [(name, st["bufs"].get((ep, name))) for name in ("A", "B")]
+        known = [(n, b) for n, b in known if b and b["iova"] is not None and b["size"]]
+        if not known:
+            if ep not in st["warned"]:
+                st["warned"].add(ep)
+                self._write(f"# ool_error {ts:.6f} seq={seq} EP=0x{ep:02x} buffers inconnus "
+                            f"(pas encore de CNTL TYPE 2/3/4/5 PARAM=0x{ep:02x}) ; messages suivants de cet EP "
+                            f"ignorés sans autre ligne jusqu'à apprentissage\n")
+            return
+        if self.hv.ctx is None:
+            self._write(f"# ool_error {ts:.6f} seq={seq} EP=0x{ep:02x} contexte asynchrone, "
+                        f"lecture impossible\n")
+            return
+        for name, b in known:
+            t0 = time.monotonic()
+            try:
+                if st["dart"] is None:
+                    st["dart"] = SepDartReader(self.hv)
+                dart = st["dart"]
+                if b["sid"] is None:
+                    b["sid"], _ = dart.find_sid(b["iova"])
+                n = min(st["nbytes"], b["size"])
+                blob = dart.read(b["sid"], b["iova"], n)
+            except Exception as e:
+                self._write(f"# ool_error {ts:.6f} seq={seq} EP=0x{ep:02x} dir={d} buf={name} "
+                            f"iova=0x{b['iova']:x} {type(e).__name__}: {e}\n")
+                continue
+            elapsed = (time.monotonic() - t0) * 1000
+            key = (ep, name)
+            prev = st["prev"].get(key)
+            if prev is None:
+                changed = "init"
+            else:
+                changed = fmt_ranges(diff_ranges(prev, blob))
+            st["prev"][key] = blob
+            sha = hashlib.sha256(blob).hexdigest()[:8]
+            nz = len(blob) - blob.count(0)
+            line = (f"# ool {ts:.6f} seq={seq} EP=0x{ep:02x} dir={d} buf={name} sha={sha} nz={nz} "
+                    f"changed={changed} len=0x{len(blob):x} elapsed_ms={elapsed:.2f}")
+            if changed != "none":
+                line += self._ool_save(seq, ep, name, blob)
+            self._write(line + "\n")
+
+    def _ool_save(self, seq, ep, name, blob):
+        st = self.ool
+        if st["capped"]:
+            return " file=-"
+        if st["written"] + len(blob) > st["max_bytes"]:
+            st["capped"] = True
+            self._write(f"# ool_cap {time.time():.6f} seq={seq} plafond SEP_OOL_MAX_MB atteint "
+                        f"({st['written']} octets écrits) : plus aucun .bin\n")
+            return " file=-"
+        try:
+            os.makedirs(st["out_dir"], exist_ok=True)
+            fn = f"{seq:06d}_{ep:02x}_{name}.bin"
+            with open(os.path.join(st["out_dir"], fn), "wb") as f:
+                f.write(blob)
+            st["written"] += len(blob)
+            return f" file={fn}"
+        except Exception as e:
+            self._write(f"# ool_error {time.time():.6f} seq={seq} écriture .bin {type(e).__name__}: {e}\n")
+            return " file=-"
 
     # --- SEP_SHMEM_DUMP ------------------------------------------------------------------
 
@@ -485,18 +668,31 @@ def _setup():
         tracer.enable_shmem_dump(os.path.abspath(out_path), full_max=max(0, full_max),
                                  when=when, sync_max=max(1, sync_max))
         shmem_txt = f"on(full_max=0x{max(0, full_max):x},when={when},sync_max={sync_max})"
+    ool_eps = _parse_eps(os.environ.get("SEP_OOL_EPS", ""))
+    ool_txt = "off"
+    if ool_eps:
+        nbytes = int(os.environ.get("SEP_OOL_BYTES", "0x4000") or "0x4000", 0)
+        if nbytes <= 0:
+            raise ValueError("SEP_OOL_BYTES doit être > 0")
+        max_mb = int(os.environ.get("SEP_OOL_MAX_MB", "64") or "64", 0)
+        tracer.enable_ool(ool_eps, os.path.abspath(out_path) + ".ool", nbytes=nbytes,
+                          max_bytes=max(0, max_mb) << 20)
+        if mode_txt != "SYNC":
+            mode_txt = "SYNC(forcé par SEP_OOL_EPS)"
+        ool_txt = (f"on(eps={','.join(f'0x{e:02x}' for e in sorted(ool_eps))},bytes=0x{nbytes:x},"
+                   f"max_mb={max_mb})")
     base = tracer.start()
 
     eps_txt = "all" if eps is None else ",".join(f"0x{e:02x}" for e in sorted(eps))
     out.write(f"# trace_sep_filtered start {time.time():.6f} node={SEP_NODE} base=0x{base:x} "
-              f"mode={mode_txt} eps={eps_txt} shmem={shmem_txt} ts=host_time_time\n")
+              f"mode={mode_txt} eps={eps_txt} shmem={shmem_txt} ool={ool_txt} ts=host_time_time\n")
     out.write("# format: <ts> <dir> EP=0x.. TAG=0x.. TYPE=0x.. PARAM=0x.. DATA=0x.. [ool=...]"
               " ; '>' AP->SEP (INBOX), '<' SEP->AP (OUTBOX)\n")
     out.flush()
     atexit.register(tracer.close)
 
     print(f"[trace_sep_filtered] mailbox {SEP_NODE}@0x{base:x} mode={mode_txt} eps={eps_txt} shmem={shmem_txt} "
-          f"-> {os.path.abspath(out_path)}")
+          f"ool={ool_txt} -> {os.path.abspath(out_path)}")
     return tracer
 
 

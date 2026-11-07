@@ -52,9 +52,19 @@ Rapproche les lignes noyau de `hv_uart.log` (sans horodatage) des messages de `s
 app »), CRC (« with CRC »), handles SKS (« handle -N » ↔ `< EP=0x12 TAG=0x00 DATA`), et liste les epochs écrits par macOS.
 Numéros de ligne uart = `grep -n` (découpage sur `\n`).
 
+## ool_view.py — dumps de buffers OOL (SEP_OOL_EPS du tracer)
+
+    python3 analysis/ool_view.py traces/<capture>/            # trouve l'unique sep.log.ool/
+    python3 analysis/ool_view.py traces/<capture>/sep.log.ool/ --ep 0x08 --buf A [--max-rows 32]
+
+Par (ep, buf) : liste des `<seq>_<ep>_<buf>.bin` (taille, sha256[:8], octets non nuls), puis plages modifiées
+et hexdump (`-` ancien / `+` nouveau / `^^`) entre deux dumps consécutifs. Le tracer n'écrit un .bin que si le
+contenu change : deux dumps consécutifs ne sont pas forcément deux messages consécutifs (voir `# ool` dans sep.log).
+Lecture seule, sortie stdout.
+
 ## Tests
 
     python3 -m unittest discover -s analysis/tests -v
 
-`analysis/tests/fake_a/` et `fake_b/` sont des traces **inventées** (pas des captures) ;
+`analysis/tests/fake_a/`, `fake_b/` et `fake_ool/` (dumps .bin) sont des données **inventées** (pas des captures) ;
 ne jamais les citer comme source.

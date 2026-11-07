@@ -14,6 +14,35 @@ Format :
 
 ---
 
+## 2026-11-07 — tracer — Option SEP_OOL_EPS (lecture seule des buffers OOL par endpoint, validée par Albert)
+- Trace : — (aucune action hardware). Conçu d'après traces/20261107-042414_c4-shmem/sep.log L136-L144
+  (`> EP=0x00 TAG=0x07 TYPE=0x04/0x02/0x05/0x03 PARAM=0x08 DATA=0x4000/0x54/0x4000/0x5c`) et L14-L23 (dart-sep
+  `dart,t6000` sid 0, 0x4000 octets lus en 2.4 ms).
+- Fait : `hv/trace_sep_filtered.py` (rien dans m1n1). Désactivé par défaut (SEP_OOL_EPS vide). Si actif :
+  - apprentissage depuis `> EP=0x00` TYPE 2/3/4/5, EP cible = PARAM : A = (TYPE 2 → IOVA=DATA<<12, TYPE 4 → taille),
+    B = (TYPE 3, TYPE 5) ; ligne `# ool learn` par valeur ; rien de codé en dur ;
+  - INBOX et OUTBOX en SYNC toute la session (header `mode=SYNC(forcé par SEP_OOL_EPS)`) ; à chaque message
+    (> et <) d'un EP de la liste, lecture de min(SEP_OOL_BYTES=0x4000, taille) octets de chaque buffer connu via
+    SepDartReader (lecture seule, PA vérifiées dans la RAM, stream mémorisé par buffer) ;
+  - ligne `# ool <ts> seq= EP= dir= buf= sha= nz= changed= len= elapsed_ms= [file=]` juste après la ligne du
+    message ; `.bin` seulement si changement (`<SEP_TRACE_OUT>.ool/<seq>_<ep>_<buf>.bin`), plafond SEP_OOL_MAX_MB
+    (64) → `# ool_cap` ; toute exception → `# ool_error`, le tracing continue.
+  - `analysis/ool_view.py` + `analysis/tests/test_ool_view.py` (fixtures synthétiques `analysis/tests/fake_ool/`).
+- Vérifié hors ligne : py_compile ; test avec stubs m1n1/hv et fausse mémoire + faux DART t6000 (scratchpad, non
+  versionné) : apprentissage, init/changed/none, `.bin` seulement si changé, erreur contexte async, erreur TCR
+  bypass sans arrêt, plafond, aucune écriture appelée. diff_ranges du tracer = celui d'ool_view (3000 cas
+  aléatoires). Tests analysis : 19/19 OK.
+- Interprété (hypothèses) : l'association TYPE 2/4 = A et 3/5 = B, et « un buffer par direction », viennent de
+  l'analyste ; non vérifiées. seq = compteur `seen` de tous les messages (1 = premier), pas un numéro de ligne.
+- NON TESTÉ sur le Mac : SYNC permanent des deux boîtes (coût par accès MMIO = aller-retour USB) ; durée réelle
+  (estimation ~5 ms/message pour 2 × 0x4000, soit ~0.1-0.2 s par rafale SBIO de 25 messages) ; tolérance de
+  macOS/SEP à ce ralentissement (timeouts possibles) ; cohérence des dumps : le SEP lit/écrit ces buffers et
+  continue de tourner pendant la lecture (seuls les CPU du guest sont arrêtés), un dump peut être partiel.
+  Moment : '>' avant que le SEP ne reçoive le message, '<' après dépilement par l'AP.
+- Note : `boot_and_trace.sh` transmet l'environnement (SEP_OOL_EPS passe), mais meta.txt n'enregistre que
+  SEP_EPS ; la config OOL est dans l'en-tête de sep.log.
+- Incidents : aucun.
+
 ## 2026-11-07 04:35 — tracer — Option SEP_SHMEM_DUMP (lecture unique de l'en-tête shmem SEP, validée par Albert)
 - Trace : — (aucune action hardware ; déclencheur choisi d'après traces/20261107-033436_c1-boot et
   traces/20261107-035422_c3-touchid/sep.log L13 `> EP=0xfe TAG=0x01 TYPE=0x1c DATA=0x00000580`)
