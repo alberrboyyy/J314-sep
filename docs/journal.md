@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-08 — driver — Étape 5 (hors ligne) : « démon » d'init (57 commandes) et boucle de blobs 0x6c -> 0x6d
+- Trace : les 18 captures contenant des commandes sbio (init) ; C8, C9, C10b, C11, C12 pour les blobs. Lecture seule, rien n'est émis.
+- Fait : `driver/sepreplay/daemon.py` (INIT_SEQUENCE de 57 TYPE, `BlobStore`, `InitPlan`, requête 0x6c = uid u32 + 20 zéros) + `driver/tests/test_step5_daemon.py`.
+- Vu : la séquence produite par le démon = les 57 premières commandes `> fc` de 18/18 captures (C10 sans sbio exclue). C11 -> C12 : les 2 blobs 0x6d de C12 sont identiques (octet pour octet) aux derniers 0x6c de C11 (uid -1 0xf4 o, uid 501 0x9245 o) ; les 14 réponses 0x6c de C11 (7 paires) sont complètes, requêtes = `export_request(uid)` 14/14. C9 -> C11 via store rechargé : 2/2 identiques. C8 -> C9 : petit blob identique ; gros : longueur annoncée 0x9317 identique et 3 x 996 o lus identiques (le tracer n'a pas dumpé 0x6c en entier en C8) : PARTIEL.
+- Interprété : confirme la boucle export->import (déjà `vérifié (HO)`), rien de nouveau. Ne dit RIEN sur l'acceptation d'un 0x6d par le SEP (écriture, hors périmètre). 29/29 tests OK au total.
+- Incidents : aucun.
+
 ## 2026-11-08 — driver — Étape 4 (hors ligne) : réassemblage GT fc/fd/fe + CRC des tranches 0x65
 - Trace : toutes les captures avec sep.log (compteur) ; OOL de C6, C8, C11, C12 (réassemblage), lecture seule.
 - Fait : `driver/sepreplay/gt.py` (règle de compteur, relecture OOL avec report `changed=none`, réassemblage par en-tête 0x1c, contrôle de tranches) + `driver/tests/test_step4_gt.py`.

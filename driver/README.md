@@ -21,3 +21,12 @@ Chaque module le répète dans sa docstring.
 - `sepreplay/crc.py` : CRC-16/ARC (écrit depuis la définition standard). `sepreplay/sensor.py` : étape 3, trame capteur + statut
   (hypothèse ; contenu du statut non interprété).
 - `sepreplay/gt.py` : étape 4, règle de compteur GT, réassemblage OOL, CRC des 12 tranches 0x65 (vérifié (proposé), K4).
+- `sepreplay/daemon.py` : étape 5, séquence d'init (57 types) et garde/renvoi des blobs 0x6c -> 0x6d. N'émet rien : produit
+  seulement la liste de commandes comparée aux traces.
+
+## Hors périmètre / interdit ici
+Aucune écriture SEP (SKS 0x12, xART 0x13, 0x10, 0x15, gigalockers, IMG4) : aucun code de ce type dans driver/ à ce stade.
+Quand il y en aura, il sera derrière un paramètre de module désactivé par défaut et signalé.
+
+## Lancer
+`cd driver && python3 -m unittest discover -s tests -v` (29 tests, < 1 s).
