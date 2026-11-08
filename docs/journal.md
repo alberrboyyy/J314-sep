@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-08 — driver — Étape 1 (hors ligne) : décodeur de mots mailbox + lecteur de sep.log
+- Trace : C8 (004657), C11 (025802), C12 (032454), lecture seule.
+- Fait : `driver/sepreplay/mailbox.py`, `driver/tests/test_step1_mailbox.py` ; aucun hardware, aucun tools/*.sh.
+- Vu : 3981 / 6348 / 641 messages = `# end seen=logged` du tracer, 0 ligne invalide, aller-retour mot 64 bits exact pour chaque message ;
+  lectures OOL 480 (C8) / 994 (C11, = journal) / 151 (C12). 5/5 tests OK.
+- Interprété : rien de nouveau ; le découpage reste `hypothèse (cohérent)` dans verification_status.md.
+- Incidents : aucun.
+
 ## 2026-11-08 18:55 — Claude — C16 (K-E1, 2e moitié : lock → mdp → lock → doigt → lock → 20 s → doigt)
 - Trace : traces/20261108-183948_c16-ke1 (marks.txt, notes.txt : good_lockb = o, good_lockc = o) ; capture arrêtée avec stop_capture.sh.
 - Vu : chaque lock → `<08/01 TYPE=0x09 P2` à +0,5-0,9 s ; mot de passe → `<12 TAG=0x09`, `<12 TAG=0x00` puis `<08/01 0x28 P2` (+1,4 s) ; doigt 10 s après lock : 0x09 puis `<12 TAG=0` (-501) + `<08/01 0x08 P2` ×2 (avant et après la réponse 0x09) + `<08 TAG=0x03` ; doigt 28 s après lock : mêmes notifs précédées de 3 `<12 TAG=0x01` (volume P1, puis 2 autres) vus ~11 s après le lock, et après le doigt `<12 TAG=0` ×3 (P1 puis P0 P0) ; un 2e `<08/01 0x09` apparaît 10-20 s après chaque lock, **y compris après le doigt dans lock_b** (+10,2 s après la marque doigt).
