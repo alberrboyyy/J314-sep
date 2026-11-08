@@ -14,6 +14,7 @@ from collections import namedtuple
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
+import lock_cycles  # noqa: E402
 import ool_attempts  # noqa: E402
 import ool_index  # noqa: E402
 import sbio_latency  # noqa: E402
@@ -52,6 +53,32 @@ class TestC8Tools(unittest.TestCase):
         self.assertEqual(ool_attempts.fmt_ranges([(0, 1), (3, 5)]), "0x0, 0x3-0x4")
         self.assertEqual(ool_index.content_end(b"\1\0\2\0\0"), 3)
         self.assertEqual(ool_index.content_end(b"\0\0"), 0)
+
+
+class TestLockCyclesClock(unittest.TestCase):
+    """Lignes ACMTRM INVENTÉES reprenant les deux formes de `now=` (C3 : epoch(0), C8 : secondes(base))."""
+
+    def test_state_epoch(self):
+        self.assertEqual(lock_cycles.state_epoch(1794020395, 0), 1794020395)   # forme C3
+        self.assertEqual(lock_cycles.state_epoch(739, 1794023194), 1794023933)  # forme C8
+        self.assertIsNone(lock_cycles.state_epoch(504, 0))                     # ni l'un ni l'autre
+
+    def test_load_states_and_offset(self):
+        import tempfile
+        lines = [b"x ACMTRM: _publish: _onDeviceLockStateChanged LOCKED(1) reason=1 seen=0 now=1794020395(0)\r",
+                 b"bruit",
+                 b"ACMTRM: _publish: _startPolicy UNLOCKED(0) reason=0 now=504(0)",
+                 b"ACMTRM: _publish: _onDeviceLockStateChanged UNLOCKED(0) reason=0 now=739(1794023194)"]
+        with tempfile.NamedTemporaryFile(suffix=".log", delete=False) as f:
+            f.write(b"\n".join(lines))
+        try:
+            st = lock_cycles.load_states(f.name)
+        finally:
+            os.unlink(f.name)
+        self.assertEqual(st, [(1794020395, "LOCKED", 1), (1794023933, "UNLOCKED", 4)])
+        fn, desc = lock_cycles.mac_to_pc_fn("/inexistant", "71546")
+        self.assertEqual(fn(1794023933), 1794095479.0)
+        self.assertIn("+71546.0", desc)
 
 
 if __name__ == "__main__":

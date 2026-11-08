@@ -14,6 +14,29 @@ Format :
 
 ---
 
+## 2026-11-08 — lecteur-logs (intégré par l'analyste) — C8 : alignement hv_uart ↔ sep.log, chemins SKS doigt / mot de passe
+- Trace : traces/20261108-004657_c8-doigt-ool (hv_uart.log, sep.log, marks.txt) ; recoupements C3 (traces/20261107-035930_c3-touchid)
+  et C1 (traces/20261107-033436_c1-boot).
+- Fait (lecteur-logs) : `analysis/uart_timeline.py` → `analysis/out/c8_uart_timeline.txt` ; rapport `analysis/out/c8_uart_align.md`.
+  98 ancrages primaires (24 CRC xART, 45 TAG xART, 29 lock change SKS), monotones, 0 rejeté ; horloge Mac : PC − Mac ≈ +71546 s,
+  dérive ~0.8 s/100 s (17 points), donc ±1 s pour les lignes ACMTRM.
+- Fait (analyste) : recompte indépendant des points repris dans docs/messages.md (section « SKS (0x12) et xART (0x13) — C8 ») ;
+  correction d'une ligne citée (2e déverrouillage mot de passe : L4287, pas L4288) ; `analysis/lock_cycles.py` lit maintenant
+  `now=N(B)` (epoch = N + B ; C8 = secondes + base) et ramène l'heure Mac à l'heure PC (`--mac-offset auto`, via
+  uart_timeline ; ignoré si < 2 s → sortie C3 inchangée) ; tests 24/24 ; `analysis/out/c8_lock_cycles.txt` régénéré (états
+  écran enfin rattachés : LOCKED/UNLOCKED autour de chaque tentative).
+- Vu : uart « Sending lock change X for handle H value V » ↔ `< EP=0x12 TAG=X TYPE=V DATA=H`, rang à rang : C8 29/29, C3 34/34,
+  C1 6/6 (TAG=0x01 = verrouillage, 0x00 = déverrouillage). 2 « Saving USER-xART with CRC » (`< EP=0x13 TYPE=0x01 PARAM=0x9c`)
+  par tentative atteignant 0x09, succès comme échec (6/6 ; C3 19/20), aucun dans les abandons. Le 2e `<01/09` d'un
+  verrouillage suit de 1-4 ms le verrouillage keybag/volume (`> EP=0x12 TAG=0x2f` → 3 × `< TAG=0x01`) : C8 4/4, C3 3/4.
+  Doigt : aucune requête AP 0x12 ; notif -501 émise par le SEP pendant 0x09, dans les 3 succès seulement (recoupe la
+  réponse OOL 0x09 de l'analyste). Mot de passe : `> TAG=0x41 DATA=0x01c80000` puis `> TAG=0x18 DATA=0x007c0000` → -501.
+  Échec doigt : aucune ligne noyau (ni erreur biométrique, ni keybag). Aucune ligne `AppleBiometric*`/`AppleMesa*` pendant
+  les essais. `lock_g1` posée ~26 s avant le verrouillage réel.
+- Interprété (hypothèses) : le SEP déverrouille lui-même le keybag 501 quand la comparaison réussit ; USER-xART = état
+  sauvegardé à chaque comparaison (compteur d'essais ?), indépendant du résultat.
+- Incidents : aucun (aucune action hardware).
+
 ## 2026-11-08 01:07 — analyste — Analyse C8 (session doigt, OOL allégé) : contenu des réponses 0x09/0x21/0x07
 - Trace : traces/20261108-004657_c8-doigt-ool (sep.log, sep.log.ool/, marks.txt, notes.txt). Comparaisons :
   traces/20261107-035930_c3-touchid (séquences), traces/20261107-043828_c6-doigt-ool (OOL, 5 refus bon doigt),
