@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-08 — driver — Étape 3 (hors ligne) : parseur de trame capteur et du statut `80 20 00 10000000 ...`
+- Trace : hv_uart.log de 20 captures (ligne `AppleBiometricSensor: start(): SensorStatus: 16B | ...`), lecture seule.
+- Fait : `driver/sepreplay/sensor.py` (trame `80 op idx u32len charge`, statut, constructeur de la demande de lecture `80 13`), `crc.py` (CRC-16/ARC, vecteur standard 0xBB3D) ; `driver/tests/test_step3_sensor.py`.
+- Vu : 20/20 lignes SensorStatus portent les mêmes 16 octets (la doc disait 16/16 : 4 traces de plus depuis) ; en-tête, longueur 0x10 = taille réelle ; les 2 derniers octets (00 00) ne sont pas le CRC-16/ARC (0x35de calculé), comme dit dans messages.md. Octet +7 = 0, u32 +0xc = 0x3352 : exposés bruts, NON interprétés.
+- Interprété : rien ; statut capteur reste `hypothèse`. Aucun nœud DT, aucun bus. 15/15 tests OK.
+- Incidents : aucun.
+
 ## 2026-11-08 — driver — Étape 2 (hors ligne) : table de découverte 0xFD (nom -> EP, tailles)
 - Trace : C5, C6, C7, C8, C9, C10b, C11, C12 (8 boots), lecture seule.
 - Fait : `driver/sepreplay/discovery.py` + `driver/tests/test_step2_discovery.py` ; recherche par nom (`find("sbio")` = 0x08), aucun n° codé en dur dans le module.
