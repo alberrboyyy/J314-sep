@@ -31,7 +31,10 @@ Interdit en phase 1 : désassembler/décompiler **tout** binaire Apple (kexts co
 ## Phase 2 — règles (inactives tant que la ligne PHASE ne dit pas 2)
 
 - Désassemblage des kexts macOS autorisé **uniquement** pour extraire le protocole AP↔SEP
-  (format des messages, séquences, constantes). Kexts cibles : AppleSEPManager et drivers biométriques.
+  (format des messages, séquences, constantes). Kexts cibles : AppleSEPManager et drivers biométriques,
+  plus AppleSEPKeyStore (ajouté par Albert le 2026-11-08) pour le seul protocole de l'EP 0x12 (SKS), tel que
+  le dernier maillon entre un match biométrique et le déverrouillage. Mêmes règles : protocole uniquement,
+  aucune clé ni secret extrait, et toute écriture vers l'EP 0x12 reste un script dans `pending/` lancé par Albert.
 - Jamais de copie de code Apple (même réécrit ligne à ligne) dans `driver/`. On documente le protocole dans
   `docs/messages.md`, et le driver s'écrit à partir de cette doc.
 - Chaque information issue d'un kext est marquée `source: kext` dans la table.
