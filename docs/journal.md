@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-08 18:55 — Claude — C16 (K-E1, 2e moitié : lock → mdp → lock → doigt → lock → 20 s → doigt)
+- Trace : traces/20261108-183948_c16-ke1 (marks.txt, notes.txt : good_lockb = o, good_lockc = o) ; capture arrêtée avec stop_capture.sh.
+- Vu : chaque lock → `<08/01 TYPE=0x09 P2` à +0,5-0,9 s ; mot de passe → `<12 TAG=0x09`, `<12 TAG=0x00` puis `<08/01 0x28 P2` (+1,4 s) ; doigt 10 s après lock : 0x09 puis `<12 TAG=0` (-501) + `<08/01 0x08 P2` ×2 (avant et après la réponse 0x09) + `<08 TAG=0x03` ; doigt 28 s après lock : mêmes notifs précédées de 3 `<12 TAG=0x01` (volume P1, puis 2 autres) vus ~11 s après le lock, et après le doigt `<12 TAG=0` ×3 (P1 puis P0 P0) ; un 2e `<08/01 0x09` apparaît 10-20 s après chaque lock, **y compris après le doigt dans lock_b** (+10,2 s après la marque doigt).
+- Interprété : K-E1 : 0x209 à chaque lock ✓, 0x228 au mot de passe ✓, 0x208 au doigt ✓, 0 TAG 0x01 pendant les invites session ouverte ✓ (C15). **Écart** : le 2e 0x209 n'est pas propre au cas « attendre 20 s » (vu après tous les locks) ; Touch ID réussit avec ou sans verrouillage du volume. Reste hypothèse (n=1 par cas).
+- Incidents : aucun.
+
 ## 2026-11-08 18:40 — Claude — C15 (K-E1 partielle, session ouverte)
 - Trace : traces/20261108-181424_c15-ke1 (marks.txt : ke1_good_1/2/3, ke1_bad_1, ke1_lock_a, ke1_pw) ; capture coupée par TRACE_TIMEOUT=1200 s juste après ke1_pw (« le Mac a reboot » = fin de capture, pas un incident). Moitié finale (lock_b, lock_c) non faite.
 - Vu : 4 invites en session ouverte (3 bon doigt, 1 mauvais) = séquence `23 06 65 07 09 1f` identique, 0x09 en ~215-290 ms ; **0 `<08 TAG=0x01`** pendant les 4 invites (seul `<08 TAG=0x03` ~0,7-1 s après chaque marque, y compris mauvais doigt) ; aucune requête AP→0x12 pendant les invites ; au lock (ke1_lock_a +0,9 s) un seul `<08 TAG=0x01 TYPE=0x08 PARAM=0x02 DATA=0x1f5` = **0x208, pas 0x209 prédit**.
