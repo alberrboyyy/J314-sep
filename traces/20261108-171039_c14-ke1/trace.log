@@ -828,3 +828,107 @@ TTY> HV: Entering guest secondary 9 at 0x1001bf60000
 [cpu9] Pass: mrs x13, HID1_EL1 = 1440000002000000 (HID1_EL1)
 [cpu9] Pass: msr HID1_EL1, x13 = 1440000002000000 (OK) (HID1_EL1)
 [cpu9] Pass: mrs x13, HID18_EL1 = 2000040004000 (HID18_EL1)
+[cpu9] Pass: msr HID18_EL1, x13 = 2000040004000 (OK) (HID18_EL1)
+[cpu0] PMGR R 292280088+0:32 = 0xff -> 0x0
+[cpu1] CPUSTART W 28e0d4000+0:32 = 0x2
+[cpu2] CPUSTART W 28e0d4000+0:32 = 0x10
+[cpu3] CPUSTART W 28e0d4000+0:32 = 0x20
+[cpu4] CPUSTART W 28e0d4000+0:32 = 0x40
+[cpu5] CPUSTART W 28e0d4000+0:32 = 0x80
+[cpu6] CPUSTART W 28e0d4000+0:32 = 0x100
+[cpu7] CPUSTART W 28e0d4000+0:32 = 0x200
+[cpu8] CPUSTART W 28e0d4000+0:32 = 0x400
+[cpu9] CPUSTART W 28e0d4000+0:32 = 0x800
+[cpu0] PMGR R 28e580180+0:32 = 0x1400024f -> 0x1f0000ff
+[cpu0] PMGR W 28e580180+0:32 = 0xf0000ff: Dangerous write
+[cpu0] PMGR R 28e580180+0:32 = 0x1400024f -> 0xf0000ff
+[cpu1] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu1] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu5] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu4] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu5] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu4] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu5] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu5] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#5 from the guest
+TTY> HV: Exiting from CPU 5
+[cpu2] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu3] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu4] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu4] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#4 from the guest
+TTY> HV: Exiting from CPU 4
+[cpu2] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu3] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu2] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu2] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#2 from the guest
+TTY> HV: Exiting from CPU 2
+[cpu7] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu8] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu3] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu3] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#3 from the guest
+TTY> HV: Exiting from CPU 3
+[cpu9] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu8] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu6] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu9] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu8] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu8] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#8 from the guest
+TTY> HV: Exiting from CPU 8
+[cpu9] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu9] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#9 from the guest
+TTY> HV: Exiting from CPU 9
+[cpu7] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu6] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu7] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu7] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#7 from the guest
+TTY> HV: Exiting from CPU 7
+[cpu6] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu6] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#6 from the guest
+TTY> HV: Exiting from CPU 6
+[cpu1] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu1] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#1 from the guest
+TTY> HV: Exiting from CPU 1
+[cpu0] Pass: mrs x1, ACC_OVRD_EL1 = 180010102001c207 (ACC_OVRD_EL1)
+[cpu0] Skip: msr ACC_OVRD_EL1, x1 = 1800101526076207
+[cpu0] Skip: msr CYC_OVRD_EL1, x9 = 3000001
+[cpu0] Guest is shutting down CPU
+TTY> HV: Requesting exit of CPU#0 from the guest
+TTY> HV: Exiting hypervisor (main CPU)
+TTY> HV: All CPUs exited
+Hypervisor exited. Entering shell.
+>>> now exiting HistoryConsole...
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/site-packages/serial/serialposix.py", line 621, in write
+    n = os.write(self.fd, d)
+OSError: [Errno 5] Input/output error
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/run_guest.py", line 182, in <module>
+    run_shell(hv.shell_locals, "Hypervisor exited. Entering shell.")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/shell.py", line 208, in run_shell
+    con.interact(msg, exitmsg)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/code.py", line 271, in interact
+    line = self.raw_input(prompt)
+  File "/usr/lib/python3.14/code.py", line 340, in raw_input
+    return input(prompt)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 2297, in _handle_sigint
+    self.interrupt()
+    ~~~~~~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 2304, in interrupt
+    self.iface.dev.write(b"!")
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/site-packages/serial/serialposix.py", line 655, in write
+    raise SerialException('write failed: {}'.format(e))
+serial.serialutil.SerialException: write failed: [Errno 5] Input/output error

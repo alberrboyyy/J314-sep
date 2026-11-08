@@ -14,6 +14,11 @@ Format :
 
 ---
 
+## 2026-11-08 18:40 — Claude — C15 (K-E1 partielle, session ouverte)
+- Trace : traces/20261108-181424_c15-ke1 (marks.txt : ke1_good_1/2/3, ke1_bad_1, ke1_lock_a, ke1_pw) ; capture coupée par TRACE_TIMEOUT=1200 s juste après ke1_pw (« le Mac a reboot » = fin de capture, pas un incident). Moitié finale (lock_b, lock_c) non faite.
+- Vu : 4 invites en session ouverte (3 bon doigt, 1 mauvais) = séquence `23 06 65 07 09 1f` identique, 0x09 en ~215-290 ms ; **0 `<08 TAG=0x01`** pendant les 4 invites (seul `<08 TAG=0x03` ~0,7-1 s après chaque marque, y compris mauvais doigt) ; aucune requête AP→0x12 pendant les invites ; au lock (ke1_lock_a +0,9 s) un seul `<08 TAG=0x01 TYPE=0x08 PARAM=0x02 DATA=0x1f5` = **0x208, pas 0x209 prédit**.
+- Interprété : TAG 0x01 n'est pas émis par un verdict biométrique en session ouverte (4/4) → soutient la lecture keybag de K1 ; 0x208 au lock, sens à revoir (0x209 différé ?). Reste hypothèse : n=4, une seule trace. Refaire lock_b/lock_c avec TRACE_TIMEOUT plus long.
+
 ## 2026-11-08 16:55 — Claude — Cause de l'échec C13 : veille inactive au login
 - Trace : traces/20261108-163401_c13-ke1/hv_uart.log L2742-2800 (« going to sleep », FB0 ON→OFF, IOCPUSleepKernel)
 - Vu : boot complet jusqu'à launchd + keybag, puis veille système ~9,5 min après le début ; seule autre veille : C6. Les captures « boot seul » duraient ≤ 300 s.

@@ -2623,3 +2623,268 @@ AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: blue
 AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
 AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
 [System Event] [42741279330] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[ANS2:client1]  setting walltime time 59513 --> 59813 and calendar 1794082707  --> 1794083007
+tx_flush:1241: disk4 xid 4794668 tx stats: # 60 finish 59 enter 154 wait 1 9468us close 65us flush 2696us
+[System Event] [44181263854] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+Invalid denylist
+Couldn't build index for com.apple.signpost_reporter: Not eligible for acceleration
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [45621292804] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [47061386367] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+tx_flush:1241: disk4 xid 4794688 tx stats: # 80 finish 79 enter 193 wait 1 9468us close 49us flush 2377us
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [48501236595] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [49941238390] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [51381397641] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[DCP:BrightnessLCD.cpp:803] [AFK]nitsToDBV: iDAC out of range
+
+[DCP:BrightnessLCD.cpp:803] [AFK]nitsToDBV: iDAC out of range
+
+AppleCS42L84Audio _setPowerStage:1143 Set PowerStage (4 -> 6)
+AppleSN012776Amp _setPowerStage:1143 Set PowerStage (4 -> 6)
+AppleCS42L84Audio::_changePowerState:959 _powerStage=6
+AppleCS42L84Audio _setPowerStage:1143 Set PowerStage (6 -> 7)
+AppleCS42L84Audio _setPowerStage:1143 Set PowerStage (7 -> 4)
+AppleCS42L84Audio::acknowledgeAllPendingPowerOffRequests [2]
+AppleSN012776Amp::_changePowerState:959 _powerStage=6
+AppleSN012776Amp _setPowerStage:1143 Set PowerStage (6 -> 7)
+AppleSN012776Amp _setPowerStage:1143 Set PowerStage (7 -> 1)
+AppleSN012776Amp::acknowledgeAllPendingPowerOffRequests [2]
+FB0 Api power state transition request from ON to OFF for internal
+[DCP:PPipeDCP_H13P.cpp:10490] set_run_mode_safe: deferring: 4 -> 1
+
+[DCP:PPipeDCP_H13P.cpp:10395] virtual IOMFBStatus IOMFB::UPPipeDCP_H13P::ready_for_run_mode_change(IOMFB::AppleRegisterStream *): initiating deferred run mod...
+setInterfaceEnable:1113 interface awdl0 disable
+AirPort: Link Down on awdl0. Reason Unspecified (1).
+scanControl: AWDL is controlling scan, ePNOScan ON, roamScan ON, limitedRoam OFF, abortScan 0
+scanControlCommand: Sending scan control command, ePNOScan ON (0x0), roamScan ON (0x0), limitedRoam OFF (0x0), abortScan 0
+scanControl: AWDL is controlling scan, ePNOScan ON, roamScan ON, limitedRoam OFF, abortScan 0
+scanControlCommand: Sending scan control command, ePNOScan ON (0x0), roamScan ON (0x0), limitedRoam OFF (0x0), abortScan 0
+0
+[DCP:UPTSQManager.cpp:150] IOMFBStatus IOMFB::UPTSQManager::power_down_M3(IOMFB::AppleRegisterStream *, UPTSQManager::ModeChangeWaiter *): request mode ch...
+[DCP:UPTSQManager.cpp:162] IOMFBStatus IOMFB::UPTSQManager::power_down_M3(IOMFB::AppleRegisterStream *, UPTSQManager::ModeChangeWaiter *): disabling M3
+
+[DCP:PPipeDCP_H13P.cpp:10468] set_run_mode_safe: no need to defer: 1 -> 0
+
+[DCP:ck_PCC2DBlm_v5.cpp:3300] Quiescing callback 
+ IOCTL (from pid 181) not recognized: 5 out of 424 line 2756
+ IOCTL (from pid 181) not recognized: 265 out of 424 line 2756
+[DCP:eoInterfaceIOAV.cpp:433] IOMFB: VideoInterfaceIOAV::did_power_off: m_power_ctrl->setPower( 0 )
+
+[DCP:eoInterfaceIOAV.cpp:146] IOMFB: IOAVVideoInterface terminated
+
+[DCP:oInterfaceIOAV.cpp:1094] void VideoInterfaceIOAV::unplug_gated(IOAVVideoInterface *): display HPD removed
+hotPlug_notify_gated: AP disp0 HPD notification not registered yet, hpdPending 1 hpdState 0
+
+[DCP:DCPDPDevice.cpp:2971] [AFK]detected SINK_COUNT=1 change without IRQ_HPD
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#85] if:3 inCmd:1 inResp:1 outRepErr:0 outCmdErr:0 t:52313089622
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#86] if:1 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:52313092153
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#88] if:3 inCmd:1 inResp:1 outRepErr:0 outCmdErr:0 t:52313094037
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#87] if:1 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:52313095651
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#84] if:1 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:52313097043
+PM response took 161 ms (76, UserEventAgent)
+[DCP:nifiedPipeline.cpp:1356] set_device_enabled_gated: current state: 1, requested state: 0
+
+PM response took 179 ms (231, symptomsd)
+PM response took 189 ms (406, systemstats)
+PM response took 194 ms (253, com.apple.hiserv)
+PM response took 196 ms (206, awdd)
+PM response took 199 ms (337, softwareupdated)
+IOMFB: User Power Assertion Request 1
+PM response took 209 ms (125, PerfPowerService)
+PM response took 214 ms (356, locationd)
+IOMFB: User Power Assertion Request 0
+IOConsoleUsers: gIOScreenLockState 3, hs 0, bs 0, now 0, sm 0xe0000280
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+PM response took 1568 ms (85, powerd)
+Port-HDMI::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=1, _sleeping=1, _accessoryPowerModeExtOffRequested 0
+Port-HDMI::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+Port-HDMI::configureAccessoryPowerInternal: sleepPower=0, allowedFeaturesMask=0x2f, state=0x1; set PowerModeOff?
+Port-HDMI::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+Port-MagSafe 3::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=1, _sleeping=1, _accessoryPowerModeExtOffRequested 0
+Port-MagSafe 3::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+Port-MagSafe 3::configureAccessoryPowerInternal: sleepPower=0, allowedFeaturesMask=0x2f, state=0x1; set PowerModeOff?
+Port-MagSafe 3::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+Port-USB-C::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=1, _sleeping=1, _accessoryPowerModeExtOffRequested 0
+Port-USB-C::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+Port-USB-C::configureAccessoryPowerInternal: sleepPower=0, allowedFeaturesMask=0x2f, state=0x1; set PowerModeOff?
+Port-USB-C::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+Port-USB-C::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=1, _sleeping=1, _accessoryPowerModeExtOffRequested 0
+Port-USB-C::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+Port-USB-C::configureAccessoryPowerInternal: sleepPower=0, allowedFeaturesMask=0x2f, state=0x1; set PowerModeOff?
+Port-USB-C::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+DK: arming ack timer, 30000 ms
+DK: allowPowerChange
+[System Event] [52458807367] [INFO] [Subsystem: nvram] [Event: delete] boot-image
+AppleActuatorDevice::powerStateWillChangeTo IOPMrootDomain sleep notification. Enable FW click control for registry entry ID 0x10000099F
+SEP EP 21 disabled
+void HibernationService::_setPowerStateGated(unsigned long *): power state transition 1 -> 0 (hib state 0)
+SEP EP 23 disabled
+SEP EP 18 disabled
+AppleCredentialManager: setPowerState: newState=0.
+AppleCredentialManager: setPowerStateGated: called, currentState=1 -> newState=0.
+AppleCredentialManager: setPowerStateGated: Scheduling immediate power off timer.
+AppleCredentialManager: setPowerStateGated: Deferring power off (ACK deadline: 10 seconds).
+SEP EP 24 disabled
+AppleCredentialManager: powerOffActionGated: called, .
+SEP EP 10 disabled
+AppleCredentialManager: powerOffActionGated: SEPEndpoint disabled (lock took: 0 ms, SEP EP disable took: 0 ms).
+AppleCredentialManager: powerOffActionGated: acknowledgeSetPowerState() succeeded.
+SEP EP 12 disabled
+SEP EP 8 disabled
+AppleSMCEmbedded::setPowerState(): ENTER powerStateOrdinal=0, _activeKeyCommand=0 newState=0
+AppleSMCEmbedded::setPowerState(): kPowerOff
+AppleSMCEmbedded::setPowerState(): going to sleep -> writing WKTP=2
+Codec Input::acknowledgeAllPendingPowerOffRequests [1]
+Codec Output::acknowledgeAllPendingPowerOffRequests [1]
+Speaker::acknowledgeAllPendingPowerOffRequests [1]
+Digital Mic::acknowledgeAllPendingPowerOffRequests [0]
+Loopback::acknowledgeAllPendingPowerOffRequests [0]
+AppleSN012776Amp _setPowerStage:1143 Set PowerStage (1 -> 0)
+AppleCS42L84Audio _setPowerStage:1143 Set PowerStage (4 -> 5)
+AppleCS42L84Audio::_changePowerState:959 _powerStage=5
+AppleLEAPController_T600x::acknowledgeAllPendingPowerOffRequests [2]
+mca0a::acknowledgeAllPendingPowerOffRequests [1]
+mca2b::acknowledgeAllPendingPowerOffRequests [1]
+mca1a::acknowledgeAllPendingPowerOffRequests [1]
+setInterfaceEnable:1113 interface ap1 disable
+AirPort: Link Down on ap1. Reason Unspecified (1).
+0
+virtual IOReturn AppleCS42L84Hw::powerDownChip():1109 took 0mS to power down all component
+AppleCS42L84Audio _setPowerStage:1143 Set PowerStage (5 -> 0)
+AppleCS42L84Audio::acknowledgeAllPendingPowerOffRequests [2]
+[AOP:udioPDMNodeBase.cpp:156] PDMDev<pdm0> sleep notification. Prev AP state 1
+mca2a::acknowledgeAllPendingPowerOffRequests [1]
+IOReturn AppleSEPManager::_setPowerState(unsigned long *): power state 2 -> 0
+[AOP:udioPDMNodeBase.cpp:554] PDMDev<pdm0> xi0 ->pll , 2400000->2400000 AP state 0
+[ANS2:client1] NVMe shutdown start seg->lba: 1, seg->size: 0
+[ANS2:client1] seg->lba 1 saveCtx 1 took 0 ms - clog 3233260
+Time 0x6aef8a26 Message IOCPUSleepKernel enter
+IOPlatformSleepAction -> AppleDialogSPMIPMURTC
+IOPlatformSleepAction -> AppleProResHW
+IOPlatformSleepAction -> AppleAVD
+IOPlatformSleepAction -> AppleSMCPMU
+AppleSMCEmbedded::_powerStateActionGated(): newState=0 _activeKeyCommand=0 notifyMBSEMessage=736c7061
+AppleSMCEmbedded::_powerStateActionGated(): now quiesced MBSE result (0)
+IOPlatformSleepAction -> AppleSMC
+IOPlatformSleepAction -> AppleARMWatchdogTimer
+IOPlatformSleepAction -> AppleDialogSPMIPMU
+IOPlatformSleepAction -> AppleDialogSPMIPMU
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleSPIMCController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleGen1SPMIController
+IOPlatformSleepAction -> AppleSPIMCController
+IOPlatformSleepAction -> AppleS5L8940XI2CController
+IOPlatformSleepAction -> AppleS5L8940XI2CController
+IOPlatformSleepAction -> AppleS5L8940XI2CController
+IOPlatformSleepAction -> AppleS5L8940XI2CController
+IOPlatformSleepAction -> AppleS5L8940XI2CController
+IOPlatformSleepAction -> AppleS5L8940XI2CController
+IOPlatformSleepAction -> AppleStockholmSPMI
+IOPlatformSleepAction -> AppleSPIMCController
+IOPlatformSleepAction -> AppleSPIMCController
+IOPlatformSleepAction -> AppleSmartIO
+IOPlatformSleepAction -> AppleT6001PMGR
+IOPlatformSleepAction -> ApplePMPv2
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT8110DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000DART
+IOPlatformSleepAction -> AppleT6000MemCacheController
+IOPlatformSleepAction -> AppleThunderboltHALType5
+IOPlatformSleepAction -> AppleThunderboltHALType5
+IOPlatformQuiesceAction -> AppleS5L8960XGPIOIC
+IOPlatformQuiesceAction -> AppleS5L8960XGPIOIC
+IOPlatformQuiesceAction -> AppleS5L8960XGPIOIC
+IOPlatformQuiesceAction -> AppleS5L8960XGPIOIC
+IOPlatformQuiesceAction -> AppleT6000PCIe
+IOPlatformQuiesceAction -> AppleT6000PCIeC
+IOPlatformQuiesceAction -> AppleT6000PCIeC
+IOPlatformQuiesceAction -> AppleARMWatchdogTimer
+IOPlatformQuiesceAction -> AppleSmartIO
+IOPlatformQuiesceAction -> AppleEventLogHandler
+IOPlatformQuiesceAction -> AppleT6000SOCTuner
+IOPlatformQuiesceAction -> AppleT6000MemCacheController
+IOPlatformQuiesceAction -> AppleT6000PlatformErrorHandler
+IOPlatformQuiesceAction -> AppleSEPManager
+IOPlatformQuiesceAction -> AppleT6001PMGR
+Starting S2R timerIOPlatformQuiesceAction -> AppleInterruptControllerV2
+IOPlatformQuiesceAction -> AppleDialogSPMIPMU
+pmu go hib (0x7)
+IOPlatformQuiesceAction -> AppleDialogSPMIPMU
+pmu go hib (0x7)
