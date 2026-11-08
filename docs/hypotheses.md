@@ -290,6 +290,8 @@ C2 = C2a et C2b, même m1n1, même kernel, mêmes bootargs, personne ne touche l
 
 C8 = `traces/20261108-004657_c8-doigt-ool` ; détail et lignes citées : `docs/messages.md` section C8,
 `analysis/out/c8_ool_attempts.txt`, `analysis/out/c8_attempts.txt`. C6 = `traces/20261107-043828_c6-doigt-ool`.
+> Revue sceptique 2026-11-08 : section « Revue sceptique de C8 » plus bas (artefact `ool_index.py`, HK-HO, protocole C10).
+> HI a une alternative concurrente (HO) qui change la lecture de C9.
 
 ## HE — Le résultat de la comparaison doigt est dans la réponse OOL de 0x09 (`< B`), pas dans le mot mailbox
 - Statut : ouverte
@@ -353,3 +355,244 @@ C8 = `traces/20261108-004657_c8-doigt-ool` ; détail et lignes citées : `docs/m
   (bons doigts d'abord, mauvais ensuite). Ne pas en faire un indice de succès.
 - Expérience (EXPÉRIENCE HUMAINE) : session alternée bon / mauvais / bon / mauvais (un essai par verrouillage) ; si `+0x44`
   suit le temps ou le nombre de déverrouillages et non le doigt, la coïncidence est confirmée.
+
+---
+
+# Revue sceptique de C8 (2026-11-08, agent sceptique)
+
+Sources relues : `traces/20261108-004657_c8-doigt-ool/sep.log` (L1674-1789, L3618-3687, L3826-3871), `marks.txt` ;
+`traces/20261107-043828_c6-doigt-ool/sep.log` (lectures A et B à chaque message, L323-357, L1000-2339, L1803-1814) ;
+`analysis/out/c8_ool_attempts.txt`, `c8_ool_index.txt`, `c8_uart_align.md` ; `analysis/ool_index.py` ;
+`hv/trace_sep_filtered.py` (`_ool_dump`, docstring). Aucune action hardware, aucun binaire Apple lu.
+Correspondance avec la demande : 1 = HE + HF, 2 = HK, 3 = HG, 4 = HH, 5 = HL, 6 = HM. Nouvelles : HN, HO.
+
+## Réserves communes à toutes les hypothèses C8
+- **Une seule session, un seul ordre** : 3 bons doigts d'abord, puis 2 mauvais (dont 1 après un mot de passe). Tout ce qui
+  sépare « bon » de « mauvais » dans C8 sépare aussi « début » de « fin » de session, `+0x44`=4 de `+0x44`=5, « avant » et
+  « après » pw_unlock_1, et « attente lock→doigt ~10-25 s » de « ~21-30 s » (marks.txt : lock_b1→fp_bad_1 = 30.4 s).
+  Seul C6 (5 refus bon doigt, autre tracer, plus lent) casse en partie cette confusion.
+- **Petits effectifs** : 3 succès, 3 échecs mauvais doigt, 4 abandons (C8 3 + C6 1). Une règle « 3/3 » a une chance non
+  négligeable d'être une coïncidence si le champ a peu de valeurs possibles (octet 0/1 : 1 chance sur 8 par sens).
+- **Instantanés** : `>` lit A avant que m1n1 ne rejoue l'écriture INBOX (le SEP n'a pas encore le message) ; `<` lit B
+  **après** le dépilement (le SEP tourne pendant la lecture, docstring du tracer). Une lecture B sur une notification ou sur
+  un `<fe` peut tomber en pleine écriture : fp_good_1 L1730 (`<01/08`) voit B **entièrement nul**, fp_good_2/3 voient déjà
+  le début de la réponse 0x09. Ne jamais interpréter le contenu B d'un message sans charge propre.
+- **Artefact d'outil trouvé (à corriger avant toute nouvelle conclusion)** — `analysis/ool_index.py` L37-61 :
+  `last_file` est indexé par buffer seulement, alors que le tracer compare les lectures **par (EP, buffer, longueur)**
+  (`key = (ep, name, len(blob))`, tracer L580). Pour une ligne `changed=none`, l'outil rattache donc parfois le .bin d'une
+  lecture d'une **autre longueur** et affiche un contenu faux. Deux cas vérifiés dans le log brut :
+  - L1684/L1685 `<fe 0x65` : log `sha=4fe7b59a nz=0` (= 0x4000 zéros), l'index affiche `end=0x15 (=001483_08_B.bin)`
+    (en-tête 0x06, lecture 0x400). Les « 5× `< B 0xfe/0x65` avec l'en-tête 0x06 précédent » de `docs/messages.md` sont
+    cet artefact : B est **vide** (tout à zéro) à ces `<fe`.
+  - L3836/L3837 et L3866/L3867 `> 0x70` (pw_unlock_1) : log `sha=fc765c2e`, le **même** sha que L1749 (`> A 0x70` d'un
+    essai doigt, `changed=0x14+0x1` depuis l'en-tête 0x0b) : A contient l'en-tête **0x70**, pas 0x21.
+  Conséquence : les 7 « exceptions » de l'en-tête (HK) ne sont pas des exceptions ; toute affirmation « B identique au B
+  précédent » sur des lignes `changed=none` est à refaire. Test rapide : pour chaque ligne `none`, comparer le `nz` du
+  log au `nz` du fichier rattaché ; une différence = rattachement faux. Les charges des tentatives (`c8_payloads/`) ont
+  toutes un `file=` propre dans le log (vérifié pour 0x06/0x07/0x09/0x21/0x65 de L1674-1785 et L3621-3686), donc HE..HJ
+  ne sont pas touchées sur le fond — à reconfirmer après correction.
+
+## HE (+ HF) — Revue : la réponse 0x09 code le résultat
+- Ce qui tient (vérifié dans le log brut) :
+  - le contenu est **frais** : la lecture B 0x4000 précédente (`<fc 0x65`, L1713 et L3636) est nulle sauf 2 octets d'en-tête ;
+    l'enregistrement 0xbf4 des succès n'est donc pas un reste de la réponse 0x54 de l'init resté dans B ;
+  - la lecture `<fc 0x09` est fiable : le SEP poste la réponse après l'avoir écrite, et le B suivant ne change qu'au `> 0x1f` ;
+  - la règle tient sur **11/11** tentatives complètes (C8 6, C6 5), dans deux captures, avec deux réglages du tracer.
+- Autres explications :
+  1. **Conséquence du déverrouillage du keybag, pas du match** : dans les 3 succès, `< EP=0x12 TAG=0 DATA=0xfffffe0b`
+     (L1728) arrive **avant** `<fc 0x09` (L1731) dans la même file OUTBOX (ordre fiable). Le SEP pourrait ne remplir
+     l'enregistrement que parce que le keybag 501 vient d'être déverrouillé. Pour un driver Linux (pas de SKS), ça change
+     tout. C8 ne peut pas séparer les deux : match et déverrouillage vont toujours ensemble.
+  2. **« -1 » = « pas de succès », pas « pas de correspondance »** : C6 (bon doigt refusé, tracer lent) donne aussi -1 mais
+     `+0xc24` = 5/5/0x1b/6/0x1b, alors que le mauvais doigt donne 0x2e ×3. Le -1 marque l'issue, la cause est ailleurs.
+  3. `+0xc24` (HF) : 0x2e **identique 3/3** pour le mauvais doigt plaide pour un **code** (un score de distance varierait
+     d'un essai à l'autre) ; succès 1/2 et C6 5/6/0x1b restent compatibles avec code ou score. Confusion à lever : pour les
+     succès, 2, 2, 1 suit « au moins un abandon avant dans ce verrouillage » (`+0x48` de 0x06 = 1, 2, 0) — compte de lots de
+     trames ou de tentatives plutôt que qualité ? 3 points, non tranchable.
+- Combien de traces : C8 + C6 pour la règle -1/0x1f5 ; une seule capture avec des succès OOL.
+- Expériences (ordre de coût) :
+  - (SANS HARDWARE) tabuler `+0xc24` contre `+0x48`/`+0x07` de 0x06, `+0x02`/`+0x06..07`/`+0x28` de 0x07 et la durée 0x09,
+    sur C6 + C8. Si `+0xc24` (succès) = f(`+0x48`) exactement → compteur, pas qualité.
+  - (EXPÉRIENCE HUMAINE, C10 étapes `fp_app_good` / `fp_app_bad`) Touch ID **session ouverte** (invite d'authentification,
+    keybag déjà déverrouillé). Si vraie (verdict) : B 0x09 = 0x1f5 + identifiant pour `fp_app_good`, -1 pour `fp_app_bad`,
+    **sans** `< EP=0x12 TAG=0 DATA=0xfffffe0b`. Si alternative 1 : B = -1 (ou différent) alors que macOS accepte, ou la notif
+    -501 réapparaît à chaque succès (→ c'est un « événement d'authentification », pas un changement d'état du keybag).
+  - (EXPÉRIENCE HUMAINE, C10 étape `fp_tip_*`) bout du doigt seulement : refus attendus avec des codes ≠ 0x2e si `+0xc24`
+    est un code de raison ; un éventail de valeurs ordonnées si c'est un score.
+
+## HK — En-tête OOL commun de 0x1c octets (1, total, offset, 0, 0, TYPE, longueur du morceau)
+- Ce qui tient : 480 lectures C8 + C5/C6/C7 ; offsets k·0x3fe4 (= 0x4000 − 0x1c) dans les `0xfd` des deux sens (0x65 A,
+  0x5f B, 0x5b/0x6d A, 0x6c B) ; fin du contenu = 0x1c + longueur sans exception. Avec l'artefact corrigé ci-dessus, les
+  « exceptions » disparaissent : `<fe` = B **entièrement nul** (pas d'en-tête du tout), `> 0x70` = en-tête 0x70.
+  C'est l'hypothèse la mieux soutenue structurellement, et elle réfute l'alternative « doorbell sans fragmentation » de HA
+  (point 3) pour 0x65/0x5b/0x6d/0x5f/0x6c : les morceaux successifs ont des contenus différents et un champ offset.
+- Ce qui reste fragile : la **sémantique** de `+0x00` (version ? drapeau « contenu présent » ? : il vaut 0 exactement quand
+  le buffer a été remis à zéro, ce qui colle mieux à un drapeau) ; `+0x0c`/`+0x10` toujours 0 (statut ? identifiant de
+  transaction ? inconnu) ; qui remet les buffers à zéro (AP après lecture ? SEP ?) — C6 montre B nul à **chaque** `>` et A
+  remis à zéro seulement autour de 6 notifications (L1000, L1022, L1667, L1880, L2199, L2339).
+- Expérience (SANS HARDWARE) : script d'invariants sur C5..C9 : TYPE en-tête = TYPE mot mailbox ; Σ longueurs des morceaux =
+  total ; longueur morceau = min(0x3fe4, total − offset) ; `+0x0c`, `+0x10` ≠ 0 au moins une fois ? ; `+0x00` = 0 ⇔ buffer
+  tout nul ? Si une seule violation hors `<fe`/notifications → réviser HK. (BOOT SANS HUMAIN) rien de plus à attendre de
+  C9/C10 que des effectifs.
+
+## HG — Revue : 0x07 `+0x06..07` = `01 01` → 0x09, `00 00` → abandon
+- Confusions écartées (vérifié sur les valeurs publiées) : le drapeau fourni par l'AP `+0x07` de 0x06 (1 si `+0x48`=0) ne
+  prédit pas l'abandon (L1674 abandon avec `+0x48`=0, L2375 abandon avec `+0x48`=1, L2968 continué avec `+0x48`=0).
+- Autres explications : l'AP abandonne pour une raison qu'il connaît par ailleurs (doigt retiré, signal capteur via AOP) et
+  le SEP ne fait que constater ; dans les deux cas l'octet **prédit** l'abandon, mais la causalité n'est pas observable sans
+  écrire vers le SEP. Pour un driver, la prédiction suffit si elle tient. 4 abandons, dont 3 « premier essai après lock ».
+  `+0x28` = 1 pour le mauvais doigt est confondu avec `+0x44`=5 (fourni par l'AP, recopié dans 0x07 à `+0x48`) : il peut
+  dépendre du paramètre de session et non du doigt.
+- Expériences : (SANS HARDWARE) C6 + C8, tabuler `+0x02`, `+0x06..07`, flottants `+0x18..` pour abandon vs continué.
+  (EXPÉRIENCE HUMAINE, C10 `fp_tap_1..3`) effleurements < 0.3 s : prédiction `00 00` dans chaque `23 06 65 07 22`, `01 01`
+  dans chaque tentative qui va jusqu'à 0x09. Une seule exception réfute « `+0x06..07` décide ». C10 cycle 1 (mauvais puis
+  bon doigt dans le **même** verrouillage, donc même `+0x44`) : si `+0x28` vaut 1 puis 0 → lié au doigt ; 1 et 1 ou 0 et 0
+  → lié au verrouillage.
+
+## HH — Revue : 0x65 = relais AP→SEP de trames capteur chiffrées
+- Ce qui tient (C6, lecture des deux buffers) : L1806-1811, au `<fe 0x65` A est **inchangé** (morceau 1) et B nul ; au
+  `> 0xfd` suivant A contient le morceau 2. Le morceau 2 apparaît donc entre le dépilement du `<fe` par l'AP et l'écriture
+  `> 0xfd` : écrit par l'AP (le SEP n'écrit A dans aucun des 156/162 `< A` de C6). Le sens AP→SEP est bien soutenu.
+- Ce qui n'est pas soutenu : « données capteur ». Rien ne relie le contenu au capteur sinon la corrélation temporelle avec
+  le doigt et la taille fixe. L'AP pourrait produire lui-même ce contenu (traitement côté noyau, ou paquet chiffré par le
+  capteur et seulement relayé : indiscernable ici). Taille 0x7200 **identique** pour abandon et tentative complète : la
+  quantité ne dépend pas de la qualité du contact.
+- Sur les compteurs : le saut SSSS est **constant** (+0xd, 6/6) alors que la durée de 0x09 varie de 235 à 303 ms et que la
+  fin de tentative varie (`<03` à 0-166 ms) → ce n'est pas un compteur de temps à cadence fixe ; plutôt un nombre fixe de
+  trames/paquets consommés ailleurs. C6 (+0x18, 4/4) diffère : réglage du tracer, ou paramètre `+0x44` (1 dans C6) ?
+- Expériences : (SANS HARDWARE) celle de l'analyste (chercher des blocs `80 52 .. 80 09 00 00 3a` hors 0x65) + vérifier si le
+  saut SSSS de C8 dépend de `+0x44` (4 vs 5 : +0xd dans les deux → non) et si celui de C6 dépend de `+0x44`=1.
+  Pour relier au capteur il faudrait observer le chemin capteur→AP (AOP/SPI) : outillage à concevoir par le tracer, en
+  lecture seule ; hors de portée immédiate. Ne pas tenter d'interpréter le corps (chiffré : hors périmètre).
+
+## HL — « Sending lock change X for handle H value V » ↔ `< EP=0x12 TAG=X TYPE=V DATA=H` ; notif -501 seulement en succès
+- Ce qui tient : la concordance **des valeurs** est indépendante de l'horloge : handles 32 bits non triviaux (0xce5f3e75 =
+  -832618891 recalculé, 0xfffffffa = -6, 0xfffffe0b = -501) dans C8 29/29, C3 34/34, C1 6/6. C'est l'hypothèse la plus solide.
+- Ce qui est en partie **circulaire** : les 29 « lock change » de C8 sont **eux-mêmes** des ancrages de l'alignement
+  (`c8_uart_align.md` §1). L'accord d'**ordre** ne prouve donc que la cohérence avec les 69 ancrages xART indépendants
+  (0 rejet), ce qui reste un bon signe, pas une preuve. `TYPE = value` repose sur **une** occurrence V=1 par capture (3 au
+  total, toutes au login) ; `PARAM=1 = volume` est déduit du type de handle.
+- « -501 seulement en succès » : vrai 3/3 vs 0/3, mais la notif apparaît aussi au mot de passe : c'est un marqueur de
+  déverrouillage de session, pas du match (voir HE alternative 1). Point important pour Linux : en succès doigt, aucune
+  requête `> EP=0x12` propre au succès ne la précède (`> 0x12 TAG=0x48` existe aussi en échec, L3645) → le SEP semble
+  déverrouiller de lui-même pendant 0x09. « Non sollicité » ne vaut que pour les EP tracés et les mots mailbox (pas l'OOL
+  de 0x12, non lu).
+- Expérience (SANS HARDWARE, BOOT SANS HUMAIN C9) : **prédiction préenregistrée** : avant d'ouvrir `hv_uart.log` de C9, écrire
+  depuis `sep.log` seul la liste des lignes « Sending lock change X for handle H value V » attendues, puis comparer.
+  Si vraie : 100 % ; une seule ligne manquante ou en trop → réviser. (EXPÉRIENCE HUMAINE C10 `fp_app_*`) : présence ou
+  absence de la notif -501 quand le keybag est déjà déverrouillé (prédiction HL : **absente**).
+
+## HM — A = AP→SEP, B = SEP→AP (biais de mesure du tracer ?)
+- Le biais existe dans C7/C8 (`split_dir=1` : `>` ne lit que A, `<` que B) : un contenu écrit par le SEP dans A, ou par l'AP
+  dans B, serait invisible. Mais **C5 et C6 lisaient les deux buffers à chaque message** (journal 2026-11-07 tracer) : `> B`
+  nul 71/73 et 141/143, `< A` inchangé 78/78 et 156/162 (les 6 autres = remise à zéro de A, toutes sur des notifications
+  SEP, liste ci-dessus). C6 couvre des tentatives doigt complètes (0x65 en morceaux, 0x07, 0x09). L'association tient donc
+  pour tout ce que C6 contient.
+- Ce qui n'est **pas** couvert : le chemin succès (C6 n'a aucun succès) : 0x6c (B, 3 morceaux après chaque succès), 0x37,
+  0x0b ; et la question « qui remet à zéro ». La nomenclature A = CNTL TYPE 2/4, B = 3/5 reste une hypothèse (C4).
+- Expérience (BOOT SANS HUMAIN, C10-boot) : `SEP_OOL_SPLIT_DIR=0` sur un boot seul (init 0x5b/0x6d/0x54/0x5f) : coût ~0.2 ms
+  par message en plus. Si `> B` est nul et `< A` inchangé partout → HM tient aussi à l'init. Pour le chemin succès : à faire
+  plus tard, **pas** dans la session humaine C10 (ne pas changer deux réglages à la fois ; C6 lent = bon doigt refusé).
+
+## HN — Les 16 octets `fe6003d8…371b` sont un UUID v4 (identifiant d'utilisateur macOS ?) et non un identifiant de gabarit
+- Statut : ouverte (nouvelle, sceptique)
+- Fondée sur : C8 L554 (`> A 0x54` : l'**AP** envoie `f5010000` + ces 16 octets **avant** toute tentative : l'AP les connaît,
+  ils ne sortent pas d'un match) ; lus comme UUID : `fe6003d8-cea5-414f-b48a-0338dc7c371b` → quartet de version = 4 et
+  variante `b` (10xx), le format d'un UUID aléatoire RFC 4122. Probabilité d'avoir les deux par hasard : 1/64. Indice, pas preuve.
+- Autres explications : UUID d'un objet biométrique (jeu de gabarits, « identité » LocalAuthentication) ou du keybag.
+- Expérience (EXPÉRIENCE HUMAINE, 30 s, aucune écriture) : dans Terminal sous macOS, `id -u` et
+  `dscl . -read /Users/$(id -un) GeneratedUID`. Si l'UUID affiché = `FE6003D8-CEA5-414F-B48A-0338DC7C371B` → identifiant
+  d'utilisateur (et `+0x00`=0x1f5 = uid, renforce HB) ; sinon → objet SEP/biométrique (le 2e doigt de HE trancherait alors).
+
+## HO — Alternative à HI : la base de gabarits est stockée par macOS et poussée au SEP à chaque boot
+- Statut : ouverte (nouvelle, sceptique)
+- Fondée sur : C8 index : à l'init, gros transferts **AP→SEP** `> A 0x5b` (4 morceaux) et `> A 0x6d` (3 morceaux) ;
+  après chaque succès, transfert **SEP→AP** `< B 0x6c` (3 morceaux, L1906-1917, L2637-2648, L3224-3235 ; lu tronqué à
+  0x400, `trunc=1`) puis `0x37` pendant lequel le noyau écrit 2 « Saving USER-xART » (anti-rejeu). Les 20 octets qui changent
+  dans l'enregistrement (HI) n'apparaissent qu'**après** la première rafale `6b 79 6c 37`. Paire de TYPE voisins 0x6c/0x6d.
+- Lecture : le SEP exporte une base mise à jour (chiffrée) via 0x6c, macOS la sauve, puis la renvoie au boot via 0x6d/0x5b,
+  l'xART empêchant le rejeu d'une vieille version. Si c'est ça, un driver Linux devra **stocker et renvoyer** ce blob.
+- Pièges pour C9 : (a) C8 s'est terminé par un `reboot()` de l'hyperviseur (arrêt non propre) ~165 s après le dernier succès :
+  une sauvegarde non vidée sur disque donnerait un faux négatif ; (b) tout usage de Touch ID en boot natif entre C8 et C9
+  fausserait la comparaison → **demander à Albert** s'il y en a eu.
+- Expériences : (SANS HARDWARE, dès maintenant) dans C8, comparer `+0x04` (longueur totale, lisible dans l'en-tête même
+  tronqué) des `< B 0x6c` post-succès avec celle de `> A 0x6d` et `> A 0x5b` à l'init. Longueurs égales → fort indice HO.
+  (C9, en cours) comparer les `> A 0x5b`/`0x6d` de l'init C9 à ceux de C5/C6/C7/C8 (sha des .bin) en plus de la 0x54 de HI.
+  Tableau de décision :
+  | 0x54 C9 | 0x5b/0x6d C9 vs C8 init | Conclusion |
+  |---|---|---|
+  | = fp_good_3 | différents | HO : état stocké par macOS, renvoyé au boot (et mis à jour) |
+  | = fp_good_3 | identiques | état persistant côté SEP (xART/stockage SEP), HI sans HO |
+  | = C5..C8 | identiques | pas de persistance, ou sauvegarde perdue (piège a) : refaire après un arrêt propre |
+  | = C5..C8 | différents | incohérent avec les deux : relire l'outillage avant d'interpréter |
+  (C10, réglage) ajouter 0x6c à `SEP_OOL_FULL_TYPES` pour lire le blob exporté en entier et le retrouver (ou non) octet pour
+  octet dans le `> A 0x6d`/`0x5b` du boot suivant (C11-boot sans humain).
+
+## HJ — Revue
+- Rien à ajouter sur le fond : la confusion `+0x44` / ordre de session est réelle. Elle contamine aussi `+0x28` et `+0x48`
+  de la réponse 0x07 (recopies). C10 cycle 1 (mauvais puis bon doigt dans le même verrouillage) la tranche à moindre coût
+  qu'une session entièrement alternée : `+0x44` identique pour les deux doigts → paramètre de verrouillage, pas de doigt.
+
+## Ordre des expériences (du moins cher au plus cher)
+1. **SANS HARDWARE (analyste, maintenant)** :
+   a. corriger `analysis/ool_index.py` (`last_file` indexé par (buffer, longueur)), régénérer `c8_ool_index.txt`, reconfirmer
+      les lignes de `docs/messages.md` qui s'appuient sur des lectures `changed=none` (en-tête « 7 exceptions », notifications) ;
+   b. invariants d'en-tête HK sur C5..C8 ;
+   c. HO : `+0x04` de `< B 0x6c` vs `> A 0x6d`/`0x5b` (C8) ;
+   d. HF/HG : tableau `+0xc24` / 0x07 / 0x06 sur C6 + C8 ;
+   e. HL : préparer la liste prédite des « lock change » de C9 depuis `sep.log` avant de lire `hv_uart.log`.
+2. **BOOT SANS HUMAIN** : C9 (en cours) → HI + HO (tableau ci-dessus) + HL (prédiction) ; puis C10-boot avec
+   `SEP_OOL_SPLIT_DIR=0` (HM à l'init). Avant d'interpréter C9 : Albert confirme l'absence d'usage Touch ID natif depuis C8.
+3. **EXPÉRIENCE HUMAINE C10** (une session, ≤ 10 min après l'écran de connexion) — protocole ci-dessous.
+4. **Décisions d'Albert (modifient l'état du Mac)** : enrôler un 2e doigt (HE/HN) ; 2e compte (HB). Seulement si HN ne tranche pas.
+
+## C10 — Session doigt « tranchante » (EXPÉRIENCE HUMAINE, ≤ 10 min)
+- Réglages capture (tracer) : comme C8 (`SEP_OOL_EPS=0x08`, `SEP_OOL_BYTES=0x400`, `SEP_OOL_SPLIT_DIR=1`), types complets
+  = ceux de C8 **+ 0x6c** (lu seulement après un succès, hors chemin requête→réponse). Ne rien changer d'autre.
+- Règles C3/C8 inchangées : verrouiller **uniquement** par Ctrl+Cmd+Q ; doigt à plat ~2 s sans appuyer ; jamais d'appui
+  sur la touche Touch ID. Au plus 3 refus d'affilée (éviter le passage forcé au mot de passe) ; si macOS exige le mot de passe,
+  `./tools/mark.sh anomalie`, taper le mot de passe, continuer.
+- Script (même forme que `tools/guide_doigt.sh` : `go <étiquette> "<consigne>"`, `wait_s`, `res`) ; à écrire par le tracer,
+  par exemple `tools/guide_doigt_c10.sh` :
+  ```
+  mark loginwin
+  go pw_login        "tape ton MOT DE PASSE + Entrée"                       ; wait_s 25
+  # cycle 1 : mauvais PUIS bon doigt dans le même verrouillage (HJ, HG +0x28, ordre inversé vs C8)
+  go lock_m1         "Ctrl+Cmd+Q (verrouiller)"                              ; wait_s 15
+  go fp_bad_1        "MAUVAIS doigt (non enrôlé)"   ; wait_s 5 ; res fp_bad_1
+  go fp_good_1       "BON doigt"                    ; wait_s 5 ; res fp_good_1 ; wait_s 20
+  # cycle 2 : effleurements (HG : provoquer des abandons), puis bon doigt
+  go lock_m2         "Ctrl+Cmd+Q (verrouiller)"                              ; wait_s 15
+  go fp_tap_1        "EFFLEURE le capteur (< 0,3 s) avec le BON doigt" ; wait_s 4
+  go fp_tap_2        "EFFLEURE encore (< 0,3 s)"                        ; wait_s 4
+  go fp_tap_3        "EFFLEURE encore (< 0,3 s)"                        ; wait_s 4 ; res fp_tap
+  go fp_good_2       "BON doigt à plat"             ; wait_s 5 ; res fp_good_2 ; wait_s 20
+  # cycle 3 : bout du doigt (HF : codes de refus), puis bon doigt
+  go lock_m3         "Ctrl+Cmd+Q (verrouiller)"                              ; wait_s 15
+  go fp_tip_1        "BON doigt, SEULEMENT LE BOUT"  ; wait_s 5 ; res fp_tip_1
+  go fp_good_3       "BON doigt à plat"             ; wait_s 5 ; res fp_good_3 ; wait_s 20
+  # session ouverte (HE alternative 1, HL) : invite Touch ID sans verrouillage
+  go fp_app_prompt   "Safari > Réglages > Mots de passe (attends l'invite Touch ID, NE POSE PAS le doigt)" ; wait_s 5
+  go fp_app_good     "BON doigt sur l'invite"       ; wait_s 5 ; res fp_app_good   # puis fermer la fenêtre
+  go fp_app_prompt2  "rouvre Safari > Réglages > Mots de passe (invite Touch ID)"            ; wait_s 5
+  go fp_app_bad      "MAUVAIS doigt sur l'invite, puis Annuler" ; wait_s 5 ; res fp_app_bad
+  # HN / HB : lecture seule
+  go uid_check       "Terminal : id -u ; dscl . -read /Users/\$(id -un) GeneratedUID  (recopie la sortie)" ; res uid_check
+  mark end
+  ```
+  Si l'invite Safari ne propose pas Touch ID (option « Remplissage automatique » désactivée), utiliser toute autre invite
+  qui affiche l'icône Touch ID sans rien modifier, ou sauter ces étapes (`./tools/mark.sh anomalie`). Ne **pas** passer par
+  `sudo` ni par un réglage système qui change l'état du Mac.
+- Durée estimée : ~1 min login, ~1 min par cycle (×3), ~1,5 min invites, ~0,5 min Terminal → **~6 min** + marge.
+- Ce que chaque étape tranche (prédictions des hypothèses actuelles) :
+  | Étapes | Hypothèse | Si vraie | Si fausse |
+  |---|---|---|---|
+  | fp_bad_1 → fp_good_1 (même lock) | HJ, HG `+0x28` | `+0x44` identique aux deux ; `+0x28` 1 puis 0 (doigt) ou égal (verrouillage) | `+0x44` change entre les deux → lié au doigt/à l'essai |
+  | fp_bad_1 avant tout succès | HE, réserve « ordre » | B 0x09 = -1, `+0xc24`=0x2e, même en début de session | 0x2e absent / autre valeur → 0x2e lié au moment de session |
+  | fp_tap_1..3 | HG | `00 00` dans chaque `23 06 65 07 22` ; `01 01` si 0x09 suit | une exception → `+0x06..07` ne décide pas |
+  | fp_tip_1 | HF | refus avec code ≠ 0x2e (ou succès avec 1/2) | 0x2e pour tout refus → booléen « pas de correspondance » |
+  | fp_good_1..3 | HE, HO | 0x1f5 + identifiant ; 0x6c lu en entier (pour C11-boot) | — |
+  | fp_app_good / fp_app_bad | HE alt. 1, HL | 0x1f5 / -1 dans B **sans** notif `<12 TAG=0 DATA=0xfffffe0b` | B = -1 malgré l'acceptation, ou notif -501 présente → verdict lié au keybag / notif = « événement d'auth » |
+  | uid_check | HN, HB | 501 et GeneratedUID = `FE6003D8-CEA5-414F-B48A-0338DC7C371B` | UUID différent → objet biométrique |
+- Après C10 : C11-boot sans humain (arrêt **propre** de macOS avant, par Albert, menu Pomme > Éteindre si possible sous HV)
+  pour retrouver le blob 0x6c de C10 dans les `> A 0x5b/0x6d` de l'init (HO).
