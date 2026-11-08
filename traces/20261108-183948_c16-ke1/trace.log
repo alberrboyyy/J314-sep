@@ -828,3 +828,9 @@ TTY> HV: Entering guest secondary 9 at 0x1001b10c000
 [cpu9] Pass: mrs x13, HID1_EL1 = 1440000002000000 (HID1_EL1)
 [cpu9] Pass: msr HID1_EL1, x13 = 1440000002000000 (OK) (HID1_EL1)
 [cpu9] Pass: mrs x13, HID18_EL1 = 2000040004000 (HID18_EL1)
+[cpu9] Pass: msr HID18_EL1, x13 = 2000040004000 (OK) (HID18_EL1)
+TTY> HV: User interrupt
+Entering hypervisor shell
+[cpu0] User interrupt
+>>> Returning from exception
+Hard rebooting the system

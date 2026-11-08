@@ -9,3 +9,10 @@ kernel: /home/albert/Desktop/sep-touchid/macos/kernel.macho
 bootargs: debug=0x14e serial=3 apcie=0xfffffffe -enable-kprintf-spam wdt=-1 clpc=0
 proxy_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00
 hv_uart_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if02
+end_reason: stop_requested
+proxy_back_after_reboot: yes
+lines: 836
+live_eps: 0x08,0x12
+marks: 8
+sep_eps: all
+sep_lines: 2453
