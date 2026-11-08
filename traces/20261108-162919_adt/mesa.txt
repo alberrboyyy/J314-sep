@@ -1,0 +1,90 @@
+# 368 noeuds
+
+# Controleurs spi1..spi4
+== /device-tree/arm-io/spi2
+   compatible = [spi-1,spimc]
+   interrupt-parent = 126
+   interrupts = [1108]
+   clock-gates = [144]
+   clock-ids = [378]
+   reg = [Container:
+   device_type = spi
+   AAPL,phandle = 44
+   spi-version = 1
+   enfants : mesa
+== /device-tree/arm-io/spi3
+   compatible = [spi-1,spimc]
+   interrupt-parent = 126
+   interrupts = [1109]
+   clock-gates = [145]
+   clock-ids = [379]
+   reg = [Container:
+   device_type = spi
+   AAPL,phandle = 46
+   spi-version = 1
+   enfants : ipd
+== /device-tree/arm-io/spi4
+   compatible = [spi-1,spimc]
+   interrupt-parent = 126
+   interrupts = [1110]
+   reg = [Container:
+   clock-gates = [146]
+   clock-ids = [380]
+   AAPL,phandle = 48
+   device_type = spi
+   spi-version = 1
+   enfants : dp855, display-temp-sens1, display-temp-sens2, display-temp-sens3
+== /device-tree/arm-io/spi1
+   compatible = [spi-1,spimc]
+   interrupt-parent = 126
+   interrupts = [1107]
+   reg = [Container:
+   clock-gates = [143]
+   clock-ids = [377]
+   AAPL,phandle = 183
+   device_type = spi
+   spi-version = 1
+   enfants : spinor
+
+# Noeuds biosensor,mesa
+parent : /device-tree/arm-io/spi2  compatible=[spi-1,spimc]
+== /device-tree/arm-io/spi2/mesa
+   compatible = [biosensor,mesa]
+   mesaType = 1
+   interrupt-parent = 132
+   interrupts = [195, 3]
+   reg = 00000000f4010000000101080000000014000000000000000000000000000000
+   scan-timer-reset-time = 39321
+   function-hid_event_dispatch = 356:ButD()
+   time-between-scans = 131072
+   device_type = mesa
+   AAPL,phandle = 45
+   function-mesa_pwr = 132:GPIO(0xc4, 0x101)
+   power-on-delay = 7
+   max-scan-time = 78643
+   spi-frequency = 8000000
+   power-off-delay = 10
+
+# function-* : phandle -> noeud cible
+   function-hid_event_dispatch: 356:ButD()  ->  /device-tree/buttons
+   function-mesa_pwr: 132:GPIO(0xc4, 0x101)  ->  /device-tree/arm-io/gpio0
+
+# gpios / interrupts
+   interrupt-parent = 132
+   interrupts = [195, 3]
+
+# parent
+== /device-tree/arm-io/spi2
+   compatible = [spi-1,spimc]
+   interrupts = [1108]
+   clock-gates = [144]
+   clock-ids = [378]
+   reg = [Container:
+   AAPL,phandle = 44
+   spi-version = 1
+
+# Noeuds GPIO (phandle)
+   /device-tree/arm-io/gpio0 phandle=132 compatible=[gpio,t6000, gpio,s5l8960x]
+   /device-tree/arm-io/aop-gpio0 phandle=133 compatible=[gpio,t6000, gpio,s5l8960x]
+   /device-tree/arm-io/nub-gpio0 phandle=134 compatible=[gpio,t6000, gpio,s5l8960x]
+   /device-tree/arm-io/smc-gpio phandle=135 compatible=[gpio,t6000, gpio,s5l8960x]

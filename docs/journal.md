@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-08 — Claude — ADT-1 : dump du device tree (lecture seule)
+- Trace : traces/20261108-162919_adt (tools/dump_adt.sh, analysis/adt_find_mesa.py)
+- Fait : dump ADT 507904 octets, m1n1 frais chainloadé, aucune écriture.
+- Vu : capteur `biosensor,mesa` = enfant de **spi2** (interrupts 1108, clock-gate 144, phandle 44) ; spi-frequency 8 MHz ; power-on-delay 7, power-off-delay 10 ; `function-mesa_pwr` = GPIO(0xc4, 0x101) sur gpio0 (phandle 132) ; IRQ capteur = gpio0 [195, 3] ; pas de function-mesa_reset / _pwr1v8 dans ce nœud ; reg = f4010000 00010108 ... (octets bruts, sens non décodé).
+- Interprété : le reset passe par l'AOP (cohérent avec docs/sensor_hw.md) ; sens du pin 0xc4 et de 0x101 = hypothèse.
+- Incidents : aucun. Mac reste en mode proxy.
+
 ## 2026-11-08 — Claude — SKS-1 : symboles AppleKeyStore ↔ messages EP 0x12
 - Trace : — (relecture docs/messages.md, kext_sepmanager.md ; analysis/out/sks_symbols.txt)
 - Fait : relié les noms de symboles aux messages 0x12 ; hypothèse SKS-1 dans docs/hypotheses.md.
