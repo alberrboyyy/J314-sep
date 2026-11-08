@@ -9,11 +9,11 @@
 # Capture recommandée (à lancer AVANT, même réglages que C8 + 0x6c en lecture complète) :
 #   SEP_OOL_EPS=0x08 SEP_OOL_BYTES=0x400 SEP_OOL_SPLIT_DIR=1 \
 #   SEP_OOL_FULL_TYPES=0x09,0x21,0x45,0x54,0x5b,0x5f,0x65,0x6c,0x6d \
-#   TRACE_TIMEOUT=1500 ./tools/boot_and_trace.sh c11-doigt-tranchant
+#   TRACE_TIMEOUT=1800 ./tools/boot_and_trace.sh c11-doigt-tranchant
 #   - 0x6c : lu en entier (B, 0x4000) seulement sur EP 0x08, 3 morceaux après chaque succès (HO).
 #     Supporté par hv/trace_sep_filtered.py : SEP_OOL_FULL_TYPES passe par _parse_eps (toute valeur 0..0xff),
 #     test `typ in full_types` dans _ool_dump. Ne change rien aux autres EP (0x6c y est un TYPE sans lecture OOL).
-#   - TRACE_TIMEOUT=1500 : C8 = 1200 s pour ~7 min de session ; ici ~2 min de boot + ≤ 10 min + marge
+#   - TRACE_TIMEOUT=1800 : C8 = 1200 s pour ~7 min de session ; ici ~2 min de boot + ≤ 10 min + marge
 #     pour un retard humain. Fin : ./tools/stop_capture.sh (reboot() HV = arrêt NON propre de macOS ;
 #     piège (a) de HO : si Albert veut tester la persistance au boot suivant, arrêt propre de macOS
 #     d'abord (menu Pomme > Éteindre), comportement sous HV non vérifié).
@@ -76,6 +76,16 @@ go fp_good_2 "BON doigt à plat"; wait_s 5; res fp_good_2; wait_s 20
 go lock_m3 "Ctrl+Cmd+Q (verrouiller)"; wait_s 15
 go fp_tip_1 "BON doigt, SEULEMENT LE BOUT"; wait_s 5; res fp_tip_1
 go fp_good_3 "BON doigt à plat"; wait_s 5; res fp_good_3; wait_s 20
+
+# Cycle 4 : mauvais doigts en série jusqu'au blocage Touch ID (chemin « mot de passe exigé »), puis mot de passe
+go lock_m4 "Ctrl+Cmd+Q (verrouiller)"; wait_s 15
+for i in 1 2 3 4 5 6; do
+  go fp_bad_s$i "MAUVAIS doigt (essai $i/6)"; wait_s 5; res fp_bad_s$i
+  read -r -p "    macOS demande le mot de passe / Touch ID désactivé ? (o/n) " r; note "lockout_after_$i $r"
+  [ "$r" = o ] && break
+done
+go fp_good_locked "BON doigt (alors que Touch ID est bloqué)"; wait_s 5; res fp_good_locked
+go pw_unlock_4 "déverrouille au MOT DE PASSE"; wait_s 20
 
 # Session ouverte : invite Touch ID hors écran de verrouillage (HE alt. 1, HL)
 echo; echo "  Invite = Réglages Système > Mots de passe. Pas d'icône Touch ID ? Échap, ./tools/mark.sh anomalie, Entrée partout."
