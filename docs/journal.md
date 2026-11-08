@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-08 — driver — Étape 4 (hors ligne) : réassemblage GT fc/fd/fe + CRC des tranches 0x65
+- Trace : toutes les captures avec sep.log (compteur) ; OOL de C6, C8, C11, C12 (réassemblage), lecture seule.
+- Fait : `driver/sepreplay/gt.py` (règle de compteur, relecture OOL avec report `changed=none`, réassemblage par en-tête 0x1c, contrôle de tranches) + `driver/tests/test_step4_gt.py`.
+- Vu : règle de compteur (fc = 0 ; fe = nb de fd déjà vus ; fd = ce nb + 1) : 5086 messages GT sur 18 traces, 0 exception (la doc cite 4006/14 traces : ensemble de traces différent). sha des .bin = sha du log pour toutes les lectures de C6/C8/C11/C12. C11 : 24/24 transferts 0x65 de 0x7200 o, 288/288 tranches (en-tête `80 52`, longueur 0x980, CRC-16/ARC) ; C6+C8+C11 : 39/39 images, 468/468 tranches. Une tranche corrompue est détectée. 0x5b = 0xfc99 o (sha d5a6117d), 0x5f = 0x568e puis 0x70ce o, complets en C11 et C12.
+- Vu (limites) : le réassemblage 0x65 doit se limiter à dir '>' tampon A (anciens tracers sans split_dir relisent la même charge sous '<' : 12 au lieu de 6 pour C6). Transferts incomplets uniquement par troncature du tracer : 0x5f de C5/C6 (2 chacun, 0x5f pas encore dans full_types) et 0x6c de C8 (3 gros blobs, 2988 o lus sur ~37 Ko).
+- Interprété : rien de nouveau ; la règle de compteur reste « vérifié (côté macOS) ». 22/22 tests OK.
+- Incidents : aucun.
+
 ## 2026-11-08 — driver — Étape 3 (hors ligne) : parseur de trame capteur et du statut `80 20 00 10000000 ...`
 - Trace : hv_uart.log de 20 captures (ligne `AppleBiometricSensor: start(): SensorStatus: 16B | ...`), lecture seule.
 - Fait : `driver/sepreplay/sensor.py` (trame `80 op idx u32len charge`, statut, constructeur de la demande de lecture `80 13`), `crc.py` (CRC-16/ARC, vecteur standard 0xBB3D) ; `driver/tests/test_step3_sensor.py`.
