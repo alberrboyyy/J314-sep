@@ -197,3 +197,52 @@ origine non lue) → `0x65` (image 0x7200 o lue sur SPI, AP recopie) → `0x07` 
 - `SET_SHMEM 0x18` de m1n1 lu comme une taille : déduction, pas vérifiée.
 - Les noms SET_OOL_IN/OUT et les sens des bits sont des noms de fonctions Apple ; leur sémantique côté SEP n'est pas
   observable depuis le kext.
+
+## Écarts d'ordre d'init K6-1..3, `+0x14` de 0x09, 0x63/0x61 (2026-11-08, analyste — source: kext, macOS 13.5)
+
+Méthode : AppleMesaSEPDriver (fileset de `macos/kernel.macho`), noms par `analysis/kext/ksyms.py`, listings
+`kdis.py func` (non commités), arbre d'appels et immédiats `w1` par script jetable. Aucun code copié. Les offsets `this+0x…`
+sont ceux du kext (noms de champs = déduits des chaînes de log, sauf mention).
+
+**K6-1 (5f et 01 jamais adjacents) : expliqué.** `loadPatch(uint, uint8*, uint, bool)` (0x978bd88) contient, dans cet
+ordre : envoi `0x5f` (patch) → `applySensorParams(false)` → lecture du n° de série module (`getSensorModuleSerialNumberRaw`,
+`memcmp` de 0x14 o, puis `checkDisableConditions`) → **`0x01` sans paramètre** (sepTransact w1=1, aucun tampon) →
+`cacheMatchPolicy(true)` → `_sensorState = 3` (this+0x200). Donc 5d 5c 6a [6f] et 31 32 sont **à l'intérieur** de
+`loadPatch`, et 0x01 en est la dernière commande SEP : l'ordre observé `5f 5d 5c 6a 31 32 01` est l'ordre du code.
+L'hypothèse « loadPatch appelle applySensorParams et le n° de série entre le patch et 0x01 » est la bonne ; la lecture
+« 5f → GetStatus → 01 » était fausse. Rôle de 0x01 : il précède le passage à l'état 3 → plutôt « activer/valider le capteur
+après patch » (interprétation ; aucun tampon, donc rien à décoder).
+
+**K6-2 (0x6f absent au 1er tour, présent au 2e) : expliqué par un drapeau posé par `setCalibrationData`.**
+`applySensorParams(coverageParamsOnly)` envoie 0x5d, 0x5c, 0x6a (si `!coverageParamsOnly`), puis 0x6f **seulement si**
+`this+0x204 ∈ {3,4}` (valeur lue comme type de capteur, cf. assert `_sensorType == kSensorType…`) **et** l'octet `this+0x2cc3`
+≠ 0. Cet octet n'est écrit qu'à un endroit du kext : `setCalibrationData` (0x9785b24, `=1`), après l'envoi de 0x5b.
+1er tour (avant 0x5b) : octet = 0 → pas de 0x6f ; 2e tour (après 5b/63) : octet = 1 → 0x6f. Concorde avec 8/8 boots.
+Autre effet : chacun de 5d/5c/6a/6f, si la réponse est `0x12d`, relance `resetSensorAndLoadPatch(4,false)` — jamais vu en trace.
+Limite : ne dit pas de quel type est notre capteur ; seule la présence de 0x6f au 2e tour prouve que `+0x204 ∈ {3,4}`.
+
+**K6-3 (0x61 jamais envoyé) : expliqué, condition dépendant de l'arbre de périphériques.**
+`setCalibrationData` envoie 0x61 avec **4 octets en entrée** (float, `w3=4`, sortie nulle) ; le log est « Modulation ratio set
+to SEP. (MR*1000)=%d ». Conditions : `this+0x1cc4` (float) ≠ 0 **et** l'indicateur « déjà envoyé » (`this+0x1cc8`) = 0. Le float est
+écrit uniquement par `mesaInit` (0x977ea54) : u16 d'une propriété de nom `modulation-ratio` × 1/1024 ; si la propriété est
+absente ou nulle, il reste 0 (init à 0 dans `start`). Donc 0x61 = « envoyer le ratio de modulation au SEP », et il n'est pas
+envoyé ici parce que `modulation-ratio` est absent/0 dans le DT de ce MBP (**hypothèse non vérifiée** : aucun DT dans les
+traces ; `grep modulation` traces/docs = 0). Conséquence Linux : rien à faire tant que cette propriété est absente.
+
+**Ordre de la 2e passe (K6-4, complément).** `setCalibrationData` finit (si `this+0x204 ∈ [2,4]` et l'octet `this+0x1c38` = 0)
+par `resetSensorAndLoadPatch(4,false)` (0x9785e70) = `resetSensor` (→ 0x19) puis `loadPatch(…)` : c'est la 2e passe complète
+(17 15 16 42 18 5f … 01 1f vue en C11). Autrement (octet ≠ 0) le kext fait `applySensorParams(false)` + `sendDeviceSerialNumberToSbio`
+sans reset. Le 1er tour passe par `prepareSession` (0x17, `performKeyExchange(1)` = 15/16) puis `loadPatch`.
+Non élucidé : quel chemin fait appeler `prepareSession`/`initializeSequenceCounter` dans la 2e passe (appel virtuel, non résolu).
+
+**K3 (+0x14 de la réponse 0x09).** Les 29 réponses 0x09 OOL non vides (C6 5, C8 6, C11 18 ; charge 0xca2 = 3234 o,
+`analysis/out/c{6,8,11}_payloads/*outB_09.bin`, C11 extrait par `ool_attempts.py --dump-dir`) ont **toutes** `+0x14..+0x1b = 0`
+(u32 +0x14 = 0, 29/29, y compris les non-correspondances `ffffffff` de C11). C6 a 5 autres fichiers 0x09 vides (0 o, pas des
+réponses). Les 18 de C11 couvrent bon et mauvais doigt, session verrouillée et ouverte. Cohérent avec « ≠ 0 ⇒ relance » :
+aucune relance n'a lieu. (C1/C3 : captures antérieures sans dump OOL, non lues → les 50 transactions annoncées par le
+sceptique ne sont couvertes qu'à 29.) Statut : lecture kext **non contredite**, branche ≠ 0 jamais exercée.
+
+**0x63 / 0x61.** 0x63 = `getCalibrationDataInfo` (0x97854d4 : sepTransact w1=0x63 ; attente d'événement 30 s `waitForEvent(0x7530)`
+si le drapeau n'est pas prêt). Utilisé sur ce capteur : oui (présent à chaque boot : `5b 63`, `63 63`, + 2 dans la queue
+user-client). `setCalibrationData` exige que la taille retournée soit `sizeof(calDataInfo)` (assert) avant
+`sendDeviceSerialNumberToSbio`. 0x61 n'est **pas** GetCalibrationDataInfo : c'est le ratio de modulation (voir K6-3), non envoyé.

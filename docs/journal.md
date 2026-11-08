@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — Kext : écarts d'init K6-1..3, +0x14 de 0x09, 0x63/0x61
+- Trace : traces/ C5..C12 (comparaison) ; analysis/out/c{6,8,11}_payloads ; source: kext (AppleMesaSEPDriver, kernel.macho 13.5).
+- Fait : lecture de loadPatch, applySensorParams, setCalibrationData, resetSensorAndLoadPatch ; extraction C11 `ool_attempts.py --dump-dir analysis/out/c11_payloads/`.
+- Vu : 5d 5c 6a [6f], 31 32 et 0x01 sont dans loadPatch ; 0x6f exige un octet posé par setCalibrationData ; 0x61 = ratio de modulation, conditionné à une propriété `modulation-ratio` ; +0x14 = 0 sur 29/29 réponses 0x09 ; 0x63 = GetCalibrationDataInfo.
+- Interprété : détails et réserves dans docs/kext_sepmanager.md (dernière section). Rien changé dans messages.md/hypotheses.md.
+- Incidents : aucun (pas de hardware).
+
 ## 2026-11-08 — sceptique — Tableau de statut de vérification
 - Trace : — (relecture de docs/messages.md, kext_sepmanager.md, hypotheses.md, journal C12)
 - Fait : `docs/verification_status.md` (1 ligne par message/champ, statut selon CLAUDE.md, manque pour `vérifié`, 3 expériences).
