@@ -14,6 +14,29 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — Correctif ool_index, test HO sur C9, invariants d'en-tête C5-C9
+- Trace : traces/20261108-004657_c8-doigt-ool, traces/20261108-010915_c9-boot-ool-persist ; C5, C6, C7 pour les invariants.
+- Fait : `analysis/ool_index.py` : les lignes `changed=none` sont maintenant rattachées au dernier .bin de même (buffer,
+  longueur), comme la comparaison du tracer ; contrôle sha256[:8] de chaque contenu rattaché (`sha_ok`). Ancienne version :
+  15 rattachements faux dans C8 (L1684, 2209, 2361, 2430, 2840, 2978, 3001, 3493, 3631, 3833, 3836, 3866, 4089, 4227, 4383),
+  0 dans C5/C6/C7/C9 ; nouvelle : 0 faux sur C5-C9. Test synthétique ajouté (25/25 OK). `c8_ool_index.txt` régénéré ;
+  `c8_ool_attempts.txt` inchangé (les charges des tentatives n'étaient pas touchées). docs/messages.md corrigé : en-tête
+  TYPE 430/430 sans exception, `<fe` = B entièrement nul (14/14), répartition des notifications refaite.
+  Nouveau `analysis/ool_invariants.py` → `analysis/out/c5_c9_ool_invariants.txt`.
+- Vu (HO) : `> A 0x6d` d'init identique dans C5-C8 et **changé dans C9** : petit blob (0xf4) = export `< B 0x6c` de C8 L3250
+  (même sha), gros blob 0x9317 o = longueur de l'export C8 L3226 (fp_good_3), 0x3e4 premiers octets identiques (seuls lus
+  dans C8). `> A 0x5b` (0xfc99 o) identique C5-C9. `< B 0x5f` différent à chaque boot. Blobs 0x6c/0x6d : magic `LTFC`,
+  u32 0x0a, uid, puis ~8 bits/octet.
+- Vu (invariants C5-C9, 1695 lectures) : 0 violation sur `+0x00` ∈ {0,1} ⇔ nul, TYPE, longueur de morceau, `+0x0c`/`+0x10`=0 ;
+  51 cas d'octets au-delà de la fin du morceau, tous = reste de la lecture précédente du même buffer.
+- Vu (`+0xc24`, C6+C8) : pas une fonction de `+0x48`/`+0x07` de 0x06 ni de `+0x24` de 0x07 (C6, `+0x48`=0 : 5, 0x1b, 6, 0x1b).
+  1er flottant de 0x07 (`+0x18`) : 0.040-0.048 pour les 3 mauvais doigts, 0.103-0.146 pour les 12 autres tentatives à 0x09 ou
+  abandonnées (C6+C8) — confondu avec `+0x44`=5 / fin de session (réserve du sceptique).
+- Interprété (hypothèse) : HO soutenue — le SEP exporte un blob chiffré par uid après chaque succès (0x6c), macOS le stocke
+  et le renvoie au boot (0x6d) ; l'enregistrement 0x54 (HI) en dérive. Conséquence pour un futur driver : il devrait
+  conserver et renvoyer ce blob. 1 boot, export lu tronqué : à confirmer (0x6c en lecture complète, C10/C11).
+- Incidents : aucun (aucune action hardware).
+
 ## 2026-11-08 — Claude (session principale) — C10 : boot de contrôle bloqué
 - Trace : traces/20261108-011515_c10-boot-ool-stable (TRACE_TIMEOUT=200, même config OOL que C9).
 - Vu : hv_uart.log s'arrête à 806 lignes (C9 : 2631), dernière ligne `IOPort::registerService(): [Port-MagSafe 3@1] Regi` tronquée ;

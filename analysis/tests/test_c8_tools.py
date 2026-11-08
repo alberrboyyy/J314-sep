@@ -55,6 +55,41 @@ class TestC8Tools(unittest.TestCase):
         self.assertEqual(ool_index.content_end(b"\0\0"), 0)
 
 
+class TestOolIndexKey(unittest.TestCase):
+    """Capture SYNTHÉTIQUE (tempdir) : une ligne changed=none doit renvoyer au dernier .bin de même
+    (buffer, longueur), comme le tracer, pas au dernier .bin du buffer."""
+
+    def test_none_uses_same_length(self):
+        import hashlib
+        import shutil
+        import tempfile
+        d = tempfile.mkdtemp()
+        try:
+            os.mkdir(os.path.join(d, "sep.log.ool"))
+            small = b"\1" + b"\0" * 0x3FF          # lecture 0x400
+            big = b"\0" * 0x4000                     # lecture complète, tout à zéro
+            for name, blob in (("000001_08_B.bin", big), ("000002_08_B.bin", small)):
+                with open(os.path.join(d, "sep.log.ool", name), "wb") as f:
+                    f.write(blob)
+            sha = lambda b: hashlib.sha256(b).hexdigest()[:8]  # noqa: E731
+            log = [
+                "1.0 < EP=0x08 TAG=0xfc TYPE=0x65 PARAM=0x00 DATA=0x00000000",
+                "# ool 1.0 seq=1 EP=0x08 dir=< buf=B sha=%s nz=0 changed=init len=0x4000 elapsed_ms=0.1 file=000001_08_B.bin" % sha(big),
+                "2.0 < EP=0x08 TAG=0xfc TYPE=0x06 PARAM=0x00 DATA=0x00000000",
+                "# ool 2.0 seq=2 EP=0x08 dir=< buf=B sha=%s nz=1 changed=init len=0x400 elapsed_ms=0.1 file=000002_08_B.bin" % sha(small),
+                "3.0 < EP=0x08 TAG=0xfe TYPE=0x65 PARAM=0x00 DATA=0x00000000",
+                "# ool 3.0 seq=3 EP=0x08 dir=< buf=B sha=%s nz=0 changed=none len=0x4000 elapsed_ms=0.1" % sha(big),
+            ]
+            with open(os.path.join(d, "sep.log"), "w") as f:
+                f.write("\n".join(log) + "\n")
+            rows = ool_index.load_index(d, 0x08)
+            self.assertEqual(rows[2]["src"], "000001_08_B.bin")
+            self.assertEqual(rows[2]["end"], 0)
+            self.assertTrue(all(r["sha_ok"] for r in rows))
+        finally:
+            shutil.rmtree(d)
+
+
 class TestLockCyclesClock(unittest.TestCase):
     """Lignes ACMTRM INVENTÉES reprenant les deux formes de `now=` (C3 : epoch(0), C8 : secondes(base))."""
 

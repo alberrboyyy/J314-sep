@@ -13,6 +13,7 @@ Usage :
 """
 
 import argparse
+import hashlib
 import os
 import re
 import sys
@@ -56,28 +57,38 @@ def load_index(capture, ep=0x08):
                  "nz": int(kv["nz"]), "changed": kv["changed"], "len": int(kv["len"], 16),
                  "elapsed_ms": float(kv["elapsed_ms"]), "full": kv.get("full"), "trunc": kv.get("trunc", "0"),
                  "file": kv.get("file"), "msg": last_msg}
+            # Le tracer compare chaque lecture à la précédente de même (EP, buffer, LONGUEUR)
+            # (hv/trace_sep_filtered.py, `key = (ep, name, len(blob))`) : une ligne changed=none renvoie au
+            # dernier .bin de même (buffer, longueur), pas au dernier .bin du buffer.
+            key = (buf, r["len"])
             if r["file"]:
-                last_file[buf] = r["file"]
-            r["src"] = r["file"] or last_file.get(buf)
+                last_file[key] = r["file"]
+            r["src"] = r["file"] or last_file.get(key)
             data = b""
             if r["src"]:
                 with open(os.path.join(ooldir, r["src"]), "rb") as g:
                     data = g.read()
             r["data"] = data
             r["end"] = content_end(data)
+            # contrôle : sha256[:8] du contenu rattaché = sha du log (None si aucun .bin)
+            r["sha_ok"] = (hashlib.sha256(data).hexdigest()[:8] == r["sha"]) if r["src"] else None
             rows.append(r)
     return rows
 
 
 def render(capture, ep):
     rows = load_index(capture, ep)
-    out = ["# ool_index : %s EP=0x%02x, %d lectures" % (capture, ep, len(rows)),
+    bad = [r for r in rows if r["sha_ok"] is False]
+    miss = [r for r in rows if r["sha_ok"] is None]
+    out = ["# ool_index : %s EP=0x%02x, %d lectures ; contrôle sha : %d faux, %d sans .bin" % (
+               capture, ep, len(rows), len(bad), len(miss)),
            "ool_L  msg_L  dir buf TAG  TYPE  len    end    nz    trunc changed  file"]
     for r in rows:
         m = r["msg"]
         out.append("%-6d %-6d %s   %s   0x%02x 0x%02x  0x%-4x 0x%-4x %-5d %-5s %-8s %s" % (
             r["ool_line"], m["lineno"], r["dir"], r["buf"], m["tag"], m["type"], r["len"], r["end"], r["nz"],
-            r["trunc"], r["changed"][:8], r["file"] or ("(=%s)" % r["src"])))
+            r["trunc"], r["changed"][:8], (r["file"] or ("(=%s)" % r["src"])) +
+            ("" if r["sha_ok"] is not False else "  SHA_FAUX")))
     return "\n".join(out) + "\n"
 
 

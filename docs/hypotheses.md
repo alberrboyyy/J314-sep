@@ -527,6 +527,12 @@ Correspondance avec la demande : 1 = HE + HF, 2 = HK, 3 = HG, 4 = HH, 5 = HL, 6 
   | = C5..C8 | différents | incohérent avec les deux : relire l'outillage avant d'interpréter |
   (C10, réglage) ajouter 0x6c à `SEP_OOL_FULL_TYPES` pour lire le blob exporté en entier et le retrouver (ou non) octet pour
   octet dans le `> A 0x6d`/`0x5b` du boot suivant (C11-boot sans humain).
+- **Résultat C9 (analyste, 2026-11-08) : ligne 1 du tableau → HO soutenue, HI à reformuler.** 0x54 C9 = copie 0x21 de
+  fp_good_3 (0 octet différent hors 0x06-0x2d) ; `> A 0x5b` C9 = C5..C8 (inchangé) ; `> A 0x6d` C9 **changé** : petit blob
+  (0xf4) = export `< B 0x6c` C8 L3250 (même sha 5965c621), gros blob de 0x9317 o = longueur de l'export L3226, 0x3e4 premiers
+  octets identiques (seuls lus). Statut : hypothèse (1 boot, export lu tronqué) ; la persistance passe par le stockage côté
+  macOS, rien n'indique un stockage propre au SEP. Reste à faire : lecture complète de 0x6c (réglage ci-dessus) et C10/C11.
+  Détail : `docs/messages.md`, section « 0x6c / 0x6d / 0x5b / 0x5f ».
 
 ## HJ — Revue
 - Rien à ajouter sur le fond : la confusion `+0x44` / ordre de session est réelle. Elle contamine aussi `+0x28` et `+0x48`
