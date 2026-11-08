@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-08 — driver — Étape 2 (hors ligne) : table de découverte 0xFD (nom -> EP, tailles)
+- Trace : C5, C6, C7, C8, C9, C10b, C11, C12 (8 boots), lecture seule.
+- Fait : `driver/sepreplay/discovery.py` + `driver/tests/test_step2_discovery.py` ; recherche par nom (`find("sbio")` = 0x08), aucun n° codé en dur dans le module.
+- Vu : 12 EP annoncés dans chacun des 8 boots, noms = table de messages.md 8/8 ; tailles FD TYPE 1 lues (octet0 min envoi, octet1 max envoi, octet2 min recv, octet3 max recv, pages 0x4000) : T4/T5 des ouvertures CNTL = octet1/octet3 x 0x4000 dans 67/67 séquences (prédiction écrite avant) ; sbio C11 : A=0x64000, B=0x6c000, 0x4000/0x4000.
+- Vu (écart) : l'ORDRE d'annonce n'est PAS identique : 3 ordres sur 8 boots (C7 : 0x17,0x0c avant 0x08 ; C9 : 0x0e avant 0x15). verification_status.md disait « C6..C12 ont le même ordre » : inexact. Ensemble identique 8/8, 4 premiers identiques. Conséquence : le pilote doit chercher par nom.
+- Interprété : le sens des 4 octets de tailles reste `hypothèse` (cohérent 67/67, mais la prédiction vient du motif lu).
+- Incidents : aucun. 10/10 tests OK.
+
 ## 2026-11-08 — driver — Étape 1 (hors ligne) : décodeur de mots mailbox + lecteur de sep.log
 - Trace : C8 (004657), C11 (025802), C12 (032454), lecture seule.
 - Fait : `driver/sepreplay/mailbox.py`, `driver/tests/test_step1_mailbox.py` ; aucun hardware, aucun tools/*.sh.

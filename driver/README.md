@@ -16,3 +16,5 @@ Chaque module le répète dans sa docstring.
 
 ## Modules
 - `sepreplay/mailbox.py` : étape 1, mot 64 bits + lecteur de `sep.log` (+ lignes `# ool`).
+- `sepreplay/discovery.py` : étape 2, table 0xFD (nom -> EP, tailles) + lecteur des ouvertures CNTL. L'ordre d'annonce varie
+  d'un boot à l'autre (3 ordres sur 8) : toujours chercher par nom.
