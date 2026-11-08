@@ -602,3 +602,28 @@ Correspondance avec la demande : 1 = HE + HF, 2 = HK, 3 = HG, 4 = HH, 5 = HL, 6 
   | uid_check | HN, HB | 501 et GeneratedUID = `FE6003D8-CEA5-414F-B48A-0338DC7C371B` | UUID différent → objet biométrique |
 - Après C10 : C11-boot sans humain (arrêt **propre** de macOS avant, par Albert, menu Pomme > Éteindre si possible sous HV)
   pour retrouver le blob 0x6c de C10 dans les `> A 0x5b/0x6d` de l'init (HO).
+
+# Verdicts après C11 (2026-11-08, analyste) — une ligne par hypothèse
+
+C11 = `traces/20261108-025802_c11-doigt-tranchant` ; détail : `docs/messages.md` section C11, `analysis/out/c11_attempt_fields.txt`.
+« Candidat `vérifié` » = prédiction écrite avant la capture et confirmée par une trace dédiée, sans exception ; la décision
+revient au sceptique / à Albert (CLAUDE.md), pas à l'analyste.
+- **HE** — tient : 0x09 `+0x00`=0x1f5 + identifiant ⇔ correspondance, 18/18 dans C11 (29/29 avec C6+C8), y compris en session
+  ouverte sans notif -501 → alternative 1 (conséquence du déverrouillage keybag) réfutée sur 2 cas. **Candidat `vérifié`.**
+- **HF** — « code par type d'échec » réfuté (mauvais doigt = 0x29, 0x2d, 0x2e) ; « score » soutenu (succès 1-4, refus ≥ 5,
+  bout 0x1e, mauvais doigt 0x29-0x2e). Reste hypothèse (seuil 4/5 jamais testé de près).
+- **HG** — forme forte réfutée : `00 00` suivi 4× de `1e 09` (correspondances). Reste vrai : tout abandon a `00 00` (10/10).
+- **HH** — inchangée (structure seulement ; aucun test du contenu).
+- **HI** — reformulée par HO : chaîne 0x21(N) = 0x09(N+1) 12/12 + 2/2 (C8), mise à jour à chaque correspondance y compris en
+  session ouverte ; 0x54 d'init = dernier état connu (C9 = C10b = C11). Candidat `vérifié` pour la chaîne intra-session.
+- **HJ** — soutenue : `+0x44` identique pour mauvais puis bon doigt du même verrouillage (C11 L1903/L1991) ; compteur de session ;
+  `+0x28` de 0x07 = 0 dans les 6 refus de C11 → le `+0x28`=1 de C8 n'était pas lié au doigt.
+- **HK** — tient : C11 994 lectures, 0 violation I1-I5 (35 restes de morceau précédent, comme C5-C9) ; contrôle sha 0 faux.
+- **HL** — valeurs 33/33 dans C11 (ordre 30/33 : un triplet de verrouillage dans un autre ordre que le log noyau) ; prédiction
+  « -501 absente en session ouverte » confirmée (L6871). Correspondance des valeurs : candidat `vérifié` ; l'ordre, non.
+- **HM** — non testée dans C11 (split_dir=1).
+- **HN** — « identifiant = GeneratedUID » **réfuté** (FF7F7F3C-… ≠ FE6003D8-…, notes.txt) ; « 0x1f5 = uid 501 » confirmé par
+  `id -u`. Nature de l'identifiant : ouverte (gabarit / jeu de gabarits / objet SEP).
+- **HO** — soutenue : `> A 0x6d` inchangé tant qu'il n'y a pas de succès (C9 = C10b = C11), changé après les succès de C8.
+  Prédiction préenregistrée pour le prochain boot (C12) : `> A 0x6d` = exports C11 L6959 (0x9245 o, sha 83613e39) et L6983
+  (0xf4 o, sha 5e58a78d). Si confirmée en octets complets → candidat `vérifié`.

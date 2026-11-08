@@ -14,6 +14,24 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — Analyse C11 (session doigt tranchante)
+- Trace : traces/20261108-025802_c11-doigt-tranchant (sep.log, sep.log.ool/, hv_uart.log, marks.txt, notes.txt d'Albert).
+- Fait : nouveaux `analysis/attempt_fields.py` (champs OOL par tentative) et `analysis/ool_transfers.py` (transferts
+  recollés). Sorties : `analysis/out/c11_attempt_fields.txt`, `c11_lock_cycles.txt`, `c11_transfers.txt`, `c11_transfers/`,
+  `c11_uart_timeline.txt`. Table : docs/messages.md section C11.
+- Vu : 24 tentatives (12 correspondances, 6 refus, 6 abandons). Réponse 0x09 : 0x1f5 + identifiant dans 12/12 correspondances,
+  0xffffffff + zéros dans 6/6 refus, y compris dans l'invite session ouverte (L6871 : 0x1f5 sans notif SKS -501 ni `<01/08` ;
+  L7155 : -1). `+0xc24` : succès 1-4, bout du doigt 0x1e, mauvais doigt 0x29/0x2d/0x2e. Nouvelle commande 0x1e entre 0x07 et
+  0x09 dans 4 tentatives où 0x07 avait `+0x06..07`=`00 00`. Abandons : `00 00` 6/6. `+0x44` identique pour mauvais puis bon
+  doigt du même verrouillage. 0x54 / 0x6e / 0x7a et `> A 0x6d` d'init = C9 ; chaîne 0x21(N) = 0x09(N+1) 12/12. 7 exports
+  0x6c complets (magic LTFC, ~8 bits/o, re-chiffrés à chaque fois). Série de 3 mauvais doigts : aucun `<01/45`, puis
+  fp_good_locked = correspondance normale et UNLOCKED. Effleurements : tous reconnus (pas d'abandon). « lock change » : 33/33
+  valeurs, 30/33 dans le même ordre. GeneratedUID ≠ identifiant 16 o (notes.txt).
+- Interprété (hypothèses) : verdict dans 0x09 indépendant du keybag ; `+0xc24` = score (seuil 4/5) ; 0x07 `00 00` = acquisition
+  faible, l'AP abandonne ou relance (0x1e) ; `+0x44` = compteur de session ; l'enregistrement est mis à jour à chaque
+  correspondance et réexporté chiffré (0x6c).
+- Incidents : aucun côté analyse.
+
 ## 2026-11-08 — Claude (session principale) — C10b : contrôle de persistance (HI/HO)
 - Trace : traces/20261108-012015_c10b-boot-ool-stable (TRACE_TIMEOUT=300, config OOL de C9, aucun humain, aucun boot natif entre C9 et C10b).
 - Vu : boot complet (hv_uart 2168 lignes, sep.log 779, 0 ool_error). `analysis/init_persist.py --ref C9` : réponses d'init 0x54 (0xbf4 o),

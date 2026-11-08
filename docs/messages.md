@@ -264,6 +264,30 @@ Invariants d'en-tête (VU, `ool_invariants.py`, C5-C9, 1695 lectures dont 1389 a
 morceau (plus court) d'un transfert ou dans une notification, et tous égaux à la lecture précédente du même buffer :
 le buffer n'est pas effacé entre deux morceaux (reste du morceau précédent), à ignorer.
 
+### SBIO (0x08) — C11 : session doigt « tranchante » (C11 = `traces/20261108-025802_c11-doigt-tranchant`)
+
+Config OOL = C8 + 0x6c en lecture complète. Résultats : notes.txt (Albert). Sorties : `analysis/out/c11_attempt_fields.txt`
+(une ligne par tentative), `c11_lock_cycles.txt`, `c11_transfers.txt` + `c11_transfers/` (blobs 0x5b/0x5f/0x6c/0x6d),
+`c11_uart_timeline.txt`. 24 tentatives : 12 correspondances, 6 refus complets, 6 abandons. Lignes = sep.log de C11.
+
+| EP | Dir | Tag | Type | Param | Data | Vu (C11) | Rôle supposé | Statut | Source | Date |
+|----|-----|-----|------|-------|------|----------|--------------|--------|--------|------|
+| 0x08 | < | 0xfc | 0x09 | 0 | 0 | Règle de C8 **sans exception sur 18 tentatives à 0x09** : `+0x00`=0x1f5 + identifiant `fe6003d8…` dans les 12 notées réussies ou suivies d'UNLOCKED (fp_good_1/2/3, 3 effleurements, fp_good_locked, invite session ouverte L6261 et fp_app_good L6871), 0xffffffff + zéros dans les 6 refus (fp_bad_1 L1903, fp_tip_1 L4747, série L5376/L5442/L5490, fp_app_bad L7155). **Invite session ouverte** (keybag déjà déverrouillé) : 0x1f5 sans notif SKS -501 et sans `<01/08` (L6261, L6871), -1 pour fp_app_bad | verdict de la comparaison, **indépendant** du déverrouillage du keybag (alternative 1 du sceptique réfutée sur 2 cas) | hypothèse (candidat `vérifié`) | trace:C11 ; trace:C8 ; trace:C6 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x09 `+0xc24` | 0 | 0 | succès : 1, 2, 2, 1, 1, 1, 1, 3, 1, 4, 2, 1 (max 4 ; C8 : 2, 2, 1) ; mauvais doigt : 0x2d (début de session), 0x29 ×3 (série), 0x2e (session ouverte) ; bout du doigt : 0x1e ; C6 bon doigt refusé : 5, 5, 6, 0x1b, 0x1b | pas un code par type d'échec (mauvais doigt = 0x29/0x2d/0x2e) ; valeurs ordonnées succès < bout < mauvais doigt, seuil entre 4 et 5 sur 29 tentatives à 0x09 (C6 5 + C8 6 + C11 18) → **score / distance** probable | hypothèse | trace:C11 ; trace:C8 ; trace:C6 | 2026-11-08 |
+| 0x08 | > / < | 0xfc | `23 06 65 07 1e 09 …` | 0 | 0 | nouvelle commande **0x1e** entre 0x07 et 0x09 : 4× (L3108, L3478, L3786, L4200), exactement les 4 tentatives continuées dont la réponse 0x07 a `+0x02`=2 et `+0x06..07`=`00 00` ; toutes réussies | l'AP « relance » après un 0x07 défavorable au lieu d'abandonner | hypothèse | trace:C11 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x07 `+0x06..07` | 0 | 0 | abandons (`… 07 22`) : `00 00` 6/6 (fp_bad_1 ×2, fp_tip_1 ×4) → C6+C8+C11 10/10 ; mais `00 00` aussi suivi de `1e 09` 4× ; `01 01` → 0x09 direct 14/14 (une fois avec `+0x02`=2, L4747) | `00 00` = acquisition insuffisante ; l'AP abandonne **ou** envoie 0x1e : `+0x06..07` ne décide pas seul (HG forte réfutée) | hypothèse | trace:C11 ; trace:C8 ; trace:C6 | 2026-11-08 |
+| 0x08 | > | 0xfc | 0x06 `+0x44` | 0 | 0 | même valeur pour mauvais puis bon doigt dans le même verrouillage (L1903 / L1991 : 1) ; 1, 2, 2, 3, 4, 5 au fil de la session ; `+0x48` = abandons précédents (0..4 pour fp_tip_1) ; réponse 0x07 `+0x28` = 0 partout dans C11 (y compris 6 refus) | `+0x44` = compteur de session, pas lié au doigt ; `+0x28`=1 de C8 n'était pas lié au doigt | hypothèse | trace:C11 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x21 / 0x09 (chaîne) | 0 | 0 | 0x54 d'init C11 = C9 (0 octet différent ; 0x6e, 0x7a idem) ; 0x09 du 1er succès = 0x54 d'init ; puis 0x09 du succès N+1 = copie 0x21 du succès N : **12/12** (hors offsets 0x06-0x2d) ; chaque succès modifie 5-16 octets (un groupe d'offsets + 0xbea/0xbee), **y compris en session ouverte** | enregistrement mis à jour à chaque correspondance (pas à chaque déverrouillage) | hypothèse | trace:C11 ; trace:C8 | 2026-11-08 |
+| 0x08 | > / < | 0xfc+frag | 0x6c / 0x6d | 0 | — | `> A 0x6d` d'init C11 = C9 (sha 5965c621 / 88a99564 : aucun succès entre C9 et C11). 7 exports `< B 0x6c` lus en entier (L2365, L3640, L4312, L5051, L5778, L6349, L6959) : gros 0x9218-0x92cc o (uid 0x1f5) + petit 0xf4 o (uid -1), magic `LTFC`, corps 7.995 bits/o ; d'un export au suivant ~1/256 octets égaux (= hasard) ; 7 exports pour 12 succès (un par rafale post-unlock, y compris après fp_app_good) | blob chiffré renouvelé à chaque export ; **prédiction C12** : `> A 0x6d` d'init = L6959 (0x9245 o, sha 83613e39) et L6983 (0xf4, sha 5e58a78d) | hypothèse | trace:C11 ; trace:C9 | 2026-11-08 |
+| 0x08 | — | — | blocage | — | — | série mauvais doigt : 3 tentatives à 0x09 (L5376, L5442, L5490 ; 0x09 = 333-366 ms, tentatives ~1 s contre ~0.5 s ailleurs), aucune pendant fp_bad_s2 (0 `> 0x23` entre L5442 et L5490) ; **aucun `<01/45`** (C3 : au 5e échec) ; fp_good_locked L5538 = correspondance normale (0x1f5, `+0xc24`=4, -501, 2×`<01/08`) suivie d'UNLOCKED (uart L4985) | pas de blocage biométrique côté SEP après 3 échecs ; le « mot de passe demandé » noté par Albert est côté interface macOS | hypothèse | trace:C11 | 2026-11-08 |
+
+Remarques C11 : (1) les « effleurements » ont tous été reconnus (0x1f5) et ont déverrouillé : ils n'ont pas produit d'abandon,
+les abandons viennent de fp_bad_1 et fp_tip_1. (2) L3108 : correspondance avec notif -501, mais UNLOCKED publié seulement
+après la correspondance suivante (L3270, uart L3828) : correspondance ≠ déverrouillage écran (1 cas). (3) Règle « lock change »
+(section SKS ci-dessous) : 33/33 valeurs, mais un triplet de verrouillage (L4515-4517) dans un ordre différent du log noyau
+(30/33 rang à rang). (4) HN : GeneratedUID macOS = FF7F7F3C-32F6-4064-B61F-0EA0AD2E5E6C ≠ `fe6003d8…` (notes.txt) :
+l'identifiant 16 o n'est **pas** le GeneratedUID ; `id -u` = 501 confirme 0x1f5 = uid.
+
 ### SKS (0x12) et xART (0x13) — C8 : alignement avec le log noyau (source : lecteur-logs, C8 ; recoupé par l'analyste)
 
 Rapport source : `analysis/out/c8_uart_align.md` (lecteur-logs, outil `analysis/uart_timeline.py`, chronologie
