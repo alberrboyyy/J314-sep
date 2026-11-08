@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-08 — Claude (session principale) — K4 : tailles et CRC des 0x65 de C11
+- Trace : traces/20261108-025802_c11-doigt-tranchant.
+- Fait : `analysis/ool_transfers.py --types 0x65 --dump-dir analysis/out/c11_65` puis `analysis/slice_crc.py` sur les charges.
+- Vu : 24/24 transferts `> A 0x65` font exactement 0x7200 octets ; 288/288 tranches (24 × 12) passent le contrôle trame + CRC-16/ARC
+  décrit par le kext. Avec C6+C8 (180/180) : 468/468 tranches, 39/39 transferts à 0x7200 (compte C6/C8 : rapport analyste).
+- Conclusion : K4 (0x65 = 12 tranches capteur de 0x980, taille 0x7200) confirmé sur 3 traces → proposé `vérifié`.
+- Incidents : aucun.
+
 ## 2026-11-08 — analyste — Phase 2 : d'où vient l'image 0x65 (AppleBiometricSensor, AppleSPUMesaDriver)
 - Trace : — (kernelcache 13.5 `macos/kernel.macho`) ; recoupé avec C8/C6 (`analysis/out/c{6,8}_payloads/*_65.bin`,
   `*outB_07.bin`) et uart C11 L685-703.
