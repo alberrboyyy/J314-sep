@@ -1,0 +1,807 @@
+Darwin Kernel Version 22.6.0: Wed Jul  5 22:22:05 PDT 2023; root:xnu-8796.141.3~6/RELEASE_ARM64_T6000
+pmap_startup() init/release time: 33606 microsec
+pmap_startup() delayed init/release of 0 pages
+vm_page_bootstrap: 2015622 free pages, 17290 wired pages, (up to 0 of which are delayed free)
+VM boostrap: 97 maps, 204 entries and 512 holes available
+Maximum number of VM swap files: 100
+"vm_compressor_mode" is 4
+VM bootstrap done: 84 maps, 165 entries and 501 holes left
+Long logs support configured: size: 16384
+OSLog stream configured: stream: 8192 bytes, cache: 2112 bytes
+Firehose configured: 16 chunks, 8 io pages
+Log queues configured: slot count: 80, per-slot size: 32768, total size: 2621440
+standard timeslicing quantum is 10000 us
+standard background quantum is 2500 us
+mig_table_max_displ = 54 mach_kobj_count = 375
+kdp_core zlib memory 0x8000
+Serial requested, consistent debug disabled or debug boot arg not present, configuring debugging over serial
+iBoot version: iBoot-8422.141.2
+Darwin Image4 Validator Version 5.0.0: Mon Jul 10 22:18:56 PDT 2023; root:AppleImage4-202.120.2~861/AppleImage4/RELEASE_ARM64E
+calling mpo_policy_init for AppleImage4
+Security policy loaded: AppleImage4 sysctl hook (AppleImage4)
+AppleImage4: failed to read nvram property: oblit-inprogress: 2
+AMFI: UDID enforcement enabled
+calling mpo_policy_init for AMFI
+Security policy loaded: Apple Mobile File Integrity (AMFI)
+calling mpo_policy_init for Sandbox
+Security policy loaded: Seatbelt sandbox policy (Sandbox)
+calling mpo_policy_init for Quarantine
+Security policy loaded: Quarantine policy (Quarantine)
+initialized XNU provisioning profile data
+initialized PPL provisioning profile data
+attempting to load 2 external trust cache modules
+loaded external trust cache module: 0
+loaded external trust cache module: 1
+completed loading external trust cache modules
+IOG flags 0x3 (0x51)
+AppleCredentialManager: init: inited KE[1] (ready=NO, AVP=NO) -> true.
+AppleCredentialManager: probe: probed KE[1] (ready=NO) -> true (score=0).
+Couldn't alloc class "AppleKeyStoreTest"
+Warning: arc4random not implemented
+Warning: arc4random not implemented
+Warning: arc4random not implemented
+logIosaActivity: log activity queue is null
+logIosaActivity: log activity queue is null
+AppleARMBootPerf: Warning: profile->magic (0x42545244) != 'BTRC'
+AppleCredentialManager: start: starting KE[1] (ready=NO) -> true.
+AppleCredentialManager: initImpl: called, KE[1].
+ACMFirstResponderKernelService: init: called, .
+ACMTRM-S: init: called, starting PersistentStore service.
+ACMTRM-A: init: called, starting TRM Analytics service.
+ACMTRM-C: init: called, starting AccessoryCache service.
+ACMKernelService: initValueFromBootArgAliasesUInt32: acc-cache size = 48 (default).
+ACMKernelService: initValueFromBootArgAliasesUInt32: acc-cache expiration = 2592000 (default).
+ACM: TRMAccCache_SetupEmpty: called, cacheSize=48 expiration=2592000.
+ACMTRM: init: called, starting TRM service.
+ACMKernelService: initValueFromBootArgAliasesUInt32: policy supported in BaseSystem = 0 (default).
+ACMKernelService: initValueFromBootArgAliasesUInt32: config profile = 4294967295 (default).
+ACMTRM: _getDefaultConfigProfile: config profile: 2 (boot-arg=2 edt-prop=2*).
+ACMKernelService: initValueFromBootArgAliasesUInt32: policy mode timeout = 604800 (default).
+ACMKernelService: initValueFromBootArgAliasesUInt32: grace period (bounded) timeout = 259200 (default).
+ACMKernelService: initValueFromBootArgAliasesUInt32: unlocked period timeout = 86400 (default).
+ACMKernelService: initValueFromBootArgAliasesUInt32: enabled by default = 1 (default).
+ACMTRM: _disableBy: [TRM ENABLED=YES] (mask=0, DISABLED BY: Def=NO* BtArg=NO HW=NO DevT=NO OSEnv=NO ExBt=NO | MgCo=NO DwOS=NO ChBd=NO GSw=NO CPro=NO BSys=NO MBud=NO SmCrd=NO ApSet=NO).
+ACMTRM: _disableBy: [TRM ENABLED=YES] (mask=0, DISABLED BY: Def=NO BtArg=NO* HW=NO DevT=NO OSEnv=NO ExBt=NO | MgCo=NO DwOS=NO ChBd=NO GSw=NO CPro=NO BSys=NO MBud=NO SmCrd=NO ApSet=NO).
+ACMTRM: _disableBy: [TRM ENABLED=YES] (mask=0, DISABLED BY: Def=NO BtArg=NO HW=NO* DevT=NO OSEnv=NO ExBt=NO | MgCo=NO DwOS=NO ChBd=NO GSw=NO CPro=NO BSys=NO MBud=NO SmCrd=NO ApSet=NO).
+ACMKernelService: initValueFromBootArgAliasesUInt32: enabled by device type = 4294967295 (default).
+ACMTRM: _loadEnabledByDeviceType: enabled by device type: YES (boot-arg=NO edt-prop=YES*).
+ACMTRM: _disableBy: [TRM ENABLED=YES] (mask=0, DISABLED BY: Def=NO BtArg=NO HW=NO DevT=NO* OSEnv=NO ExBt=NO | MgCo=NO DwOS=NO ChBd=NO GSw=NO CPro=NO BSys=NO MBud=NO SmCrd=NO ApSet=NO).
+ACMTRM: _loadDisabledByExternalBoot: disabled by ExternalBoot: NO.
+ACMTRM: _disableBy: [TRM ENABLED=YES] (mask=0, DISABLED BY: Def=NO BtArg=NO HW=NO DevT=NO OSEnv=NO ExBt=NO* | MgCo=NO DwOS=NO ChBd=NO GSw=NO CPro=NO BSys=NO MBud=NO SmCrd=NO ApSet=NO).
+ACMTRM: _loadDisabledByOSEnvironment: disabled by OSEnvironment: NO.
+ACMTRM: _disableBy: [TRM ENABLED=YES] (mask=0, DISABLED BY: Def=NO BtArg=NO HW=NO DevT=NO OSEnv=NO* ExBt=NO | MgCo=NO DwOS=NO ChBd=NO GSw=NO CPro=NO BSys=NO MBud=NO SmCrd=NO ApSet=NO).
+ACMTRM: _mapAndPublishTRM: set TRM_PolicyTimeout = 604800.
+ACMTRM: _mapAndPublishTRM: set TRM_UnlockedPeriodTimeout = 86400.
+ACMTRM: _mapAndPublishTRM: sending kIOMessageServicePropertyChange(#changes=2) while LOCKED(1), TRM: 604800/-(255) 4294967295/-(255) M=255/4294967295/4294967295 ---(255)/---(255) L=255 BS=255 R=255 UP=86400/255, CUR: -(255) -(255).
+AppleCredentialManager: initImpl: KE[1] INITED.
+AppleCredentialManager: initImpl: returning, KE[1] -> true.
+AppleCredentialManager: startImpl: called, KE[1].
+ACMTRM: start: security.mac.acm.root_pivot_occurred sysctl registered.
+AppleCredentialManager: startImpl: initializing power management.
+AppleCredentialManager: startImpl: will join SEPManager's PM tree in getSEPEndpoint().
+AppleCredentialManager: startImpl: registering notifications.
+AppleCredentialManager: startImpl: KE[1] STARTED.
+AppleCredentialManager: startImpl: returning, KE[1] -> true.
+AppleCredentialManager: start: started KE[1] (ready=YES) -> true.
+AppleSEPKeyStore:330:0: starting (BUILT: Jul 10 2023 22:11:57) (normal variant)
+AppleSEPKeyStore:533:0: _sep_enabled = 1
+AppleSSE::start called
+AppleSSE::start returning, result = 1
+virtual bool CoreAnalyticsHub::start(IOService *)::139:CoreAnalyticsHub start
+Registered CoreAnalyticsHub functions with xnu.virtual bool CoreAnalyticsHub::start(IOService *)::218:CoreAnalyticsHub start completed
+Couldn't alloc class "AppleKeyStoreTest"
+AppleS5L8940XI2CController::start: i2c3 this: <ptr> _i2cBaseAddress: <ptr>
+spi3 AppleSPIMCController::start:129: using CCLK 24000000
+spi4 AppleSPIMCController::start:129: using CCLK 24000000
+admac-aop-audio: Built on Jul  5 2023 at 22:14:03.           
+AppleOLYHAL::probe: score = 1000
+AppleBCMWLANBusInterfacePCIe::isIOKitEnvironment() WLAN Active Driver mode IOKit
+AppleOLYHAL::start: entry with provider 0xaa33fd86d20
+Creating an object of AppleOLYHALPlatformFunctionEmbeddedAMFM class
+Couldn't alloc class "AppleKeyStoreTest"
+pci (build 22:14:13 Jul  5 2023), flags 0xc3008
+AppleEmbeddedPCIE::start this = <ptr>, _debugFlags = 0xfffffffe
+163866427us IOThunderboltFamily (build 22:14:27 Jul  5 2023)
+pci (build 22:14:13 Jul  5 2023), flags 0xc3008
+AppleTunneledPCIE::start(apciec1) this = <ptr>, _debugFlags = 0x80000001
+163871624us AppleThunderboltGenericHAL::probe
+163871642us AppleThunderboltGenericHAL(0)::start
+pci (build 22:14:13 Jul  5 2023), flags 0xc3008
+AppleTunneledPCIE::start(apciec2) this = <ptr>, _debugFlags = 0x80000001
+163877142us AppleThunderboltGenericHAL::probe
+163877158us AppleThunderboltGenericHAL(0)::start
+AppleInterruptControllerV2::start: Num Shared Timestamps == 16
+Couldn't find sioaesdisable-offset from DeviceTree to override
+Couldn't find sioaesdisableuid1-offset from DeviceTree to override
+Couldn't find sioaesdisablegid0-offset from DeviceTree to override
+Couldn't find sioaesdisablegid1-offset from DeviceTree to override
+AppleS8000AES::start: registers at phys:0x0x39b060000/0x0x2922d0000 virt:0x<ptr>/0x0x4000 / 0x<ptr>/0x0x8000
+AppleGPIOICController::start: this: <ptr>, _gpioicBaseAddress: <ptr>
+start: Found no-restore-gpio-pins in provider to skip restoring.
+AppleGPIOICController::start: this: <ptr>, _gpioicBaseAddress: <ptr>
+AppleGPIOICController::start: this: <ptr>, _gpioicBaseAddress: <ptr>
+AppleGPIOICController::start: this: <ptr>, _gpioicBaseAddress: <ptr>
+ApplePMGR: Starting AppleT6001PMGR
+Copyright (c) 1982, 1986, 1989, 1991, 1993
+	The Regents of the University of California. All rights reserved.
+
+MAC Framework successfully initialized
+using 16384 buffer headers and 10240 cluster IO buffer headers
+AMFI: developer mode is force enabled on this platform
+AMFI: finished: 1 1
+AppleEventLogHandler: started
+DP855 ok=1
+AppleTCON::publishMemoryDevicesBelow matched lcd-pmicwp
+AppleTCON::publishMemoryDevicesBelow matched lcd-pmic
+AppleTCON::publishMemoryDevicesBelow matched lcd-sswp
+AppleTCON::publishMemoryDevicesBelow matched lcd-ss
+AppleTCON::publishMemoryDevicesBelow matched tcon-registers
+AppleTCON::publishMemoryDevicesBelow matched lcd-eeprom
+spi2 AppleSPIMCController::start:129: using CCLK 24000000
+General panic behavior:
+          	debugFacility = 0x80000001
+          	chan debug    = 0x0000ffff
+          	Gen PanicMask = 0x000087fb
+          
+Test features:
+          	PseudoMem     = 0x00000000
+          	PeriphDisable = 0x00000000
+          	DMADisable    = 0x00000000
+          	AXIBurstSize  = 0x00000003
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(SMC): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(SMC): Boot args override: wdt = -1
+RTBuddy(SMC): Resuming...
+
+Starting AppleSMC kext(<ptr>) - (Jul  5 2023@22:22:53)
+AppleSMCEmbedded::setPowerState(): ENTER powerStateOrdinal=1, _activeKeyCommand=0 newState=1
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(SIO): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(SIO): Boot args override: wdt = -1
+          	TSC Mode      = 0x00000000
+          
+Jitter:
+          	Tx WA mask    = 0x0000ffff
+          	Rx WA mask    = 0x0000ffff
+          	HiJ panic msk = 0x00000000
+          	HiJ threshold = 0x00000960
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+virtual bool AppleSEPManager::start(IOService *): 
+virtual bool AppleSEPManager::start(IOService *): SEP memory IS coherent
+virtual bool AppleSEPManager::start(IOService *): control endpoints created
+          
+_getExecutionPlatform: AudioDMAController::admac-aop-audio::492: Running on silicon.
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(ACIO2): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(ACIO2): Boot args override: wdt = -1
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(ACIO1): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(ACIO1): Boot args override: wdt = -1
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(PMP): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(PMP): Boot args override: wdt = -1
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(ANS2): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(ANS2): Boot args override: wdt = -1
+virtual IOService *AppleANS2NVMeController::probe(IOService *, SInt32 *)::194:Found (ANS2) provider, returning score 100000
+virtual IOService *AppleANS3NVMeController::probe(IOService *, SInt32 *)::82:Found (ANS2) provider and linear-sq, returning score 300000
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(AOP): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(AOP): Boot args override: wdt = -1
+AppleSPUFirmwareService: found node AOP
+RTBuddy(AOP): Resuming...
+
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(DCPEXT0): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(DCPEXT0): Boot args override: wdt = -1
+AppleS5L8940XI2CController::start: i2c5 this: <ptr> _i2cBaseAddress: <ptr>
+AppleS5L8940XI2CController::start: i2c4 this: <ptr> _i2cBaseAddress: <ptr>
+[AOP:AOP_oslog_init.cpp:96] Start AOP OSLog init
+RTBuddy(AOP): OSLog endpoint registering to logd(uuid: 84016AA3-CD75-39F8-BF4F-E6A813656017, role: AOP, range_start: 0, range_end: 255, fw_type: 1)
+[AOP:P_os_log_support.cpp:60] AOP os log initialized
+AppleARMBacklight::start: Using new Backlight Architecture 1
+AppleARMBacklight::start: no DBV offset data
+AppleARMBacklight::start: no DBV max data
+AppleARMBacklight::start: _calibratedMaxCurrent=13799
+AppleARMBacklight::start: _calibratedMidCurrent=3199
+AppleARMBacklight::start: mA2Nits2ndOrderCoef=-1
+AppleARMBacklight::start: mA2Nits1stOrderCoef=75
+AppleARMBacklight::start: mA2Nits0thOrderCoef=-2
+AppleARMBacklight::start: nits2mAmps2ndOrderCoef=628
+AppleARMBacklight::start: nits2mAmps1stOrderCoef=13279
+AppleARMBacklight::start: nits2mAmps0thOrderCoef=18
+AppleARMBacklight::start: _lMaxProduct=104857600
+AppleARMBacklight::start: _lMidProduct=9175040
+AppleARMBacklight::start: _lMinProduct=262144
+AppleARMBacklight::start: No valid backlight cal data in syscfg.. Use defaults
+AppleARMBacklight::exportCalibration: _lMaxProduct=104857600, _lMidProduct=9175040, _lMinProduct=262144, _lMaxPanel=104857599, _lMidPanel=25021279, _lMinPanel=260799, _milliAmps2NitsScaleFactor=1611780
+AppleARMBacklight::start: no backlight enable function
+AppleARMBacklight::start: no backlight update function
+AppleARMBacklight::start: _minDACLevel=130 _maxDACLevel=1968
+[AOP:ALSVD6286.cpp:80] [ALS1] VD6286 device found. Calibration Override:0
+setDirectionAndRole: APA0TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA1TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA2TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA3TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA4TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA5TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA6TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA7TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA8TX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA9TX::admac-aop-audio::578: TX:Initialized.
+[AOP:ClientInfo.cpp:184] exp "inCallbackAction(it.key(), inRef)" fail, RunActionOnClientManagers(), ln 1...
+HID: Legacy shim 2
+setDirectionAndRole: APAATX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APABTX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APACTX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APADTX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APAETX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APAFTX::admac-aop-audio::578: TX:Initialized.
+setDirectionAndRole: APA0RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA1RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA2RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA3RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA4RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA5RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA6RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA7RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA8RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APA9RX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APAARX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APABRX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APACRX::admac-aop-audio::578: RX:Initialized.
+HID: Legacy shim 2
+setDirectionAndRole: APADRX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APAERX::admac-aop-audio::578: RX:Initialized.
+setDirectionAndRole: APAFRX::admac-aop-audio::578: RX:Initialized.
+HID: Legacy shim 2
+AppleS5L8940XI2CController::start: i2c0 this: <ptr> _i2cBaseAddress: <ptr>
+[dockchannel] Started AppleSerialShim.
+HID: Legacy shim 2
+spi1 AppleSPIMCController::start:129: using CCLK 200000000
+[AOP:iggerController.cpp:129] VoiceTrig ready!! <AppleAOPVoiceTriggerController v240.2 built: Jun 30 202317:4...
+[AOP:ClientInfo.cpp:184] exp "inCallbackAction(it.key(), inRef)" fail, RunActionOnClientManagers(), ln 1...
+[AOP:Controller.cpp:160] RTKitAudioFramework v240.4 (built Jun 30 2023 17:51:05) ready!! {12 nodes}
+[AOP:Controller.cpp:251] aop-audio v240.10 (built Jun 30 2023 17:56:19, debug 0x0) ready!!
+[AOP:SPU_init.cpp:320] ===( AOP IS READY )===
+AppleSPU::_handleReadyReport, serviceName (SPUApp) 
+AppleSPU::_handleReadyReport, serviceName (aop-voicetrigger) 
+AppleSPU::_handleReadyReport, serviceName (aop-audio) 
+Couldn't alloc class "AppleSPULogDriver"
+HID: Legacy shim 2
+[uart] Started AppleSerialShim.
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(GFX): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(GFX): Boot args override: wdt = -1
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(DCP): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(DCP): Boot args override: wdt = -1
+HID: Legacy shim 2
+AppleGen1SPMIController[aop-spmi0]:61: Start
+AppleGen1SPMIController[clvr-spmi4]:61: Start
+HID: Legacy shim 2
+AppleGen1SPMIController[aop-spmi1]:61: Start
+HID: Legacy shim 2
+IOMFB: service matched: AppleDCPExpert
+HID: Legacy shim 2
+HID: Legacy shim 2
+AppleGen1SPMIController[clvr-spmi3]:61: Start
+AppleGen1SPMIController[clvr-spmi2]:61: Start
+HID: Legacy shim 2
+IOMFB: service matched: AppleDCPExpert
+open by AppleSPUHIDDriver 0x100000412 (0x0)
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(DCPEXT2): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(DCPEXT2): Boot args override: wdt = -1
+HID: Legacy shim 2
+open by AppleSPUHIDDriver 0x10000041d (0x0)
+open by AppleSPUHIDDriver 0x100000420 (0x0)
+open by AppleSPUHIDDriver 0x100000423 (0x0)
+probe: manufacturer Redbird
+open by AppleSPUHIDDriver 0x10000042a (0x0)
+HID: Legacy shim 2
+probe: manufacturer Redbird
+probe: manufacturer Redbird
+virtual bool AppleARMLightEmUp::start(IOService *): starting...
+open by AppleSPUHIDDriver 0x100000437 (0x0)
+AppleSPUHIDDriver: set cma kIOHIDEventServiceQueueSize to 81920 KB
+HID: Legacy shim 2
+probe: manufacturer Redbird
+probe: manufacturer Redbird
+probe: manufacturer Redbird
+HID: Legacy shim 2
+open by AppleSPUHIDDriver 0x10000044a (0x0)
+probe: manufacturer Redbird
+probe: manufacturer Redbird
+[AOP:udioPDMNodeBase.cpp:115] PDMDev<pdm0> LPClkCfg=Src:pll ,Freq:2400000
+[AOP:udioPDMNodeBase.cpp:554] PDMDev<pdm0> off ->xi0 , 0->2400000 AP state 1
+AppleS5L8940XI2CController::start: i2c2 this: <ptr> _i2cBaseAddress: <ptr>
+HID: Legacy shim 2
+AppleSPUVD6286 probe: manufacturer Redbird
+RedBird driver found
+AppleSPUVD6287 probe: device name Redbird
+open by AppleSPUVD6286 0x10000044c (0x0)
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+AppleS5L8940XI2CController::start: i2c1 this: <ptr> _i2cBaseAddress: <ptr>
+HID: Legacy shim 2
+HID: Legacy shim 2
+callPlatformFunction: IODMAController00000040::admac-aop-audio::1305: Allocated suspend ARMFunction <ptr>.
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+[AOPAudio](error) expression "getNamedProperty(inName, static_cast<void*>(outProperty), &sz)" failed, AppleAOPAudioLPMicInDevice::getNamedProperty(), line 300, status: 0xe00002f0
+admac-sio: Built on Jul  5 2023 at 22:14:03.           
+General panic behavior:
+          	debugFacility = 0x80000001
+          	chan debug    = 0x0000ffff
+          	Gen PanicMask = 0x000087fb
+          
+Test features:
+          	PseudoMem     = 0x00000000
+          	PeriphDisable = 0x00000000
+          	DMADisable    = 0x00000000
+          	AXIBurstSize  = 0x00000003
+          	TSC Mode      = 0x00000000
+          
+Jitter:
+          	Tx WA mask    = 0x0000ffff
+          	Rx WA mask    = 0x0000ffff
+          	HiJ panic msk = 0x00000000
+          	HiJ threshold = 0x00000960
+          
+_getExecutionPlatform: AudioDMAController::admac-sio::492: Running on silicon.
+setDirectionAndRole: SIO0TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO1TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO2TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO3TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO4TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO5TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO6TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO7TX::admac-sio::578: TX:Initialized.
+setDirectionAndRole: SIO0RX::admac-sio::578: RX:Initialized.
+setDirectionAndRole: SIO1RX::admac-sio::578: RX:Initialized.
+HID: Legacy shim 2
+setDirectionAndRole: SIO2RX::admac-sio::578: RX:Initialized.
+setDirectionAndRole: SIO3RX::admac-sio::578: RX:Initialized.
+setDirectionAndRole: SIO4RX::admac-sio::578: RX:Initialized.
+setDirectionAndRole: SIO5RX::admac-sio::578: RX:Initialized.
+setDirectionAndRole: SIO6RX::admac-sio::578: RX:Initialized.
+setDirectionAndRole: SIO7RX::admac-sio::578: RX:Initialized.
+AppleGen1SPMIController[nub-spmi1]:61: Start
+[AOPAudio](error) expression "getNamedProperty(inName, static_cast<void*>(outProperty), &sz)" failed, AppleAOPAudioLPMicInDevice::getNamedProperty(), line 300, status: 0xe00002f0
+AppleSPUVD6286 handleStart: Using FDR
+HID: Legacy shim 2
+AppleGen1SPMIController[nub-spmi0]:61: Start
+HID: Legacy shim 2
+HID: Legacy shim 2
+AppleTCControllerSingleTransport::start(@0x0) - Start
+AppleMCDP29XXGPIO::start: found: "function-force-dpfu-open-drain"HID: Legacy shim 2
+AppleGen1SPMIController[clvr-spmi1]:61: Start
+HID: Legacy shim 2
+virtual bool AppleM2ScalerCSCDriver::start(IOService *): Name=scaler1 Lock=<ptr> id=1 max_msrs=8 msr_mask=0xff scaler_count=0
+virtual bool AppleM2ScalerCSCDriver::start(IOService *): MSR Driver Waiting for IOSurfaceRoot
+HID: Legacy shim 2
+IOMFB: service matched: AppleDCPExpert
+pmu fault log: sgpio,sgpio_shutdown
+SOCD: BASE 0x8B00, COUNT 0x0400
+HID: Legacy shim 2
+SOCD: Magic value D1h 0Dh 7Fh 31h
+AppleDialogSPMIPMU::start: Non-primary PMU detected
+AppleARMRTC started!#####
+AppleDialogSPMIPMURTC started!******
+AppleGen1SPMIController[clvr-spmi0]:61: Start
+pmu fault log: sgpio,sgpio_shutdown wdog,reset_in1
+SOCD: BASE 0x8B00, COUNT 0x0400
+HID: Legacy shim 2
+SOCD: Magic value 49h 4Eh 49h 54h
+AppleDialogSPMIPMU::start: Primary PMU detected
+AppleARMRTC started!#####
+AppleDialogSPMIPMURTC started!******
+Couldn't alloc class "AppleKeyStoreTest"
+HID: Legacy shim 2
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(DCPEXT1): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(DCPEXT1): Boot args override: wdt = -1
+HID: Legacy shim 2
+virtual void AppleM2ScalerCSCDriver::free(): Freeing Object
+IOMFB: service matched: AppleDCPExpert
+HID: Legacy shim 2
+AppleA7IOPNub: withRegistryEntry, 47: allocated nub <ptr>
+
+RTBuddy(DCPEXT3): start(<ptr>) - (Jul  5 2023@22:21:21)
+RTBuddy(DCPEXT3): Boot args override: wdt = -1
+IOMFB: service matched: AppleDCPExpert
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+HID: Legacy shim 2
+Couldn't alloc class "AppleKeyStoreTest"
+AppleSMCChargerUtil: AppleSMCChargerUtil Init
+AppleSMCSensorDispatcher::start: Found 1 sensors from the device tree
+AppleSMCSensorDispatcher::start: Start success
+
+SOCD container control key may not exist on this platform. SMCResult = (kSMCKeyNotFound)
+AppleSMCPMU::start
+ApplePassthroughPPM::start (<ptr>)
+ApplePPM::start (<ptr>)
+ApplePPMCPMS::initLocal (<ptr>)
+Platform supports LPEM: 0ApplePPM::initLocal success
+ApplePPMCPMS::initLocal PTD enabled
+Couldn't alloc class "AppleKeyStoreTest"
+ApplePPMCPMS::initLocal success
+RTBuddy(ANS2): Resuming...
+
+RTBuddy(SIO): Resuming...
+
+RTBuddy(DCPEXT3): Resuming...
+
+CPMS: ASB has arrived
+RTBuddy(DCPEXT0): Resuming...
+ApplePPM::start success
+ApplePassthroughPPM::start success
+
+RTBuddy(DCPEXT2): Resuming...
+
+HID: Legacy shim 2
+RTBuddy(DCP): Resuming...
+
+RTBuddy(DCPEXT1): Resuming...
+
+IOMFB: AppleDCPLinkService heap size increment: 0x0
+IOMFB: service matched: AppleDCPLinkService (pipe:2)
+[DCPEXT1:ap_link.c:299] shared memory dva: 0x1f001338000 0xffffffff0002e000
+[DCP:ck_PCC2DBlm_v5.cpp:2611] IOMFB LACS_ERROR: DCP took too long to respond to LAS stats
+[DCP:ck_PCC2DBlm_v5.cpp:2646] IOMFB: BLM LTS data hasn't been read in more than 10 secs
+
+
+[DCPEXT1:ap_link.c:276] ap_link: IOMFB: DCP heap size: 0x1030000 [iBoot:0x1030000] [LinkService:0x0]
+
+
+IOMFB: AP DRIVER START!
+IOMFB: driver commit: 
+PMURTCHelper::initWithProviderrtc_write_helper isLegacy=0
+[DCP:ck_PCC2DBlm_v5.cpp:2611] IOMFB LACS_ERROR: DCP took too long to respond to LAS stats
+[ PCI configuration begin ]
+IOPCIConfigurator::configure kIOPCIEnumerationWaitTime is 900
+[ PCI configuration end, bridges 3, devices 0 ]
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#65] if:1 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:3970924409
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#66] if:3 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:3971112159
+IOMFB: AppleDCPLinkService heap size increment: 0x0
+IOMFB: service matched: AppleDCPLinkService (pipe:4)
+[DCPEXT3:ap_link.c:299] shared memory dva: 0x1f0013c4000 0xffffffff00069000
+
+[DCPEXT3:ap_link.c:276] ap_link: IOMFB: DCP heap size: 0x1030000 [iBoot:0x1030000] [LinkService:0x0]
+
+
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#59] if:1 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:3971114291
+[ANS2:client1] power up done[0]: PMU=Ocarina, PWR=0
+[ANS2:client1] power up done[1]: PMU=Ocarina, PWR=0
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#62] if:3 inCmd:0 inResp:0 outRepErr:0 outCmdErr:0 t:3971115210
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#63] if:1 inCmd:7 inResp:7 outRepErr:0 outCmdErr:0 t:3971665409
+virtual bool AppleANS2NVMeController::start(IOService *)::416:Found the ANS2Endpoint1
+AppleDialogSPMIPMURTC tick read!&&&&&&&
+bool AppleEmbeddedNVMeController::SetNamespacesStruct()::194:Obtained 3 namespaces from DT
+virtual bool IONVMeController::start(IOService *)::793:IONVMeController::start
+virtual IOFilterInterruptEventSource *AppleANS2NVMeController::CreateDeviceInterrupt(IOInterruptEventSource::Action, IOFilterInterruptEventSource::Filter, IOService *)::2806:ANS2 NVMe interrupt index - 0x4
+virtual uint32_t AppleANS2CGNVMeController::GetNVMePPLQueueEntries()::420:NVMePPL Queue Entries=254
+virtual bool AppleANS2CGNVMeController::InitializePCI()::177:Successfully initialized NVMe CoastGuard
+[DCP:dpointInterface.cpp:606] [AFK][AFKMailboxSharedMemoryEndpointInterface:#64] if:1 inCmd:11 inResp:11 outRepErr:0 outCmdErr:0 t:3972144907
+IOMFB: AP DRIVER START!
+IOMFB: driver commit: 
+virtual bool AppleSEPManager::start(IOService *): PM init done
+virtual bool AppleSEPManager::start(IOService *): registered
+IOReturn AppleSEPManager::_setPowerState(unsigned long *): power state 0 -> 2
+static IOService *AppleSEPManager::getReadableNvram(): Waiting for IODTNVRAM
+static IOService *AppleSEPManager::getReadableNvram(): Got IODTNVRAM OK
+void AppleSEPManager::_loadFlagData(): Didn't find oblit-inprogress in NVRAM
+
+void AppleSEPBooter::_bootAction(void *, void *): SEP status: 1
+void AppleSEPBooter::_bootAction(void *, void *): SEP accepted Tz0
+RTBuddy(PMP): Resuming...
+
+ApplePMPv2 started
+AppleHPMARMI2C::start - Unable to read hpmlog boot-arg
+AppleHPM runtime power conservation disabled.
+AppleSmartIO (RTBuddy-based)::start (<ptr>) - (Jul  5 2023@22:14:30)
+AppleHPMARMI2C::start - Unable to read hpmlog boot-arg
+AppleDialogSPMIPMURTC ending!%%%
+void AppleSEPBooter::_bootAction(void *, void *): SEP status: 2
+void AppleSEPBooter::_bootAction(void *, void *): SEP status: 2
+AppleTCControllerAssignableTransport::probe - failed!
+AppleTCControllerType10::start
+AppleTCController::genericStart(@0x0) - Start
+IOMFB: AppleDCPLinkService heap size increment: 0x0
+IOMFB: service matched: AppleDCPLinkService (pipe:0)
+[DCP:ap_link.c:299] shared memory dva: 0x1f006f68000 0xffffffff005fc000
+
+[DCP:ap_link.c:276] ap_link: IOMFB: DCP heap size: 0x1030000 [iBoot:0x1030000] [LinkService:0x0]
+
+
+AppleHPM runtime power conservation disabled.
+IOMFB: AP DRIVER START!
+IOMFB: driver commit: 
+AppleTCControllerAssignableTransport::probe - failed!
+AppleTCControllerType10::start
+AppleTCController::genericStart(@0x0) - Start
+IOReturn AppleSEPBooter::bootSEP(AppleSEPFirmware *, bool, AppleSEPSharedMemoryBuffer *, bool): SEP booting
+IOReturn AppleSEPBooter::bootSEP(AppleSEPFirmware *, bool, AppleSEPSharedMemoryBuffer *, bool): Shmbuf for SEP: { slave addr = 0x580000, size = 0x1c000 }
+AppleARMRTC registering service!@@@@@@
+AppleARMRTC service registered!$$$$$
+AppleARMRTC publishing service!^^^^^^
+AppleHPMARMI2C::start - Unable to read hpmlog boot-arg
+AppleHPM runtime power conservation disabled.
+AppleBTM::start
+IOMFB: AppleDCPLinkService heap size increment: 0x0
+IOMFB: service matched: AppleDCPLinkService (pipe:3)
+[DCPEXT2:ap_link.c:299] shared memory dva: 0x1f00137c000 0xffffffff00071000
+
+[DCPEXT2:ap_link.c:276] ap_link: IOMFB: DCP heap size: 0x1030000 [iBoot:0x1030000] [LinkService:0x0]
+
+
+IOMFB: AP DRIVER START!
+IOMFB: driver commit: 
+AppleMaverickBTM::start (<ptr>)
+AppleMaverickBTM::start success
+AppleTCControllerAssignableTransport::probe - failed!
+AppleTCControllerType11::start
+AppleTCController::genericStart(@0x0) - Start
+IOReturn DCPAVSACController::_registerSACAggressor(DCPAVRemoteSACControllerProxy *, UInt32, UInt32, const UInt64 *, const UInt32 *) error: ret = invalid argument
+AppleARMNORNVRAM.cpp:start:48 - bank size=0x10000, bank count=0x10, current bank=0xD
+SPINORFlasherDriver::virtual bool AppleEmbeddedSimpleSPINORFlasherDriver::start(IOService *): service = IOPlatformDevice found.
+SPINORFlasherDriver::virtual bool AppleEmbeddedSimpleSPINORFlasherDriver::start(IOService *): dual-iboot-support = true
+SPINORFlasherDriver::virtual bool AppleEmbeddedSimpleSPINORFlasherDriver::start(IOService *): atomic-firmware-update-support = true
+AppleBiometricSensor: Found SandDollarFamily
+
+AppleBiometricSensor: Found SandDollarFamily
+
+Couldn't alloc class "AppleSEPARTService"
+Couldn't alloc class "AppleKeyStoreTest"
+Couldn't alloc class "AppleKeyStoreTest"
+AppleCredentialManager: sepManagerMatchedGated: AppleSEPManager matched.
+void AppleSEPBooter::_bootAction(void *, void *): SEP accepted IMG4
+IOMFB: AppleDCPLinkService heap size increment: 0x0
+IOMFB: service matched: AppleDCPLinkService (pipe:1)
+[DCPEXT0:ap_link.c:299] shared memory dva: 0x1f0013f0000 0xffffffff00089000
+
+[DCPEXT0:ap_link.c:276] ap_link: IOMFB: DCP heap size: 0x1030000 [iBoot:0x1030000] [LinkService:0x0]
+
+
+[System Event] [3963660962] [INFO] [Subsystem: nvram] [Event: write] display-crossbar0 with data size 0x60
+callPlatformFunction: IODMAController000000CD::admac-sio::1305: Allocated suspend ARMFunction <ptr>.
+IOMFB: AP DRIVER START!
+IOMFB: driver commit: 
+callPlatformFunction: IODMAController000000CD::admac-sio::1305: Allocated suspend ARMFunction <ptr>.
+AppleBiometricSensor: Looking for AOP driver...
+IOPCIConfigurator::configure kIOPCIEnumerationWaitTime is 900
+AppleBiometricSensor: start(): SensorStatus:    16B | 80 20 00 10 00 00 00 00 60 00 00 00 52 33 00 00 
+HID: Legacy shim 2
+callPlatformFunction: IODMAController000000CD::admac-sio::1305: Allocated suspend ARMFunction <ptr>.
+AppleARMBacklight::start: No AAP function
+AppleARMBacklight::start: Pre-strobe iDAC=2046 default 
+ktriage_register_subsystem_strings: set subsystem 8 strings
+mcache: 10 CPU(s), 128 bytes CPU cache line size
+mbinit: done [512 MB total pool size, (341/170) split]
+dlil_init: Waiting for all the create dlil kernel threads to get scheduled at least once.
+Couldn't alloc class "AppleKeyStoreTest"
+dlil_init: All the created dlil kernel threads have been scheduled at least once. Proceeding.
+IOAccessoryManager::configureAccessoryPowerGated: atc3-hdmi: Configuring Accessory Power to (1)
+AppleTCControllerSingleTransport::configureAccessoryPowerGated: PowerModeOff
+AppleTCControllerSingleTransport::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=0, _sleeping=0, _accessoryPowerModeExtOffRequested 0
+AppleTCControllerSingleTransport::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+AppleTCControllerSingleTransport::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+[ERROR] IOPort::initPortType(): [AppleTCControllerSingleTransport@104] Cannot init port type - it is already set! (m_portType: 2, portType: 2)
+
+IOPort::registerService(): [Port-HDMI@1] Registering service Port-HDMI@1...
+
+IOPort::registerService(): [Port-HDMI@1] Registering service Port-HDMI@1...
+
+AppleTCControllerSingleTransport::Start(@0x0) - Interrupt added to workloop
+IOPortTransportState::start(): [Port-HDMI@1: DisplayPort] m_parentPort->isFeatureSupported(kIOPortFeatureTRM): NO, this->isTRMSupported(): NO, (transportType: 5, parentPortType: 6, parentPortNumber: 1)
+IOPortTransportState::registerService(): [Port-HDMI@1: DisplayPort] Registering service DisplayPort@... (transportType: 5, provider: Port-HDMI@1)
+IOPort::registerService(): [Port-HDMI@1] Registering service Port-HDMI@1...
+
+com.apple.AppleFSCompressionTypeDataless kmod start
+ifnet_attach: All kernel threads created for interface lo0 have been scheduled at least once. Proceeding.
+ifnet_attach: Waiting for all kernel threads created for interface gif0 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface gif0 have been scheduled at least once. Proceeding.
+skip attaching fsw to lo0 using legacy TX modelifnet_attach: Waiting for all kernel threads created for interface stf0 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface stf0 have been scheduled at least once. Proceeding.
+IOAccessoryTRM::start(): bootedFromRamDisk: NO, dockSupportsTRM: NO (m_mgrPrimaryPortID: 260)
+IOAccessoryTRM::_setPropertiesGated(): Setting USB Restricted Mode: NO... (m_mgrPrimaryPortID: 260)
+IOAccessoryTRM::_setPropertiesGated(): Could not set USB RM state - no reference to USB Connect Shim!
+IOAccessoryTRM::start(): Registering service IOAccessoryTRM... (m_mgrPrimaryPortID: 260)
+com.apple.AppleFSCompressionTypeZlib kmod start
+IOAccessoryManager::configureAccessoryPowerGated: AppleHPMDevice: Configuring Accessory Power to (1)
+AppleTCControllerType10::configureAccessoryPowerGated: PowerModeOff
+AppleTCControllerType10::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=0, _sleeping=0, _accessoryPowerModeExtOffRequested 0
+AppleTCControllerType10::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+AppleTCControllerType10::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+apfs_module_start:3058: load: com.apple.filesystems.apfs, v2142.140.9, apfs-2142.140.9, 2023/07/10
+apfs_module_start:3084: setting max link-id cache size to: 10
+ktriage_register_subsystem_strings: set subsystem 7 strings
+callPlatformFunction: IODMAController000000CD::admac-sio::1305: Allocated suspend ARMFunction <ptr>.
+IOAccessoryManager::configureAccessoryPowerGated: AppleHPMDevice: Configuring Accessory Power to (1)
+AppleTCControllerType10::configureAccessoryPowerGated: PowerModeOff
+AppleTCControllerType10::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=0, _sleeping=0, _accessoryPowerModeExtOffRequested 0
+AppleTCControllerType10::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+AppleTCControllerType10::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = unsigned char]:54 adc-pre-amp-gain is 1 from default values
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = unsigned char]:54 adc-pga-vol is 38 from default values
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = bool]:54 enable-ringsense is 1 from EDT
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = bool]:54 ringsense-inverted is 1 from EDT
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = L84ClkSrc]:54 internal-mclk-src is 1 from EDT
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = bool]:54 PowerOffAtSleep is 1 from EDT
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = unsigned char]:54 headphone-volume-boost is 0 from default values
+void AppleCS42L84Audio::_getPropertyT(const char *, T &, const bool) [T = unsigned char]:54 enable-dcid is 1 from EDT
+nfs_kext_start: successfully loaded NFS kext
+IOPCIConfigurator::configure kIOPCIEnumerationWaitTime is 900
+IOAccessoryManager::configureAccessoryPowerGated: AppleHPMDevice: Configuring Accessory Power to (1)
+AppleTCControllerType11::configureAccessoryPowerGated: PowerModeOff
+AppleTCControllerType11::configureAccessoryPowerInternal: _powerState=1, _powerStateInternal=0, _sleeping=0, _accessoryPowerModeExtOffRequested 0
+AppleTCControllerType11::configureAccessoryPowerInternal: !getAccessoryPowerReady(); set PowerModeOff?
+AppleTCControllerType11::configureAccessoryPowerInternal: handleAccessoryPowerWillChange, confirm PowerModeOff
+Couldn't alloc class "AppleKeyStoreTest"
+com.apple.AppleFSCompressionTypeDataless load succeeded
+com.apple.AppleFSCompressionTypeZlib load succeeded
+Setting up notifier for CoreAnalyticsHub
+calling mpo_policy_init for ASP
+calling mpo_policy_initbsd for ASP
+ASP: NVRAM pointer initialized
+ASP: No recovery key set
+Security policy loaded: Apple System Policy (ASP)
+[ERROR] IOPort::initPortType(): [AppleTCControllerType10@102] Cannot init port type - it is already set! (m_portType: 2, portType: 2)
+
+IOPort::registerService(): [Port-USB-C@2] Registering service Port-USB-C@2...
+
+[ERROR] IOPort::initPortType(): [AppleTCControllerType11@105] Cannot init port type - it is already set! (m_portType: 2, portType: 2)
+
+IOPort::registerService(): [Port-MagSafe 3@1] Registering service Port-MagSafe 3@1...
+
+[ERROR] IOPort::initPortType(): [AppleTCControllerType10@103] Cannot init port type - it is already set! (m_portType: 2, portType: 2)
+AppleBCMWLANBusInterfacePCIe::isIOKitEnvironment() WLAN Active Driver mode IOKit
+IOPort::registerService(): [Port-MagSafe 3@1] Regi

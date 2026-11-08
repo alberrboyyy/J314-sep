@@ -4,6 +4,14 @@ Une entrée par observation, capture ou décision. Plus récent en haut.
 
 Format :
 ```
+## 2026-11-08 — Claude (session principale) — C10 : boot de contrôle bloqué
+- Trace : traces/20261108-011515_c10-boot-ool-stable (TRACE_TIMEOUT=200, même config OOL que C9).
+- Vu : hv_uart.log s'arrête à 806 lignes (C9 : 2631), dernière ligne `IOPort::registerService(): [Port-MagSafe 3@1] Regi` tronquée ;
+  sep.log 256 lignes, 5 messages EP 0x08, aucune réponse 0x54/0x6e/0x7a ; 0 ool_error ; aucun panic dans l'uart. end_reason=timeout, proxy revenu.
+- Interprété : boot de macOS bloqué ou très ralenti avant l'init SBIO ; cause inconnue. Capture inutilisable pour HI.
+- Fait : relance (C10b) avec TRACE_TIMEOUT=300.
+- Incidents : blocage de boot ci-dessus.
+
 ## AAAA-MM-JJ HH:MM — <agent ou Albert> — <titre>
 - Trace : traces/<dossier> (ou —)
 - Fait : ce qui a été fait
