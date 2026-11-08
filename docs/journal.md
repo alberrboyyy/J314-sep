@@ -4,14 +4,6 @@ Une entrée par observation, capture ou décision. Plus récent en haut.
 
 Format :
 ```
-## 2026-11-08 — Claude (session principale) — C10 : boot de contrôle bloqué
-- Trace : traces/20261108-011515_c10-boot-ool-stable (TRACE_TIMEOUT=200, même config OOL que C9).
-- Vu : hv_uart.log s'arrête à 806 lignes (C9 : 2631), dernière ligne `IOPort::registerService(): [Port-MagSafe 3@1] Regi` tronquée ;
-  sep.log 256 lignes, 5 messages EP 0x08, aucune réponse 0x54/0x6e/0x7a ; 0 ool_error ; aucun panic dans l'uart. end_reason=timeout, proxy revenu.
-- Interprété : boot de macOS bloqué ou très ralenti avant l'init SBIO ; cause inconnue. Capture inutilisable pour HI.
-- Fait : relance (C10b) avec TRACE_TIMEOUT=300.
-- Incidents : blocage de boot ci-dessus.
-
 ## AAAA-MM-JJ HH:MM — <agent ou Albert> — <titre>
 - Trace : traces/<dossier> (ou —)
 - Fait : ce qui a été fait
@@ -21,6 +13,30 @@ Format :
 ```
 
 ---
+
+## 2026-11-08 — Claude (session principale) — C10 : boot de contrôle bloqué
+- Trace : traces/20261108-011515_c10-boot-ool-stable (TRACE_TIMEOUT=200, même config OOL que C9).
+- Vu : hv_uart.log s'arrête à 806 lignes (C9 : 2631), dernière ligne `IOPort::registerService(): [Port-MagSafe 3@1] Regi` tronquée ;
+  sep.log 256 lignes, 5 messages EP 0x08, aucune réponse 0x54/0x6e/0x7a ; 0 ool_error ; aucun panic dans l'uart. end_reason=timeout, proxy revenu.
+- Interprété : boot de macOS bloqué ou très ralenti avant l'init SBIO ; cause inconnue. Capture inutilisable pour HI.
+- Fait : relance (C10b) avec TRACE_TIMEOUT=300.
+- Incidents : blocage de boot ci-dessus.
+
+## 2026-11-08 — tracer — Script de session humaine C11 (outillage, aucune action hardware)
+- Trace : — (protocole : docs/hypotheses.md « Revue sceptique de C8 », section « C10 — Session doigt », renommée C11 ;
+  C10 = boot de contrôle traces/20261108-011515_c10-boot-ool-stable)
+- Fait : `tools/guide_doigt_c11.sh` (forme de `guide_doigt.sh`). Étiquettes : loginwin, pw_login, lock_m1, fp_bad_1, fp_good_1,
+  lock_m2, fp_tap_1..3, fp_good_2, lock_m3, fp_tip_1, fp_good_3, fp_app_prompt, fp_app_good, fp_app_quit, fp_app_prompt2,
+  fp_app_bad, uid_check, end. Notes : res_* , uid_id_u, uid_generateduid, fin. Invite session ouverte : Réglages Système >
+  Mots de passe (reverrouillée en quittant Réglages Système ; non vérifié sur ce Mac, repli = marque `anomalie`).
+  Config recommandée en en-tête : SEP_OOL_EPS=0x08, SEP_OOL_BYTES=0x400, SEP_OOL_SPLIT_DIR=1,
+  SEP_OOL_FULL_TYPES=0x09,0x21,0x45,0x54,0x5b,0x5f,0x65,0x6c,0x6d, TRACE_TIMEOUT=1500. `bash -n` OK. Non commité.
+- Vu (lecture seule de hv/trace_sep_filtered.py) : 0x6c est accepté : SEP_OOL_FULL_TYPES passe par `_parse_eps` (toute valeur
+  0..0xff) et `_ool_dump` teste `typ in full_types` ; seul EP 0x08 est concerné (SEP_OOL_EPS). Coût : 3 lectures B de 0x4000
+  par succès ; plafond SEP_OOL_MAX_MB=64 non menacé (C8 : 2,7 Mo de .bin).
+- Interprété : — . Point ouvert : la fin par `stop_capture.sh` = reboot() HV (arrêt non propre, piège (a) de HO) ; un arrêt
+  propre de macOS avant le boot de test de persistance (C12 ?) est à décider par Albert.
+- Incidents : aucun.
 
 ## 2026-11-08 — analyste — C9 : test HI (réponse 0x54 d'init après la session C8)
 - Trace : traces/20261108-010915_c9-boot-ool-persist (boot sans humain, même config OOL que C7/C8, 0 `ool_error`, aucune
