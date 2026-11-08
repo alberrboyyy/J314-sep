@@ -19,12 +19,7 @@ wait_s() { for s in $(seq "$1" -1 1); do printf "\r    attends %2d s (ne touche 
 
 [ -s .current_capture ] || { echo "Pas de capture en cours : lance d'abord boot_and_trace.sh."; exit 1; }
 echo "${B}K-E1.${N} Session ouverte. Doigt à plat ~2 s, sans appuyer. Jamais la touche Touch ID."
-for i in 1 2 3; do
-  go ke1_good_$i "Réglages Système > Mots de passe, BON doigt à l'invite"; res good_$i
-  echo "    (quitte Réglages Système pour le reverrouiller)"; read -r -p "    Entrée quand c'est fait… " _
-done
-go ke1_bad_1 "Rouvre Réglages > Mots de passe, MAUVAIS doigt à l'invite"; res bad_1
-read -r -p "    Annule l'invite, quitte Réglages. Entrée… " _
+# (invites session ouverte : 3 bon doigt + 1 mauvais déjà faites dans C15)
 go ke1_lock_a "Verrouille : Ctrl+Cmd+Q"
 go ke1_pw "MOT DE PASSE + Entrée"
 go ke1_lock_b "Verrouille : Ctrl+Cmd+Q"; wait_s 5
