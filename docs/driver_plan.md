@@ -13,8 +13,7 @@ Rappel : le driver ne s'écrit qu'à partir de messages `vérifié` ; ce plan li
 Rôle : alimentation, reset, lecture du statut, lecture des trames d'image (0x7200 o), exécution des commandes capteur que
 le SEP demande (GetSerialNumber, SessionKeyExchange, InitializeSequenceCounter, Patch…). L'AP ne fabrique rien (KS §7).
 - Nœud DT : le capteur est un périphérique SPI ordinaire sous un contrôleur de l'AP, compatible ADT `biosensor,mesa`
-  (hypothèse, source: kext + m1n1 trace_mesa.py, M « Capteur (Mesa) », P §2.3). **Quel contrôleur sur t6001 (spi2 ? spi4 ?),
-  chip-select, IRQ, GPIO d'alimentation/reset, fréquence, phase : inconnu** (P §2.2 : aucun nœud dans linux-asahi, à lire dans l'ADT).
+  (hypothèse, source: kext + m1n1 trace_mesa.py, M « Capteur (Mesa) », P §2.3). **Contrôleur : spi2, 8 MHz, IRQ gpio0 195, alim gpio0 0xc4 (ADT-1, 2026-11-08) ; chip-select/phase/reset : inconnus** (P §2.2 : aucun nœud dans linux-asahi, à lire dans l'ADT).
 - Transport : `spi-apple` mainline (P §2.1), sans DMA ; macOS passe par SIO (P §2.3). 0x7200 o en PIO : possible, non éprouvé (inconnu).
 - Trame capteur `[0x80][opcode][index][u32 LE longueur][charge]`, lecture d'image = trame `80 13 00 0b000000 <size>` puis lecture de
   `size` o (hypothèse, source: kext). Contrôle : 12 tranches de 0x980, CRC-16/ARC en fin de tranche (**vérifié (proposé)**, K4, 39 images / 468 tranches).

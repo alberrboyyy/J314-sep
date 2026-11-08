@@ -85,3 +85,9 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
 3. **EXPÉRIENCE HUMAINE** : K-E1 (session ouverte : 3 bon doigt + 1 mauvais ; lock → mot de passe ; lock → doigt ; lock → 20 s → doigt),
    ≤ 4 min, **prédictions écrites avant** (0 `<01` en session ouverte ; 0x209 par lock ; 0x228 mot de passe ; 0x208 doigt). Fait passer
    les 5 lignes `<01/xx` + notif -501. Variante : 2e doigt enrôlé pour le rôle de l'identifiant 16 o et de `+0xc24` (graduer).
+
+
+## Mise à jour 2026-11-08 soir (Claude)
+- K-E1 partielle (C15) : 0 `<08 TAG=0x01` pendant 4 invites en session ouverte (3 bon doigt, 1 mauvais), 0 requête AP→0x12 : soutient « TAG 0x01 = état keybag, pas verdict » ; reste `hypothèse` (n=4, une trace). Lock : `<01/08 p2` (0x208) vu, pas 0x209 : à revoir. Manque : lock→doigt, lock→20 s→doigt.
+- ADT-1 : capteur = enfant de spi2 (8 MHz), mesa_pwr = gpio0 0xc4/0x101, IRQ gpio0 195 (trace 20261108-162919_adt) : `vérifié` en tant que lecture de l'ADT ; rôle des broches = hypothèse.
+- SKS-1 : voir hypotheses.md ; non tranché sans écriture.
