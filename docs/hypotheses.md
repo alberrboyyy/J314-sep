@@ -783,3 +783,11 @@ Le présent texte ne change aucun statut dans `docs/messages.md` : il **propose*
 2. **Analyste, kext** : expliquer les écarts K6-1 (place de 0x01), K6-2 (condition de 0x6f), K6-3 (0x61 jamais envoyé) et
    relire le point exact de remise à zéro du compteur dans GT (K2).
 3. **EXPÉRIENCE HUMAINE K-E1** (≤ 4 min) : invites Touch ID en session ouverte + trois types de déverrouillage (K1).
+
+## SKS-1 — Le SEP refuse-t-il 0x09 tant que le trousseau n'est pas validé ? (2026-11-08, Claude, source: kext = noms de symboles seulement)
+Aucun désassemblage fait : lecture de `analysis/out/sks_symbols.txt` (396 noms) recoupée avec messages.md §SKS et kext_sepmanager.md §6.
+- VU (traces) : chemin doigt = **aucune requête AP→0x12** avant le succès ; le SEP émet seul `< 0x12 TAG=0x00 DATA=-501` pendant le 0x09 puis macOS publie UNLOCKED. Chemin mot de passe = `> 0x12 TAG 0x41` puis `0x18`. lockState (0x0015 au boot, 0x0228 après code) est une notification **SEP→AP** (`<01`).
+- Noms (source: kext) : `AppleKeyStore::sep_deliver_msg`, `change_lock_state`, `unlock_the_device`, `verify_password`, `device_state_transition`, `get_device_state`, `notify_change_device_state`, `ep_check_policy`, `IOSEPBiometricService::finalizeSKSStateHandling`. Côté AP, le keystore ne fait que relayer/mettre en cache l'état annoncé par le SEP ; aucun nom ne suggère un « jeton bio » envoyé par l'AP pour autoriser un match.
+- HYPOTHÈSE (non vérifiée) : l'état « blocage bio » (0x0015) vient du SEP, donc le SEP l'applique très probablement lui-même ; macOS s'abstient en plus d'offrir Touch ID. Le déverrouillage du trousseau après match est fait par le SEP seul (pas de message AP) → pour Linux, `0x09` suffirait une fois le mot de passe validé via 0x12, mais le mot de passe doit passer par SKS.
+- NON TRANCHÉ : « refuse » vs « macOS s'abstient ». Seule expérience qui tranche : envoyer 0x09 (écriture SBIO) à l'état 0x0015 → script dans `pending/`, à lancer par Albert. Expérience passive possible (K-E1 bis) : doigt posé sur l'écran de login juste après boot, vérifier que macOS n'envoie pas 0x09 (confirme l'abstention de macOS, pas le refus du SEP).
+- Filtre [cyber] : pas déclenché cette fois (pas de désassemblage). Étude plus profonde du protocole 0x12 (format des TAG 0x18/0x41/0x2f) non faite.

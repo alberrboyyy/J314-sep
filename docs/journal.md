@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-08 — Claude — SKS-1 : symboles AppleKeyStore ↔ messages EP 0x12
+- Trace : — (relecture docs/messages.md, kext_sepmanager.md ; analysis/out/sks_symbols.txt)
+- Fait : relié les noms de symboles aux messages 0x12 ; hypothèse SKS-1 dans docs/hypotheses.md.
+- Vu : chemin doigt sans requête AP→0x12 ; lockState annoncé par le SEP.
+- Interprété : le SEP applique probablement lui-même le blocage bio ; non tranché sans écriture (pending/).
+- Incidents : /dev/ttyACM* absent → Mac injoignable, pas de hardware ce tour.
+
 ## 2026-11-08 — analyste — Kext : écarts d'init K6-1..3, +0x14 de 0x09, 0x63/0x61
 - Trace : traces/ C5..C12 (comparaison) ; analysis/out/c{6,8,11}_payloads ; source: kext (AppleMesaSEPDriver, kernel.macho 13.5).
 - Fait : lecture de loadPatch, applySensorParams, setCalibrationData, resetSensorAndLoadPatch ; extraction C11 `ool_attempts.py --dump-dir analysis/out/c11_payloads/`.
