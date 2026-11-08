@@ -5,3 +5,4 @@ analysis/out/
 __pycache__/
 .current_capture
 .stop_capture
+.appel_msg

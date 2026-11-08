@@ -9,6 +9,8 @@ Albert veut que tout ce qui peut être automatisé le soit ; ne lui demander que
 en étapes courtes et numérotées, une action par ligne.
 
 ## Préparer
+0. Pour appeler Albert (à chaque fois qu'il doit agir) : `./tools/appel_albert.sh "consigne courte"` — fenêtre
+   animée et drôle sur le bureau 2 (Hyprland) + ding + notification. C'est sa demande (2026-11-08).
 1. Protocole écrit dans `docs/hypotheses.md` (section « EXPÉRIENCE HUMAINE ») par le sceptique : étapes, étiquettes,
    résultat attendu de chaque étape.
 2. Vérifier les ports (skill `sep-capture`), lancer la capture en mode auto avec un `TRACE_TIMEOUT` assez long
