@@ -14,6 +14,20 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — C9 : test HI (réponse 0x54 d'init après la session C8)
+- Trace : traces/20261108-010915_c9-boot-ool-persist (boot sans humain, même config OOL que C7/C8, 0 `ool_error`, aucune
+  tentative doigt) ; références : C5, C6, C7, C8 (init) et réponses 0x09/0x21 des 3 succès de C8.
+- Fait : `analysis/init_persist.py` → `analysis/out/c9_init_persist.txt` (diff octet par octet, offsets dans la charge).
+- Vu : requête `> A 0x54` (L554) identique à C5-C8. Réponse `< B 0x54` (L556, 0xbf4 o) : 24 octets différents de l'init
+  C5/C6/C7/C8 ; 6 différents de la copie dans 0x09 de fp_good_3 ; **0 différent** de la copie dans la réponse 0x21 de
+  fp_good_3 (C8 L3054 ; offsets 0x06-0x2d de l'enregistrement non comparables, recouverts dans 0x21). Même chaîne dans C8 :
+  0x21 du succès N = 0x09 du succès N+1 (2/2). Les 3 essais mauvais doigt n'ont rien changé. Réponses d'init 0x6e (L572) et
+  0x7a (L576) : identiques à C5-C8 (l'identifiant 16 o ne change pas).
+- Interprété (hypothèse HI, une seule observation de boot) : l'enregistrement est conservé par le SEP au reboot et mis à jour
+  à chaque succès ; 0x09 donne l'état avant, 0x21 l'état après. Lieu de stockage (xART ?) et sens des champs : inconnus.
+  Ne passe pas en `vérifié` : à confirmer par le sceptique (ex. 2e boot sans succès : 0x54 doit rester égal à C9).
+- Incidents : aucun.
+
 ## 2026-11-08 — lecteur-logs (intégré par l'analyste) — C8 : alignement hv_uart ↔ sep.log, chemins SKS doigt / mot de passe
 - Trace : traces/20261108-004657_c8-doigt-ool (hv_uart.log, sep.log, marks.txt) ; recoupements C3 (traces/20261107-035930_c3-touchid)
   et C1 (traces/20261107-033436_c1-boot).
