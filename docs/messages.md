@@ -217,7 +217,7 @@ construit par GT (fonction « message brut » : TAG = 0x26, TYPE = 0, DATA = uid
   `+0x07` = 1 si image présente, `+0x08` = un bit d'état de la capture, `+0x09..+0x6a` = 0x62 o recopiés de la capture,
   `+0x28` bit 0 posé selon un drapeau. Trace : `+0x06..07` = `01 01` → 0x09 direct, `00 00` → abandon ou 0x1e ;
   `+0x02` = 2 aux abandons — **recoupe partiellement** (même emplacement des drapeaux ; la valeur 2 n'est pas expliquée).
-  Lecture de la branche principale (réponse SEP) non faite : codes d'erreur 0x130 et 0x193 traités à part.
+  Branche principale (réponse SEP) : voir « Capteur (Mesa) → 0x65 », paragraphe 0x07.
 - **0x6c / 0x6d (catacomb = conteneur des gabarits)** : 0x6c reçoit 0x18 o de l'espace utilisateur (commande user-client
   `PrepareSaveCatacomb` v2) ; la réponse (blob `LTFC`) est gardée dans `_catacombData` du kext ; `CompleteSaveCatacomb`
   (sans appel SEP) la recopie vers l'espace utilisateur ; `ConfirmSaveCatacomb` envoie 0x37 (0x18 o). Au boot,
@@ -246,6 +246,119 @@ un u16 = bits 16-31 (TYPE + PARAM·0x100), info = DATA (bits 32-63), et réparti
   `<03` → `>21` (C1 L1143-L1144).
 - TAG 0x04 : envoie aux clients le message IOKit 0xe3ff800c (sens non lu) — trace : `<04` pendant 0x73 (C1 L321),
   cohérent avec un signal « SEP prêt ».
+
+### Capteur (Mesa) → 0x65 — chemin des données capteur (phase 2, **source: kext** sauf mention, 2026-11-08)
+
+Kexts lus : `com.apple.driver.AppleBiometricSensor` (classes AppleMesa / AppleSandDollar / AppleSPIBiometricSensor),
+`com.apple.driver.AppleMesaSEPDriver`, `AppleSPUMesaDriver` (dans `com.apple.driver.AppleSPU`). Le kernelcache contient
+une **table de symboles** (LC_SYMTAB) : les noms de fonctions ci-dessous sont des symboles, pas des déductions
+(`analysis/kext/ksyms.py`). Personnalités IOKit lues dans le plist prelink du kernelcache.
+
+**Raccordement (source: kext, personnalités IOKit)**
+- `AppleSandDollar` (mesaType 1, famille du capteur de ce Mac : uart « Found SandDollarFamily ») se rattache par
+  `IONameMatch = biosensor,mesa` à un `IOProviderClass = AppleARMSPIDevice` (fourni par `com.apple.driver.AppleSPIMC`) :
+  **le capteur est un périphérique SPI ordinaire sous un contrôleur SPI de l'AP**, pas un service de l'AOP.
+  `AppleMesaSEPDriver` se rattache, lui, à `sep-endpoint,sbio` (AppleSEPDeviceService).
+- Public (m1n1, `proxyclient/hv/trace_mesa.py`, commit e2d671d5, 2022, écrit pour M1 — source: m1n1) : nœud ADT de
+  compatible `biosensor,mesa` enfant d'un contrôleur `spi-1,spimc` (tracé comme `/arm-io/spi2`), transferts faits par
+  le coprocesseur **SIO** (canaux DMA 0x18/0x19), alimentation par une GPIO `mesa_pwr` (pin 0xc4 sur gpio0, M1).
+  **Non vérifié sur ce M1 Max** (t6001) : chemin ADT, numéro de spi, pin.
+- Propriétés lues par `AppleMesa::start` sur le nœud (source: kext, noms de chaînes) : `function-mesa_pwr`,
+  `function-mesa_pwr1v8`, `mesa-drive-1v8`, `function-bb_gpio`, `function-monitor-current-3v0/1v8`,
+  `function-over-current`, délais `power-on/off-*delay` (préfixés ou non `mesa-`), `spi-frequency`/`mesa-spi-freq`,
+  `mesa-spi-clock-phase`, `mesa-sensor-id`, `function-mesa-reset-ntfy`, interruptions (IOInterruptEventSource +
+  minuterie de scrutation).
+- **Rôle de l'AOP** : seulement reset/alimentation. Si le nœud a `function-mesa-reset-ntfy`, `AppleMesa::start`
+  logue « Looking for AOP driver... » et attend (60 s max) le service `AppleSPUMesaDriver` ; celui-ci se rattache à un
+  `IOHIDInterface` de transport SPU (page d'usage 0x20, usage 0x13), envoie à l'AOP les commandes 0x20
+  (« kMesaCommandResetBegin ») puis 0x21 après 10 ms autour d'un reset, pilote `function-mesa_reset`, prend une
+  assertion PM « mesa-pm-assertion ». AppleMesa suit aussi la veille de l'AOP (« AOP is going to sleep / woke up »).
+  **Aucune donnée d'image ne passe par l'AOP** dans le code lu. Trace : uart C11 L702-703, « Looking for AOP
+  driver... » suivi aussitôt de « SensorStatus » (pas d'assert `aopMesaDriver`) ; services AOP prêts listés : SPUApp,
+  aop-voicetrigger, aop-audio (uart L298-300).
+
+**Trame capteur sur SPI (source: kext ; recoupée par les traces)** : `[0x80][opcode][index][u32 LE longueur totale de
+la trame][charge…]`.
+- Lecture d'image (`AppleMesa::readSensorData(size)`, size ≤ 65536) : envoi de la trame de 11 octets
+  `80 13 00 0b000000 <size u32 LE>`, puis lecture SPI de `size` octets dans un tampon du driver (`_sensorDataMD`).
+- Déclenchement (`AppleMesa::handleStateMachine`, appelée sur interruption) : statut capteur lu dans le driver ; si
+  octet d'état (statut +7) = 7 = « données disponibles », u32 à statut +0xc = octets disponibles, lus s'ils atteignent
+  l'une des deux tailles d'image attendues (champs du driver posés selon le capteur, non lus).
+- Contrôle (`AppleSandDollar::_checkImageCRC`) : image = N tranches égales (N = champ du driver) ; dans chaque tranche,
+  u32 LE à +3 = longueur de la tranche ; 2 derniers octets = CRC-16 LE sur tout le reste de la tranche, CRC-16/ARC
+  (poly réfléchi 0xA001, init 0 : table du kext identique à la table ARC standard).
+- **Recoupement trace** (`analysis/slice_crc.py`) : charges `> A 0x65` de C8 (9) et C6 (6) = 15 × 12 tranches de 0x980 :
+  **180/180** tranches ont `80 52 NN` en tête, u32 à +3 = 0x980 et un CRC-16/ARC exact. Un hasard est exclu (2^-16 par
+  tranche). Le corps de chaque tranche (+0x17..−2) reste à ~8 bits/octet.
+- Statut au démarrage (uart, 16/16 traces identiques) : `80 20 00 10000000 00 60 00 00 00 52 33 00 00` (même en-tête,
+  longueur 0x10) ; ses 2 derniers octets **ne sont pas** un CRC-16/ARC (0x35de attendu) : format du statut complet non
+  élucidé.
+
+**Chemin jusqu'à 0x65 (source: kext)** : lecture SPI → `_checkImageCRC` (appel virtuel dans
+`AppleMesa::dispatchCaptureReady`) → recopie (`memmove`) dans un IOBufferMemoryDescriptor neuf par client →
+`AppleBiometricSensorEventSource::captureReady` → `AppleMesaSEPDriver::handleCapture` → `getCaptureBufferFromIOMD`
+(`OSData::withBytes`, recopie) → `IOMesaCaptureDataLocal` → file `IOMesaCaptureDataQueue` → `asyncCaptureHandler` :
+`> 0x23`, `> 0x06` (paramètres), puis `> 0x65` avec les octets et la longueur de l'OSData **tels quels**.
+**Aucune transformation** sur l'AP : que des recopies et un contrôle de CRC. Le kext n'a pas de clé capable de
+déchiffrer l'image.
+
+**Chiffrement capteur ↔ SEP (interprétation, source: kext + m1n1)** : le corps des tranches est probablement chiffré
+par le capteur avec une clé de session connue du seul SEP. Le kext sert de relais pour l'établir ; séquences
+vues dans AppleMesaSEPDriver (TYPE SEP / méthode capteur, slots de vtable résolus par symboles) :
+
+| Fonction Mesa | Séquence (SEP = sepTransact TYPE, CAPTEUR = méthode AppleMesa/AppleSandDollar → SPI) |
+|---|---|
+| `prepareSession` | CAPTEUR GetSerialNumber → SEP 0x17 |
+| `performKeyExchange` | SEP 0x15 (réponse = `hostKeyWrapped`, 40 o exigés) → CAPTEUR SessionKeyExchange(40 o → 40 o) → SEP 0x16 (les 40 o du capteur) |
+| `initializeSequenceCounter` | SEP 0x42 → CAPTEUR InitializeSequenceCounter → SEP 0x18 |
+| `loadPatch` | SEP 0x5f (le patch firmware capteur vient **du SEP**) → CAPTEUR Patch → CAPTEUR GetStatus → SEP 0x01 |
+| `applySensorParams` | SEP 0x5d → CAPTEUR SetEncryptedParameters ; SEP 0x5c → idem ; SEP 0x6a → CAPTEUR SendEncryptedCommand ; SEP 0x6f → idem |
+| `getSensorModuleSerialNumberRaw` | CAPTEUR GetModuleSerialNumber → SEP 0x31 → CAPTEUR EncryptedGetModuleSerialNumber → SEP 0x32 |
+| `establishDiffieHellmanSession` | SEP 0x43 → CAPTEUR DHKeyExchange → SEP 0x44 (non vu en trace) |
+| `provisionNavajo` / `seaCookieHandleMessage` | provisionnement / usine (non vu) |
+
+Trace : l'ordre d'init observé 17-15-16-42-18, 5f…01, 5d-5c-6a, 31→32 **recoupe** ces séquences. Public (m1n1
+e2d671d5) : « After power on, the command buffer is encrypted by the SEP ». Conséquence : Linux n'a pas à comprendre
+ces charges, seulement à les **relayer** octet pour octet entre le SEP (EP 0x08) et le capteur (SPI).
+
+**0x07 — réponse « image traitée » (`image_processing_result_full`, branche principale, source: kext)** : le kext exige
+une taille > 0x88 et ≥ 0x89 + u32 à `+0x85` (partie finale de longueur variable à `+0x89`). Champs nommés par le log
+« kImageProceessed » : `+0x00` s16 err ; `+0x02` u32 assessment ; `+0x06` u8 imageForMatching ; `+0x07` u8
+imageForEnrolling ; `+0x0e` u32 feedback ; `+0x12` u32 purpose ; `+0x18`/`+0x1c`/`+0x20` float contrast/brightness/
+featureStrength (logués ×1000 en mV) ; `+0x24` u32 numPxOutliers ; `+0x40` u8 dirtOnSensor ; `+0x51` u8 (statistique
+0x24). `+0x09..+0x6a` (0x62 o) recopiés dans un cache du driver. Règles : si assessment ∈ {2,3} (en mode commande 3)
+ou = 4, et feedback ∈ {0xc8,0xc9,0xca,0xcc,0xcd} → statut client 0x55/0x56/0x57/0x58/0x62 (table du kext) ; si
+assessment ∈ {0,2,3} → statut client 0x5f ; feedback 0xc9 annule un drapeau tiré de `+0x08`.
+**0x130 et 0x193 ne sont pas des champs** : ce sont des codes de retour de la transaction 0x07 elle-même
+(`sepTransact` ≠ 0) ; 0x130 → `checkSensorState(0)` (et un drapeau), 0x193 → statistique 0x17 ; sens non lu.
+Trace (C8 9/9 + C6 6/6, `analysis/out/c{6,8}_payloads/*outB_07.bin`) : `+0x85` = 0x37 (= 0xc0 − 0x89) 15/15 ;
+abandons : assessment 2, feedback 0xc9, imageForMatching = imageForEnrolling = 0 (4/4) ; tentatives comparées :
+assessment 0, feedback 0 (10/11 ; L2399 C8 : assessment 3, feedback 0xc9, image retenue) ; err = 0 partout ; contrast
+plus bas pour les 3 mauvais doigts (0.040-0.048 contre 0.10-0.15) — 3 cas, peut-être une coïncidence (autre doigt =
+autre contact). Le `+0x28` = 1 des mauvais doigts n'est pas lu par le kext dans cette branche.
+
+| EP | Dir | Tag | Type | Param | Data | Vu | Rôle supposé | Statut | Source | Date |
+|----|-----|-----|------|-------|------|----|--------------|--------|--------|------|
+| 0x08 | > | 0xfc/0xfd | 0x65 | 0 | 0 / 0x10000 | 180/180 tranches de 0x980 (C8, C6) : en-tête `80 52 NN`, longueur u32 à +3, CRC-16/ARC final exact | recopie octet pour octet des trames lues sur SPI ; corps chiffré par le capteur (clé de session SEP) | hypothèse | kext ; trace:C8 ; trace:C6 ; m1n1 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x07 | 0 | 0 | `+0x85` = 0x37 15/15 ; abandons assessment 2 / feedback 0xc9 | `image_processing_result_full` (champs nommés ci-dessus) | hypothèse | kext ; trace:C8 ; trace:C6 | 2026-11-08 |
+
+**Ce que Linux doit fournir (déduit, rien de vérifié)**
+1. Contrôleur SPI : upstream a `spi-apple` (compatible `apple,spi` ; m1n1 `kboot_t6020_compat.c` publie la
+   correspondance `apple,t6020-spi` → `apple,spi`). macOS fait les transferts par DMA SIO (m1n1) ; il reste à voir si le
+   mode PIO de `spi-apple` suffit pour 0x7200 o par capture (fréquence et taille FIFO non lues).
+2. Un pilote client « mesa » : alimentation (GPIO/fonctions `function-mesa_pwr*` + délais de l'ADT), reset, IRQ,
+   trames `0x80` (lecture de statut, `80 13` lecture de données), contrôle CRC-16/ARC, machine d'état capture.
+3. Le relais SEP ↔ capteur pour la mise en route (patch 0x5f→01, clé 0x15→0x16, compteur 0x42→0x18, paramètres
+   0x5d/0x5c/0x6a/0x6f) puis par tentative 0x23, 0x06, **0x65 (image brute)**, 0x07, 0x09… sur l'EP 0x08. Ce sont des
+   **écritures vers le SEP** : hors de portée des agents (pending/ + Albert).
+4. Probablement rien côté AOP pour les données ; le reset coordonné par l'AOP (`function-mesa-reset-ntfy`) n'a pas
+   d'équivalent connu sous Linux (inconnu : est-il obligatoire ?).
+Le format des commandes du capteur en clair (opcodes autres que 0x13/0x20/0x52, statut) n'est connu que partiellement ;
+les commandes chiffrées n'ont pas besoin d'être comprises.
+
+**Inconnus** : chemin ADT/numéro spi/pins sur le M1 Max (faire un dump ADT via l'outillage tracer) ; format exact du
+statut et des opcodes en clair ; mode de chiffrement de l'image ; le SEP accepte-t-il une image venue d'un hôte non
+macOS (rien ne l'indique contre) ; sens de 0x130/0x193 ; rôle exact de l'AOP au reset.
 
 ### SBIO (0x08) — structures récurrentes
 

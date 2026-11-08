@@ -114,6 +114,8 @@ ne jamais les citer comme source.
     python3 analysis/kext/macho_fileset.py macos/kernel.macho [BUNDLE_ID]
     VENV/bin/python analysis/kext/kdis.py macos/kernel.macho BUNDLE_ID strrefs|vcallers SLOT|callers ADDR|func ADDR
     python3 analysis/kext/mesa_cmd_map.py macos/kernel.macho      # après `kdis.py ... vcallers 0x9e0/0x9d8`
+    python3 analysis/kext/ksyms.py macos/kernel.macho [REGEX] | --at ADDR...   # table de symboles du kernelcache
+    python3 analysis/slice_crc.py analysis/out/c8_payloads/*inA_65.bin          # trames/CRC-16 des tranches 0x65
     python3 analysis/kext/mesa_case_reach.py macos/kernel.macho   # après `kdis.py ... func 0xfffffe000977eecc > analysis/out/kext/f_psc.txt`
 
 `kdis.py` demande capstone (venv hors repo). Les listings (`func`) et index vont dans `analysis/out/kext/` (ignoré) :

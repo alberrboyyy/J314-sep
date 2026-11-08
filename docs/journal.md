@@ -14,6 +14,28 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — Phase 2 : d'où vient l'image 0x65 (AppleBiometricSensor, AppleSPUMesaDriver)
+- Trace : — (kernelcache 13.5 `macos/kernel.macho`) ; recoupé avec C8/C6 (`analysis/out/c{6,8}_payloads/*_65.bin`,
+  `*outB_07.bin`) et uart C11 L685-703.
+- Fait : `analysis/kext/ksyms.py` (table de symboles LC_SYMTAB du kernelcache : les fonctions des kexts sont nommées) ;
+  `analysis/slice_crc.py` (contrôle trame/CRC des tranches 0x65) ; lecture de AppleMesa::start, readSensorData,
+  handleStateMachine, dispatchCaptureReady, AppleSandDollar::_checkImageCRC, crc16ansi, AppleSPUMesaDriver, et dans
+  Mesa : handleCapture, asyncCaptureHandler (0x65, 0x07), séquences SEP/capteur (slots de vtable résolus par symboles).
+  Personnalités IOKit lues dans le plist prelink. Code public m1n1 `proxyclient/hv/trace_mesa.py` lu. Listings dans
+  analysis/out/kext/abs/ (non versionné). Aucune copie de code.
+- Vu (kext) : AppleSandDollar se rattache à `biosensor,mesa` sur un AppleARMSPIDevice (capteur SPI de l'AP) ; l'AOP
+  (AppleSPUMesaDriver, HID SPU page 0x20/usage 0x13) ne sert qu'au reset (commandes 0x20/0x21, `function-mesa_reset`).
+  Lecture image = trame `80 13 00 0b000000 <size>` puis lecture SPI ; tranches contrôlées par CRC-16/ARC ; chemin
+  jusqu'à `> 0x65` = recopies seulement. Init : SEP 0x15 → capteur SessionKeyExchange → SEP 0x16, 0x42 → capteur → 0x18,
+  0x5f → capteur Patch → 0x01, 0x5d/0x5c/0x6a/0x6f → paramètres/commandes chiffrés vers le capteur. 0x07 : champs
+  nommés (assessment, feedback, contrast…) ; 0x130/0x193 = codes de retour de la transaction.
+- Vu (trace) : 180/180 tranches 0x65 (C8+C6) passent le contrôle du kext (en-tête `80 52 NN`, longueur 0x980 à +3,
+  CRC-16/ARC). Réponses 0x07 : `+0x85` = 0x37 15/15 ; abandons assessment 2 / feedback 0xc9.
+- Interprété : 0x65 = image brute du capteur recopiée telle quelle, chiffrée par le capteur avec une clé de session
+  négociée par le SEP via l'AP. Linux : `spi-apple` + pilote mesa (alim/IRQ/trames/CRC) + relais vers l'EP 0x08. Statut
+  `hypothèse` (source: kext) ; non vérifié sur ce Mac : nœud ADT/spi/pins (m1n1 donne `/arm-io/spi2` et SIO sur M1).
+- Incidents : aucun (pas de hardware).
+
 ## 2026-11-08 — analyste — Phase 2 : lecture de AppleMesaSEPDriver + AppleSEPGenericTransfer (TYPE sbio → noms)
 - Trace : — (kernelcache macOS 13.5 `macos/kernel.macho` ; recoupé avec C1, C3, C8, C11, C12 via docs/messages.md)
 - Fait : `analysis/kext/macho_fileset.py` (segments d'une entrée MH_FILESET), `analysis/kext/kdis.py` (capstone dans un venv
