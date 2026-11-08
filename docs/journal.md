@@ -14,6 +14,15 @@ Format :
 
 ---
 
+## 2026-11-08 — Claude (session principale) — C10b : contrôle de persistance (HI/HO)
+- Trace : traces/20261108-012015_c10b-boot-ool-stable (TRACE_TIMEOUT=300, config OOL de C9, aucun humain, aucun boot natif entre C9 et C10b).
+- Vu : boot complet (hv_uart 2168 lignes, sep.log 779, 0 ool_error). `analysis/init_persist.py --ref C9` : réponses d'init 0x54 (0xbf4 o),
+  0x6e, 0x7a = 0 octet différent de C9. Les 4 lectures `# ool` du `> A 0x6d` d'init ont les mêmes sha/nz que C9 (e87ef868, 7e50186d, fa51f810, 791868ac).
+- Interprété (hypothèse) : sans succès entre deux boots, macOS renvoie le même blob 0x6d et le SEP rend la même 0x54 → cohérent avec HO
+  (blob exporté par 0x6c après succès, conservé par macOS, renvoyé au boot). Ne distingue pas encore « 0x54 dérivée du blob » de « état SEP propre » :
+  il faudrait un boot où macOS ne renvoie pas le blob, ce qu'on ne peut pas provoquer en phase 1 sans écriture.
+- Incidents : aucun.
+
 ## 2026-11-08 — analyste — Correctif ool_index, test HO sur C9, invariants d'en-tête C5-C9
 - Trace : traces/20261108-004657_c8-doigt-ool, traces/20261108-010915_c9-boot-ool-persist ; C5, C6, C7 pour les invariants.
 - Fait : `analysis/ool_index.py` : les lignes `changed=none` sont maintenant rattachées au dernier .bin de même (buffer,
