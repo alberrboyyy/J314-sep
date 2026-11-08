@@ -105,3 +105,11 @@ Classe 3 — bloquantes pour un match
 9. Provenance du blob `0x5b` sous Linux (fichier macOS ?), enrôlement sous Linux.
 Classe 4 — non bloquantes
 10. Sens des bits 3, 4, 6, 9 du lockState ; TAG 0x02/0x04 ; compteur GT exact dans le kext ; écarts K6 ; expérience K-E1 ; mapping multi-uid.
+
+
+## Mise à jour 2026-11-09 : étapes 1 à 5 faites hors ligne
+- Fait dans `driver/` (module `sepreplay/`, 29 tests) : décodeur de mots mailbox, table 0xFD (recherche par nom), parseur du statut capteur, réassemblage GT + CRC des 0x65, rejeu de la séquence d'init (57 commandes, 18/18 captures) et des blobs 0x6c→0x6d. Aucune émission vers le SEP.
+- Corrigé : l'ordre d'annonce des endpoints n'est pas fixe (3 ordres sur 8 boots) → toujours chercher par nom.
+- Nœud DT capteur : spi2, 8 MHz, IRQ gpio0 195, alim gpio0 0xc4 (ADT-1). Reste inconnu : chip-select, phase, reset (via l'AOP).
+- SKS (question « le SEP refuse-t-il 0x09 avant le mot de passe ? ») : non tranchée sans écriture ; sera visible à l'étape 6 (SEP piloté par Linux seul).
+- Reste : étape 6 (décision d'Albert : Linux qui boote sur le Mac + SEPOS), puis étape 7.
