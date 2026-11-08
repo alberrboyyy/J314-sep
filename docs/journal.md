@@ -14,6 +14,27 @@ Format :
 
 ---
 
+## 2026-11-08 — documentaliste — État public côté Linux (SEP, spi-apple, AOP, mesa)
+- Trace : — (sources publiques) ; recoupé avec traces/20261107-033436_c1-boot/hv_uart.log:176-184.
+- Fait : lu m1n1 local (`70757dc7`) : src/sep.c, src/kboot.c, src/main.c, hw/sep.py, hv/trace_mesa.py,
+  hv/trace_aop.py. Lu linux-asahi branche `asahi` (raw.githubusercontent) : drivers/soc/apple/{sep.rs,aop.rs,Kconfig},
+  drivers/spi/{spi-apple.c,Kconfig}, drivers/dma/apple-sio.c, DT t600x-*/t6001-j314c/t8103*/t8112. Vérifié la présence
+  dans le mainline et lu la doc Asahi (sep, feature-support/m1, subsystems, devicetree-bindings). Détail et citations dans
+  docs/public_linux_state.md.
+- Vu (public) : Linux a un pilote SEP « stub » (`sep.rs`, downstream) qui ne fait qu'amorcer SEPOS (BOOT_TZ0, BOOT_IMG4 de
+  `sepfw`, SET_SHMEM, découverte EP 0xfd ignorée). Aucun code SBIO, SKS ou xART. Sur t600x, le nœud `sep` est
+  `disabled` et j314/j316 n'a pas d'alias `sep`, donc m1n1 ne transmet pas `sepfw`. m1n1 parle au SEPROM (EP 0xff,
+  GETRAND) pour les graines. `spi-apple` est mainline (6.15), sans DMA ; son Kconfig cite « fingerprint sensor ». Le DT
+  t600x ne décrit que spi1 (NVRAM) et spi3 (HID), aucun nœud mesa. trace_mesa.py (M1) : capteur sous `spi-1,spimc`,
+  DMA via SIO EP 0x20, GPIO `mesa_pwr` 0xc4, « command buffer is encrypted after the poweron sequence », message de
+  0x7200 octets. aop.rs ne connaît que aop-audio, als et las. TouchID = « TBA » dans le feature support.
+- Vu (trace) : macOS démarre spi1 à spi4 sur notre j314c ; spi2 et spi4 sont absents du DT Linux.
+- Interprété : sous Linux publié, le SEP reste sous SEPROM sur j314c. Rien de public pour SBIO ni pour le reset mesa via
+  l'AOP. trace_mesa.py recoupe la lecture du kext (SPI de l'AP, chiffrement après échange de clé, 0x7200 octets).
+  Contradiction mineure : la doc Asahi donne type = bits 16-24 et param = 25-31, alors que le code fait 16-23/24-31
+  (pour le sceptique). La page des bindings Asahi dit SPI « not submitted upstream », ce qui est périmé.
+- Incidents : `gh api` refusé par les permissions ; lectures faites via WebFetch et raw.githubusercontent.
+
 ## 2026-11-08 — analyste — Phase 2 : AppleSEPManager (boot, CNTL, découverte, ouverture d'EP) + lockState IOBiometricFamily
 - Trace : — (kernelcache 13.5 `macos/kernel.macho`) ; recoupé avec C11 (sep.log L3-148, L348-L2100, L558-L5980 ;
   hv_uart L643-766, L1515, L1555), C1 L39-41, C12 L39-49.
