@@ -14,6 +14,18 @@ Format :
 
 ---
 
+## 2026-11-08 — Claude (session principale) — C12 : test de la prédiction HO (boot sans humain après C11)
+- Trace : traces/20261108-032454_c12-boot-ho (TRACE_TIMEOUT=300, config OOL de C11 avec 0x6c/0x6d complets ; sortie C11 par reboot() HV, aucun boot natif).
+- Prédiction écrite AVANT la capture (analyste, rapport C11) : le `> A 0x6d` d'init de C12 = dernier export `< B 0x6c` de C11,
+  L6959 (0x9245 o, sha 83613e39) et L6983 (0xf4 o, sha 5e58a78d).
+- Vu (`analysis/ool_transfers.py --types 0x6d`, sortie analysis/out/c12_transfers.txt) : C12 L520 `>A 0x6d` total 0x9245, lu 0x9245,
+  sha 83613e39, magic LTFC, uid 0x1f5 ; L494 `>A 0x6d` total 0xf4, sha 5e58a78d, uid 0xffffffff. Les deux identiques octet pour octet
+  (sha sur la totalité) à la prédiction. 0 ool_error.
+- Conclusion : HO (blob LTFC exporté par le SEP via 0x6c après un succès, conservé par macOS, renvoyé tel quel au boot via 0x6d)
+  confirmée par une prédiction a priori sur une trace dédiée → **candidat `vérifié`** au sens de CLAUDE.md, à valider par Albert.
+  Non établi : où macOS stocke le blob, ce qu'il contient (chiffré), si le SEP refuse un blob absent/ancien (non testable sans écriture).
+- Incidents : aucun.
+
 ## 2026-11-08 — analyste — Analyse C11 (session doigt tranchante)
 - Trace : traces/20261108-025802_c11-doigt-tranchant (sep.log, sep.log.ool/, hv_uart.log, marks.txt, notes.txt d'Albert).
 - Fait : nouveaux `analysis/attempt_fields.py` (champs OOL par tentative) et `analysis/ool_transfers.py` (transferts
