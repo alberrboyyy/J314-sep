@@ -14,6 +14,11 @@ Format :
 
 ---
 
+## 2026-11-08 16:55 — Claude — Cause de l'échec C13 : veille inactive au login
+- Trace : traces/20261108-163401_c13-ke1/hv_uart.log L2742-2800 (« going to sleep », FB0 ON→OFF, IOCPUSleepKernel)
+- Vu : boot complet jusqu'à launchd + keybag, puis veille système ~9,5 min après le début ; seule autre veille : C6. Les captures « boot seul » duraient ≤ 300 s.
+- Interprété : veille d'inactivité à l'écran de connexion (personne n'a tapé le mot de passe), pas un échec de boot. Relance C14 avec Albert devant le Mac.
+
 ## 2026-11-08 16:35 — Claude — C13 (K-E1) avortée : pas de session ouverte
 - Trace : traces/20261108-163401_c13-ke1 (timeout 900 s, reboot propre, proxy revenu)
 - Vu : noyau jusqu'à launchd, puis mise en veille (S2R, « pmu go hib ») vers 16:44 ; Albert rapporte « macOS a pas boot » (écran sans login ?). Aucune étape K-E1 faite.
