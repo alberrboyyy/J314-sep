@@ -4,9 +4,9 @@ AUCUNE ÉMISSION : ce module ne fait que PRODUIRE la liste des commandes qu'un f
 ce que macOS a émis dans une trace. Il n'ouvre ni mailbox ni périphérique.
 
 Statuts (docs/verification_status.md) :
-  - séquence d'init (57 premières commandes `> fc`) : **vérifié (proposé)**, K6 (8/8 boots ; ici 18/18 captures avec sbio).
+  - séquence d'init (57 premières commandes `> fc`) : **vérifié (macOS)**, K6 (8/8 boots ; ici 18/18 captures avec sbio).
     Les attributions fonction -> sous-séquence sont `hypothèse` et ne sont PAS utilisées.
-  - boucle 0x6c -> 0x6d (`LTFC`) : **vérifié (proposé)** (HO : import C12 = dernier export C11 ; C9 = C8, C11 = C9).
+  - boucle 0x6c -> 0x6d (`LTFC`) : **vérifié (macOS)** (HO : import C12 = dernier export C11 ; C9 = C8, C11 = C9).
     Contenu chiffré/opaque : le démon ne l'interprète pas. En-tête observé (hypothèse) : `LTFC`, u32 0x0a, u32 uid (+8).
     Format de la requête 0x6c : 0x18 o = uid u32 LE puis zéros (observé 2 valeurs : 501 et 0xffffffff).
   - ordre d'import « petit blob (uid -1, 0xf4 o) puis gros (uid utilisateur) » : observé dans 5 boots, `proposé`.

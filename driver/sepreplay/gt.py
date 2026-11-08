@@ -3,7 +3,7 @@
 Statuts (docs/verification_status.md) :
   - mot GT (TAG in {fc,fd,fe}, TYPE = commande, PARAM = 0, DATA = compteur << 16) : **vérifié (côté macOS)**.
   - en-tête OOL 0x1c o (u32 LE : 1, total, offset, 0, 0, TYPE, longueur du morceau) : **vérifié (lecture)**.
-  - 0x65 = 12 tranches de 0x980, CRC-16/ARC en fin de tranche : **vérifié (proposé)**, K4.
+  - 0x65 = 12 tranches de 0x980, CRC-16/ARC en fin de tranche : **vérifié (macOS)**, K4.
   - A = AP->SEP, B = SEP->AP : hypothèse (la direction est celle écrite par le tracer, `dir=` de la ligne `# ool`).
 Règle de compteur testée ici (observation sur les traces, formulée à partir de messages.md « Fragments ») :
   `fc` : DATA = 0 ; `fe` : compteur = nombre de `fd` déjà vus dans le transfert ; `fd` : compteur = ce nombre + 1 ;

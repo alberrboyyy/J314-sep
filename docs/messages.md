@@ -339,7 +339,7 @@ autre contact). Le `+0x28` = 1 des mauvais doigts n'est pas lu par le kext dans 
 
 | EP | Dir | Tag | Type | Param | Data | Vu | Rôle supposé | Statut | Source | Date |
 |----|-----|-----|------|-------|------|----|--------------|--------|--------|------|
-| 0x08 | > | 0xfc/0xfd | 0x65 | 0 | 0 / 0x10000 | 180/180 tranches de 0x980 (C8, C6) : en-tête `80 52 NN`, longueur u32 à +3, CRC-16/ARC final exact | recopie octet pour octet des trames lues sur SPI ; corps chiffré par le capteur (clé de session SEP) | hypothèse | kext ; trace:C8 ; trace:C6 ; m1n1 | 2026-11-08 |
+| 0x08 | > | 0xfc/0xfd | 0x65 | 0 | 0 / 0x10000 | 180/180 tranches de 0x980 (C8, C6) : en-tête `80 52 NN`, longueur u32 à +3, CRC-16/ARC final exact | recopie octet pour octet des trames lues sur SPI ; corps chiffré par le capteur (clé de session SEP) | structure (12 × 0x980, en-tête, CRC) : vérifié (comportement observé de macOS, 468/468 tranches, 3 sessions, rejeu 2026-11-09) ; contenu et « le SEP l'exige » : hypothèse | kext ; trace:C8 ; trace:C6 ; m1n1 | 2026-11-08 |
 | 0x08 | < | 0xfc | 0x07 | 0 | 0 | `+0x85` = 0x37 15/15 ; abandons assessment 2 / feedback 0xc9 | `image_processing_result_full` (champs nommés ci-dessus) | hypothèse | kext ; trace:C8 ; trace:C6 | 2026-11-08 |
 
 **Ce que Linux doit fournir (déduit, rien de vérifié)**

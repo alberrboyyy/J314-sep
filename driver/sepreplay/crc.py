@@ -1,6 +1,6 @@
 """CRC-16/ARC (polynôme réfléchi 0xA001, init 0, pas de XOR final), écrit ici à partir de la définition standard.
 
-Statut : contrôle des tranches 0x65 = `vérifié (proposé)` (K4, 468/468 tranches). Aucun code Apple.
+Statut : contrôle des tranches 0x65 = `vérifié (macOS)` (K4, 468/468 tranches). Aucun code Apple.
 """
 
 

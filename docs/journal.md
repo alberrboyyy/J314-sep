@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-09 — sceptique — Tranchage des lignes « vérifié (proposé) »
+- Trace : — (relecture de docs/verification_status.md, journal, driver/tests ; aucun hardware, aucune écriture SEP)
+- Fait : règle CLAUDE.md « Qui décide quoi » appliquée. Sens de `vérifié` précisé : comportement observé de macOS, reproductible ; jamais « le SEP exige ».
+- Vu : passent à `vérifié` (macOS) : init de 57 commandes (8/8 boots + rejeu 18/18 captures dont C13-C16 hors échantillon ; réserve : coupure à 57 choisie après coup), structure 0x65 + CRC des 12 tranches (468/468, 3 sessions), boucle 0x6c -> 0x6d (prédiction C12 écrite avant, exacte ; réserve : gros blob C8 -> C9 partiel), `<03` => `>21` (50/50, déjà vérifié).
+- Reste `hypothèse` : « `<01` suit le keybag, pas le verdict » (K-E1 : une session, prédiction 0x209@lock partiellement fausse), ordre petit/gros blob, contenu des 0x65, tout « exigé par le SEP ».
+- Incidents : aucun. Docs modifiées : verification_status.md, messages.md (ligne 0x65), driver/README.md.
+
 ## 2026-11-08 — driver — Étape 5 (hors ligne) : « démon » d'init (57 commandes) et boucle de blobs 0x6c -> 0x6d
 - Trace : les 18 captures contenant des commandes sbio (init) ; C8, C9, C10b, C11, C12 pour les blobs. Lecture seule, rien n'est émis.
 - Fait : `driver/sepreplay/daemon.py` (INIT_SEQUENCE de 57 TYPE, `BlobStore`, `InitPlan`, requête 0x6c = uid u32 + 20 zéros) + `driver/tests/test_step5_daemon.py`.
