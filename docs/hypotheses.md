@@ -627,3 +627,149 @@ revient au sceptique / à Albert (CLAUDE.md), pas à l'analyste.
 - **HO** — soutenue : `> A 0x6d` inchangé tant qu'il n'y a pas de succès (C9 = C10b = C11), changé après les succès de C8.
   Prédiction préenregistrée pour le prochain boot (C12) : `> A 0x6d` = exports C11 L6959 (0x9245 o, sha 83613e39) et L6983
   (0xf4 o, sha 5e58a78d). Si confirmée en octets complets → candidat `vérifié`.
+
+# Confrontation kext ↔ traces (2026-11-08, sceptique)
+
+Objet : les affirmations `source: kext` de `docs/messages.md` (« SBIO (0x08) — lecture du kext » et « Capteur (Mesa) → 0x65 »)
+qui font une prédiction testable sur les traces **déjà capturées**. Aucun hardware, aucun désassemblage, lecture seule de
+`traces/` (sep.log, marks.txt, notes.txt) et de `analysis/out/` (c3/c8/c11_lock_cycles, c11_attempt_fields, c8_ool_attempts,
+c8_ool_index, c11_transfers). Comptages faits par recherche regex sur les `sep.log` (lignes `^<ts> [<>] EP=0x08 …`).
+
+**Réserve de méthode (circularité).** Les motifs de trace (ordre d'init, `<03`→`>21`, fragments `DATA=k·0x10000`…) étaient
+connus de l'analyste **avant** sa lecture du kext ; le kext n'est donc pas une prédiction aveugle pour ces points, c'est une
+deuxième source indépendante qui explique un motif déjà vu. Seules les prédictions de la consigne (points 1, 3-7) et les
+miennes ci-dessous ont été écrites avant les comptages. Je note honnêtement que j'avais parcouru `c11_lock_cycles.txt` et
+C11 L1855-L2079 avant de rédiger les prédictions des points 2-6 ; les comptages globaux (toutes traces) sont postérieurs.
+
+Le présent texte ne change aucun statut dans `docs/messages.md` : il **propose** ; la décision revient à Albert (CLAUDE.md).
+
+## K1 — TAG 0x01 (SEP→AP) = état de verrouillage du keybag (DATA = uid, TYPE + PARAM·0x100 = lockState), pas un verdict biométrique
+- Prédictions (avant comptage) : (a) `<01/08` aussi au déverrouillage par mot de passe ; (b) aucun `<01/08` après une
+  correspondance en session déjà ouverte (C11 fp_app_good) ; (c) `<01/09` lié à chaque verrouillage.
+- Comptages (C3 = `20261107-035930_c3-touchid`, C8, C11 ; tableaux `analysis/out/c{3,8,11}_lock_cycles.txt`) :
+  - (c) **24/24** transitions LOCKED hors boot (uart) ont un `<01/09 p2` (0x209) à ±2 s : C3 10/10 (L1362, 2024, 2292, 2510,
+    2760, 3176, 3918, 4362, 4608, 5173), C8 5/5 (L1526, 2070, 2675, 3280, 3932), C11 9/9 (L1498, 2401, 2956, 3370, 3668, 3936,
+    4348, 5087, 5814). Les 11 `<01/09` restants sont tous un **2e `<01/09` identique 10,6-14,5 s après** un verrouillage resté
+    verrouillé (C3 L1464, 3462, 4714 ; C8 L2209, 2840, 3493, 4089 ; C11 L1647, 2552, 4519, 5244) ; absents quand on
+    déverrouille avant ce délai (C11 fp_tap, C3 idle_f1). **0 `<01/09` orphelin.**
+  - (b) **2/2** correspondances en session ouverte sans aucune notif TAG 0x01 : C11 L6261 (fp_app_prompt, 0x09 = 0x1f5, score 2)
+    et L6871 (fp_app_good, 0x1f5, score 1). À l'inverse, **toutes** les correspondances sur écran verrouillé ont ≥ 1 `<01/08`
+    (C11 10/10, C8 3/3, C3 8/9 ; exception C3 L5418 : `<01/45` ×3 à la place, après la rafale d'échecs de fp_bad_2).
+  - (a) **réfutée telle qu'énoncée** : les 8 déverrouillages par mot de passe ont `<01/28 p2` (0x228) — C3 pw_login L701/707,
+    pw_unlock L1677/1690, pw_after_bad L5723/5730 ; C8 pw_login L853/864, pw_unlock_1 L3833/3842, pw_unlock_2 L4383/4392 ;
+    C11 pw_login L851/860, pw_unlock_4 L5980 — et `<01/08` n'apparaît que **2/8** fois (C8 L855, C3 L5724, glissé entre deux
+    0x228). Aucune correspondance doigt ne produit 0x228. **La phrase de messages.md (§ lecture du kext, « `<01/08` aux succès et
+    au déverrouillage mot de passe ») est inexacte et doit être corrigée** : mot de passe → 0x228 (8/8), 0x208 occasionnel.
+  - DATA = 0x1f5 dans 100 % des TAG 0x01 (un seul compte : la partie « DATA = uid » n'est pas testée au-delà de 501, cf. HB).
+- Autres explications : (i) TAG 0x01 = « événement d'authentification » vu par SKS — réfutée par (b) et par les 0x209 sans
+  aucune activité biométrique ; (ii) 0x208/0x228 = mode de déverrouillage (bio / code) — **compatible** avec la lecture
+  keybag (un champ de bits d'état : 0x01 verrouillé ?, 0x20 code saisi ?, 0x200 premier déverrouillage depuis le boot ? —
+  pure spéculation, `PARAM=0` avant le 1er login : 0x11/0x15/0x55, `PARAM=2` après). (iii) Le 2e 0x209 différé =
+  verrouillage effectif des clés de classe après un délai de grâce — plausible, non testé.
+- Verdict : **lecture kext confirmée** (pas un verdict biométrique ; suit les transitions de verrouillage) ; sous-prédiction (a)
+  fausse dans sa forme, ce qui ne contredit pas le kext mais corrige la doc.
+- Proposition : **`vérifié`** pour « `<01/09 p2` accompagne chaque verrouillage » (kext + 3 traces, 24/24, 0 orphelin).
+  **Reste `hypothèse`** pour « TAG 0x01 n'est jamais émis par une correspondance en session ouverte » : le cas décisif tient sur
+  2 tentatives d'**une seule** trace → expérience K-E1.
+- **EXPÉRIENCE HUMAINE K-E1** (≤ 4 min, peut se greffer sur la prochaine session doigt) : session ouverte, 3 invites Touch ID
+  bon doigt + 1 mauvais doigt ; puis lock → mot de passe ; lock → bon doigt ; lock → attendre 20 s → bon doigt.
+  Si vraie : 0 TAG 0x01 pendant les 4 invites ; 0x209 à chaque lock (+ 2e 0x209 seulement dans le cas « attendre 20 s ») ;
+  0x228 au mot de passe ; 0x208 au doigt. Si fausse : un `<01/xx` pendant une invite en session ouverte → TAG 0x01 dépend
+  aussi du verdict biométrique.
+
+## K2 — Mot mailbox fabriqué par GT : TAG ∈ {0xfc, 0xfd, 0xfe}, bits 16-47 = commande (TYPE, PARAM = 0), bits 48-63 = compteur
+- Prédiction (avant comptage) : sur tout message EP 0x08 à TAG ≥ 0xfc : PARAM = 0, DATA & 0xffff = 0 ; DATA >> 16 = 0 sur
+  chaque 0xfc ; compteur croissant 1, 2, 3… sur les fragments d'un même transfert ; aucun TAG 0xff.
+- Comptages : **4006/4006** messages TAG 0xfc/0xfd/0xfe des 14 traces ont PARAM = 0 et DATA & 0xffff = 0 ; **0** TAG 0xff
+  dans les 7317 lignes EP 0x08. Tous les 0xfc ont DATA = 0. Fragments C11 (55 lignes fd/fe) et C8 (44) :
+  - envoi AP fragmenté (0x5b, 0x6d, 0x65) : `>fc`(0) `<fe`(0) `>fd`(1) `<fe`(1) `>fd`(2) `<fe`(2) `>fd`(3) puis `<fc`(0) (C11 L418-432) ;
+  - réponse SEP fragmentée (0x5f, 0x6c) : `>fc`(0) requête, `<fc`(0) 1er morceau, `>fe`(**0**) `<fd`(1) `>fe`(1) `<fd`(2)
+    (C11 L2363-2373, 10/10 transactions 0x6c de C8+C11, 4/4 0x5f).
+- **Exception à la lecture littérale du kext** (« compteur incrémenté à chaque message envoyé dans la transaction, remis à zéro
+  au début de chaque transaction ») : l'AP a déjà envoyé `>fc`(0) quand son premier `>fe` vaut encore 0 (10/10), et la réponse
+  `<fc` du SEP vaut 0 après ses `<fe`(0..2). Le compteur est donc remis à zéro **à chaque transfert (chaque 0xfc, chaque
+  sens)**, pas une fois par couple requête/réponse ; il vaut l'indice du morceau (fd k = morceau k ; fe k = accusé du morceau k).
+  Soit la paraphrase du kext est imprécise (« transaction » = un transfert dans un sens), soit l'analyste a mal lu le point de
+  remise à zéro. Pour un pilote, la règle observée suffit et ne dépend pas de l'interprétation.
+- Verdict : **confirmé sans exception** pour l'encodage (TAG, TYPE = commande, PARAM = 0, DATA = compteur << 16) ;
+  **règle du compteur corrigée** (par transfert et par sens), 0 exception à la règle corrigée.
+- Proposition : **`vérifié`** pour l'encodage et la règle corrigée — deux sources indépendantes (kext, 14 traces / 4006 messages,
+  fragments dans les deux sens) et comportement reproductible d'un boot à l'autre. Réserve : seule une écriture vers le SEP
+  (hors de portée, `pending/`) prouverait que le SEP **exige** ce format ; « vérifié » porte ici sur ce que macOS émet.
+
+## K3 — 0x09 : `+0x14` u32 ≠ 0 ⇒ le kext relance (`retryMatchAfterHomeButtonPress` : 0x65/0x06/0x07/0x75/0x09 sans 0x23)
+- Prédiction : si un `+0x14` ≠ 0 existe, on voit une séquence de capture sans `> 0x23` en tête, ou un 0x3e / 0x75.
+- Comptages : `> 0xfc 0x23` = `> 0xfc 0x65` dans **chaque** trace (C1 1/1, C3 22/22, C6 6/6, C8 9/9, C11 24/24 = 62/62),
+  toutes les séquences de `c*_lock_cycles` commencent par `23 06 65` ; **0** message TYPE 0x3e, 0x75, 0x74, 0x0a.
+  50 transactions 0x09 (C1 1, C3 20, C6 5, C8 6, C11 18) : **aucune relance**.
+- Conséquence si le kext est bien lu : `+0x14` = 0 dans les 50 réponses. Je n'ai pas lu la valeur (fichiers binaires) ;
+  `c8_ool_attempts.txt` dit seulement que `+0x14..+0x1b` est **constant** sur les 6 réponses C8 (valeur non imprimée).
+- Verdict : **non testable** dans le sens « ≠ 0 ⇒ relance » (jamais déclenché). Test faisable **sans hardware** (analyste) :
+  imprimer `+0x14` u32 des 29 réponses 0x09 OOL (C6 5, C8 6, C11 18). Attendu si le kext est bien lu : 0 partout. Une seule
+  valeur ≠ 0 sans relance ⇒ lecture du kext fausse sur ce champ.
+- Provoquer une relance (« home button » = clic sur la touche Touch ID pendant la capture) : **déconseillé** sous HV (risque de
+  veille / extinction, gel). Pas d'EXPÉRIENCE HUMAINE proposée tant que Linux n'en a pas besoin.
+
+## K4 — Toute charge `> 0x65` fait 0x7200 o (12 tranches `sensor96112_slice16_t` de 0x980)
+- Prédiction : 62/62 transferts 0x65 en exactement 2 morceaux (tampon 0x4000 : 0x3fe4 + 0x321c) ; total d'en-tête = 0x7200.
+- Comptages : **62/62** transferts `> 0x65` des 5 traces ont exactement un `>fd` (compteur 1) et jamais de compteur 2
+  (#lignes fc|fd 0x65 = 3 × #transferts dans chaque trace) → total ∈ ]0x3fe4, 0x7fc8], compatible. Octets exacts : **15/62**
+  (C6 6 + C8 9, `analysis/slice_crc.py` : 180/180 tranches, CRC-16/ARC). C3 et C1 : pas d'OOL → total illisible.
+  C11 (24) : OOL complète (`full=1`, len 0x4000) mais 0x65 absent de `c11_transfers.txt`.
+- Verdict : **compatible sans exception, confirmé octet pour octet sur 15/62**. Test sans hardware : `ool_transfers.py --types
+  0x65` + `slice_crc.py` sur C11 → attendu 24 × 0x7200 et 288/288 tranches CRC exactes. Après ce test, avec C6 + C8 + C11
+  (3 traces, 39 images, trois sessions doigt différentes) : proposition **`vérifié`** pour « taille 0x7200, 12 tranches à
+  CRC-16/ARC ». Le contenu chiffré reste `hypothèse` (HH).
+
+## K5 — Notification `< TAG=0x03` ⇒ l'AP envoie `> 0xfc 0x21` (`checkBgOpsResult`)
+- Prédiction : autant de `>21` que de `<03`, chacun juste après son `<03` ; jamais de `>21` sans `<03` préalable.
+- Comptages : `<03` = `>21` dans chaque trace (C1 1/1, C3 20/20, C6 5/5, C8 6/6, C11 18/18 = **50/50**), et `<03` = nombre
+  de 0x09 (50/50 : une notif par comparaison, succès comme échec). **49/50** : le `>21` est le message EP 0x08 suivant de l'AP
+  (≤ 15 ms). **Exception** : C3 `<03` L5362 (…102.717) → `>21` L5381 (…103.086, +370 ms), après que l'AP a déjà lancé la
+  tentative suivante (L5363 `>23`, L5373 `>09`, L5379 `>22`). Cohérent avec le kext (drapeau `_bgOpsResultReady` + réveil d'un
+  fil : le `>21` attend que la tentative en cours libère le verrou), pas avec une réponse synchrone.
+- Verdict : **confirmé** (1:1 en nombre, 0 `>21` orphelin) ; « immédiatement » faux une fois sur 50, explication kext cohérente.
+- Proposition : **`vérifié`** comme **comportement de macOS** (kext + 5 traces, 50/50). Non testé : que le SEP exige le 0x21
+  (ou bloque sinon) — nécessite une omission volontaire = écriture → hors agent.
+
+## K6 — Ordre d'init identique d'un boot à l'autre (C5..C12)
+- Prédiction : même suite de TYPE `>fc` à l'init dans tous les boots complets ; ordre des fonctions du kext
+  (prepareSession 17 → performKeyExchange 15/16 → initializeSequenceCounter 42/18 → loadPatch 5f…01 → applySensorParams
+  5d/5c/6a/6f → getSensorModuleSerialNumberRaw 31/32 → setCalibrationData 61/5b/63).
+- Comptages (C5, C6, C7, C8, C9, C10b, C11, C12 = 8 boots complets ; C10 `011515` exclu : 5 lignes EP 0x08) : les **57
+  premières commandes sont identiques 8/8** :
+  `73 | 17 15 16 42 18 5f 5d 5c 6a 31 32 01 1f 31 32 5b 63 | 19 | 17 15 16 42 18 5f 5d 5c 6a 6f 31 32 01 1f 63 63 |
+  7c 6b 79 6d 39 6b 79 6b 79 6d 2b 6b 79 54 2b 33 36 6e 7a 71 28 7c`, puis une queue de 6 commandes de **même multiensemble**
+  {2b ×3, 7c, 63 ×2} dans un **ordre variable** (8 ordres différents, ex. C5 `7c 63 2b 2b 2b 63`, C8 `63 7c 63 2b 2b 2b`,
+  C11 `2b 7c 2b 63 2b 63`), puis `7d 0b` 8/8. La partie variable est celle des commandes user-client (plusieurs démons
+  concurrents) — attendu ; la partie pilotée par le kext est figée.
+- **Exceptions à la lecture des séquences du kext** (à relire par l'analyste, rien de bloquant) :
+  1. `loadPatch` = « 5f → capteur Patch → GetStatus → 01 » : dans **16/16** passes, 5f et 01 sont séparés par
+     `5d 5c 6a [6f] 31 32`. Ou 0x01 n'appartient pas à `loadPatch`, ou `loadPatch` appelle applySensorParams et le numéro de série
+     entre le patch et 0x01.
+  2. `applySensorParams` (5d 5c 6a 6f) : 0x6f **absent de la 1re passe 8/8, présent dans la 2e 8/8** → branche conditionnelle
+     non décrite.
+  3. `setCalibrationData` (61, 5b, 63) : **0x61 jamais envoyé** (0/7317) ; 5b uniquement en 1re passe.
+  4. 0x19 (`HandleReset`) sépare 8/8 deux passes complètes : la 2e passe refait clé, compteur, patch (2e 0x5f, réponse
+     différente : 0x568e puis 0x70ce o en C11) → un reset capteur fait partie de l'init normale.
+  5. Jamais vus non plus : 0x48 (`sendDeviceSerialNumberToSbio`), 0x1b, 0x43/0x44, 0x04, 0x67.
+- Verdict : **confirmé sans exception** pour « ordre identique » (préfixe de 57, 8/8) ; la correspondance fine
+  fonction-kext → sous-séquence a 3 écarts (1-3).
+- Proposition : **`vérifié`** pour la suite d'init observée (8 boots, reproductible, noms kext en appui). Les attributions
+  `loadPatch`/0x01 et la condition de 0x6f restent `hypothèse` (source: kext) tant que les écarts 1-2 ne sont pas expliqués.
+
+## K7 — 0x27 / 0x25 (`commandStartMatch`) présents quelque part ?
+- Prédiction (consigne) : à chercher. La mienne : absents (aucun motif inconnu n'a été signalé dans les séquences).
+- Comptage : **0** message EP 0x08 de TYPE 0x27 ou 0x25 (toutes TAG) dans les 15 `sep.log` (7317 lignes EP 0x08), y compris
+  les 50 comparaisons (écran verrouillé, session ouverte, mauvais doigt, bout du doigt). Pas de 0x03 (`commandStartEnroll`).
+- Verdict : **confirmé : absents**. Conséquence : sur 13.5, le déverrouillage et les invites passent par
+  `asyncCaptureHandler`/`handleMatch` (23 06 65 07 [1e] 09) sans `commandStartMatch`. Usage de 0x27/0x25 inconnu (autre mode :
+  Apple Pay ? accessoire ? ancienne voie ?) — ne pas l'implémenter sans nouvelle observation.
+- Statut proposé : observation `vérifiée` (absence sur 5 traces doigt) ; le rôle de 0x27/0x25 : ouvert.
+
+## Ce qui reste à faire (du moins cher au plus cher)
+1. **Analyste, sans hardware** : (a) `+0x14` u32 des 29 réponses 0x09 OOL (K3) ; (b) totaux + CRC des 24 `> 0x65` de C11 (K4) ;
+   (c) corriger dans `docs/messages.md` la phrase sur `<01/08` au mot de passe (K1) et la règle du compteur (K2).
+2. **Analyste, kext** : expliquer les écarts K6-1 (place de 0x01), K6-2 (condition de 0x6f), K6-3 (0x61 jamais envoyé) et
+   relire le point exact de remise à zéro du compteur dans GT (K2).
+3. **EXPÉRIENCE HUMAINE K-E1** (≤ 4 min) : invites Touch ID en session ouverte + trois types de déverrouillage (K1).
