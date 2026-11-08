@@ -108,3 +108,14 @@ discriminants good/bad, variables, entropie par 64 octets. `--dump-dir` écrit l
 
 `analysis/tests/fake_a/`, `fake_b/` et `fake_ool/` (dumps .bin) sont des données **inventées** (pas des captures) ;
 ne jamais les citer comme source.
+
+## kext/ — phase 2 : lecture du kernelcache (source: kext)
+
+    python3 analysis/kext/macho_fileset.py macos/kernel.macho [BUNDLE_ID]
+    VENV/bin/python analysis/kext/kdis.py macos/kernel.macho BUNDLE_ID strrefs|vcallers SLOT|callers ADDR|func ADDR
+    python3 analysis/kext/mesa_cmd_map.py macos/kernel.macho      # après `kdis.py ... vcallers 0x9e0/0x9d8`
+    python3 analysis/kext/mesa_case_reach.py macos/kernel.macho   # après `kdis.py ... func 0xfffffe000977eecc > analysis/out/kext/f_psc.txt`
+
+`kdis.py` demande capstone (venv hors repo). Les listings (`func`) et index vont dans `analysis/out/kext/` (ignoré) :
+ne jamais les commiter ni les recopier dans docs/ ou driver/ (CLAUDE.md phase 2). Adresses codées en dur dans
+`mesa_cmd_map.py` / `mesa_case_reach.py` : valables pour le kernelcache 13.5 de `macos/` uniquement.

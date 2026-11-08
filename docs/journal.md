@@ -14,6 +14,29 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — Phase 2 : lecture de AppleMesaSEPDriver + AppleSEPGenericTransfer (TYPE sbio → noms)
+- Trace : — (kernelcache macOS 13.5 `macos/kernel.macho` ; recoupé avec C1, C3, C8, C11, C12 via docs/messages.md)
+- Fait : `analysis/kext/macho_fileset.py` (segments d'une entrée MH_FILESET), `analysis/kext/kdis.py` (capstone dans un venv
+  du scratchpad : index des chaînes par fonction, appels virtuels `sepTransact` vtable +0x9e0 / `sepTransactToIOMD` +0x9d8
+  avec la constante en w1), `analysis/kext/mesa_cmd_map.py` + `mesa_case_reach.py` (cases du répartiteur user-client
+  `performSpecificCommandGated` → noms de commandes, attribution par accessibilité : 27/27 non ambigus). Sorties dans
+  analysis/out/kext/ (non versionné). Aucune copie de code ; tout est décrit en prose dans docs/messages.md (source: kext).
+- Vu (kext) : 98 + 16 appels avec TYPE constant ; GT construit le mot mailbox (TAG = request 0xfc/0xfd/0xfe, bits 16-47 =
+  commande, bits 48-63 = compteur de messages de la transaction) et l'en-tête OOL de 0x1c o (version 1, total, offset,
+  champ +0x0c, 0, commande, taille du morceau). 0x09 : réponse exigée = 0xca2 o (`match_info_t`), +0x00 = uid (−1 =
+  pas de correspondance). 0x65 : 0x7200 o = 12 tranches capteur. 0x22 = `kEnableBgOpsUpdate`, 0x63 =
+  `kGTGetCalibrationDataInfo` (noms de constantes lus dans des asserts). 0x6c = PrepareSaveCatacomb (entrée 0x18 o),
+  0x37 = ConfirmSaveCatacomb, 0x6d = LoadCatacomb, 0x70/0x71 = Save/LoadBioLockoutRecord. Notifications TAG 0x01 :
+  passées à IOBiometricFamily `sksQueueProcess` (« userID, lockState ») ; TAG 0x03 → `checkBgOpsResult` → 0x21 ;
+  `> TAG 0x26 DATA=uid` = `dropUnlockToken`.
+- Interprété : recoupe l'en-tête OOL, les fragments, les séquences d'init et de tentative observés ; les `<01/08`,
+  `<01/09`, `<01/45` seraient des états de keybag (SKS) et non des résultats biométriques (contredit l'ancienne lecture
+  de `<01/08`). Le blob catacomb n'est pas stocké par le kext (relais vers l'espace utilisateur). Statut : `hypothèse`
+  (source: kext) partout ; lectures incertaines signalées dans messages.md (+0x0c de l'en-tête, request 0xff, sens de 0x1e,
+  branche principale de la réponse 0x07, `+0xc24` non interprété par le kext).
+- Incidents : aucun (pas de hardware). 1re attribution « case le plus proche » fausse pour 0x6c/0x37/0x38 (branches
+  « version 2 » hors ligne) ; corrigée par l'analyse d'accessibilité.
+
 ## 2026-11-08 — Albert — Passage en phase 2 (KEXTS)
 - Albert a modifié lui-même la ligne PHASE de CLAUDE.md (`## PHASE ACTUELLE : 2 — KEXTS`).
 - Rappel des règles phase 2 : désassemblage des kexts uniquement pour le protocole AP↔SEP, aucune copie de code Apple dans `driver/`,

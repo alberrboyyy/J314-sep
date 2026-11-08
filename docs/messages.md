@@ -98,6 +98,155 @@ Note CNTL — vu sur les 9 endpoints : DATA(T3) = DATA(T2) + T4/0x1000 + 4, et D
 Interprété : deux buffers OOL par endpoint, alloués à la suite en pages de 4 Kio avec 4 pages d'écart ; lequel est
 « entrée » ou « sortie » : inconnu. La base (page 0x14) n'est reliée à aucune adresse connue.
 
+### SBIO (0x08) — lecture du kext (phase 2, **source: kext**, 2026-11-08)
+
+Kexts lus (kernelcache macOS 13.5, `macos/kernel.macho`) : `com.apple.driver.AppleMesaSEPDriver` (client sbio) et
+`com.apple.iokit.AppleSEPGenericTransfer` (« GT », transport utilisé par Mesa sur l'EP 0x08). Outils :
+`analysis/kext/macho_fileset.py`, `analysis/kext/kdis.py` (capstone), `analysis/kext/mesa_cmd_map.py`,
+`analysis/kext/mesa_case_reach.py` ; sorties dans `analysis/out/kext/` (non versionné). Rien de ce qui suit n'est
+`vérifié` : c'est une lecture de désassemblage. Colonne « Trace » : ce que la lecture du kext recoupe dans nos captures.
+
+**Transport GT (source: kext)** — Mesa n'écrit jamais le mot mailbox lui-même : il appelle une fonction
+`sepTransact(commande, entrée, longueur, sortie, longueur, verrou)` qui délègue à GT `transact`.
+- Mot mailbox construit par GT : bits 8-15 = « request » (0xfc/0xfd/0xfe/0xff), bits 16-47 = commande (u32 ; en
+  pratique < 0x100, donc TYPE = commande et PARAM = 0), bits 48-63 = compteur 16 bits incrémenté à chaque message
+  envoyé dans la transaction, remis à zéro au début de chaque transaction. L'octet d'endpoint n'est pas posé par GT
+  (par la couche endpoint d'AppleSEPManager, non lue). Trace : explique « 0xfc DATA=0 » et « fragments DATA=k·0x10000 »
+  (k = compteur, bits 48-63 = bits 16-31 de DATA) — **recoupe** la section « structures récurrentes ».
+- Rôle des valeurs de request (côté récepteur, table de saut de GT) : 0xfc = premier paquet d'un transfert (offset 0) ;
+  0xfe = « envoie le paquet suivant » (le récepteur d'un transfert incomplet répond 0xfe) ; 0xfd = paquet suivant ;
+  0xff = cas à part, non élucidé. Trace : variante « pendant » = gros envoi AP (`>fc`, `<fe`, `>fd`…, puis `<fc`
+  réponse) ; variante « après » = grosse réponse SEP (`<fc`, `>fe`, `<fd`…) — **recoupe**.
+- Messages avec request < 0xfc : GT ne les traite pas, il les passe tels quels au client (Mesa `handleSEPMessage`).
+- En-tête de paquet dans le buffer OOL (`gt_packet_t`, 0x1c octets, écrit par GT) : `+0x00` u32 version = 1 ;
+  `+0x04` taille totale ; `+0x08` offset du morceau ; `+0x0c` u32 recopié d'un champ du contexte de transfert
+  (posé par `transact` depuis un de ses arguments, probablement « flags » — lecture incertaine) ; `+0x10` = 0 à
+  l'écriture ; `+0x14` commande ; `+0x18` taille du morceau = min(reste, taille buffer − 0x1c) ; charge à `+0x1c`.
+  Contrôles à la réception : version = 1, taille totale ≤ max, offset = 0 pour 0xfc, commande et taille totale
+  identiques d'un morceau à l'autre. Trace : **recoupe** exactement les invariants d'en-tête observés (C5-C9).
+- Buffers : GT tient un buffer d'envoi et un buffer de réception distincts (buffers A et B des analyses OOL ;
+  correspondance A = envoi AP, B = réception, cohérente avec les traces, non vérifiée sur les adresses).
+
+**Commandes AP → SEP (TYPE)** — chaque appel `sepTransact`/`sepTransactToIOMD` de Mesa avec une constante en w1, nommé
+par la fonction appelante (nom tiré des chaînes `__func__` des logs/asserts) ; pour le répartiteur des commandes
+user-client (`performSpecificCommandGated`, commandes de biometrickitd), par le nom de la commande user-client
+(table de noms du kext ; case attribué par accessibilité dans le graphe de flot, 27/27 sites non ambigus).
+« IOMD » = la sortie va directement dans un tampon fourni par l'espace utilisateur (le kext ne la lit pas).
+
+| TYPE | Nom côté kext (source: kext) | Entrée / sortie (source: kext) | Trace (observé) |
+|------|------------------------------|--------------------------------|-----------------|
+| 0x73 | `initSbioCommunication` (appel direct GT) | entrée 4 o | 1re commande sbio (C1 L320) — recoupe |
+| 0x17 | `prepareSession` | entrée 0x10 o | init, ordre 17-15-16-42-18 — recoupe |
+| 0x15, 0x16 | `performKeyExchange` | 0x15 : entrée 4 o, sortie ; 0x16 : entrée 0x28 o (« hostKeyWrapped.size == 40 ») | idem |
+| 0x42, 0x18 | `initializeSequenceCounter` | 0x42 : sortie (12 o ou 0x40 o selon assert) ; 0x18 : entrée 0x40 o | idem |
+| 0x1b | `prepareNotPairedSession` | entrée 4 o, sortie | non vu |
+| 0x5f, 0x01 | `loadPatch` | 0x5f : entrée 2 o (type de patch ?), sortie = patch ; 0x01 : sans charge | 0x5f réponse différente à chaque boot ; 0x01 à l'init — recoupe la place, pas le contenu |
+| 0x19, 0x04 | `HandleReset` / `LoadPatch` (gestion de reset capteur) | sans charge | 0x19 vu 1× à l'init |
+| 0x5d, 0x5c, 0x6a, 0x6f | `applySensorParams` | 0x5d/0x5c : entrée 4 o ; 0x6a/0x6f : sortie | ordre 5d-5c-6a à l'init — recoupe |
+| 0x31, 0x32 | `getSensorModuleSerialNumberRaw` | 0x31 : sortie ; 0x32 : entrée 0x40 o, sortie (18 ou 20 o) | toujours en paire 31→32 — recoupe |
+| 0x48 | `sendDeviceSerialNumberToSbio` | entrée 0xc o (numéro de série plateforme) | non vu dans la table |
+| 0x61, 0x5b, 0x63 | `setCalibrationData` | 0x61 : entrée 4 o ; 0x5b : entrée = données de calibration ; 0x63 : sortie | 0x5b = gros transfert fixe à l'init (C5-C9 identique) — recoupe |
+| 0x63 | `kGTGetCalibrationDataInfo` (nom de constante lu dans un assert de `diagnostics`) ; aussi `getCalibrationDataInfo` | sortie | 0x63 à l'init (C1 L363…) |
+| 0x67 | `calibrateSensorFDET` | sortie | non vu |
+| 0x1f | `cacheMatchPolicy` | sortie = `match_policy_info_t` (taille vérifiée) | après 0x09 et à l'init — recoupe |
+| 0x2b | `cacheProtectedConfigurationSpecific` ; user-client `GetProtectedConfig` (IOMD) | entrée 4 o | 9× (le plus fréquent) |
+| 0x39 | `cacheSysProtectedConfigurationSpecific` ; `GetSystemProtectedConfig` (IOMD) | sortie | init |
+| 0x2c / 0x3a | `SetProtectedConfig` / `SetSystemProtectedConfig` | entrée 0x3c / 0x44 o | non vu |
+| 0x28 | `GetLoggingType` ; `cacheCaptureData` | sortie 1 o (« loggingType.size == 1 ») | 0x28 à l'init (C1 L469) |
+| 0x58, 0x5a | `cacheCaptureData` | — | non vu |
+| 0x2d | `NoCatacomb` | entrée 4 o | non vu |
+| 0x2e | `GetTemplatesValidity` (IOMD) | entrée 4 o | non vu |
+| 0x33 | `GetCatacombId` (IOMD) | entrée 4 o | C1 L442, L1236 |
+| 0x36 | `GetCatacombHash` | entrée 4 o, sortie | C1 L444… |
+| 0x6b, 0x79 | `GetCatacombState`, `GetCatacombGroupState` (IOMD) | sans entrée | toujours 6b puis 79 — recoupe |
+| 0x6e | `GetIdentitiesList` (IOMD) | entrée de l'utilisateur | init (1×) |
+| 0x7a | `GetIdentityRecords` (IOMD) | sans entrée | init (1×) |
+| 0x7c | `GetBioDeviceList` (IOMD) | sans entrée | réparti dans la capture |
+| 0x7d | `updateOperationDeviceList` | sortie (liste de devices) | C1 L523, L1087 |
+| 0x7b | `accessoryAttachDetachHandlerGated` | sans charge | non vu (accessoire Magic Keyboard) |
+| 0x40 | `IsXARTAvailable` (IOMD) | sans entrée | C1 L1856 |
+| 0x54 | `RequestTopologyOfTemplate` (IOMD) | entrée de l'utilisateur, sortie vers l'utilisateur | réponse 0xbf4 o recopiée dans 0x09 — voir format 0x09 |
+| 0x55 | `ReadCatacombSU` | entrée de l'utilisateur | non vu |
+| 0x57 | `RemoveTemplate` | entrée 0x14 o | non vu |
+| 0x3c | `RemoveUserData` | entrée 4 o | non vu |
+| 0x3d | `forceBioLockoutSpecific` | entrée 4 o | non vu (pas de blocage forcé dans C11) |
+| 0x6c | `PrepareSaveCatacomb` (version 2 de la commande) | entrée **0x18 o** fournie par l'espace utilisateur ; sortie gardée dans `_catacombData` | `> A` 0x18 o puis gros blob `< B` — recoupe |
+| 0x37 | `ConfirmSaveCatacomb` (version 2) | entrée 0x18 o | 0x37 après 0x6c (C1 L1234, L1242) — recoupe |
+| 0x38 | `GetFreeIdentityCount` (version 2, IOMD) | entrée | non vu |
+| 0x6d | `LoadCatacomb` | entrée = blob fourni par l'espace utilisateur | `> A 0x6d` d'init = dernier export 0x6c (C12) — recoupe |
+| 0x70 | `SaveBioLockoutRecord` (IOMD) | sans entrée ; sortie vers l'utilisateur | blob 0x69 o `HRLB` après login/unlock — recoupe (« BioLockoutRecord ») |
+| 0x71 | `LoadBioLockoutRecord` | entrée fournie par l'espace utilisateur | 1× à l'init (C1 L466) — recoupe |
+| 0x14, 0x7e, 0x30, 0x24 | `provisionNavajo`/`provisionSandDollar`, `lockRootKeyInSensor` | petites entrées/sorties | non vu (provisionnement capteur) |
+| 0x43, 0x44 | `establishDiffieHellmanSession` | 0x44 : entrée 0x84 o (« hostKeyPayload.size == 130 ») | non vu |
+| 0x49-0x4f, 0x53, 0x76, 0x77, 0x00 | `seaCookieHandleMessage` | divers | non vu |
+| 0x64 | `prepareSerialisedTemplates` | entrée/sortie | non vu |
+| 0x03 | `commandStartEnroll` | entrée 0x44 o | non vu (pas d'enrôlement capturé) |
+| 0x1e, 0x08 | `handleEnrollment` | 0x1e sans charge ; 0x08 : sortie (`enrollment_info_t`) | non vu en enrôlement |
+| 0x27, 0x25 | `commandStartMatch` | entrée 0x3c / 0x44 o | non vu dans la table (à rechercher dans C11) |
+| 0x05, 0x0b | `commandCancel` (0x05 aussi : `enrollmentTimeoutHandler`, `enrollmentForceFailHandler`) | sans charge | 0x0b : C1 L566, L1133 — recoupe la place |
+| 0x23 | `asyncCaptureHandler`, juste après le log « kImageProcessingInit » | sans charge | 1re commande de chaque tentative (`23 06 65 07…`) — recoupe |
+| 0x06 | `asyncCaptureHandler` (aussi `forceNoMatch`, `retryMatchAfterHomeButtonPress`) | entrée = paramètres de traitement d'image courants (`_lastImageProcessingParams`) | charge 0xa7 o — recoupe |
+| 0x65 | `asyncCaptureHandler` (aussi retry) | entrée = image capteur ; le kext exige 0x7200 o = 12 × `sensor96112_slice16_t` pour ce type de capteur | 0x7200 o en 12 blocs de 0x980 o — **recoupe** (0x7200/12 = 0x980) |
+| 0x07 | `asyncCaptureHandler` (aussi retry) | sans entrée ; sortie = résultat de traitement d'image (`imgProcResFull`, voir format) | réponse 0xc0 o — recoupe |
+| 0x74, 0x75 | `asyncCaptureHandler`, branche capture accessoire | 0x74 : entrée image ; 0x75 : entrée 0x21 o | non vu (pas d'accessoire) |
+| 0x22 | `kEnableBgOpsUpdate` (nom de constante lu dans un assert) | sans charge ; dernier argument = « !locked » | fin de tentative (abandon et succès) — recoupe |
+| 0x0c, 0x1e, 0x09 | `handleMatch` | 0x0c, 0x1e sans charge ; **0x09 : sans entrée, sortie exigée = 0xca2 o** (`match_info_t`) | 0x09 réponse 0xca2 o — **recoupe** ; 0x1e entre 0x07 et 0x09 — recoupe |
+| 0x0a | `applyPostponedMatch` | entrée/sortie | non vu |
+| 0x3e | `retryMatchAfterHomeButtonPress` | — | non vu |
+| 0x21 | `checkBgOpsResult` (déclenché par la notification TAG 0x03, voir plus bas) | sortie (« size == sizeof(*result) ») puis messages « template list updated / not updated » | `<03` puis `>21` en fin d'unlock — recoupe |
+
+Tous les TYPE 0xfc vus dans nos traces (C1-C12) ont un site d'appel dans Mesa ; l'inverse n'est pas vrai (« non vu »
+ci-dessus : enrôlement, provisionnement, accessoire, sea cookie…). Le message `> TAG=0x26 TYPE=0 DATA=uid` (C1 L509) est
+construit par GT (fonction « message brut » : TAG = 0x26, TYPE = 0, DATA = uid) et appelé depuis Mesa
+`dropUnlockToken(userID)` — **recoupe** (DATA=0x1f5).
+
+**Formats OOL (source: kext)**
+- **0x09 → `match_info_t`, 0xca2 o** (le kext rejette toute autre taille ; code d'erreur 0x56 traité à part) :
+  `+0x00` u32 userID, 0xffffffff = pas de correspondance (le kext teste −1) ; `+0x00..+0x13` (20 o = uid + 16 o
+  d'identité) recopiés tels quels dans le résultat envoyé aux clients ; `+0x14` u32 ≠ 0 → le kext lance
+  `retryMatchAfterHomeButtonPress` (nouvelle séquence 0x65/0x06/0x07/0x75/0x09) ; `+0x18` u32 conservé localement
+  (rôle non lu) ; `+0x20..+0xc27` (0xc08 o) recopiés dans un cache du driver (et réutilisés dans le message client des
+  non-correspondances) ; `+0xc28..+0xc89` (0x62 o) recopiés dans un 2e cache ; `+0xc8a` u32 → champ `+0x14` du résultat
+  client ; `+0xc8e..+0xca1` (20 o) recopiés dans le résultat client et dans un 3e champ du driver. Trace : uid/identité
+  `fe6003d8…` et −1 aux refus — **recoupe** ; la copie de la réponse 0x54 observée à `+0x2c` tombe dans le bloc
+  `+0x20..+0xc27` ; le champ `+0xc24` (valeur ordonnée succès < bout < mauvais doigt) est le **dernier u32 de ce bloc
+  0xc08** d'après les bornes de copie — le kext ne l'interprète pas (aucune lecture isolée trouvée) : sa signification
+  reste à établir côté espace utilisateur.
+- **0x07 → résultat de traitement d'image, 0xc0 o** : sur la branche accessoire, le kext fabrique lui-même une structure
+  de 0xc0 o qu'il traite ensuite comme la réponse 0x07 : `+0x02` u32 (= 4 quand pas d'image, 0 sinon), `+0x06` et
+  `+0x07` = 1 si image présente, `+0x08` = un bit d'état de la capture, `+0x09..+0x6a` = 0x62 o recopiés de la capture,
+  `+0x28` bit 0 posé selon un drapeau. Trace : `+0x06..07` = `01 01` → 0x09 direct, `00 00` → abandon ou 0x1e ;
+  `+0x02` = 2 aux abandons — **recoupe partiellement** (même emplacement des drapeaux ; la valeur 2 n'est pas expliquée).
+  Lecture de la branche principale (réponse SEP) non faite : codes d'erreur 0x130 et 0x193 traités à part.
+- **0x6c / 0x6d (catacomb = conteneur des gabarits)** : 0x6c reçoit 0x18 o de l'espace utilisateur (commande user-client
+  `PrepareSaveCatacomb` v2) ; la réponse (blob `LTFC`) est gardée dans `_catacombData` du kext ; `CompleteSaveCatacomb`
+  (sans appel SEP) la recopie vers l'espace utilisateur ; `ConfirmSaveCatacomb` envoie 0x37 (0x18 o). Au boot,
+  `LoadCatacomb` envoie 0x6d avec le blob fourni par l'espace utilisateur (log « Catacomb Restore Complete (size = …) »).
+- **0x54, 0x70, 0x2b, 0x33, 0x6b, 0x6e, 0x79, 0x7a, 0x7c, 0x40, 0x38, 0x2e, 0x62, 0x66** : passent par
+  `sepTransactToIOMD` — la réponse est écrite directement dans la mémoire de l'appelant user-client ; **le kext ne la
+  lit pas** : son format est défini entre le SEP et biometrickitd.
+
+**Stockage du blob 0x6c (question 4)** : le kext ne le persiste pas (ni propriété IORegistry, ni fichier) ; il sert de
+relais entre le SEP et un client user-client (commandes `PrepareSaveCatacomb`/`CompleteSaveCatacomb`/
+`ConfirmSaveCatacomb`/`LoadCatacomb`). L'écriture disque se fait côté espace utilisateur (le log du kext « Template
+file exists at boot » / commande `TemplatesExistsAtBoot` indique un fichier de gabarits géré par le daemon ; nom et
+chemin hors du kext). Idem pour l'enregistrement de blocage (`SaveBioLockoutRecord` 0x70 / `LoadBioLockoutRecord` 0x71).
+
+**Messages SEP → AP hors 0xfc (Mesa `handleSEPMessage`, source: kext)** : le kext lit request = TAG (bits 8-15),
+un u16 = bits 16-31 (TYPE + PARAM·0x100), info = DATA (bits 32-63), et répartit sur TAG 1..4 :
+- TAG 0x01 : transmis à IOBiometricFamily `sksQueueEnqueue` (u32 DATA + u16) puis traité par `sksQueueProcess`, qui
+  logue « userID = %d, lockState = %d » : **DATA = userID, u16 (TYPE + PARAM·0x100) = état de verrouillage SKS (keybag)**.
+  Les TYPE 0x08, 0x09, 0x11, 0x15, 0x28, 0x45, 0x55 des notifications 0x01 sont donc des valeurs d'état du keybag de
+  l'utilisateur, pas des résultats biométriques ; signification de chaque valeur non lue (dans IOBiometricFamily /
+  espace utilisateur). Trace : `<01/08` aux succès et au déverrouillage mot de passe, `<01/09` après chaque lock —
+  cohérent avec des états de keybag (déverrouillé / verrouillé), ce qui **contredit** la lecture « résultat de
+  correspondance » de `<01/08`.
+- TAG 0x02 : le kext cherche un contexte utilisateur par DATA (uid) et y range le u16. Rôle non lu.
+- TAG 0x03 : pose le drapeau `_bgOpsResultReady` et réveille `checkBgOpsResult`, qui envoie 0x21 — recoupe la séquence
+  `<03` → `>21` (C1 L1143-L1144).
+- TAG 0x04 : envoie aux clients le message IOKit 0xe3ff800c (sens non lu) — trace : `<04` pendant 0x73 (C1 L321),
+  cohérent avec un signal « SEP prêt ».
+
 ### SBIO (0x08) — structures récurrentes
 
 Vu sur les 224 messages EP 0x08 de C1 (regroupement : `analysis/sbio_transactions.py`) :
@@ -163,8 +312,8 @@ login = L681-710 (03:36:13-14) ; lock→unlock = L1042-1145 (03:36:58–03:37:00
 | 0x08 | < | 0x01 | 0x11 | 0 | 0x1f5 | L467 (pendant 0x71), L510 (juste après `> TAG=0x26`), L693 (login) — 3× | notification d'état pour 501 | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | > | 0x26 | 0x00 | 0 | 0x1f5 | L509 (1×, seul message AP→SEP hors 0xfc/0xfe/0xfd) | l'AP signale l'uid 501 au SEP ? (entre ancrages L454 et L550 ; même fenêtre que « BIO DROPPED … forcedBioRestrictionReason=2 », uart L2296) | hypothèse | trace:C1 | 2026-11-07 |
 | 0x08 | < | 0x01 | 0x28 | 0x02 | 0x1f5 | L699, L705 (login, chacune suivie de `> 0xfc 0x70`) | « session/keybag 501 déverrouillé » ? | hypothèse | trace:C1 | 2026-11-07 |
-| 0x08 | < | 0x01 | 0x09 | 0x02 | 0x1f5 | L1042 (1×, 03:36:58.35, ~2-3 s après le lock, pendant l'écran verrouillé) | événement après lock (armement ?) ; **reproduit 10/10 verrouillages dans C3**, sans doigt (voir section C3) | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
-| 0x08 | < | 0x01 | 0x08 | 0x02 | 0x1f5 | L1125 (pendant 0x09), L1127 (après) — 2× | résultat « correspondance » ? **C3 : 2× dans chacun des 8 succès, 0 dans les 12 échecs** ; mais aussi 1× au déverrouillage mot de passe après blocage (C3 L5724) | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
+| 0x08 | < | 0x01 | 0x09 | 0x02 | 0x1f5 | L1042 (1×, 03:36:58.35, ~2-3 s après le lock, pendant l'écran verrouillé) | événement après lock (armement ?) ; **reproduit 10/10 verrouillages dans C3**, sans doigt (voir section C3) ; **source: kext** : notification TAG 0x01 = changement d'état SKS (keybag) pour DATA=uid, u16 lockState = TYPE + PARAM·0x100 = 0x0209 (voir section kext) | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
+| 0x08 | < | 0x01 | 0x08 | 0x02 | 0x1f5 | L1125 (pendant 0x09), L1127 (après) — 2× | résultat « correspondance » ? **C3 : 2× dans chacun des 8 succès, 0 dans les 12 échecs** ; mais aussi 1× au déverrouillage mot de passe après blocage (C3 L5724) ; **source: kext** : notification TAG 0x01 = changement d'état SKS (keybag) pour DATA=uid, u16 lockState = TYPE + PARAM·0x100 = 0x0208 (voir section kext) — contredit « résultat de correspondance » | hypothèse | trace:C1 ; trace:C3 | 2026-11-07 |
 | 0x08 | < | 0x03 | 0x00 | 0 | 0 | L1143 (1×, fin de 0x70 à l'unlock) | fin d'opération ? | hypothèse | trace:C1 | 2026-11-07 |
 
 ### SBIO (0x08) — C3 : lock, tentatives doigt, déverrouillage (C3 = `traces/20261107-035930_c3-touchid`)
@@ -180,7 +329,7 @@ Les marques de `marks.txt` sont décalées par rapport aux actions (voir rapport
 | 0x08 | > / < | 0xfc + notifs | `23 06 65(<fe 0, >fd 0x10000) 07 09 [<01/08 P2] <fc09 [<01/08 P2] 1f 22 0b 70 <03 21` | — | — | 25 messages identiques bit à bit (dir/TAG/TYPE/PARAM/DATA) : L2147, 2391, 2602, 2861, 3553, 4109, 4461, 4966 et C1 L1109 ; chacun suivi d'UNLOCKED ≤ 2 s ; notif SKS `TAG=0x00 DATA=0xfffffe0b` pendant 0x09 (L2160, 2404, 2622, 2874, 3567, 4122, 4474, 4980) | déverrouillage Touch ID réussi ; **reproduit 8 fois dans c3** (+1 C1) ; absent des 2 déverrouillages mot de passe (L1675-1729, L5721-5760) et de 30 s de lock sans doigt | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
 | 0x08 | > / < | 0xfc + notifs | `23 06 65 07 09 <fc09 1f 22 70 <03 21` | — | — | 12× : L3281, 3340, 3495, 3526, 4861, 4888, 4927, 5264, 5338, 5363, 5394, 5418 ; jamais suivi d'UNLOCKED. Diffère du succès par : pas de `<01/08`, pas de `0b`, 0x09 = 296-356 ms, pas de notif SKS -501, `<03` ~0.3-0.4 s après la fin de 0x70 | tentative doigt rejetée ; **reproduit 12 fois dans c3** ; doigt utilisé inconnu (marques peu fiables) | hypothèse | trace:C3 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | `23 06 65 07 22` | 0 | 0 | 2× : L4915, L4954 (28-29 ms, pas de 0x09), suivis 80 ms après d'une tentative complète | tentative abandonnée (acquisition inexploitable ?) | hypothèse | trace:C3 | 2026-11-07 |
-| 0x08 | < | 0x01 | 0x45 | 0x00 | 0x1f5 | L5432, L5433, L5435 (pendant 0x09 du 5e échec consécutif, à la place des `<01/08`), L5504 (1111.2, +10.6 s après le `<01/09` L5173) ; 4× dans **un seul** cycle de verrouillage | « trop d'échecs, biométrie bloquée » ? (un seul cycle : coïncidence possible) ; déverrouillage ensuite au mot de passe | hypothèse | trace:C3 | 2026-11-07 |
+| 0x08 | < | 0x01 | 0x45 | 0x00 | 0x1f5 | L5432, L5433, L5435 (pendant 0x09 du 5e échec consécutif, à la place des `<01/08`), L5504 (1111.2, +10.6 s après le `<01/09` L5173) ; 4× dans **un seul** cycle de verrouillage | « trop d'échecs, biométrie bloquée » ? (un seul cycle : coïncidence possible) ; déverrouillage ensuite au mot de passe ; **source: kext** : notification TAG 0x01 = changement d'état SKS (keybag) pour DATA=uid, u16 lockState = TYPE + PARAM·0x100 = 0x0045 (voir section kext) | hypothèse | trace:C3 | 2026-11-07 |
 | 0x08 | > / < | 0xfc | `6b 79 6c(2 tours) 37 33 36 6c 37` | 0 | 0 | ~15-16 s après chaque unlock doigt resté déverrouillé (L2734, 2998, 3758, 4334, 4582 : 5/5) ; L5813 6 s après l'unlock mot de passe post-blocage (s'arrête après 0x33) ; absent après pw_unlock ; C1 L1224 | tâche post-déverrouillage (mise à jour de gabarit ?) ; **reproduit 5 fois dans c3** | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
 | 0x08 | < puis > / < | 0x01 puis 0xfc | `<01/28 P2` → `70`, deux fois | 0x02 | 0x1f5 | login L701-713, pw_unlock L1677-1711, pw_after_bad L5723-5760 ; aussi dans les succès doigt via `70` | réaction au déverrouillage (commun mot de passe / doigt) ; **reproduit 3 fois dans c3** (+ C1 login) | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
 | 0x08 | — | — | aucun message | — | — | fp_prelogin (457.7-472.1) et idle1 : 0 message EP 0x08 de L585 à L683 ; fp_noprompt (1163.8-1193.8) : 0 message après L5826 | doigt sans demande de macOS → aucun trafic mailbox SBIO | hypothèse | trace:C3 | 2026-11-07 |
