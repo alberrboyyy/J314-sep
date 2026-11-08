@@ -767,6 +767,16 @@ Le présent texte ne change aucun statut dans `docs/messages.md` : il **propose*
   Apple Pay ? accessoire ? ancienne voie ?) — ne pas l'implémenter sans nouvelle observation.
 - Statut proposé : observation `vérifiée` (absence sur 5 traces doigt) ; le rôle de 0x27/0x25 : ouvert.
 
+## EXPÉRIENCE ADT-1 — dump ADT en lecture seule pour localiser le capteur (agent tracer à écrire ; non exécutée)
+- But : lire dans l'ADT du j314c le nœud `compatible = biosensor,mesa` et son parent `spi-1,spimc` : nom (`spiN`), `reg`,
+  `interrupts`, `function-mesa_pwr`, `function-mesa_pwr1v8`, `function-mesa_reset`, `mesa-spi-freq`, délais d'alim, et
+  le nœud gpio cible des phandles. Détail dans `docs/sensor_hw.md`.
+- Moyen : un script `tools/dump_adt.sh` (à écrire par **tracer**) qui chainloade m1n1 frais comme `boot_and_trace.sh` et
+  écrit l'ADT (`adt.txt` via la lecture proxy de l'arbre, sans HV, sans écriture MMIO, sans SEP) dans un dossier traces/.
+  Rien d'autre sur le Mac. Pas d'écriture vers le SEP ; le hardware passe uniquement par tools/*.sh.
+- Résultat attendu : tableau contrôleur/IRQ/GPIO fiable. Un seul dump suffit (pas de doigt, pas d'humain).
+- Statut : proposée, non lancée. Sans ça, `docs/sensor_hw.md` reste en `hypothèse`.
+
 ## Ce qui reste à faire (du moins cher au plus cher)
 1. **Analyste, sans hardware** : (a) `+0x14` u32 des 29 réponses 0x09 OOL (K3) ; (b) totaux + CRC des 24 `> 0x65` de C11 (K4) ;
    (c) corriger dans `docs/messages.md` la phrase sur `<01/08` au mot de passe (K1) et la règle du compteur (K2).

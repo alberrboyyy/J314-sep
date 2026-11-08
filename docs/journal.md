@@ -14,6 +14,26 @@ Format :
 
 ---
 
+## 2026-11-08 — sceptique — Tableau de statut de vérification
+- Trace : — (relecture de docs/messages.md, kext_sepmanager.md, hypotheses.md, journal C12)
+- Fait : `docs/verification_status.md` (1 ligne par message/champ, statut selon CLAUDE.md, manque pour `vérifié`, 3 expériences).
+- Vu : vérifié (proposé) = encodage GT, ordre d'init, séquence match + verdict 0x09, 0x65 (structure), `<03`→`>21`, HO/0x6c-0x6d, `<01/09` au verrou ; le reste hypothèse.
+- Interprété : « vérifié » = comportement de macOS ; aucune écriture SEP donc rien sur ce que le SEP exige.
+
+## 2026-11-08 — driver — Plan d'architecture du pilote Touch ID (docs/driver_plan.md)
+- Trace : —
+- Fait : lu messages.md (kext, 0x65, C8-C12), kext_sepmanager.md, public_linux_state.md, hypotheses.md (K1-K7) ; écrit docs/driver_plan.md (composants, dépendances avec statuts, prérequis hors agent, étapes, inconnues classées). Aucun code, aucun hardware.
+- Vu : —
+- Interprété : bloquants principaux = SEPOS sous Linux (IMG4, réservé Albert), keybag SKS (0x0015 au boot), nœud DT du capteur inconnu.
+- Incidents : aucun
+
+## 2026-11-08 — analyste — Contrôleur SPI / broches du capteur (j314c) : ADT absent
+- Trace : traces/20261107-033436_c1-boot/hv_uart.log:176,182-184,910,912,2078 ; macos/kernel.macho (plist prelink, strings).
+- Fait : recherche d'un dump ADT dans traces/macos/m1n1/docs/analysis (aucun) ; lu trace_mesa.py ; noms de propriétés `mesa*`/`function-mesa_*` du kernel.
+- Vu : 4 contrôleurs spi1-4 démarrés ; capteur = enfant `biosensor,mesa` d'un AppleARMSPIDevice ; noms `function-mesa_pwr/_pwr1v8/_reset`. Contrôleur et broches non identifiables sans ADT.
+- Interprété : voir docs/sensor_hw.md (spi2/spi4 candidats, 0xc4 = valeur M1 non transposable). Demande EXPÉRIENCE ADT-1 dans docs/hypotheses.md (non exécutée).
+- Incidents : aucun (pas de hardware).
+
 ## 2026-11-08 — documentaliste — État public côté Linux (SEP, spi-apple, AOP, mesa)
 - Trace : — (sources publiques) ; recoupé avec traces/20261107-033436_c1-boot/hv_uart.log:176-184.
 - Fait : lu m1n1 local (`70757dc7`) : src/sep.c, src/kboot.c, src/main.c, hw/sep.py, hv/trace_mesa.py,
