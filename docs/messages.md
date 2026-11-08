@@ -185,6 +185,49 @@ Les marques de `marks.txt` sont décalées par rapport aux actions (voir rapport
 | 0x08 | < puis > / < | 0x01 puis 0xfc | `<01/28 P2` → `70`, deux fois | 0x02 | 0x1f5 | login L701-713, pw_unlock L1677-1711, pw_after_bad L5723-5760 ; aussi dans les succès doigt via `70` | réaction au déverrouillage (commun mot de passe / doigt) ; **reproduit 3 fois dans c3** (+ C1 login) | hypothèse | trace:C3 ; trace:C1 | 2026-11-07 |
 | 0x08 | — | — | aucun message | — | — | fp_prelogin (457.7-472.1) et idle1 : 0 message EP 0x08 de L585 à L683 ; fp_noprompt (1163.8-1193.8) : 0 message après L5826 | doigt sans demande de macOS → aucun trafic mailbox SBIO | hypothèse | trace:C3 | 2026-11-07 |
 
+### SBIO (0x08) — C8 : contenu OOL des tentatives doigt (C8 = `traces/20261108-004657_c8-doigt-ool`)
+
+Capture : SEP_OOL_EPS=0x08, lectures 0x400 (types complets 0x09,0x21,0x45,0x54,0x5b,0x5f,0x65,0x6d), `>` lit le buffer A,
+`<` lit le buffer B (split_dir=1). Résultats rapportés par Albert (notes.txt) : fp_good_1/2/3 déverrouillé, fp_bad_1/2 refusé.
+Sorties : `analysis/out/c8_attempts.txt` (séquences vs C3), `c8_ool_attempts.txt` (comparaison octet par octet),
+`c8_ool_index.txt` (lecture OOL ↔ message), `c8_latency.txt`, `c8_payloads/` (charges recollées) ; C6 refait avec le même
+outil : `c6_ool_attempts.txt`, `c6_payloads/` (C6 = `traces/20261107-043828_c6-doigt-ool`, 5 tentatives 0x09 bon doigt
+**refusées**). Offsets ci-dessous = offsets dans la **charge** (après l'en-tête de 0x1c octets), sauf mention.
+Rappel : chaque dump est un instantané pris quand le tracer voit le mot mailbox ; l'association A = AP→SEP, B = SEP→AP
+reste une hypothèse (cohérente avec tout C8).
+
+**En-tête OOL — VU** sur les 480 lectures EP 0x08 de C8 (et C5/C6/C7) : u32 LE `+0x00`=1 (0 si buffer remis à zéro),
+`+0x04` = longueur totale, `+0x08` = offset du morceau (0, 0x3fe4, 0x7fc8, 0xbfac = k·0x3fe4, seulement dans les
+`0xfd`), `+0x0c`=`+0x10`=0, `+0x14` = TYPE du mot mailbox (428/435 lectures 0xfc/0xfd/0xfe non nulles ; les 7 autres sont `changed=none`, buffer pas
+encore réécrit : 5× `< B 0xfe/0x65` avec l'en-tête 0x06 précédent, L1684…, et 2× `> A 0x70` avec l'en-tête 0x21, L3836, L3866),
+`+0x18` = longueur du morceau (≤ 0x3fe4 = 0x4000−0x1c), charge à `+0x1c`. Fin du contenu non nul = 0x1c + longueur, sans
+exception. Les 35 notifications EP 0x08 (`<01/xx`, `<02/01`, `<03/00`, `<04/00`) n'ont **pas** de contenu propre visible : B y est nul,
+identique au B précédent, égal au début de la réponse 0xfc qui suit (`<01/08` L2426→L2428, L2997→L2999) ou réduit
+à l'en-tête vide de la commande en cours (L325, L536, L584).
+Interprété : enveloppe commune de la couche de transport sbio ; les 0xfe/0xfd sont des morceaux d'une même charge.
+
+| EP | Dir | Tag | Type | Param | Data | Vu (C8, OOL) | Rôle supposé | Statut | Source | Date |
+|----|-----|-----|------|-------|------|--------------|--------------|--------|--------|------|
+| 0x08 | > / < | 0xfc+notifs | séquence 25 messages | — | — | identique bit à bit à C3 L2147 (dir/TAG/TYPE/PARAM/DATA) pour fp_good_2 (L2399-2485) et fp_good_3 (L2968-3054) ; fp_good_1 (L1698-1784) : mêmes 25 mots, `<03/00` (L1750) arrivé **avant** `<fc 70` (L1780) au lieu d'après | succès Touch ID (C3 : 8× ; C8 : 3/3) | hypothèse | trace:C8 ; trace:C3 | 2026-11-08 |
+| 0x08 | > / < | 0xfc | `23 06 65 07 22` | 0 | 0 | 3× avant un succès : L1674 (fp_good_1), L2351 et L2375 (fp_good_2), 38-44 ms, pas de 0x09 ; C6 L1791 | tentative abandonnée par l'AP après 0x07 | hypothèse | trace:C8 ; trace:C6 ; trace:C3 | 2026-11-08 |
+| 0x08 | > / < | 0xfc | `23 06 65 07 09 1f 22 70 [2b] <03 21` | 0 | 0 | 3 essais mauvais doigt : L3621, L3687 (fp_bad_1), L4217 (fp_bad_2) ; = séquence échec de C3, avec en plus `2b` entre `<fc 70` et `<03` dans 2/3 (L3675, L4271) ; pas de `<01/08`, pas de `0b`, pas de notif SKS `TAG=0 DATA=0xfffffe0b` (présente pendant 0x09 dans les 3 succès : L1728, L2424, L2995) | refus | hypothèse | trace:C8 | 2026-11-08 |
+| 0x08 | > | 0xfc | 0x06 | 0 | 0 | A : charge 0xa7 octets (9/9). `+0x40..+0x4b` différent à chaque tentative et **recopié** dans la réponse 0x07 à `+0x44` (9/9) ; `+0x97..+0xa6` (16 octets, entropie haute) identiques dans toutes les tentatives d'un même verrouillage, différents d'un verrouillage à l'autre (5 verrouillages) ; `+0x40` u32 différent à chaque tentative (croissant dans C6, pas dans C8) ; `+0x44` u32 = 4 (6 tentatives lock_g*) / 5 (3 tentatives lock_b*) ; C6 : 1 (6/6) ; `+0x48` u32 = nombre d'abandons depuis la dernière tentative complète du même verrouillage (C8 : 0,1 / 0,1,2 / 0 / 0,0 / 0 ; C6 : 0,1,0,0,0,0 — 15/15) et `+0x07` = 1 si `+0x48`=0, 0 sinon (15/15) | paramètres de session de capture (nonce par verrouillage ?) ; fixés par l'AP **avant** la comparaison | hypothèse | trace:C8 | 2026-11-08 |
+| 0x08 | > | 0xfc/0xfd | 0x65 | 0 | 0 / 0x10000 | A : 0x7200 octets en 2 morceaux (0x3fe4 + 0x321c), 9/9 ; 12 blocs de 0x980 octets, chacun = 0x17 octets d'en-tête `80 52 NN 80 09 00 00 3a 80 00…00 22 33 15 06 SS SS 00 09 57` + 0x969 octets à entropie ~8 bits/octet (sur 0x7200 : 7.99). NN = index de bloc qui continue après un abandon (0x00-0x0b puis 0x0c-0x17, 0x18-0x23) et repart à 0 après une tentative complète (C8 6/6, C6 4/4) ; SSSS (big-endian) +1 par bloc sur toute la capture, aucun saut après un abandon (C8 3/3, C6 1/1), saut après chaque tentative complète : +0xd dans C8 (6/6), +0x18 dans C6 (4/4) ; corps incompressible (zlib 9 : ratio 1.001) | données capteur AP→SEP ; corps **chiffré ou compressé** (non interprété) | hypothèse | trace:C8 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x07 | 0 | 0 | B : 0xc0 octets (9/9 + C6 6/6). `+0x06..+0x07` = `01 01` dans les 11 tentatives suivies de 0x09 (C8 6, C6 5), `00 00` dans les 4 abandons (C8 L1692, L2369, L2393 ; C6 L1791) ; `+0x02` = 2 dans 4/4 abandons, 0 dans 10/11 autres (3 pour L2417) ; `+0x18..` : groupes de 4 octets qui, lus en float32 LE, donnent 0.014-0.16 (et +inf `0000807f` 2× dans C6) ; `+0x28` = 1 dans les 3 mauvais doigts, 0 ailleurs (C8+C6) ; recopie de `+0x18..+0x5f` dans la réponse 0x09 à `+0xc37` (8/8 échecs C8+C6 ; quelques octets diffèrent dans les 3 succès) | résultat de l'acquisition (qualité ?) qui décide abandon/comparaison ; `+0x28` = indice lié au doigt (3 essais seulement : coïncidence possible) | hypothèse | trace:C8 ; trace:C6 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x09 | 0 | 0 | B : 0xca2 octets dans les 6 tentatives (et C6 5/5). **Succès (3/3)** : `+0x00` u32 = 0x1f5 ; `+0x04..+0x13` = 16 octets `fe6003d8 cea5414f b48a0338 dc7c371b` (identiques 3/3) ; `+0x1c`=1 ; `+0x2c..+0xc1f` (0xbf4 octets) = **la réponse 0x54 de l'init** (L556), 0 octet différent pour fp_good_1, 20 octets différents (mêmes offsets) pour fp_good_2/3. **Échec (3/3 C8 + 5/5 C6)** : `+0x00` = 0xffffffff, `+0x04..+0x1f` = 0, `+0x24` u16 = 0xffff, `+0x40..+0xbff` entièrement nul. Commun : `+0x20` u32 = 0x00040c08, `+0xc20` = 0xffffffff, `+0xc8e` = 0x1f5. `+0xc24` u32 : succès 2, 2, 1 ; mauvais doigt 0x2e ×3 ; C6 bon doigt refusé 5, 5, 0x1b, 6, 0x1b. Entropie faible partout (≤ 3.3 bits/64 o) | résultat de la comparaison : uid + identifiant (16 o) + enregistrement 0x54 si correspondance, -1 et zéros sinon ; `+0xc24` = code/raison ou score (pas un simple booléen : 1 et 2 pour des succès) | hypothèse | trace:C8 ; trace:C6 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x21 | 0 | 0 | B : 0xc8e octets (6/6). = préfixe 12 o (`01 00 | 01 00 | f5010000 | 0` succès ; `01 00 | 00 00 | ffffffff | 0` échec) + `0x09[0x00:0x14]` + `0x09[0x1c:0xc8a]` décalé de +4, à 48-62 octets près (succès) ou 10 (échec, autour de `+0x20` et `+0xc20`) ; `+0x3a` deux u16 égaux qui varient entre succès (1, 0x12, 0x10) | récapitulatif de fin de tentative (même résultat que 0x09) | hypothèse | trace:C8 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x70 | 0 | 0 | B : 0x69 octets, 12/12 (6 tentatives + login L860/L872 + pw_unlock L3838/L3868/L4388/L4424) ; `HRLB` (`48524c42`) + u32 2 + zéros jusqu'à `+0x20`, `+0x20`=0x3a, `+0x2d..+0x2f`=`00 00 29` ; `+0x21..+0x2c` et `+0x30..+0x68` différents à chaque fois, entropie ~5.2 bits/64 o (proche du max pour cette taille) ; aucun octet ne sépare succès et échec | blob opaque à magic `HRLB` (signé/chiffré ? non interprété) | hypothèse | trace:C8 | 2026-11-08 |
+| 0x08 | < | 0xfc | 0x1f | 0 | 0 | B : 2 octets `05 05` dans 6/6 tentatives (succès et échecs) | ? (constant) | hypothèse | trace:C8 | 2026-11-08 |
+| 0x08 | > / < | 0xfc | 0x54 (init) | 0 | 0 | `>` A L554 : charge 0x14 = `f5010000` + les 16 octets `fe6003d8…371b` ; `<` B L556 : 0xbf4 octets, **identiques** dans C5, C6, C7, C8 (4 boots) ; les mêmes 16 octets dans `<` B 0x6e (L572) et 0x7a (L576) | l'AP demande au SEP l'enregistrement associé à (uid 501, identifiant 16 o) ; l'identifiant est stable entre boots (gabarit/utilisateur enrôlé ?) | hypothèse | trace:C8 ; trace:C5 ; trace:C6 ; trace:C7 | 2026-11-08 |
+| 0x08 | > / < | 0xfc | 0x23, 0x22, 0x0b, 0x09 (`>`), 0x07 (`>`), 0x70 (`>`), 0x21 (`>`) | 0 | 0 | charge vide (longueur 0) dans 100 % des lectures C8 | commandes sans argument | hypothèse | trace:C8 | 2026-11-08 |
+
+Latence (VU, `analysis/out/c8_latency.txt`, `> 0xfc X` → `< 0xfc X`) : médiane 1.59 ms sur 200 paires ; moyenne des paires
+< 50 ms (définition qui redonne C3 2.35 / C6 7.36 / C7 2.47) = **3.62 ms** ; restreinte aux TYPE présents dans C7 : 2.17 ms
+(C7 2.21). Le chiffre 3.62 vient de la composition (0x07 ~20 ms, 0x23 ~6.6 ms absents de C7), pas d'un ralentissement :
+TYPE par TYPE C8 ≈ C7 (plancher ~1.4 ms par paire contre ~0.05 ms en ASYNC dans C3). 0x09 : succès 250, 247, 235 ms,
+échecs 277, 298, 303 ms (comme C3 : 240-245 / 296-356). `# ool_stats` L4480 : 480 lectures, 0.45 ms en moyenne (max 1.50),
+216 ms au total, 1.95 Mo, 9 traductions ; 0 `ool_error`.
+
 ### SKS (0x12) — structure (aperçu, C1)
 
 | EP | Dir | Tag | Type | Param | Data | Vu (C1) | Rôle supposé | Statut | Source | Date |

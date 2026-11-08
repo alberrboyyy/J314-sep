@@ -14,6 +14,38 @@ Format :
 
 ---
 
+## 2026-11-08 01:07 — analyste — Analyse C8 (session doigt, OOL allégé) : contenu des réponses 0x09/0x21/0x07
+- Trace : traces/20261108-004657_c8-doigt-ool (sep.log, sep.log.ool/, marks.txt, notes.txt). Comparaisons :
+  traces/20261107-035930_c3-touchid (séquences), traces/20261107-043828_c6-doigt-ool (OOL, 5 refus bon doigt),
+  C5/C7 (réponse 0x54 de l'init).
+- Fait : nouveaux scripts `analysis/sbio_latency.py`, `attempt_compare.py`, `ool_index.py`, `ool_attempts.py`
+  (+ `analysis/tests/test_c8_tools.py`, synthétique ; 22/22 tests OK). Sorties : `analysis/out/c8_latency.txt`,
+  `c8_attempts.txt`, `c8_lock_cycles.txt`, `c8_ool_index.txt`, `c8_ool_attempts.txt`, `c8_payloads/`, `c8_stats.txt`,
+  `c3_c8_diff_ep08.txt`, `c6_ool_attempts.txt`, `c6_payloads/`. Table : `docs/messages.md` section C8.
+- Vu (latence) : `# ool_stats` L4480 : 480 lectures, 0.45 ms moy. (max 1.50), 216 ms au total, 0 `ool_error`.
+  Requête→réponse 0xfc : moyenne des paires < 50 ms = 3.62 ms (même définition : C3 2.35, C7 2.47) ; médiane 1.59 ms ;
+  sur les seuls TYPE présents dans C7 : 2.17 ms (C7 2.21). L'écart vient des commandes doigt longues (0x07 ~20 ms,
+  0x23 ~6.6 ms) absentes de C7 ; TYPE par TYPE, C8 ≈ C7.
+- Vu (séquences) : séquence « succès » de 25 mots de C3 L2147 reproduite bit à bit dans fp_good_2 (L2399) et fp_good_3
+  (L2968) ; fp_good_1 (L1698) : mêmes mots, `<03/00` avant `<fc 70`. 3 abandons `23 06 65 07 22` avant un succès
+  (L1674, L2351, L2375). Mauvais doigt : 3 tentatives (L3621, L3687, L4217) = séquence échec de C3, + `2b` après `<fc 70`
+  dans 2/3. 0x09 : succès 235-250 ms, échecs 277-303 ms.
+- Vu (OOL) : en-tête commun de 0x1c octets (1, longueur totale, offset du morceau, 0, 0, TYPE, longueur du morceau).
+  Réponse 0x09 (0xca2 o, 6/6) : succès 3/3 = 0x1f5 + 16 octets fixes `fe6003d8…371b` + copie de la réponse 0x54 de
+  l'init (L556 ; 0xbf4 o, identique dans C5/C6/C7/C8) ; échecs 3/3 C8 + 5/5 C6 = 0xffffffff + zéros sur 0x40-0xbff.
+  Réponse 0x21 = même contenu que 0x09 réarrangé. Réponse 0x07 : `+0x06..07` = `01 01` dans les 11 tentatives suivies
+  de 0x09, `00 00` dans les 4 abandons (C8+C6). Requête 0x65 = 12 blocs de 0x980 o, en-tête de 0x17 o avec compteurs,
+  corps à ~8 bits/octet, incompressible. Réponse 0x70 = magic `HRLB` + 0x48 octets à haute entropie. Le 0x1f répond `05 05`
+  partout. Aucune notification n'a de contenu OOL propre.
+- Interprété (hypothèses HE-HJ dans docs/hypotheses.md) : le résultat de la comparaison est dans la réponse 0x09
+  (uid/identifiant/enregistrement si correspondance, -1/zéros sinon), le mot mailbox ne le porte pas ; `+0xc24` est un
+  code ou un score (succès 2, 2, 1 ; mauvais doigt 0x2e ×3 ; C6 5, 5, 0x1b, 6, 0x1b) ; 0x07 décide abandon/comparaison ;
+  0x65 = trames capteur chiffrées ou compressées (contenu non interprété).
+- Limites : `lock_cycles.py` colonne « état écran » inutilisable dans C8 (horloge du Mac `now=504…992`, pas un epoch) :
+  rattachement fait par les marques + notes.txt. Un seul utilisateur et un seul doigt enrôlé (supposé) : l'identifiant
+  16 o ne peut pas être attribué (utilisateur, gabarit, appareil). 3 succès / 3 échecs mauvais doigt : petits nombres.
+- Incidents : aucun (aucune action hardware).
+
 ## 2026-11-07 — tracer — Lecture OOL allégée (SEP_OOL_BYTES=0x400, types complets, une direction, cache IOVA→PA)
 - Trace : — (aucune action hardware). Chiffres tirés de traces/20261107-043309_c5-ool-boot et
   traces/20261107-043828_c6-doigt-ool (sep.log lignes `# ool`, fichiers sep.log.ool/*.bin), et de C3

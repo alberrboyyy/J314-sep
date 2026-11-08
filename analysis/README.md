@@ -62,6 +62,46 @@ et hexdump (`-` ancien / `+` nouveau / `^^`) entre deux dumps consécutifs. Le t
 contenu change : deux dumps consécutifs ne sont pas forcément deux messages consécutifs (voir `# ool` dans sep.log).
 Lecture seule, sortie stdout.
 
+## uart_timeline.py — chronologie fusionnée hv_uart.log + sep.log
+
+    python3 analysis/uart_timeline.py traces/<capture>/ [--ep08-only] [-o analysis/out/x.txt]
+
+Ancrages primaires (correspondances uniques et monotones) : CRC xART, TAG xART, et rang à rang
+« Sending lock change X for handle H value V » ↔ `< EP=0x12 TAG=X TYPE=V DATA=H` (utilisé seulement si les deux suites
+concordent entièrement). Ancrages secondaires : horloge du Mac (`IOConsoleUsers … now <epoch>`, `ACMTRM … now=N(boot)`)
+corrigée d'un décalage PC−Mac mesuré + dérive linéaire (±1 s). Chaque ligne uart reçoit l'intervalle [ancrage
+précédent ; suivant] ; seul cet intervalle compte, l'heure interpolée sert à intercaler. Lignes uart filtrées (ACMTRM,
+AppleSEPKeyStore lock/unlock, xART, apfs keybag, biométrie, `SEP EP n`) ; sep : EP 0x08, EP 0x12 notifications, EP 0x13.
+
+## sbio_latency.py — latence requête → réponse 0xfc
+
+    python3 analysis/sbio_latency.py traces/<A>/ [traces/<B>/ ...] [--ep 0x08] [--fast-ms 10] [-o analysis/out/x.txt]
+
+Paires `> 0xfc X` / premier `< 0xfc X` suivant ; médiane, moyenne, moyenne des paires < 50 ms (définition qui redonne
+les chiffres C3 2.35 / C6 7.36 / C7 ~2.5 ms), et tableau par TYPE comparé entre captures. Horloge PC du tracer.
+
+## attempt_compare.py — tentatives doigt vs séquence de référence
+
+    python3 analysis/attempt_compare.py traces/<capture>/ [--ref traces/<C3>/ --ref-line 2147 --ref-n 25] [-o ...]
+
+Découpage de `lock_cycles.attempts()`, comparaison mot à mot (dir/TAG/TYPE/PARAM/DATA) à N messages EP 0x08 d'une
+capture de référence (défaut : la séquence succès de C3 L2147), différences difflib avec numéros de ligne.
+
+## ool_index.py — lecture OOL ↔ message
+
+    python3 analysis/ool_index.py traces/<capture>/ [--ep 0x08] [-o analysis/out/x.txt]
+
+Rattache chaque `# ool` au message qui le précède et au .bin (ou au dernier .bin du buffer si `changed=none`) ; fin du
+contenu non nul. `from ool_index import load_index`.
+
+## ool_attempts.py — comparaison octet par octet des charges OOL par tentative
+
+    python3 analysis/ool_attempts.py traces/<capture>/ [--dump-dir analysis/out/<x>/] [-o analysis/out/x.txt]
+
+Classe chaque tentative (abort / good / bad selon la marque fp_good*/fp_bad* — à recouper avec notes.txt), recolle
+les morceaux 0xfc/0xfd selon l'en-tête observé de 0x1c octets, puis par (dir, buf, TYPE) : octets constants,
+discriminants good/bad, variables, entropie par 64 octets. `--dump-dir` écrit les charges recollées.
+
 ## Tests
 
     python3 -m unittest discover -s analysis/tests -v

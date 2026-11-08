@@ -285,3 +285,71 @@ C2 = C2a et C2b, même m1n1, même kernel, mêmes bootargs, personne ne touche l
 - Comparaisons prévues (analyste) : fenêtres `fp_good_*` entre elles (répétabilité), `fp_good_*` vs `pw_unlock`,
   `fp_good_*` vs `fp_bad_*`, `lock1` vs `lock_f*`, `fp_prelogin` vs `fp_good_*`, toutes les `idle*` vs C2.
 - Ce que C3 ne tranche pas : le contenu OOL ; HB (un seul compte) ; la cause (et non la simple corrélation) de HD.
+
+# Hypothèses issues de C8 (2026-11-08, analyste)
+
+C8 = `traces/20261108-004657_c8-doigt-ool` ; détail et lignes citées : `docs/messages.md` section C8,
+`analysis/out/c8_ool_attempts.txt`, `analysis/out/c8_attempts.txt`. C6 = `traces/20261107-043828_c6-doigt-ool`.
+
+## HE — Le résultat de la comparaison doigt est dans la réponse OOL de 0x09 (`< B`), pas dans le mot mailbox
+- Statut : ouverte
+- Fondée sur : C8 `< B 0x09` L1731, L2428, L2999 (succès : `+0x00`=0x1f5, 16 octets `fe6003d8…371b`, `+0x1c`=1,
+  `+0x2c..+0xc1f` = réponse 0x54 de l'init L556) vs L3647, L3711, L4247 (échecs : 0xffffffff, zéros) ; C6 5/5 refus
+  identiques aux échecs C8. Mot mailbox 0x09 identique (PARAM=0, DATA=0) dans tous les cas.
+- Autres explications possibles : le SEP écrit le même contenu pour une autre raison (ex. compte-rendu à destination
+  d'un démon, le vrai verdict passant par SKS 0x12 — la notif `TAG=0 DATA=0xfffffe0b` n'apparaît que dans les succès) ;
+  l'association A/B ↔ sens reste une hypothèse du tracer.
+- Expérience (AUTO, sans humain) : relire chaque future capture doigt avec `analysis/ool_attempts.py` et tester la
+  règle « `+0x00`==0x1f5 ⇔ 2× `<01/08` ⇔ UNLOCKED » sur toutes les tentatives (prédiction : 0 exception).
+- Expérience (EXPÉRIENCE HUMAINE, décision d'Albert) : enrôler un **second doigt** dans macOS, puis session C8 avec doigt 1,
+  doigt 2, mauvais doigt. Si les 16 octets changent avec le doigt → identifiant de gabarit ; s'ils restent égaux →
+  identifiant d'utilisateur/de base. Prédiction HE : `+0x00`=0x1f5 pour doigt 1 et doigt 2, -1 pour le mauvais.
+- Si vraie : un driver Linux lirait le verdict dans B après `< 0xfc 0x09`. Si fausse : chercher dans SKS (0x12).
+
+## HF — `+0xc24` (u32) de la réponse 0x09 est un code de raison ou un score, pas un booléen
+- Statut : ouverte
+- Fondée sur : succès 2, 2, 1 (C8) ; mauvais doigt 0x2e ×3 (C8 L3647, L3711, L4247) ; bon doigt refusé 5, 5, 0x1b, 6, 0x1b (C6).
+- Autres explications possibles : compteur interne ; valeur qui dépend du temps d'acquisition (C6 = tracer lent).
+- Expérience (EXPÉRIENCE HUMAINE) : 3 essais de chaque : bon doigt à plat, bon doigt seulement le bout, bon doigt
+  glissé, mauvais doigt, objet non-doigt (gomme). Prédiction « code » : une valeur stable par type d'échec ;
+  « score » : valeurs dispersées et ordonnées selon la qualité.
+
+## HG — La réponse 0x07 décide abandon (`22`) ou comparaison (`09`) ; `+0x06..+0x07` = `01 01` si on compare
+- Statut : ouverte
+- Fondée sur : `01 01` dans 11/11 tentatives suivies de 0x09 (C8 6, C6 5), `00 00` dans 4/4 abandons (C8 L1692, L2369,
+  L2393 ; C6 L1791). `+0x02` = 2 dans 4/4 abandons mais aussi 3 dans un cas continué (L2417) : moins net.
+- Autres explications possibles : l'AP abandonne pour une autre raison (timeout, doigt retiré) et 0x07 ne fait que
+  le refléter. 4 abandons seulement.
+- Expérience (EXPÉRIENCE HUMAINE) : toucher le capteur très brièvement (< 0.3 s) 5 fois pour provoquer des abandons ;
+  prédiction : `00 00` à chaque `23 06 65 07 22`. AUTO : vérifier sur toutes les captures futures.
+
+## HH — TYPE 0x65 (`> A`, 0x7200 octets) = 12 trames capteur chiffrées ou compressées
+- Statut : ouverte (le contenu n'est PAS interprétable ; seule la structure est testée)
+- Fondée sur : 12 blocs de 0x980 o, en-tête de 0x17 o constant sauf index de bloc NN et compteur SSSS ; corps 7.99 bits/o,
+  ratio zlib 1.001 ; NN continue après un abandon, repart à 0 après une tentative complète ; SSSS saute de +0xd (C8, 6/6)
+  ou +0x18 (C6, 4/4) après une tentative complète.
+- Autres explications possibles : le corps est du bruit ou des données déjà compressées ; les sauts SSSS viennent de trames
+  envoyées ailleurs (autre TYPE, autre buffer) ou consommées par le SEP lui-même.
+- Expérience (AUTO, analyse) : chercher dans C8 tout message entre la fin d'une tentative complète et la suivante dont
+  le contenu porte des blocs `80 52 .. 80 09 00 00 3a` (expliquerait les sauts). Ne pas tenter de déchiffrer (hors périmètre).
+
+## HI — L'enregistrement 0xbf4 renvoyé par 0x54 à l'init est un état persistant mis à jour après un succès
+- Statut : ouverte
+- Fondée sur : réponse 0x54 identique dans C5, C6, C7, C8 (aucun succès Touch ID entre C5 et C8 ; C6 = 5 refus) ;
+  dans C8, la copie dans la réponse 0x09 est identique pour fp_good_1 et diffère de 20 octets (offsets 0x3a-0x42, 0x8a-0x90,
+  0xe4-0xea, 0xbea-0xbef de l'enregistrement) pour fp_good_2 et fp_good_3, après les rafales post-unlock `6b 79 6c 37…`.
+- Autres explications possibles : ces 20 octets sont des compteurs/horodatages recalculés à chaque réponse, sans persistance.
+- Expérience (AUTO via `tools/boot_and_trace.sh`, sans humain, boot seul comme C7) : prochain boot avec SEP_OOL_EPS=0x08 et
+  0x54 dans les types complets ; comparer la réponse 0x54 de l'init à `analysis/out/c8_payloads/L02968_good_outB_09.bin`
+  [0x2c:0xc20]. Égale à fp_good_3 → état persistant mis à jour ; égale à C5 → pas de persistance (ou non écrite).
+  Ne demande aucune écriture vers le SEP.
+
+## HJ — Les champs `+0x44` et `+0x48` de la requête 0x06 sont fixés par l'AP avant la comparaison
+- Statut : ouverte
+- Fondée sur : `+0x44` = 4 (6 tentatives lock_g*), 5 (3 tentatives lock_b*), 1 (C6, 6/6) ; `+0x48` = nombre d'abandons
+  depuis la dernière tentative complète (15/15) ; `+0x97..+0xa6` (16 o) fixes par verrouillage. Ces valeurs précèdent 0x09 :
+  elles ne peuvent pas être le résultat de la tentative en cours.
+- Point de vigilance : `+0x44` sépare parfaitement bon et mauvais doigt dans C8 **par coïncidence de calendrier**
+  (bons doigts d'abord, mauvais ensuite). Ne pas en faire un indice de succès.
+- Expérience (EXPÉRIENCE HUMAINE) : session alternée bon / mauvais / bon / mauvais (un essai par verrouillage) ; si `+0x44`
+  suit le temps ou le nombre de déverrouillages et non le doigt, la coïncidence est confirmée.
