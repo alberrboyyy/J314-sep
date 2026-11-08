@@ -20,6 +20,15 @@ objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le 
 - **Rien ne sort de ce repo vers Asahi** (issues, PR, doc, IRC/Matrix). Projet privé.
 - **`traces/` est en lecture seule après capture.** On ne modifie jamais un log brut ; les analyses vont dans `docs/`.
 
+## Qui décide quoi (accord d'Albert, 2026-11-09)
+
+- L'agent décide seul : lecture, analyse, docs, outils sur le PC, captures en lecture seule, et les validations techniques
+  (le sceptique tranche « vérifié » ou « hypothèse » ; ce qui reste incertain est noté, pas renvoyé à Albert).
+- L'agent demande à Albert **seulement** si l'action peut abîmer le Mac ou écrit vers le SEP, en une phrase simple
+  (ce qu'on fait, ce qui peut rater, oui/non). Pas de jargon dans les questions.
+- Les lignes rouges ci-dessus ne changent pas. Albert prévoit un backup du Mac plus tard : tant qu'il n'existe pas,
+  aucune action risquée pour les données.
+
 ## Phase 1 — sources autorisées
 
 - Traces capturées ici (`traces/`).
