@@ -14,6 +14,29 @@ Format :
 
 ---
 
+## 2026-11-08 — analyste — Phase 2 : AppleSEPManager (boot, CNTL, découverte, ouverture d'EP) + lockState IOBiometricFamily
+- Trace : — (kernelcache 13.5 `macos/kernel.macho`) ; recoupé avec C11 (sep.log L3-148, L348-L2100, L558-L5980 ;
+  hv_uart L643-766, L1515, L1555), C1 L39-41, C12 L39-49.
+- Fait : `analysis/kext/kdump_syms.py` (listing par fonction nommée LC_SYMTAB, sortie analysis/out/kext/, non versionné) ;
+  lecture d'AppleSEPBooter (bootSEP, _bootAction), AppleSEPControl (cmsg*, _cmsgSend, _cmsgAction), AppleSEPDiscovery
+  (_msgReceived), AppleSEPEndpoint (enable, setSend/ReceiveOOLBuffer), AppleSEPManager (_sendMessageGated), GT
+  (init, enableEndpoint), Mesa (getSEP, handleSEPMessage, prepareSession, performKeyExchange, initializeSequenceCounter,
+  setCalibrationData), IOBiometricFamily (sksQueueProcess, isAtLeastOne*, check*Timer). Slots de vtable résolus par
+  symboles. Aucune copie de code. Synthèse : `docs/kext_sepmanager.md` (messages.md non modifié : autres agents).
+- Vu (kext) : `> EP=0xFE` = taille shmem en pages dans les octets 2-3 (« TYPE 0x1c » = 0x1c000 o, uart L660) ; CNTL
+  2/4 = SET_OOL_IN (buffer d'envoi AP→SEP), 3/5 = SET_OOL_OUT (réception), tailles en octets, adresses >> 12, buffers
+  alloués par l'AP (GT, 0x4000 pour sbio) ; tag CNTL = index du pool + 1 (s'inverse entre C1 et C11) ; CNTL reçus 0x0d/0x15
+  = « OS actif », 0x29 = non sollicité (uart L765) ; FD TYPE 1 = [min,max] pages envoi / réception ; pas de numéro
+  d'endpoint codé en dur (nub `sep-endpoint,sbio`). lockState : bit 0 verrouillé, bit 1 blocage code, bit 2 blocage bio,
+  bit 5 code validé (noms des fonctions qui testent les bits). TAG 0x02 → champ « biométrie présente » du contexte.
+  0x17 = n° de série capteur ; 0x15/0x16 = clé de session SEP↔capteur (AP relaie) ; 0x5b, 0x6d, 0x71 = blobs utilisateur.
+- Vu (trace) : 0x0228 3/3 juste après une saisie de mot de passe (C11 L851, L860, L5980), 1 ms après `< EP=0x12
+  TAG=0x98 TYPE=0x67` (L850) ; 0x0015 au boot ; `<02` 1× après le 2e `> 0x6d` (L548 → L562).
+- Interprété : après boot, la bio est bloquée tant que le keybag n'a pas validé le code via SKS (EP 0x12) → bloquant
+  probable pour Linux (dépendance D2 de kext_sepmanager.md). Tout reste `hypothèse` (source: kext).
+- Incidents : venv capstone du scratchpad absent → recréé dans le scratchpad de cette session. `> EP=0xFF TYPE 0x1b` /
+  `< 0x7f` non attribués.
+
 ## 2026-11-08 — Claude (session principale) — K4 : tailles et CRC des 0x65 de C11
 - Trace : traces/20261108-025802_c11-doigt-tranchant.
 - Fait : `analysis/ool_transfers.py --types 0x65 --dump-dir analysis/out/c11_65` puis `analysis/slice_crc.py` sur les charges.
