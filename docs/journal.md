@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-08 16:35 — Claude — C13 (K-E1) avortée : pas de session ouverte
+- Trace : traces/20261108-163401_c13-ke1 (timeout 900 s, reboot propre, proxy revenu)
+- Vu : noyau jusqu'à launchd, puis mise en veille (S2R, « pmu go hib ») vers 16:44 ; Albert rapporte « macOS a pas boot » (écran sans login ?). Aucune étape K-E1 faite.
+- Interprété : inconnu (écran de login jamais atteint côté affichage, ou veille avant saisie).
+- Incidents : capture inutilisable pour K-E1.
+
 ## 2026-11-08 — Claude — ADT-1 : dump du device tree (lecture seule)
 - Trace : traces/20261108-162919_adt (tools/dump_adt.sh, analysis/adt_find_mesa.py)
 - Fait : dump ADT 507904 octets, m1n1 frais chainloadé, aucune écriture.
