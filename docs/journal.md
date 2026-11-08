@@ -14,6 +14,15 @@ Format :
 
 ---
 
+## 2026-11-08 — Albert — Passage en phase 2 (KEXTS)
+- Albert a modifié lui-même la ligne PHASE de CLAUDE.md (`## PHASE ACTUELLE : 2 — KEXTS`).
+- Rappel des règles phase 2 : désassemblage des kexts uniquement pour le protocole AP↔SEP, aucune copie de code Apple dans `driver/`,
+  `source: kext` sur chaque info tirée d'un kext. Lignes rouges inchangées (pas d'écriture SEP par un agent, SEPOS hors périmètre).
+- Albert a proposé « prendre du code Apple » : refusé par Claude (droit d'auteur + règle CLAUDE.md) ; approche « doc du protocole → driver neuf ».
+- Kexts cibles repérés dans macos/kernel.macho (LC_FILESET_ENTRY) : AppleMesaSEPDriver (fileoff 0x42b2d0), AppleBiometricSensor (0x2d28e0),
+  AppleBiometricServices (0x2dd8b0), IOBiometricFamily (0x6de8b0), AppleSEPManager (0x49e030), AppleSEPKeyStore (0x49a270),
+  AppleSEPGenericTransfer (0x497bf0). Outils dispo : llvm-objdump seulement (pas de Ghidra/r2).
+
 ## 2026-11-08 — Claude (session principale) — C12 : test de la prédiction HO (boot sans humain après C11)
 - Trace : traces/20261108-032454_c12-boot-ho (TRACE_TIMEOUT=300, config OOL de C11 avec 0x6c/0x6d complets ; sortie C11 par reboot() HV, aucun boot natif).
 - Prédiction écrite AVANT la capture (analyste, rapport C11) : le `> A 0x6d` d'init de C12 = dernier export `< B 0x6c` de C11,

@@ -3,7 +3,7 @@
 Projet privé de reverse engineering du SEP (Secure Enclave Processor) d'un MacBook Pro M1 Max,
 objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le setup.
 
-## PHASE ACTUELLE : 1 — TRACES SEULES
+## PHASE ACTUELLE : 2 — KEXTS
 
 > Seul Albert modifie cette ligne. Un agent ne change jamais de phase, même s'il est bloqué :
 > il note le blocage dans `docs/hypotheses.md` et propose le passage en phase 2 dans son rapport.
