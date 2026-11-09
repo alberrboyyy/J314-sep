@@ -1,0 +1,13 @@
+2026-11-09 23:21:18 run: uname -a; id -u; cat /etc/os-release | head -2; lscpu | head -1
+2026-11-09 23:21:25 run: ls /proc/device-tree/soc 2>/dev/null | grep -i spi; ls /sys/bus/spi/devices 2>&1; ls /sys/bus/spi/drivers 2>&1 | head; rpm -q kernel-devel gcc make git 2>&1; ls /lib/modules/$(uname -r)/build 2>&1 | head -2; df -h / | tail -1; ip -brief a | head -3; ls /proc/device-tree/soc/ | head -3
+2026-11-09 23:21:32 run: dnf install -y kernel-devel-$(uname -r) gcc make git 2>&1 | tail -4
+2026-11-09 23:21:42 run: dnf install -y gcc make git 2>&1 | tail -2; dnf list --available "kernel*devel*" 2>&1 | tail -5; rpm -q kernel-16k-core kernel-16k 2>&1 | head -3
+2026-11-09 23:21:57 run: dnf install -y kernel-16k-devel-7.2.12-402.asahi.fc45 2>&1 | tail -2 || true; ls /usr/src/kernels
+2026-11-09 23:22:14 run: dnf install -y kernel-devel-matched 2>&1 | tail -2; ls /usr/src/kernels
+2026-11-09 23:22:24 run: rm -rf /root/mesa && mkdir -p /root/mesa
+2026-11-09 23:22:24 put: driver/linux/mesa_probe.c -> /root/mesa/
+2026-11-09 23:22:24 put: driver/linux/Makefile -> /root/mesa/
+2026-11-09 23:22:24 run: cd /root/mesa && make 2>&1 | tail -8; ls *.ko 2>&1; modinfo ./mesa_probe.ko 2>&1 | grep -E "^(name|parm|description)"
+2026-11-09 23:22:32 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | tail -12; ls *.ko 2>&1; modinfo ./mesa_probe.ko 2>&1 | grep -E "^(name|parm|description)"
+2026-11-09 23:22:42 run: zcat /proc/config.gz | grep -E "CONFIG_OF_OVERLAY|CONFIG_OF_CONFIGFS|CONFIG_SPI_APPLE|CONFIG_GPIO_MACIO|CONFIG_PINCTRL_APPLE" ; ls /sys/kernel/config 2>&1; ls /sys/class/gpio 2>&1 | head -2; cat /proc/device-tree/soc/spi@39b104000/compatible; echo; ls /proc/device-tree/soc/spi@39b104000 /proc/device-tree/soc/spi@39b10c000
+2026-11-09 23:22:50 run: grep -E "CONFIG_OF_OVERLAY|CONFIG_OF_CONFIGFS|CONFIG_SPI_APPLE=|CONFIG_PINCTRL_APPLE_GPIO" /boot/config-$(uname -r) /lib/modules/$(uname -r)/config 2>/dev/null | head; ls /boot | head; which dtc fdtoverlay 2>&1 | head -2

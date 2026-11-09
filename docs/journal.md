@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 23:00 — Claude — Linux de test (Fedora Asahi Remix, 10.67.0.94) : module compilé
+- Fait : exception root dans CLAUDE.md (ajoutée par Albert) ; tools/linux_ssh.sh (run/put/get, interdits : disques, boot, m1n1, SEP ; journal logs/linux_ssh.log) ; installé gcc, make, git, kernel-devel sur le Linux de test ; copié et compilé driver/linux/mesa_probe.c → mesa_probe.ko OK (noyau 7.2.12-402.asahi.fc45 16k).
+- Vu : le DT de ce Linux ne décrit que spi@39b104000 (flash, = spi1 ADT) et spi@39b10c000 (hid-transport, = spi3 ADT). **spi2 (ADT, capteur) n'y est pas** : pas de nœud `biosensor,mesa`, donc le module ne se liera à rien tant que le DT n'est pas changé. dtc/fdtoverlay absents ; support des overlays non confirmé.
+- Interprété : pour tester le capteur il faut un DT avec spi2 + mesa (overlay si le noyau le permet, sinon DT dans la charge m1n1 = installation m1n1, réservée à Albert).
+- Incidents : aucun.
+
 ## 2026-11-09 23:00 — Claude (driver) — Squelette Linux du capteur, hors ligne
 - Trace : traces/20261108-162919_adt/mesa.txt (lecture seule)
 - Fait : driver/linux/ : fragment DT (spi2, 8 MHz, IRQ gpio0 195, alim gpio0 0xc4, délais 7/10), module spi `mesa_probe` (enable=0 par défaut, lecture 16 o du statut, aucun envoi SEP), README. `.gitignore` : `linux/` -> `/linux/` pour pouvoir versionner driver/linux.
