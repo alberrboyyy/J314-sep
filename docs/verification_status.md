@@ -103,3 +103,6 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
   `vérifié (macOS)` (prédiction écrite avant, 7/7 poses, 113/114 blocs de 256 o ; réserve : pas de sha du transfert réassemblé).
 - SPI-2 (C17-C20) : transport SPI AP ↔ capteur (trames `80 <cmd> <len>`, état 0x10/0x20, lecture 0x13, DMA SIO 0x18/0x19) : `vu`
   dans 4 captures, noms des commandes = hypothèses ; jamais rejoué par nous. Broches spi2 = 48/49/50 : hypothèse.
+- SPI-3 (2026-11-10, MESA-HELLO, traces/20261110-005244_mesa_hello) : sans macOS, alimentation par gpio0 196 + trames 0x78, 0x10,
+  0x70, 0x13 sur spi2 (CLKDIV 3, CPHA 1, pas de CS, broches laissées par iBoot) → identité du capteur identique à celle lue sous
+  macOS : `vérifié` (1 essai ; à refaire une fois pour la reproductibilité). Rend SPI-2 `vérifié` pour ces 4 trames seulement.

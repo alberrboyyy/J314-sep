@@ -97,3 +97,8 @@ allumage, +1 par message), puis une longueur et un contenu d'aspect aléatoire, 
   la pose telle quelle au SEP dans `> 0x65`. 27 images lues pour 7 envoyées : les suivantes ne vont pas au SEP (rôle inconnu).
   En attente : demande d'état toutes les ~0,5 s. Trames 0x30 après le résultat et 0x40 avant la pose suivante (rôle supposé :
   arrêt / reprise du balayage).
+
+### Essai sans macOS (MESA-HELLO, 2026-11-10) — vérifié
+`tools/mesa_hello.sh` (m1n1 seul) : alimentation gpio0 196, spi2 en mode scruté (CLKDIV 3, CFG 0x40002), trames 0x78, 0x10, 0x70,
+0x13 → le capteur rend la même identité que sous macOS. Conséquences : les broches SPI n'ont pas besoin d'être réglées (état
+d'iBoot suffisant), pas de chip-select, CPHA = 1. Tout le reste du dialogue est chiffré et vient du SEP : non essayé.
