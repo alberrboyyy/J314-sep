@@ -37,3 +37,19 @@ DMA SIO, rôle de la broche reset. Tout est dans l'ADT, que nous n'avons pas.
 
 ## Expérience demandée (lecture seule, non exécutée)
 Voir `docs/hypotheses.md`, « EXPÉRIENCE ADT-1 ».
+
+## Alimentation et broches de spi2 (2026-11-10)
+Sources : `analysis/adt_pmgr_ps.py` sur `traces/20261108-162919_adt/adt.bin` (hors ligne) ; `traces/20261110-001208_gpio_peek`
+(`tools/gpio_peek.sh`, lecture seule sous m1n1 seul) ; fichiers publics Linux `t600x-pmgr.dtsi`, `t600x-gpio-pins.dtsi`.
+
+| Élément | Valeur | Statut |
+|---|---|---|
+| Domaine d'alimentation de spi2 | pmgr `SPI2` (id 144), registre CPU 0x28e580200 = `ps_spi2` (`power-controller@200`, parent `ps_spi_p`) du DT public | lu (ADT) + concordant avec le DT public ; allumé (0xff) sous m1n1 seul |
+| Broches SPI de spi2 | gpio0 48 (MISO, tirage bas), 49, 50, fonction périphérique 1 ; rôle horloge/MOSI de 49 et 50 non distingué | **hypothèse** (même motif que spi1/spi3/spi4, numérotation 48-51 / 52-55 / 56-59) |
+| Chip-select | aucun (`function-spi_cs0 = 1:null()`, broche 51 non configurée) | hypothèse |
+| IRQ capteur (gpio0 195) | entrée, tirage bas, lue à 1 sous m1n1 | lu |
+| mesa_pwr (gpio0 196) | non configurée sous m1n1 (ni sortie ni entrée) → capteur probablement éteint | lu / hypothèse |
+
+Réserve : un 5e groupe au même motif (116, 117, 118) n'a pas de contrôleur SPI connu dans l'ADT ; tant qu'il n'est pas
+expliqué, « spi2 = 48-50 » reste une hypothèse. Pour un DT Linux : `pinmux = <APPLE_PINMUX(48, 1)>, <APPLE_PINMUX(49, 1)>,
+<APPLE_PINMUX(50, 1)>` (iBoot les a déjà réglées ainsi : ne rien changer d'autre).

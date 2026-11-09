@@ -21,3 +21,4 @@
 2026-11-09 23:58:29 run: grep -n "ps_spi" /root/live.dts | head; grep -n -B8 "phandle = <0x5f>" /root/live.dts | head -20; grep -n "phandle = <0x5d>" -B6 /root/live.dts | head -10
 2026-11-09 23:58:35 run: grep -n -A8 "power-controller@200 {" /root/live.dts | head -12; grep -n -B1 -A6 "clkref\"" /root/live.dts | head -12; grep -n -A12 "spi@39b10c000 {" /root/live.dts | grep -E "clocks|power-domains|pinctrl"; grep -n "pinctrl@" /root/live.dts | head -3; grep -n -B3 -A10 "gpio-controller;" /root/live.dts | grep -E "phandle|pinctrl@|gpio-ranges|ngpios" | head
 2026-11-09 23:58:48 run: sed -n 5053,5064p /root/live.dts; grep -n "interrupt-controller@" /root/live.dts | head -2; awk "/interrupt-controller@28e100000 \\{/,/\\};/" /root/live.dts | grep -E "phandle|compatible"; echo ---; grep -n "pinctrl-ap\|pinctrl_ap" /root/live.dts | head -2; sed -n 920,935p /root/live.dts
+2026-11-10 00:10:50 run: uname -r

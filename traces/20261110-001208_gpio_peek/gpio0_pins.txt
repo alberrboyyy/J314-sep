@@ -1,0 +1,256 @@
+# gpio0 base 0x39b028000, 255 broches ; valeur brute puis champs (format du pilote public Linux)
+  0 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+  1 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+  2 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+  3 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+  4 0x00076a02 data=0 mode=out periph=0 pull=0 in_en=1 drv=2 grp=7 lock=0
+  5 0x00076a02 data=0 mode=out periph=0 pull=0 in_en=1 drv=2 grp=7 lock=0
+  6 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+  7 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+  8 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+  9 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 10 0x008742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 11 0x00874221 data=1 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 12 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 13 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 14 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 15 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 16 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 17 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 18 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 19 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 20 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 21 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 22 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 23 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 24 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 25 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 26 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 27 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 28 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 29 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 30 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 31 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+ 32 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 33 0x00874203 data=1 mode=out periph=0 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 34 0x004763a1 data=1 mode=in periph=1 pull=3 in_en=1 drv=0 grp=7 lock=0
+ 35 0x00476220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 36 0x004763a1 data=1 mode=in periph=1 pull=3 in_en=1 drv=0 grp=7 lock=0
+ 37 0x00476221 data=1 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 38 0x004763a1 data=1 mode=in periph=1 pull=3 in_en=1 drv=0 grp=7 lock=0
+ 39 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 40 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 41 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 42 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 43 0x00076aa0 data=0 mode=in periph=1 pull=1 in_en=1 drv=2 grp=7 lock=0
+ 44 0x00076b81 data=1 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+ 45 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 46 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 47 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 48 0x008742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 49 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 50 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 51 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 52 0x008742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 53 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 54 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 55 0x00874221 data=1 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 56 0x008742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 57 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 58 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 59 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+ 60 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 61 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 62 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 63 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 64 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 65 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 66 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 67 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 68 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 69 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 70 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 71 0x00a74220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=1
+ 72 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 73 0x00c742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 74 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 75 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 76 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 77 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 78 0x00c742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 79 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 80 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 81 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 82 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 83 0x00c742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+ 84 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 85 0x00474a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 86 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 87 0x00c7400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 88 0x00c7408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+ 89 0x00c7400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 90 0x00c7400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 91 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+ 92 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 93 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 94 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 95 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 96 0x00076621 data=1 mode=in periph=1 pull=0 in_en=1 drv=1 grp=7 lock=0
+ 97 0x00076621 data=1 mode=in periph=1 pull=0 in_en=1 drv=1 grp=7 lock=0
+ 98 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+ 99 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+100 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+101 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+102 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+103 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+104 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+105 0x00076a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+106 0x008763a1 data=1 mode=in periph=1 pull=3 in_en=1 drv=0 grp=7 lock=0
+107 0x00876221 data=1 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+108 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+109 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+110 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+111 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+112 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+113 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+114 0x00c70a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+115 0x00c70a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+116 0x008742a0 data=0 mode=in periph=1 pull=1 in_en=1 drv=0 grp=7 lock=0
+117 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+118 0x00874220 data=0 mode=in periph=1 pull=0 in_en=1 drv=0 grp=7 lock=0
+119 0x00c70a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+120 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+121 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+122 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+123 0x00076aa1 data=1 mode=in periph=1 pull=1 in_en=1 drv=2 grp=7 lock=0
+124 0x0007688e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=2 grp=7 lock=0
+125 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+126 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+127 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+128 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+129 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+130 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+131 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+132 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+133 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+134 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+135 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+136 0x004763a1 data=1 mode=in periph=1 pull=3 in_en=1 drv=0 grp=7 lock=0
+137 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+138 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+139 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+140 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+141 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+142 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+143 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+144 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+145 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+146 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+147 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+148 0x00076a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+149 0x0007688e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=2 grp=7 lock=0
+150 0x00076a80 data=0 mode=in periph=0 pull=1 in_en=1 drv=2 grp=7 lock=0
+151 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+152 0x0087408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+153 0x0087408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+154 0x0087408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+155 0x0087408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+156 0x0087408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+157 0x0087408e data=0 mode=irq_off periph=0 pull=1 in_en=0 drv=0 grp=7 lock=0
+158 0x00276a21 data=1 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=1
+159 0x00276ba1 data=1 mode=in periph=1 pull=3 in_en=1 drv=2 grp=7 lock=1
+160 0x00276ba1 data=1 mode=in periph=1 pull=3 in_en=1 drv=2 grp=7 lock=1
+161 0x00276ba1 data=1 mode=in periph=1 pull=3 in_en=1 drv=2 grp=7 lock=1
+162 0x00276ba1 data=1 mode=in periph=1 pull=3 in_en=1 drv=2 grp=7 lock=1
+163 0x00276ba1 data=1 mode=in periph=1 pull=3 in_en=1 drv=2 grp=7 lock=1
+164 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+165 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+166 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+167 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+168 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+169 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+170 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+171 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+172 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+173 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+174 0x00076b81 data=1 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+175 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+176 0x00076b80 data=0 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+177 0x00076b80 data=0 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+178 0x00076a02 data=0 mode=out periph=0 pull=0 in_en=1 drv=2 grp=7 lock=0
+179 0x00076b81 data=1 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+180 0x00076b81 data=1 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+181 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+182 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+183 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+184 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+185 0x00076ac0 data=0 mode=in periph=2 pull=1 in_en=1 drv=2 grp=7 lock=0
+186 0x00076ac0 data=0 mode=in periph=2 pull=1 in_en=1 drv=2 grp=7 lock=0
+187 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+188 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+189 0x0007698e data=0 mode=irq_off periph=0 pull=3 in_en=0 drv=2 grp=7 lock=0
+190 0x0007698e data=0 mode=irq_off periph=0 pull=3 in_en=0 drv=2 grp=7 lock=0
+191 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+192 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+193 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+194 0x00076a02 data=0 mode=out periph=0 pull=0 in_en=1 drv=2 grp=7 lock=0
+195 0x00076a81 data=1 mode=in periph=0 pull=1 in_en=1 drv=2 grp=7 lock=0
+196 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+197 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+198 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+199 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+200 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+201 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+202 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+203 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+204 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+205 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+206 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+207 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+208 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+209 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+210 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+211 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+212 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+213 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+214 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+215 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+216 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+217 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+218 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+219 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+220 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+221 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+222 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+223 0x00000000 data=0 mode=in periph=0 pull=0 in_en=0 drv=0 grp=0 lock=0
+224 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+225 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+226 0x0007698e data=0 mode=irq_off periph=0 pull=3 in_en=0 drv=2 grp=7 lock=0
+227 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+228 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+229 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+230 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+231 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+232 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+233 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+234 0x00076b81 data=1 mode=in periph=0 pull=3 in_en=1 drv=2 grp=7 lock=0
+235 0x0087400e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+236 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+237 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+238 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+239 0x00076a20 data=0 mode=in periph=1 pull=0 in_en=1 drv=2 grp=7 lock=0
+240 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+241 0x0007680e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=2 grp=7 lock=0
+242 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+243 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+244 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+245 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+246 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+247 0x00076621 data=1 mode=in periph=1 pull=0 in_en=1 drv=1 grp=7 lock=0
+248 0x00076621 data=1 mode=in periph=1 pull=0 in_en=1 drv=1 grp=7 lock=0
+249 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+250 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+251 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+252 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+253 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0
+254 0x0007000e data=0 mode=irq_off periph=0 pull=0 in_en=0 drv=0 grp=7 lock=0

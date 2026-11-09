@@ -1,0 +1,6 @@
+date: 20261110-001208
+name: gpio_peek
+m1n1_commit: 70757dc7
+proxy_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00
+chainload: oui
+mmio_reads: gpio0 config broches 0..N-1 ; pmgr PS SPI_P SPI1 SPI2 SPI3 SPI4 SIO

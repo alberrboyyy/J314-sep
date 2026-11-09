@@ -21,16 +21,21 @@
 		reg = <0x3 0x9b108000 0x0 0x4000>;
 		interrupt-parent = <&aic>;
 		interrupts = <AIC_IRQ 1108 IRQ_TYPE_LEVEL_HIGH>;	/* LU : ADT interrupts = [1108] ; type : A VERIFIER (copie de spi1/spi3) */
-		power-domains = <&ps_spi2>;	/* PUBLIC : t600x-pmgr.dtsi definit ps_spi2 (reg 0x200) ; non verifie sur ce noyau */
+		power-domains = <&ps_spi2>;	/* LU : ADT pmgr SPI2 (id 144) -> registre 0x28e580200 = ps_spi2 (reg 0x200) de t600x-pmgr.dtsi ;
+						 * allume (0xff) sous m1n1 seul (traces/20261110-001208_gpio_peek) */
 		clocks = <&clkref>;		/* A VERIFIER : l'ADT dit clock-gates 144 / clock-ids 378 ; macOS voit CCLK 24 MHz */
-		/* INCONNU : pinctrl-0 / broches SPI de spi2 (ni dans l'ADT ni dans linux-asahi). Ne pas deviner. */
+		/* HYPOTHESE (docs/sensor_hw.md, 2026-11-10) : broches gpio0 48, 49, 50 en fonction 1, deja reglees par iBoot
+		 * (meme motif que spi1/spi3/spi4). Non verifie : laisse en commentaire.
+		 * pinctrl-0 = <&spi2_pins>; pinctrl-names = "default";
+		 * &pinctrl_ap { spi2_pins: spi2-pins { pinmux = <APPLE_PINMUX(48, 1)>, <APPLE_PINMUX(49, 1)>, <APPLE_PINMUX(50, 1)>; }; };
+		 */
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";		/* active seulement par le noeud ci-dessous quand on teste */
 
 		mesa: biosensor@0 {
 			compatible = "biosensor,mesa";	/* LU : ADT compatible = [biosensor,mesa] */
-			reg = <0>;			/* ADT : function-spi_cs0 = null() -> CS natif du contrôleur, CS0 probable (hypothese) */
+			reg = <0>;			/* ADT : function-spi_cs0 = null() -> pas de broche CS (broche 51 non configuree) ; hypothese */
 			spi-max-frequency = <8000000>;	/* LU : ADT spi-frequency = 8000000 */
 			/* spi-cpha / spi-cpol : A VERIFIER (phase inconnue, "mesa-spi-clock-phase" jamais lu). Mode 0 par defaut. */
 

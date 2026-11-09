@@ -15,7 +15,7 @@ Ces fichiers n'ont jamais ete compiles ni lances. Ils servent de depart pour un 
 5. Faut-il une phase d'horloge (spi-cpha) pour avoir une reponse coherente ?
 
 ## Ce qui reste inconnu
-- Adresse exacte de spi2 (devinee), horloge, type d'interruption.
+- Horloge, type d'interruption. (Adresse de spi2 et alimentation ps_spi2 : lues. Broches 48/49/50 : hypothese.)
 - Chip-select, phase, sens actif de l'alimentation (flags 0x101), unite des delais.
 - Le reset du capteur : il semble passer par l'AOP, rien de public sous Linux. Sans lui, l'alimentation seule peut ne pas suffire.
 - Faut-il envoyer une demande avant le statut ? Le module lit sans rien envoyer.
