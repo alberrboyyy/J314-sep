@@ -113,3 +113,8 @@ Classe 4 — non bloquantes
 - Nœud DT capteur : spi2, 8 MHz, IRQ gpio0 195, alim gpio0 0xc4 (ADT-1). Reste inconnu : chip-select, phase, reset (via l'AOP).
 - SKS (question « le SEP refuse-t-il 0x09 avant le mot de passe ? ») : non tranchée sans écriture ; sera visible à l'étape 6 (SEP piloté par Linux seul).
 - Reste : étape 6 (décision d'Albert : Linux qui boote sur le Mac + SEPOS), puis étape 7.
+
+## Mise à jour 2026-11-09 (soir) : le SEP sous m1n1 seul
+- VU : le SEP répond à GETRAND (EP 0xFF) sans macOS (traces/20261109-212150_sep_getrand, 4 octets). Boîtes vides au repos, compteurs ≠ 0 (traces/20261109-210517_sep_peek).
+- Doc publique (m1n1 `proxyclient/m1n1/hw/sep.py`, docs Asahi « SEP boot flow ») : la séquence de boot est GET_STATUS (0x66) → BOOT_TZ0 → GET_STATUS → BOOT_IMG4 (+ SET_SHMEM sur 0xFE). C'est l'OS (ou m1n1) qui envoie le firmware SEPOS ; iBoot ne fait que le précharger. Si SEPOS tourne déjà quand m1n1 prend la main : non documenté, hypothèse « plutôt non ».
+- DÉCISION (Claude, d'après CLAUDE.md) : pas d'autre message vers le SEP pour l'instant. GET_STATUS serait un 2e test d'écriture à faible valeur (GETRAND a déjà montré que la ROM répond). La suite réelle = BOOT_TZ0/BOOT_IMG4 (étape 6, fichier IMG4 : hors périmètre agent, réservé Albert).
