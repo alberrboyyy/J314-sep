@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 23:00 — Claude (driver) — Squelette Linux du capteur, hors ligne
+- Trace : traces/20261108-162919_adt/mesa.txt (lecture seule)
+- Fait : driver/linux/ : fragment DT (spi2, 8 MHz, IRQ gpio0 195, alim gpio0 0xc4, délais 7/10), module spi `mesa_probe` (enable=0 par défaut, lecture 16 o du statut, aucun envoi SEP), README. `.gitignore` : `linux/` -> `/linux/` pour pouvoir versionner driver/linux.
+- Vu : rien de nouveau (aucun hardware, rien compilé).
+- Interprété : adresse spi2, horloge, type d'IRQ, CS, phase, polarité/unité des délais = suppositions marquées dans le .dtsi ; reset via AOP inconnu.
+
 ## 2026-11-09 22:20 — Albert, Claude — Après SEP-BOOT : retour sous macOS
 - Rapport d'Albert : macOS démarre, tout va bien, **mais il a dû se reconnecter à son compte Apple** (iCloud).
 - Interprété (hypothèse) : effet de bord probable du démarrage du SEP par m1n1 (le SEP a perdu/invalidé un état lié aux jetons du compte), puisque ~20 reboots/captures sous hyperviseur avant n'avaient rien provoqué de tel (aucun signalement). Non prouvé : Touch ID non testé dans ce message.
