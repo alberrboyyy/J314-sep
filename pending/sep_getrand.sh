@@ -35,7 +35,7 @@ iface = UartInterface()
 p = M1N1Proxy(iface, debug=False)
 bootstrap_port(iface, p)
 buf = p.malloc(16)
-n = p.call(p.get_base() + int(os.environ["SYMOFF"], 16), buf, 4)
+n = p.call(p.get_base() + int(os.environ["SYMOFF"], 16) - 0x10000, buf, 4)  # adresse vérifiée par tools/check_sep_sym.sh
 data = iface.readmem(buf, 4) if n == 4 else b""
 print("getrand OK, 4 octets : " + data.hex(" ") if n == 4 else f"getrand : {n} octet(s) (pas de réponse)")
 p.free(buf)

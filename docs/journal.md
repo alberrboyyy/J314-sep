@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 21:20 — Claude — Correction SEP-GETRAND : le plantage venait de MON adresse
+- Trace : traces/20261109-211835_check_sym et traces/20261109-211849_check_sym (tools/check_sep_sym.sh : lecture de 16 octets de m1n1, rien d'autre)
+- Vu : à base+0x40e40 (adresse que j'avais appelée) la mémoire contient des NOP ; la fonction sep_get_random est à base+0x30e40 (contrôle : octets lus = octets attendus, « ADRESSE BONNE »). Le décalage est celui de 0x10000 entre l'adresse du fichier ELF et le chargement du .bin.
+- Interprété : le 1er essai (211028) a sauté dans une zone de NOP, pas dans la fonction : **il ne dit rien sur le SEP**, et le message GETRAND n'a très probablement jamais été envoyé. La conclusion « le SEP fait planter m1n1 » de l'entrée précédente est **retirée**. pending/sep_getrand.sh corrigé (-0x10000), non relancé.
+- Incidents : aucun cette fois ; Mac en mode proxy.
+
 ## 2026-11-09 21:10 — Albert (lancé), Claude (noté) — SEP-GETRAND : m1n1 plante au premier appel
 - Trace : traces/20261109-211028_sep_getrand (meta, chainload.log, getrand.log)
 - Fait : pending/sep_getrand.sh lancé par Albert ; appel de sep_get_random (offset 0x40e40 du m1n1 chargé).
