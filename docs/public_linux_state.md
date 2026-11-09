@@ -216,3 +216,63 @@ Sources relues : https://asahilinux.org/docs/hw/soc/sep/ (sections « Endpoint i
   partent sur 0xFF, seul SET_SHMEM part sur 0xFE. Les deux ne concordent pas : le rôle exact de 0xFE et 0xFF
   dans la doc est probablement imprécis ; se fier au code, et à nos traces.
 - Nos traces n'en disent rien de plus : l'état de SEPOS reste à trancher (cf. journal du 2026-11-09 21:21).
+
+---
+
+## 2026-11-09 — SPI t6001 (contrôleurs, horloges, pinctrl, absence de mesa)
+
+Documentaliste. Sources : linux-asahi branche `asahi`, fichiers bruts
+`https://raw.githubusercontent.com/AsahiLinux/linux/asahi/arch/arm64/boot/dts/apple/<fichier>` lus le 2026-11-09
+(numéros de ligne de cette lecture ; branche rebasée, ils peuvent bouger). Mainline `drivers/spi/spi-apple.c` (530 l.).
+
+### A. Ce que le DT public décrit pour t600x (M1 Pro/Max)
+- [public] Seuls `spi1` et `spi3` existent : `t600x-die0.dtsi:653-665` et `:667-679`.
+  - spi1 : `reg = <0x3 0x9b104000 0x0 0x4000>`, `interrupts = <AIC_IRQ 0 1107 LEVEL_HIGH>`, `clocks = <&clk_200m>`,
+    `pinctrl-0 = <&spi1_pins>`, `power-domains = <&ps_spi1>`, `status = "disabled"`, compatible
+    `"apple,t6000-spi", "apple,spi"`.
+  - spi3 : `reg = <0x3 0x9b10c000 0x0 0x4000>`, IRQ 1109, `clocks = <&clkref>`, `pinctrl-0 = <&spi3_pins>`,
+    `power-domains = <&ps_spi3>`, `disabled`.
+- [public] **Il n'y a PAS de nœuds `spi0`, `spi2`, `spi4`**, ni désactivés : `grep spi` sur t600x-die0/dieX/common,
+  t6000/t6001.dtsi ne donne que spi1 et spi3 (+ `spi1_pins`/`spi3_pins` dans `t600x-gpio-pins.dtsi:39-51`).
+- [public] Horloges : fixes, `t600x-common.dtsi:427-433` `clkref` = 24 000 000 Hz ; `:434-440` `clk_200m` = 200 MHz.
+  Ce sont des `fixed-clock`, pas de gate PMGR. Le pilote fait `devm_clk_get_enabled` (`spi-apple.c:474`) et calcule
+  le diviseur avec `clk_get_rate` (l.201). **Cohérent avec nos traces** [trace] : spi1 200 MHz, spi2/3/4 24 MHz
+  (`hv_uart.log:176,182-184`) -> spi2 et spi4 auraient `clocks = <&clkref>` comme spi3.
+- [public] Power-domains : `t600x-pmgr.dtsi` définit **ps_spi0** (reg 0x1f0, l.942), **ps_spi1** (0x1f8, l.951),
+  **ps_spi2** (0x200, l.960), **ps_spi3** (0x208, l.969), **ps_spi4** (0x210, l.978), tous enfants de `ps_spi_p`
+  (0x1e8, l.933, lui-même sous `ps_sio`). Donc le domaine d'alimentation de spi2 et spi4 existe déjà dans le DT public,
+  il manque seulement le nœud du contrôleur.
+- [public] Pinctrl : `spi1_pins` = broches 10, 11, 32, 33 ; `spi3_pins` = 52, 53, 54, 55, toutes `APPLE_PINMUX(n, 1)`
+  (`t600x-gpio-pins.dtsi:39-51`). Pas de `spi2_pins`/`spi4_pins`. (À titre de comparaison t8103 : spi0 67-69,
+  spi1 42-45, spi3 46-49, `t8103.dtsi:1114-1133`.) Le numéro de fonction « 1 » est celui des SPI connus ; pour
+  spi2/spi4 de t6001 les broches sont **non trouvées dans les sources publiques**.
+- [public] t8103 (M1) : spi0 `0x235100000` IRQ 614, spi1 `0x235104000` IRQ 615, spi3 `0x23510c000` IRQ 617
+  (`t8103.dtsi:834-875`) ; `spi2` absent aussi, alors que trace_mesa.py l'utilise sur M1 (`/arm-io/spi2`).
+
+### B. Écart d'adresse et IRQ
+- [public] spi1 = 0x39b104000, spi3 = 0x39b10c000 : écart 0x8000 pour deux numéros, soit **0x4000 par contrôleur**
+  (la taille `reg` est 0x4000). Même pas sur t8103 (0x235100000 / 04000 / 0c000) et IRQ qui suivent le numéro
+  (614, 615, 617 ; 1107, 1109).
+- [déduit] Donc spi2 = **0x39b108000** (spi0 = 0x39b100000, spi4 = 0x39b110000) et IRQ spi2 = **1108**, spi4 = 1110.
+  Hypothèse par régularité, **pas écrite dans une source publique** : à confirmer avec l'ADT (`reg`/`interrupts`
+  du nœud `spi2`) avant toute utilisation. Attention : `t600x-die0.dtsi:725` utilise l'IRQ 1111 pour autre chose
+  (nœud suivant), donc 1110 n'est pas contredit mais vérifier l'ADT. Pour la numérotation IRQ sur die 1 (t6002),
+  `AIC_IRQ` prend le premier argument en die ; non pertinent pour t6001 (1 die).
+- [trace] Aucune trace ni doc locale ne contient 0x39b108000 (grep traces/ docs/ vide) : adresse non vérifiée.
+
+### C. Capteur Touch ID / GPIO d'alimentation
+- [public] Aucun DT public (t600x-*, t6001-j314c/j316c, t8103*, spi1-nvram.dtsi) ne contient `mesa`, `biosensor`,
+  `touchid`, ni nœud fingerprint. Seule mention : Kconfig `SPI_APPLE` « … or fingerprint sensor » (voir §2.1).
+- [public] Seul nœud client SPI actif sur t6001-j314/316 : `hid-transport@0` sur spi3
+  (`t600x-j314-j316.dtsi:357-376`) avec `spien-gpios = <&pinctrl_ap 194 0>` (GPIO d'activation du SPI HID) et
+  IRQ via `pinctrl_nub 6`. C'est le **seul modèle public** de « GPIO d'alimentation/enable » d'un périphérique SPI
+  Apple ; rien pour mesa.
+- [public] GPIO d'alimentation de mesa : seulement `0xc4: "mesa_pwr"` dans m1n1 `trace_mesa.py:53-56` (machine M1 de
+  l'auteur, `/arm-io/gpio0`). **Non trouvé dans les sources publiques pour t6001** ; à lire dans l'ADT
+  (`function-mesa-reset-ntfy`, etc., voir `docs/sensor_hw.md`).
+- [déduit] Un nœud DT de départ pour mesa : copier le motif spi3 (`clocks=<&clkref>`, `power-domains=<&ps_spi2>`,
+  `pinctrl-0` à créer, IRQ à confirmer) — tous les chiffres propres à mesa restent à prendre dans l'ADT.
+
+### D. Contradictions avec nos traces
+- Aucune : la doc publique est seulement incomplète (pas de spi2/spi4 dans le DT, pas de mesa). Les 4 contrôleurs vus
+  dans la trace macOS ne sont pas tous décrits par Linux.

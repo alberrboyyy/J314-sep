@@ -776,3 +776,10 @@ Format :
 - Phase 1 (traces seules) décidée. Passage en phase 2 (kexts) si le jalon 1 est prometteur.
 - Hôte : PC Ryzen sous Arch. Cible : MacBook Pro 14" M1 Max.
 - Contrainte : hyperviseur m1n1 = macOS 13.5 uniquement → volume macOS 13.5 dédié au tracing.
+
+## 2026-11-09 — documentaliste — SPI t6001 dans le DT public Linux
+- Source : linux-asahi `asahi`, t600x-die0.dtsi, t600x-pmgr.dtsi, t600x-gpio-pins.dtsi, t600x-common.dtsi (lus en ligne).
+- Vu : seuls spi1 (0x39b104000, IRQ 1107, clk_200m) et spi3 (0x39b10c000, IRQ 1109, clkref) sont décrits ; pas de
+  spi0/spi2/spi4, même désactivés. Mais ps_spi0..ps_spi4 existent dans le PMGR. Pas de pinctrl spi2/spi4. Pas de mesa.
+- Déduit (hypothèse) : pas de 0x4000 par contrôleur => spi2 = 0x39b108000, IRQ 1108. Rien en trace à ce jour. À lire dans l'ADT.
+- Détail et lignes : docs/public_linux_state.md, section « 2026-11-09 — SPI t6001 ».
