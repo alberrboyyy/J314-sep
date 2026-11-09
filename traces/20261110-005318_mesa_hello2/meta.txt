@@ -1,0 +1,6 @@
+date: 20261110-005318
+name: mesa_hello2
+m1n1_commit: 70757dc7
+proxy_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00
+chainload: oui
+writes: gpio0 pin196 (alim capteur), spi2 (mode scruté), trames 0x78 0x10 0x70 0x13 ; rien vers le SEP
