@@ -30,7 +30,18 @@ from m1n1.proxyutils import ProxyUtils, bootstrap_port
 from m1n1.hw.sep import SEP
 iface = UartInterface(); p = M1N1Proxy(iface, debug=False); bootstrap_port(iface, p)
 u = ProxyUtils(p)
-sep = SEP(p, iface, u)
+# Le constructeur SEP() de m1n1 appelle dart_init avec l'ancienne signature (crash constaté le 2026-11-09 21:5x :
+# mauvais type de DART). On le construit à la main avec la bonne : dart_init(base, 0, keep_pts=0, type=T6000=2).
+from collections import defaultdict, deque
+from m1n1.trace.asc import ASCRegs
+sep = SEP.__new__(SEP)
+sep.i, sep.p, sep.u = iface, p, u
+sep.sep_base = u.adt["/arm-io/sep"].get_reg(0)[0]
+sep.dart_base = u.adt["/arm-io/dart-sep"].get_reg(0)[0]
+sep.asc = ASCRegs(u, sep.sep_base)
+sep.dart_handle = p.request(p.P_DART_INIT, sep.dart_base, 0, 0, 2)
+sep.epnum2name, sep.epname2num, sep.msgs = {}, {}, defaultdict(deque)
+print(f"dart_handle={sep.dart_handle:#x}", flush=True)
 print("boot SEP (public m1n1 sequence)...", flush=True)
 sep.boot()
 print("BOOT OK", flush=True)

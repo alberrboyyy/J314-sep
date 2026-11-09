@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 22:00 — Albert (lancé), Claude (noté) — SEP-BOOT : plantage de m1n1 avant tout message au SEP
+- Trace : sortie console du lancement de pending/sep_boot.sh (pas de dossier de trace : crash avant l'écriture des logs).
+- Vu : « Exception: SYNC / data abort » dans m1n1 pendant `dart_map` (create_shmem), avant tout `send_msg` ; Mac redémarré par m1n1.
+- Interprété : incompatibilité du code Python public `SEP.__init__` avec ce m1n1 : `dart_init` côté C prend (base, device, keep_pts, type), le Python passe (base, sid, type) → type de DART faux (T8020 au lieu de T6000). Aucun message n'a été envoyé au SEP (le boot commence après create_shmem). Script corrigé (DART T6000 explicite), non relancé.
+- Incidents : reboot du Mac (prévu). 
+
 ## 2026-11-09 22:00 — Claude (documentaliste) — Sources publiques : EP 0xFF et passage SEPROM → SEPOS
 - Trace : — (sources publiques seulement ; détail dans docs/public_linux_state.md §5)
 - Vu : m1n1 `sep.py` donne les messages de l'EP 0xFF : GET_STATUS=2 (réponse 0x66), BOOT_TZ0=5, BOOT_IMG4=6 ; GETRAND=16 (réponse 116). Doc Asahi : iBoot précharge, XNU amorce (boottz0 puis IMG4). Le mot SEPROM n'est pas dans la doc.

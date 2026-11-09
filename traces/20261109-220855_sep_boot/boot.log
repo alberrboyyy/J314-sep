@@ -1,0 +1,57 @@
+TTY> Heap limit: 0x10010d38000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+boot SEP (public m1n1 sequence)...
+TTY> Exception: SYNC
+TTY> Exception taken from EL2h
+TTY> Running in EL2
+TTY> MPIDR: 0x80000000
+TTY> Registers: (@0x10005effc00)
+TTY>   x0-x3: 0000000008d58000 0000000000001de8 000fff0000000003 0000000008d58000
+TTY>   x4-x7: 000fff0010d4c003 0000000000004000 0000010005b32958 0000010008d5c030
+TTY>  x8-x11: 0000010006544f10 0000000000008000 0000010005ec2b18 0000000000000000
+TTY> x12-x15: 00000100067bc010 0000010005b25380 0000000000000760 0000000000000000
+TTY> x16-x19: 0000000000000000 0000000000000000 0000000000000039 0000000000030000
+TTY> x20-x23: 0000000000000000 00000000beef0000 0000010010d4c000 0000000000004000
+TTY> x24-x27: 00000000beef4000 0000010006544ed0 0000000000000001 0000000000000004
+TTY> x28-x30: 0000000000000000 0000010005effe00 0000010005a47650
+TTY> PC:       0x10005a4765c (rel: 0x1765c)
+TTY> SP:       0x10005effd00
+TTY> SPSR:     0x20000009
+TTY> FAR:      0x8d59de8
+TTY> ESR:      0x96000006 (data abort (current))
+TTY> L2C_ERR_STS: 0x11000ffc00000000
+TTY> L2C_ERR_ADR: 0x0
+TTY> L2C_ERR_INF: 0x0
+TTY> E_LSU_ERR_STS: 0x0
+TTY> E_FED_ERR_STS: 0x0
+TTY> E_MMU_ERR_STS: 0x0
+TTY> Unhandled exception, rebooting...
+Traceback (most recent call last):
+  File "<stdin>", line 10, in <module>
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hw/sep.py", line 105, in boot
+    self.create_shmem()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hw/sep.py", line 102, in create_shmem
+    self.p.dart_map(self.dart_handle, self.SHMEM_IOVA, self.shmem, 0x30000)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 1125, in dart_map
+    return self.request(self.P_DART_MAP, dart, iova, bfr, len)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 758, in request
+    return self._request(opcode, *args2, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 722, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 401, in proxyreq
+    return self.reply(self.REQ_PROXY)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 204, in readfull
+    block = self.dev.read(size - len(d))
+  File "/usr/lib/python3.14/site-packages/serial/serialposix.py", line 595, in read
+    raise SerialException(
+        'device reports readiness to read but returned no data '
+        '(device disconnected or multiple access on port?)')
+serial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
