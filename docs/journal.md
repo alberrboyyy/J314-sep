@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-09 22:10 — Albert (lancé), Claude (noté) — SEP-BOOT : SEPOS démarre depuis m1n1 seul
+- Trace : traces/20261109-221029_sep_boot (pending/sep_boot.sh corrigé : DART T6000 explicite)
+- Fait : séquence publique m1n1 (GET_STATUS → BOOT_TZ0 → GET_STATUS → BOOT_IMG4 + SET_SHMEM) avec le firmware SEPFW déjà en RAM, puis écoute 30 s.
+- Vu : « BOOT OK » (les 4 réponses attendues reçues). Endpoints annoncés sur 0xFD : **7 sur 12** — cntl 0x00, hdcp 0x0e, xars 0x10, xarm 0x13, hibe 0x14, pnon 0x15, stac 0x18. **Absents** : sbio 0x08, scrd 0x0a, sse 0x0c, sks 0x12, skdl 0x17. Messages en attente non lus : 3 sur EP 0x00, 1 sur EP 0x13 (contenu non affiché par le script, perdu).
+- Interprété (hypothèse) : SEPOS tourne et attend l'AP (xART/politique de boot) ; les services biométrie/clés (sbio, sks…) ne sont annoncés qu'après ces échanges, comme sous macOS où xart/pnon passent d'abord. Non établi. Le message en attente sur 0x13 est probablement une demande xART.
+- Suite : répondre à xART/pnon = écriture vers 0x13/0x15, lignes rouges → script pending/ + décision d'Albert. Rien fait. Contrôle demandé à Albert : redémarrer sous macOS, ouvrir la session, tester Touch ID.
+- Incidents : aucun.
+
 ## 2026-11-09 22:00 — Albert (lancé), Claude (noté) — SEP-BOOT : plantage de m1n1 avant tout message au SEP
 - Trace : sortie console du lancement de pending/sep_boot.sh (pas de dossier de trace : crash avant l'écriture des logs).
 - Vu : « Exception: SYNC / data abort » dans m1n1 pendant `dart_map` (create_shmem), avant tout `send_msg` ; Mac redémarré par m1n1.

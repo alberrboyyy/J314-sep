@@ -1,0 +1,14 @@
+TTY> Heap limit: 0x10010444000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+dart_handle=0x10005c50ed0
+boot SEP (public m1n1 sequence)...
+BOOT OK
+Endpoints annoncés :
+  0x00 cntl
+  0x0e hdcp
+  0x10 xars
+  0x13 xarm
+  0x14 hibe
+  0x15 pnon
+  0x18 stac
+Messages restants par EP : {'0x13': 1, '0x0': 3}
