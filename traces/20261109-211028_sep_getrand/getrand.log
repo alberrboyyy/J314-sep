@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "<stdin>", line 9, in <module>
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 770, in call
+    return self.request(self.P_CALL, addr, *args, reboot=reboot)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 758, in request
+    return self._request(opcode, *args2, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 722, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 401, in proxyreq
+    return self.reply(self.REQ_PROXY)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 314, in reply
+    self.handle_boot(data)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 333, in handle_boot
+    reason = START(reason)
+  File "/usr/lib/python3.14/enum.py", line 709, in __call__
+    return cls.__new__(cls, value)
+           ~~~~~~~~~~~^^^^^^^^^^^^
+  File "/usr/lib/python3.14/enum.py", line 1194, in __new__
+    raise ve_exc
+ValueError: 4 is not a valid START

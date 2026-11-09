@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-09 21:10 — Albert (lancé), Claude (noté) — SEP-GETRAND : m1n1 plante au premier appel
+- Trace : traces/20261109-211028_sep_getrand (meta, chainload.log, getrand.log)
+- Fait : pending/sep_getrand.sh lancé par Albert ; appel de sep_get_random (offset 0x40e40 du m1n1 chargé).
+- Vu : m1n1 rechargé OK (ADT, proxy vivant), puis à l'appel : « ValueError: 4 is not a valid START » côté PC (le Mac a envoyé un message de reprise inattendu) ; Albert : « acm device closed » affiché, puis **le Mac a redémarré tout seul**. Aucune réponse GETRAND lue.
+- Interprété (hypothèse) : soit l'adresse appelée n'est pas la bonne (base de m1n1 ≠ base + offset ELF), soit l'envoi/attente sur la boîte du SEP a fait planter m1n1. Non tranché. Un redémarrage est le mode d'échec prévu ; aucune donnée touchée.
+- Incidents : reboot du Mac. Pas de nouvelle tentative sans accord d'Albert ; un « peek » de contrôle a été proposé puis refusé par Albert.
+
 ## 2026-11-09 21:05 — Claude — SEP-PEEK : état du SEP sous m1n1 seul (lecture seule)
 - Trace : traces/20261109-210517_sep_peek (tools/sep_peek.sh : 3 lectures de registres d'état, aucune écriture, aucun message dépilé)
 - Vu : base 0x396400000 ; CPU_CONTROL = 0 (RUN bit4 = 0) ; boîte AP→SEP et SEP→AP : vides, activées, non pleines ; compteurs de lecture/écriture ≠ 0 (5/5 et 6/6).
