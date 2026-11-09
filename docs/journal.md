@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 21:05 — Claude — SEP-PEEK : état du SEP sous m1n1 seul (lecture seule)
+- Trace : traces/20261109-210517_sep_peek (tools/sep_peek.sh : 3 lectures de registres d'état, aucune écriture, aucun message dépilé)
+- Vu : base 0x396400000 ; CPU_CONTROL = 0 (RUN bit4 = 0) ; boîte AP→SEP et SEP→AP : vides, activées, non pleines ; compteurs de lecture/écriture ≠ 0 (5/5 et 6/6).
+- Interprété (hypothèse) : des messages ont déjà circulé dans les deux sens depuis le boot (iBoot ↔ SEP), puis tout a été consommé : la boîte n'est pas « vierge ». CPU_CONTROL = 0 ne prouve pas que le SEP est arrêté : ce registre pilote le démarrage d'un ASC classique, et le SEP est lancé par iBoot autrement (non établi). Donc **inconnu** : si SEPOS tourne déjà sous m1n1 seul. Pour trancher il faudrait un message de découverte, donc une écriture.
+- Incidents : aucun. Mac reste en mode proxy.
+
 ## 2026-11-09 — sceptique — Tranchage des lignes « vérifié (proposé) »
 - Trace : — (relecture de docs/verification_status.md, journal, driver/tests ; aucun hardware, aucune écriture SEP)
 - Fait : règle CLAUDE.md « Qui décide quoi » appliquée. Sens de `vérifié` précisé : comportement observé de macOS, reproductible ; jamais « le SEP exige ».
