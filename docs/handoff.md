@@ -1,0 +1,21 @@
+Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 et 10).
+
+## Albert et la façon de travailler
+- Français simple, courtes réponses, souvent depuis son téléphone. IL NE COMPREND PAS LE JARGON (étapes, EP, « proposé vérifié »…). Décide seul tout le technique ; ne lui demande que ce qui peut abîmer le Mac ou écrit vers le SEP, en une phrase (quoi, ce qui peut rater, oui/non). Tout ce qu'il doit lancer : commande prête à coller avec `! `.
+- Autonomie : captures/reboots via tools/boot_and_trace.sh, sous-agents (analyste, lecteur-logs, sceptique, tracer, documentaliste, driver) sans demander. Quota limité. Appel : ./tools/appel_albert.sh "consigne courte".
+- Lignes rouges (CLAUDE.md) : pas de sudo/bputil/kmutil/csrutil/nvram/dd/partitionnement ; le hardware passe par tools/*.sh ; toute écriture SEP = script dans pending/ avec en-tête (but, risque, résultat), Albert le lance ; rien vers Asahi ; traces/ en lecture seule ; pas de copie de code Apple ; info de kext marquée `source: kext`. Exception : sur le Linux de test root@10.67.0.94 uniquement, root via tools/linux_ssh.sh (son filtre refuse les commandes contenant « sep », « xart », 0x10/12/13/15, disques, m1n1… : évite ces chaînes dans les commandes).
+- Commits fréquents, attribution demandée par le harness. Albert a un backup de sa partition Linux (c'est tout ce qui lui importe) ; la reconnexion iCloud qu'il a subie après le boot SEP par m1n1 est de cause non établie (2 reboots natifs ensuite sans souci).
+
+## Résultats acquis (tout commité)
+- Captures C1-C16 (K-E1 terminée : TAG 0x01 suit le keybag, 0x209@lock, 0x228@mdp, 0x208@doigt ; 0 TAG 0x01 pendant invites en session ouverte).
+- Statuts : init 57 commandes, structure 0x65 + CRC, boucle 0x6c→0x6d = « vérifié (macOS) » (= ce que macOS fait, pas ce que le SEP exige). driver/ (sepreplay, 29 tests) rejoue tout hors ligne.
+- ADT : capteur `biosensor,mesa` sous spi2 (0x39B108000, 8 MHz, IRQ AIC 1108, CS natif), mesa_pwr = gpio0 0xc4, IRQ gpio0 195. Broches SPI et domaine pmgr de spi2 INCONNUS (pas dans ADT ni linux-asahi ; le DT vivant du Linux de test n'a ni ps_spi2 ni pinctrl spi2).
+- SEP sous m1n1 seul : peek lecture seule OK ; GETRAND (EP 0xFF) répond ; pending/sep_boot.sh (code public m1n1, DART T6000) a démarré SEPOS : « BOOT OK », 7/12 endpoints (cntl hdcp xars xarm hibe pnon stac), sans sbio/sks/scrd/sse/skdl.
+- Dans 19/19 boots macOS, sbio etc. sont annoncés ~0,12 s après la réponse de l'AP à l'échange xART (EP 0x13). xART = coffre : le SEP confie des blobs, l'AP les lui rend au boot suivant (état du disque macOS, jamais capturé). Rejeu impossible sans ce contenu, et risqué (macOS/FileVault/trousseau). Décision : aucune réponse 0x13/0x15, aucune capture des blobs, pas de nouveau boot SEP.
+- Linux de test (Fedora Asahi Remix, 10.67.0.94) : gcc/make/git/dtc/kernel-devel installés ; driver/linux/mesa_probe.ko compile (enable=0 par défaut, lecture seule). DT vivant sans __symbols__, pas de configfs d'overlay.
+
+## Où on en est / options (à proposer à Albert simplement)
+1. Lire le power-state de spi2 côté macOS dans l'ADT pmgr (script tools/ en lecture seule, m1n1 en mode proxy) pour trouver le domaine d'alimentation ; broches toujours introuvables.
+2. Ou s'arrêter sur les acquis. Étape 6 (faire parler Linux au SEP complet) bloquée par xART : seule voie = Linux qui tient son propre coffre xART sur un SEP remis à zéro (réinstallation/effacement de macOS : détruit les données macOS ; non testé, non décidé).
+3. Reste ouvert : SKS-1 (le SEP refuse-t-il 0x09 avant le mot de passe ? hypothèse « oui, le SEP » ; tranche seulement par une écriture), 2e 0x209 inexpliqué après chaque lock, cause iCloud.
+État du Mac à la fin de la session : démarré sur la partition Asahi de test (pas en mode proxy m1n1) ; /dev/ttyACM* absent tant qu'Albert ne le remet pas en proxy.
