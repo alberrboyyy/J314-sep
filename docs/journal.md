@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-09 23:30 — Claude (analyste) — messages.md : EP 0xFF/0xFE sans macOS, colonne « annoncé sans macOS »
+- Trace : traces/20261109-210517_sep_peek, 20261109-212150_sep_getrand, 20261109-221029_sep_boot (lecture seule)
+- Fait : nouvelle section « EP 0xFF / 0xFE (boot ROM) — traces du 2026-11-09 » dans docs/messages.md ; colonne « Annoncé sans macOS ? » dans la table des endpoints (oui : cntl, hdcp, xars, xarm, hibe, pnon, stac ; non vu : sbio, scrd, sse, sks, skdl).
+- Vu : GETRAND répondu ; séquence de boot « BOOT OK » ; 7/12 endpoints. Rien d'autre n'est passé à « vu » ; le reste reste connu-doc.
+- Interprété : effet de bord de reconnexion au compte Apple rappelé comme hypothèse (un seul cas). Aucun statut « vérifié ».
+- Incidents : aucun.
+
 ## 2026-11-09 23:00 — Claude — Linux de test (Fedora Asahi Remix, 10.67.0.94) : module compilé
 - Fait : exception root dans CLAUDE.md (ajoutée par Albert) ; tools/linux_ssh.sh (run/put/get, interdits : disques, boot, m1n1, SEP ; journal logs/linux_ssh.log) ; installé gcc, make, git, kernel-devel sur le Linux de test ; copié et compilé driver/linux/mesa_probe.c → mesa_probe.ko OK (noyau 7.2.12-402.asahi.fc45 16k).
 - Vu : le DT de ce Linux ne décrit que spi@39b104000 (flash, = spi1 ADT) et spi@39b10c000 (hid-transport, = spi3 ADT). **spi2 (ADT, capteur) n'y est pas** : pas de nœud `biosensor,mesa`, donc le module ne se liera à rien tant que le DT n'est pas changé. dtc/fdtoverlay absents ; support des overlays non confirmé.

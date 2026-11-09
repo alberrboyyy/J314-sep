@@ -31,23 +31,23 @@ le noyau numérote les endpoints en décimal.
 Nom annoncé = DATA ASCII de `< EP=0xFD TYPE=0x00 PARAM=<ep>` (C1 L16-38, L108-124, L161), lu par le tracer (`# epname`).
 Tailles CNTL = DATA de `> EP=0x00 TYPE=0x04` / `TYPE=0x05` pour cet endpoint (voir section CNTL).
 
-| EP | Nom annoncé (C1) | FD TYPE 1 DATA (C1) | Tailles CNTL T4 / T5 (C1) | Rôle | Statut | Source |
-|----|------------------|---------------------|---------------------------|------|--------|--------|
-| 0x00 | `cntl` (L22) | 0x00000000 (L23) | — | propriétés / activation des endpoints | connu-doc (rôle) ; nom : hypothèse | doc-asahi ; trace:C1 |
-| 0x08 | `sbio` (L108) | 0x01010101 (L109) | 0x4000 / 0x4000 (L142-149) | authentification biométrique (Touch ID) | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x0a | `scrd` (L123) | 0x01010101 (L124) | 0x4000 / 0x4000 (L216-223) | credentials utilisateur (probable) | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x0c | `sse ` (L117) | 0x01010101 (L118) | 0x4000 / 0x4000 (L1554-1561, activé seulement à 03:38:07) | NFC / Apple Pay | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x0e | `hdcp` (L37) | 0x01010101 (L38) | 0x4000 / 0x4000 (L41-48) | HDCP | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x10 | `xars` (L25) | 0x02020202 (L26) | aucune séquence CNTL vue | xART setup | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x12 | `sks ` (L161) | 0x02010201 (L162) | 0x8000 / 0x8000 (L163-172) | Secure Key Store | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x13 | `xarm` (L28) | 0x02020202 (L29) | 0x8000 / 0x8000 (L91-98) | xART manager (noyau : « AppleSEPXART (EP: 19) ») | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x14 | `hibe` (L16) | 0x01010101 (L17) | aucune séquence CNTL vue | hibernation | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x15 | `pnon` (L32) | 0x02020404 (L33) | 0x10000 / 0x8000 (L252-259) | boot policy | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x17 | `skdl` (L113) | 0x01010101 (L114) | 0x4000 / 0x4000 (L130-137) | kext deny list | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0x18 | `stac` (L19) | 0x02020202 (L20) | 0x8000 / 0x8000 (L80-87) | trusted accessory | connu-doc (rôle) | doc-asahi ; trace:C1 |
-| 0xFD | (découverte) | — | — | liste des endpoints + tailles OOL | connu-doc | doc-asahi ; m1n1 hw/sep.py |
-| 0xFE | Boot254 | — | — | boot SEPOS / mémoire partagée | connu-doc | doc-asahi ; m1n1 |
-| 0xFF | Boot255 | — | — | ROM de boot SEP | connu-doc | doc-asahi ; m1n1 |
+| EP | Nom annoncé (C1) | FD TYPE 1 DATA (C1) | Tailles CNTL T4 / T5 (C1) | Rôle | Statut | Source | Annoncé sans macOS ? |
+|----|------------------|---------------------|---------------------------|------|--------|--------|----|
+| 0x00 | `cntl` (L22) | 0x00000000 (L23) | — | propriétés / activation des endpoints | connu-doc (rôle) ; nom : hypothèse | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0x08 | `sbio` (L108) | 0x01010101 (L109) | 0x4000 / 0x4000 (L142-149) | authentification biométrique (Touch ID) | connu-doc (rôle) | doc-asahi ; trace:C1 | non vu (absent de SEP-BOOT) |
+| 0x0a | `scrd` (L123) | 0x01010101 (L124) | 0x4000 / 0x4000 (L216-223) | credentials utilisateur (probable) | connu-doc (rôle) | doc-asahi ; trace:C1 | non vu (absent de SEP-BOOT) |
+| 0x0c | `sse ` (L117) | 0x01010101 (L118) | 0x4000 / 0x4000 (L1554-1561, activé seulement à 03:38:07) | NFC / Apple Pay | connu-doc (rôle) | doc-asahi ; trace:C1 | non vu (absent de SEP-BOOT) |
+| 0x0e | `hdcp` (L37) | 0x01010101 (L38) | 0x4000 / 0x4000 (L41-48) | HDCP | connu-doc (rôle) | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0x10 | `xars` (L25) | 0x02020202 (L26) | aucune séquence CNTL vue | xART setup | connu-doc (rôle) | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0x12 | `sks ` (L161) | 0x02010201 (L162) | 0x8000 / 0x8000 (L163-172) | Secure Key Store | connu-doc (rôle) | doc-asahi ; trace:C1 | non vu (absent de SEP-BOOT) |
+| 0x13 | `xarm` (L28) | 0x02020202 (L29) | 0x8000 / 0x8000 (L91-98) | xART manager (noyau : « AppleSEPXART (EP: 19) ») | connu-doc (rôle) | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0x14 | `hibe` (L16) | 0x01010101 (L17) | aucune séquence CNTL vue | hibernation | connu-doc (rôle) | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0x15 | `pnon` (L32) | 0x02020404 (L33) | 0x10000 / 0x8000 (L252-259) | boot policy | connu-doc (rôle) | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0x17 | `skdl` (L113) | 0x01010101 (L114) | 0x4000 / 0x4000 (L130-137) | kext deny list | connu-doc (rôle) | doc-asahi ; trace:C1 | non vu (absent de SEP-BOOT) |
+| 0x18 | `stac` (L19) | 0x02020202 (L20) | 0x8000 / 0x8000 (L80-87) | trusted accessory | connu-doc (rôle) | doc-asahi ; trace:C1 | oui (SEP-BOOT 2026-11-09) |
+| 0xFD | (découverte) | — | — | liste des endpoints + tailles OOL | connu-doc | doc-asahi ; m1n1 hw/sep.py | — |
+| 0xFE | Boot254 | — | — | boot SEPOS / mémoire partagée | connu-doc | doc-asahi ; m1n1 | — |
+| 0xFF | Boot255 | — | — | ROM de boot SEP | connu-doc | doc-asahi ; m1n1 | — |
 
 Vu : les 12 noms annoncés dans C1 correspondent exactement aux 12 endpoints listés par la doc Asahi (aucun en plus,
 aucun en moins). Les annonces 0xFD sont toutes `<` (SEP→AP) ; aucune requête `> EP=0xFD` n'est tracée.
@@ -78,6 +78,39 @@ de 0x4000 ; l'octet 1 = taille T4, l'octet 3 = taille T5 (0x15 : octets 04/04/02
 | 0xFF | > | 0x01 | 0x06 | 0 | 4 | L12 | BOOT_IMG4 ; DATA=4 (m1n1 met l'IOVA du firmware >> 12) | connu-doc (type) | m1n1 | 2026-11-07 |
 | 0xFE | > | 0x01 | 0x1c | 0 | 0x580 | L13 | mémoire partagée : 0x580 << 12 = 0x580000 = « Shmbuf for SEP: slave addr = 0x580000 » (uart L614). m1n1 utilise TYPE 0x18 (SET_SHMEM), macOS 0x1c | hypothèse | trace:C1 ; m1n1 | 2026-11-07 |
 | 0xFF | < | 0x01 | 0x6a | 0 | 0 | L14 | BOOT_IMG4_DONE (« SEP accepted IMG4 », uart L669) | connu-doc | m1n1 | 2026-11-07 |
+
+### EP 0xFF / 0xFE (boot ROM) — traces du 2026-11-09 (sans macOS, m1n1 seul)
+
+Traces : SEP-GETRAND = `traces/20261109-212150_sep_getrand` (`getrand.log`) ; SEP-BOOT = `traces/20261109-221029_sep_boot`
+(`boot.log`) ; état des registres = `traces/20261109-210517_sep_peek`. Journal : entrées du 2026-11-09 21:05 à 22:20.
+Les types et réponses viennent de m1n1 `proxyclient/m1n1/hv/sep.py` / `src/sep.c` (code public) ; `docs/public_linux_state.md` §5.
+
+| EP | Dir | Type | Réponse | Rôle (doc) | Statut | Ce que les traces du 2026-11-09 montrent |
+|----|-----|------|---------|------------|--------|------------------------------------------|
+| 0xFF | > | 2 GET_STATUS | 0x66 | statut de la ROM | connu-doc | VU : inclus dans la séquence SEP-BOOT, qui se termine par « BOOT OK » (le log ne détaille pas chaque message) |
+| 0xFF | > | 5 BOOT_TZ0 | 0x69, puis 0xD2 | amorçage TZ0 | connu-doc | VU : idem (« BOOT OK » = les 4 réponses attendues reçues). 0x69 et 0xD2 non listés individuellement dans boot.log |
+| 0xFF | > | 6 BOOT_IMG4 | 0x6A | amorçage de SEPOS (DATA = IOVA firmware >> 12) | connu-doc | VU : idem. Firmware SEPFW déjà en RAM (`sepfw-loaded = 1` dans `adt_sep.txt` du peek) |
+| 0xFE | > | 0x18 SET_SHMEM | — | mémoire partagée | connu-doc | VU : envoyé dans la même séquence ; pas de réponse attendue |
+| 0xFF | > | 16 GETRAND | 116 | 4 octets aléatoires de la ROM | connu-doc | VU : répondu, 4 octets `6e 0a 78 60` (`getrand.log`), sans macOS. Premier essai (211028) invalide : mauvaise adresse de ma part (journal 21:20) |
+
+VU (faits) :
+- GETRAND : une réponse, aucun plantage (212150).
+- SEP-BOOT : « BOOT OK » ; endpoints annoncés sur 0xFD : **7 sur 12** (cntl, hdcp, xars, xarm, hibe, pnon, stac).
+  **Absents : sbio, sks, scrd, sse, skdl.** Messages restants non lus : 3 sur EP 0x00, 1 sur EP 0x13 (contenu perdu, le script
+  ne l'affichait pas).
+- Peek (210517) : CPU_CONTROL = 0, boîtes vides, compteurs ≠ 0 avant tout message du PC.
+- Effet de bord : après SEP-BOOT, macOS a redémarré normalement mais **Albert a dû se reconnecter à son compte Apple**
+  (journal 22:20). Touch ID non testé.
+
+INTERPRÉTÉ (hypothèses, non vérifiées) :
+- La ROM répond sans macOS ; cela ne prouve pas à lui seul que SEPOS tourne, mais l'annonce 0xFD de 7 endpoints après le boot
+  suggère que SEPOS démarre depuis m1n1 seul.
+- Les 5 endpoints absents seraient annoncés plus tard, après des échanges xART/pnon (macOS les fait en premier). Non établi.
+- Le message en attente sur 0x13 serait une demande xART. Non lu.
+- La reconnexion au compte Apple serait un effet de bord du démarrage du SEP par m1n1 (un état lié aux jetons du compte
+  perdu ou invalidé). Non prouvé : un seul cas, ~20 captures sous hyperviseur avant n'avaient rien provoqué. **Pause** :
+  pas de nouveau boot SEP par m1n1 ni de réponse xART/pnon sans décision d'Albert.
+- Rappel : les lignes C1 ci-dessus (0xFF TYPE 0x1b, 0x1c sur 0xFE, etc.) sont celles de macOS ; les traces d'aujourd'hui ne les revoient pas.
 
 ### CNTL (0x00) — C1 L34-L259, L1554-L1561
 
