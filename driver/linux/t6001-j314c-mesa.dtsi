@@ -15,20 +15,22 @@
 
 /* Le noeud spi2 n'existe pas dans linux-asahi (seuls spi1 et spi3, docs/public_linux_state.md 2.2). */
 &{/soc} {
-	spi2: spi@39b108000 {		/* A VERIFIER : adresse devinee (spi1=39b104000, spi3=39b10c000, pas de 4 KiB x4).
-					 * Le champ "reg" de l'ADT n'a pas ete decode dans mesa.txt. */
+	spi2: spi@39b108000 {		/* LU : ADT spi2 reg = 0x19B108000 (+ base arm-io 0x200000000), taille 0x4000
+					 * (traces/20261108-162919_adt/adt.txt L1042-1055) ; confirme par le pas de spi1/spi3. */
 		compatible = "apple,t6000-spi", "apple,spi";
 		reg = <0x3 0x9b108000 0x0 0x4000>;
 		interrupt-parent = <&aic>;
 		interrupts = <AIC_IRQ 1108 IRQ_TYPE_LEVEL_HIGH>;	/* LU : ADT interrupts = [1108] ; type : A VERIFIER (copie de spi1/spi3) */
+		power-domains = <&ps_spi2>;	/* PUBLIC : t600x-pmgr.dtsi definit ps_spi2 (reg 0x200) ; non verifie sur ce noyau */
 		clocks = <&clkref>;		/* A VERIFIER : l'ADT dit clock-gates 144 / clock-ids 378 ; macOS voit CCLK 24 MHz */
+		/* INCONNU : pinctrl-0 / broches SPI de spi2 (ni dans l'ADT ni dans linux-asahi). Ne pas deviner. */
 		#address-cells = <1>;
 		#size-cells = <0>;
 		status = "disabled";		/* active seulement par le noeud ci-dessous quand on teste */
 
 		mesa: biosensor@0 {
 			compatible = "biosensor,mesa";	/* LU : ADT compatible = [biosensor,mesa] */
-			reg = <0>;			/* A VERIFIER : chip-select inconnu */
+			reg = <0>;			/* ADT : function-spi_cs0 = null() -> CS natif du contrôleur, CS0 probable (hypothese) */
 			spi-max-frequency = <8000000>;	/* LU : ADT spi-frequency = 8000000 */
 			/* spi-cpha / spi-cpol : A VERIFIER (phase inconnue, "mesa-spi-clock-phase" jamais lu). Mode 0 par defaut. */
 
