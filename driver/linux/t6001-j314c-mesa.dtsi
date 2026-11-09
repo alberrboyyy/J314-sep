@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+/*
+ * Fragment de device tree : capteur Touch ID (ADT "biosensor,mesa") sur MacBook Pro 14" j314c / t6001.
+ * HORS LIGNE, JAMAIS TESTE sur du materiel.
+ *
+ * Valeurs LUES dans l'ADT : traces/20261108-162919_adt/mesa.txt (statut "verifie" en tant que lecture, voir
+ * docs/verification_status.md ADT-1). Le role des broches reste une hypothese.
+ * Tout ce qui est marque A VERIFIER est inconnu ou devine ; ne pas s'y fier.
+ *
+ * A inclure apres t6001-j314c.dts, par ex. : #include "t6001-j314c-mesa.dtsi"
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/* Le noeud spi2 n'existe pas dans linux-asahi (seuls spi1 et spi3, docs/public_linux_state.md 2.2). */
+&{/soc} {
+	spi2: spi@39b108000 {		/* A VERIFIER : adresse devinee (spi1=39b104000, spi3=39b10c000, pas de 4 KiB x4).
+					 * Le champ "reg" de l'ADT n'a pas ete decode dans mesa.txt. */
+		compatible = "apple,t6000-spi", "apple,spi";
+		reg = <0x3 0x9b108000 0x0 0x4000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 1108 IRQ_TYPE_LEVEL_HIGH>;	/* LU : ADT interrupts = [1108] ; type : A VERIFIER (copie de spi1/spi3) */
+		clocks = <&clkref>;		/* A VERIFIER : l'ADT dit clock-gates 144 / clock-ids 378 ; macOS voit CCLK 24 MHz */
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";		/* active seulement par le noeud ci-dessous quand on teste */
+
+		mesa: biosensor@0 {
+			compatible = "biosensor,mesa";	/* LU : ADT compatible = [biosensor,mesa] */
+			reg = <0>;			/* A VERIFIER : chip-select inconnu */
+			spi-max-frequency = <8000000>;	/* LU : ADT spi-frequency = 8000000 */
+			/* spi-cpha / spi-cpol : A VERIFIER (phase inconnue, "mesa-spi-clock-phase" jamais lu). Mode 0 par defaut. */
+
+			/* LU : ADT interrupt-parent = 132 = gpio0, interrupts = [195, 3] */
+			interrupts-extended = <&pinctrl_ap 195 IRQ_TYPE_EDGE_BOTH>;	/* "3" = EDGE_BOTH : A VERIFIER */
+
+			/* LU : ADT function-mesa_pwr = 132:GPIO(0xc4, 0x101). 0xc4 = 196. Sens actif (flags 0x101) : A VERIFIER */
+			pwr-gpios = <&pinctrl_ap 196 GPIO_ACTIVE_HIGH>;
+
+			/* LU : power-on-delay = 7, power-off-delay = 10. Unite (ms ?) : A VERIFIER */
+			apple,power-on-delay = <7>;
+			apple,power-off-delay = <10>;
+
+			/*
+			 * INCONNU, volontairement absent :
+			 *  - reset du capteur : "function-mesa_reset" passerait par l'AOP (hypothese, kext) ; rien de public sous Linux ;
+			 *  - alim 1,8 V ("function-mesa_pwr1v8") : non lue dans l'ADT de notre machine ;
+			 *  - canaux DMA / SIO : spi-apple n'utilise pas le DMA.
+			 */
+			status = "disabled";
+		};
+	};
+};
