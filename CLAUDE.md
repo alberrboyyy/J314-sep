@@ -11,7 +11,6 @@ objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le 
 ## Lignes rouges (toutes phases, non négociables)
 
 - **Jamais de matériel Apple leaké** (sources internes, firmwares déchiffrés non publics, dumps). Ne pas en chercher sur le web.
-- **SEPOS, iBoot, firmware SEP : hors périmètre.** Pas de tentative de déchiffrement, pas d'attaque contre le SEP.
 - **Aucune écriture vers le SEP par un agent** : endpoints 0x12 (SKS), 0x13 (xART), 0x10, 0x15, gigalockers, envoi d'IMG4.
   Un agent qui pense qu'une écriture est nécessaire écrit un script dans `pending/` avec un en-tête expliquant
   le but, le risque et le résultat attendu, puis s'arrête. Albert relit et lance.
