@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-10 00:19 — Claude — C17 : premier relevé du bus SPI du capteur sous macOS (registres seulement)
+- Trace : traces/20261110-001859_c17-spi-boot (boot macOS 240 s, sans doigt ; `TRACE_SCRIPT=hv/trace_sep_spi.py` : traceur SEP habituel + registres de spi2 + broches gpio0 48-51 et 195-196, mode ASYNC, aucune écriture). Analyse : `analysis/spi2_transfers.py <dossier> [--sep]`.
+- Vu : 84 échanges SPI. **Aucun accès à TXDATA/RXDATA** : les données passent par DMA (SIO), seuls les compteurs sont visibles. Réglages constants : CLKDIV = 3, CFG = 0x40042 (bit 1 = CPHA dans la table publique m1n1, bits 6:5 = 2), SHIFTCFG 0x80c07, PIN = 0. Tailles : lecture/écriture 0x17 (40 fois, entre presque tous les autres échanges), écritures seules 0x07, 0x0b, 0x2f, 0x40, 0x47, 0x49, 0x4d, 0x56, échanges 0x1b, 0x33, 0x4b, et deux gros envois **0x568e** (21 ms) et **0x70ce** (29 ms).
+- Vu (broches) : macOS n'écrit jamais les broches 48-51 (réglage d'iBoot conservé). Broche 196 : passée en sortie à 0 puis à 1 (alimentation active à l'état haut), avec deux cycles 0→1 de ~11 ms plus tard (t+28,575 et t+28,752) suivis chacun de la même suite d'échanges. Broche 195 : mode interruption, masquée/démasquée en permanence.
+- Vu (ordre) : les échanges SPI alternent avec les commandes SEP de l'EP 0x08 : p. ex. `0x15` → écriture 0x2f ; `0x42` → écriture 0x47 puis échange 0x4b ; `0x5f` (transfert OOL depuis le SEP) → envoi 0x568e ; `0x5d`/`0x5c` → écritures 0x40 ; `0x31` → écriture 0x49 + échange 0x4b ; après t+32 s un échange 0x17 toutes les 0,5 s.
+- Interprété (hypothèse) : l'AP sert de relais : le SEP fournit les blocs à envoyer au capteur (dont un gros bloc par allumage, probablement le correctif du capteur) et reçoit ses réponses ; 0x17 = lecture d'état. Fréquence réelle = 24 MHz / (3+1) = 6 MHz si la formule publique s'applique (l'ADT annonce 8 MHz) : non tranché. Contenu non vu → capture C18 avec lecture des buffers DMA (hv/trace_sep_spi_dma.py).
+- Incidents : aucun (end_reason timeout, m1n1 revenu en proxy).
+
 ## 2026-11-10 00:15 — Claude — spi2 : registre d'alimentation trouvé (hors ligne), broches candidates 48/49/50 (lecture seule)
 - Trace : traces/20261108-162919_adt/adt.bin (hors ligne, analysis/adt_pmgr_ps.py) ; traces/20261110-001208_gpio_peek (tools/gpio_peek.sh : 255 lectures de config de broches gpio0 + 6 lectures de registres d'alimentation pmgr, aucune écriture, rien vers le SEP, spi2 lui-même non lu).
 - Vu (ADT, table pmgr.devices) : SPI2 id 144 (= `clock-gates` du nœud spi2), psreg 9, psidx 0, parent SPI_P → registre PS = pmgr.reg[2] + 0x200 = CPU **0x28e580200**. Contrôle de la formule : SPI1 → +0x1f8, SPI3 → +0x208, SPI4 → +0x210, identiques au fichier public Linux `t600x-pmgr.dtsi` (ps_spi1@1f8, **ps_spi2@200**, ps_spi3@208, ps_spi4@210, parent ps_spi_p).
