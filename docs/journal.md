@@ -14,6 +14,11 @@ Format :
 
 ---
 
+## 2026-11-10 00:20 — Albert, Claude — Contrôle iCloud : 2 reboots natifs sans demande de connexion
+- Rapport d'Albert : deux redémarrages normaux sous macOS, aucun problème de login.
+- Interprété : la déconnexion n'est pas un état durable ; cause toujours non établie (effet unique du boot SEP par m1n1, ou événement indépendant). Pas de preuve contre le boot SEP, mais pas de dégât persistant observé.
+- Suite décidée (Claude, CLAUDE.md) : analyse hors ligne de l'échange xART (EP 0x13) des boots macOS ; aucune écriture SEP.
+
 ## 2026-11-10 00:10 — Claude — Pourquoi 7/12 : ce qui précède sbio dans les boots macOS (lecture seule)
 - Trace : les 19 sep.log de traces/ (C1…C16) ; détail C1 : traces/20261107-033436_c1-boot/sep.log.
 - Vu : macOS envoie exactement la même séquence de boot que m1n1 (GET_STATUS, BOOT_TZ0, GET_STATUS, BOOT_IMG4 + SET_SHMEM) ; 7 endpoints (cntl, hdcp, xars, xarm, hibe, pnon, stac) annoncés ~0,6 s après, avec dès ce moment 1 message `< EP=0x13 TAG=0x02 TYPE=0x0e` et 2-3 messages `< EP=0x00` (0x0d, 0x29…) = **les 4 messages restés en attente dans SEP-BOOT** (1 sur 0x13, 3 sur EP 0). Les 5 autres (sbio…) sont annoncés ~3 s plus tard, **19/19 boots précédés de messages AP→SEP sur EP 0x13 (xART)** dans les 12 lignes d'avant.
