@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 22:00 — Claude (documentaliste) — Sources publiques : EP 0xFF et passage SEPROM → SEPOS
+- Trace : — (sources publiques seulement ; détail dans docs/public_linux_state.md §5)
+- Vu : m1n1 `sep.py` donne les messages de l'EP 0xFF : GET_STATUS=2 (réponse 0x66), BOOT_TZ0=5, BOOT_IMG4=6 ; GETRAND=16 (réponse 116). Doc Asahi : iBoot précharge, XNU amorce (boottz0 puis IMG4). Le mot SEPROM n'est pas dans la doc.
+- Interprété : état du SEP sous m1n1 non écrit publiquement ; SEPOS probablement pas amorcé (hypothèse). Désaccord doc/code sur le rôle de 0xFE/0xFF noté pour le sceptique.
+- Incidents : aucun.
+
 ## 2026-11-09 21:21 — Albert (lancé), Claude (noté) — SEP-GETRAND : le SEP répond sous m1n1 seul
 - Trace : traces/20261109-212150_sep_getrand (pending/sep_getrand.sh corrigé)
 - Vu : appel de sep_get_random (EP 0xFF, commande 16) : réponse reçue, 4 octets aléatoires (6e 0a 78 60), aucun plantage, Mac resté en mode proxy.

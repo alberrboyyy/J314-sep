@@ -167,3 +167,52 @@ hypothèse ; **[trace]** = vu dans nos captures (pas une source publique).
 2. Côté capteur, il faut ajouter au DT le bon contrôleur (spi2 ou spi4 ? à lire dans l'ADT) et un nœud enfant mesa
    (alimentation, IRQ, CS), puis un pilote client SPI. Le transport existe (spi-apple, mainline), sans DMA.
 3. Pour le reset via l'AOP, rien n'existe publiquement.
+
+---
+
+## 5. EP 0xFF (SEPROM) : messages connus et état du SEP à l'arrivée de m1n1 — lu le 2026-11-09
+Sources relues : https://asahilinux.org/docs/hw/soc/sep/ (sections « Endpoint information », « SEP boot flow »,
+« Coprocessor information »), clone m1n1 local. Rien d'autre (pas de macOS, pas de kext).
+
+### 5.1 Messages acceptés par l'EP 0xFF
+- [public] `m1n1/proxyclient/m1n1/hw/sep.py:10-15` (`BootRomMsg`) : GET_STATUS = 2, BOOT_TZ0 = 5, BOOT_IMG4 = 6
+  (le champ « type » est TYPE, bits 16-23, l.67-71 du même fichier pour la structure `SEPMessage`) ; SET_SHMEM = 0x18
+  est envoyé sur l'EP 0xFE (`sep.py:121-123`). Seul GETRAND (16 → réponse 116) est dans `src/sep.c:14-17`.
+- [public] Réponses ROM : `sep.py:17-21` (`BootRomStatus`) : 0x66 (statut OK), 0x69 (TZ0 fait), 0x6A (IMG4 fait),
+  0xD2 (« unk », reçu juste après 0x69). Séquence complète `sep.py:104-127` : GET_STATUS → 0x66 ; BOOT_TZ0 → 0x69
+  puis 0xD2 ; GET_STATUS → 0x66 ; BOOT_IMG4 (DATA = adresse IOVA >> 12) + SET_SHMEM ; attente de 0x6A.
+- [public] **Il existe donc un message de statut en lecture seule : GET_STATUS (type 2) sur l'EP 0xFF, réponse
+  attendue type 0x66.** Il est écrit dans `sep.py` (Sven Peter, 2021) ; aucun champ DATA de la réponse n'est
+  décrit ni lu. La doc Asahi ne documente ni ce message ni ses valeurs : « non trouvé » côté doc.
+- [public] Pas de message « version » ni « état détaillé » dans m1n1, ni dans `drivers/soc/apple/sep.rs` de
+  linux-asahi (constantes l.42-51, cf. §1.2) : non trouvé.
+- [déduit, NON vérifié, à ne pas lancer sans décision] GET_STATUS ressemble à une simple lecture, mais c'est quand
+  même un message envoyé au SEP : il ne sort pas de notre périmètre de lecture seule sans l'accord d'Albert (comme
+  GETRAND l'a été). Je ne le propose pas ici.
+
+### 5.2 Qui charge SEPOS, état du SEP quand m1n1 démarre
+- [public] Doc Asahi « SEP boot flow » : « iBoot preloads SEP firmware into a memory region that's recorded in ADT » ;
+  « XNU sends a boottz0 message, bringing SEP into second stage boot (a portion of RAM is reserved for this) » ;
+  puis XNU envoie l'IMG4 ; le SEP le vérifie et, s'il est accepté, démarre SEPOS. Donc : iBoot **précharge**,
+  l'**OS** (XNU, ou Linux/m1n1 à terme) **amorce**. Le SEP se vérifie lui-même (« Coprocessor information »).
+- [public] Aucune page de la doc Asahi ne parle de « SEPROM » (le mot n'y figure pas) ni de l'état du SEP quand m1n1
+  prend la main ; l'EP 0xFF y est seulement « Boot255 ».
+- [public] m1n1 `src/main.c:187` appelle `sep_init()` à chaque démarrage et `src/kboot.c:108-126` demande de
+  l'aléa à l'EP 0xFF avant de lancer Linux, sans avoir amorcé SEPOS : m1n1 compte donc sur une ROM qui répond
+  alors que SEPOS n'a pas été amorcé par lui.
+- [déduit] Sous m1n1 en mode proxy (avant tout macOS), le SEP est donc vraisemblablement encore sous la ROM : aucune
+  source ne l'écrit noir sur blanc. Notre trace `20261109-212150_sep_getrand` (réponse 116 sans macOS) est
+  compatible avec cela. Cas hyperviseur (m1n1 lancé sous macOS 13.5) : m1n1 s'exécute **avant** le noyau XNU
+  invité (hv lance XNU comme invité), donc avant tout boottz0 de XNU ; mais ce que mBoot/iBoot fait au SEP avant
+  de passer la main à m1n1 n'est pas décrit publiquement : non trouvé.
+
+### 5.3 SEPOS tourne-t-il déjà quand m1n1 prend la main ?
+- **Non trouvé dans les sources publiques.** Les indices publics (iBoot ne fait que précharger ; XNU envoie
+  boottz0 et IMG4 ; m1n1 parle à la ROM) indiquent que non, par défaut. Le statut reste une hypothèse.
+
+### 5.4 Contradiction à transmettre au sceptique
+- Doc Asahi (table des endpoints) : 0xFE « Boot254 » = « Signals SEP to boot into SEPOS with an IMG4 » ; 0xFF
+  « Boot255 » = « protected region ... is ready for its own use ». Code m1n1 `sep.py:104-125` : BOOT_TZ0 et BOOT_IMG4
+  partent sur 0xFF, seul SET_SHMEM part sur 0xFE. Les deux ne concordent pas : le rôle exact de 0xFE et 0xFF
+  dans la doc est probablement imprécis ; se fier au code, et à nos traces.
+- Nos traces n'en disent rien de plus : l'état de SEPOS reste à trancher (cf. journal du 2026-11-09 21:21).
