@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-10 00:55 — Albert (doigt), Claude — C20 : doigt posé avec écoute du bus SPI du capteur
+- Trace : traces/20261110-003201_c20-doigt-spi (`TRACE_SCRIPT=hv/trace_sep_spi_dma.py SEP_OOL_EPS=0x08`, tools/guide_doigt.sh ; 16 marques ; arrêt demandé après `end`). Protocole et prédiction écrits avant : docs/hypotheses.md « C20 ».
+- Actions d'Albert (notes.txt) : mot de passe au login, 3 bons doigts = déverrouillé (o, o, o), 2 mauvais doigts = refusé (n, n), puis mot de passe. « tout bon ». ~2 min entre le login et le 1er verrouillage (Mac lent sous écoute).
+- Vu : 0 erreur de lecture SIO. 27 lectures SPI de 0x7200 octets (en-tête `80 52 <n> 80 09 00 00 3a …`, n = 0x00, 0x0c, 0x18… : +12 par image d'une même pose), 7 envois SEP `> 0x65`, 6 `> 0x09`. **Les 7 envois 0x65 contiennent chacun la 1re image SPI d'une pose (n = 0x00, ou 0x0c une fois)** : 113 blocs de 256 o sur 114 retrouvés tels quels dans les buffers OOL A (le bloc manquant est à cheval sur la coupure en morceaux OOL). Les 20 autres images lues sur SPI ne sont dans aucun buffer envoyé au SEP.
+- Vu (déroulé d'une pose) : en attente, demande d'état 0x10 toutes les ~0,5 s (réponse `…11 02 21 80 04 80808080`) ; au doigt l'état passe à `13 00 21 00 0e…` puis `07 00 21 00 8e 00 72 00 00` (0x7200 en attente) → 0x13 (longueur 0x7200) → lecture de l'image → SEP 0x23, 0x06, **0x65**, 0x07, 0x1e, 0x09 → `< TAG 0x01` (résultat) ; l'AP continue à lire des images pendant ce temps ; fin par trame 0x30, puis 0x40 avant la pose suivante.
+- Interprété : prédiction « relais pur » confirmée 7/7 → `vérifié (macOS)` pour « la charge de 0x65 = image lue sur SPI, non transformée par l'AP » (réserve : comparaison par blocs de 256 o, pas un sha du transfert réassemblé). Hypothèses restantes : rôle des images non transmises (flux continu du capteur ?), sens des octets d'état, trames 0x30/0x40 = arrêt/reprise du balayage.
+- Incidents : aucun ; m1n1 revenu en proxy.
+
 ## 2026-11-10 00:35 — Claude — C18/C19 : contenu du dialogue SPI AP ↔ capteur (écoute seule)
 - Trace : traces/20261110-002417_c18-spi-dma-boot (200 s), traces/20261110-002829_c19-spi-dma-boot (120 s) ; boots macOS sans doigt, `TRACE_SCRIPT=hv/trace_sep_spi_dma.py` (boîte ASC de SIO en SYNC + lecture mémoire à travers dart-sio, aucune écriture).
 - Vu : C18 : les offsets du code public m1n1 (trace_mesa.py, M1) marchent pour les échanges doubles, pas pour les écritures seules (66 buffers non lus). Cause lue dans les blocs de contrôle : le champ DATA du message SIO TYPE 6 choisit le descripteur (+0x40 + DATA*0xc). Traceur corrigé → C19 : 147 buffers lus, 0 erreur. Trames `80 <cmd> <len> 000000` : 0x10 état (47), 0x13 demande de réponse (10), 0x78/0x70 début, 0x72, 0x73, 0x60 + bloc de 0x568e / 0x70ce octets, 0x55 (9), 0x30, 0x40. Réponse 0x70 identique dans C18 et C19. Détail et table : docs/sensor_hw.md « Dialogue SPI ».

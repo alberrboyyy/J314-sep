@@ -92,4 +92,8 @@ allumage, +1 par message), puis une longueur et un contenu d'aspect aléatoire, 
   `trace_mesa.py`). Un pilote Linux n'aurait donc à connaître que le transport ci-dessus ; le contenu vient du SEP.
 - Sans le service sbio du SEP (bloqué par xART, voir driver_plan), Linux peut au mieux allumer le capteur, lire son identité
   (0x70) et son état (0x10) : ce sont les seules trames en clair.
-- Non vu : ce qui se passe quand un doigt est posé (interruption 195, lecture de l'image 0x7200) → capture avec doigt à faire.
+- Doigt posé (C20, traces/20261110-003201_c20-doigt-spi, **vérifié (macOS)** 7/7) : l'état annonce 0x7200 octets en attente,
+  l'AP les lit (0x13 puis réception de 0x7200 : `80 52 <n> 80 09 00 00 3a …`, 12 tranches de 0x980) et envoie la 1re image de
+  la pose telle quelle au SEP dans `> 0x65`. 27 images lues pour 7 envoyées : les suivantes ne vont pas au SEP (rôle inconnu).
+  En attente : demande d'état toutes les ~0,5 s. Trames 0x30 après le résultat et 0x40 avant la pose suivante (rôle supposé :
+  arrêt / reprise du balayage).

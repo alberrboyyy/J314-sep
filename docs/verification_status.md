@@ -98,3 +98,8 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
 - K-E1 complète (C15+C16) : prédictions 0x209@lock, 0x228@mot de passe, 0x208@doigt, 0 TAG 0x01 en invite : confirmées (n=1 par cas, une session) → décision sceptique 2026-11-09 : reste `hypothèse` pour « `<01` suit le keybag, pas le verdict » (une seule session, pas de répétition, et la prédiction 0x209@lock était fausse sur un point) ; manque : une 2e session identique. Écart : 2e 0x209 présent dans tous les cas, pas seulement après 20 s.
 - Correction (driver, rejeu 8 boots) : l'ordre d'annonce 0xFD n'est **pas fixe** (3 ordres sur 8 boots, C7 et C9 diffèrent) : la ligne « C6..C12 ont le même ordre » est inexacte ; le pilote cherche les EP par nom.
 - Rejeu hors ligne (driver/, 29 tests) : init 57 commandes 18/18 captures ; 0x65 : 24/24 transferts, 288/288 CRC (C11), 39/39 images et 468/468 tranches sur C6+C8+C11 ; 0x6d C12 = 0x6c C11 octet pour octet (2/2).
+
+- SPI-1 (2026-11-10, C20) : la charge de `> 0x65` est l'image lue par l'AP sur le bus SPI du capteur, non transformée :
+  `vérifié (macOS)` (prédiction écrite avant, 7/7 poses, 113/114 blocs de 256 o ; réserve : pas de sha du transfert réassemblé).
+- SPI-2 (C17-C20) : transport SPI AP ↔ capteur (trames `80 <cmd> <len>`, état 0x10/0x20, lecture 0x13, DMA SIO 0x18/0x19) : `vu`
+  dans 4 captures, noms des commandes = hypothèses ; jamais rejoué par nous. Broches spi2 = 48/49/50 : hypothèse.

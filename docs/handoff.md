@@ -14,8 +14,11 @@ Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Lin
 - Dans 19/19 boots macOS, sbio etc. sont annoncés ~0,12 s après la réponse de l'AP à l'échange xART (EP 0x13). xART = coffre : le SEP confie des blobs, l'AP les lui rend au boot suivant (état du disque macOS, jamais capturé). Rejeu impossible sans ce contenu, et risqué (macOS/FileVault/trousseau). Décision : aucune réponse 0x13/0x15, aucune capture des blobs, pas de nouveau boot SEP.
 - Linux de test (Fedora Asahi Remix, 10.67.0.94) : gcc/make/git/dtc/kernel-devel installés ; driver/linux/mesa_probe.ko compile (enable=0 par défaut, lecture seule). DT vivant sans __symbols__, pas de configfs d'overlay.
 
+- Bus SPI du capteur écouté sous macOS (2026-11-10, C17-C20, hv/trace_sep_spi_dma.py, analysis/sio_dialog.py, docs/sensor_hw.md « Dialogue SPI ») : trames en clair = réveil 0x78, identité 0x70, état 0x10, lecture 0x13 ; tout le reste est chiffré entre le SEP et le capteur, l'AP relaie (vérifié macOS pour l'image 0x65, C20). Albert a confirmé le 2026-11-10 que le projet reste privé malgré l'interdiction d'IA de m1n1/CLAUDE.md : ne rien modifier dans m1n1/, rien vers Asahi.
+
 ## Où on en est / options (à proposer à Albert simplement)
 1. Fait le 2026-11-10 (alimentation + broches candidates). Suite : essai réel du capteur sous Linux = DT avec spi2 + mesa dans la charge m1n1 (installation m1n1 = Albert, à la main) puis mesa_probe enable=1 ; ou essai depuis m1n1 (écritures GPIO/SPI vers le capteur, pas vers le SEP : à décider).
 2. Ou s'arrêter sur les acquis. Étape 6 (faire parler Linux au SEP complet) bloquée par xART : seule voie = Linux qui tient son propre coffre xART sur un SEP remis à zéro (réinstallation/effacement de macOS : détruit les données macOS ; non testé, non décidé).
 3. Reste ouvert : SKS-1 (le SEP refuse-t-il 0x09 avant le mot de passe ? hypothèse « oui, le SEP » ; tranche seulement par une écriture), 2e 0x209 inexpliqué après chaque lock, cause iCloud.
-État du Mac à la fin de la session : démarré sur la partition Asahi de test (pas en mode proxy m1n1) ; /dev/ttyACM* absent tant qu'Albert ne le remet pas en proxy.
+4. Suite possible côté Linux sans SEP : faire parler mesa_probe au capteur avec les trames en clair (0x78, 0x70, 0x10) = premières écritures réelles vers le capteur (pas vers le SEP) ; demande un DT avec spi2 dans la charge m1n1 (Albert) ou un essai depuis m1n1.
+État du Mac au 2026-11-10 00:55 : en mode proxy m1n1 après C20.

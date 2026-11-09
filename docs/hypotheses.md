@@ -909,3 +909,13 @@ Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n
   Risque : mauvais échantillon 3 fois = verrouillage biométrique à 5 échecs (déjà vu 0x45) → le mot de passe restera accepté. Mais cela demande un hôte qui
   rejoue l'init : étape 6/7 du plan, pas avant.
 - [LINUX] aucune : le Linux ne tient pas de sbio.
+
+## C20 — EXPÉRIENCE HUMAINE : doigt posé avec écoute du bus SPI du capteur (2026-11-10, Claude)
+- But : voir sur le bus SPI ce qui se passe quand un doigt est posé (interruption, lecture de l'image) et vérifier
+  l'hypothèse « l'AP relaie tel quel » : l'image lue sur SPI doit être identique (octet pour octet) à la charge du
+  message SEP `> 0x65` (0x7200 o) qui suit.
+- Moyen : `TRACE_SCRIPT=hv/trace_sep_spi_dma.py SEP_OOL_EPS=0x08 ./tools/boot_and_trace.sh c20-doigt-spi`, puis
+  `./tools/guide_doigt.sh` (mot de passe, 3 bons doigts, 2 mauvais). Écoute seule, rien n'est envoyé.
+- Attendu si relais pur : pour chaque essai, une ou plusieurs réceptions SPI dont le sha1 = celui du buffer OOL du 0x65.
+  Sinon (contenu différent) : l'AP transforme l'image, hypothèse à revoir.
+- Risque : le mode SYNC sur SIO + SEP ralentit macOS ; Touch ID peut échouer ou être lent (à noter, pas grave).
