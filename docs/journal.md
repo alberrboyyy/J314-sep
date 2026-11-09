@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-10 00:35 — Claude — C18/C19 : contenu du dialogue SPI AP ↔ capteur (écoute seule)
+- Trace : traces/20261110-002417_c18-spi-dma-boot (200 s), traces/20261110-002829_c19-spi-dma-boot (120 s) ; boots macOS sans doigt, `TRACE_SCRIPT=hv/trace_sep_spi_dma.py` (boîte ASC de SIO en SYNC + lecture mémoire à travers dart-sio, aucune écriture).
+- Vu : C18 : les offsets du code public m1n1 (trace_mesa.py, M1) marchent pour les échanges doubles, pas pour les écritures seules (66 buffers non lus). Cause lue dans les blocs de contrôle : le champ DATA du message SIO TYPE 6 choisit le descripteur (+0x40 + DATA*0xc). Traceur corrigé → C19 : 147 buffers lus, 0 erreur. Trames `80 <cmd> <len> 000000` : 0x10 état (47), 0x13 demande de réponse (10), 0x78/0x70 début, 0x72, 0x73, 0x60 + bloc de 0x568e / 0x70ce octets, 0x55 (9), 0x30, 0x40. Réponse 0x70 identique dans C18 et C19. Détail et table : docs/sensor_hw.md « Dialogue SPI ».
+- Interprété (hypothèse) : l'AP relaie entre le SEP et le capteur des messages chiffrés (compteur de 8 octets par allumage) ; seules l'identité et l'état sont en clair.
+- Incidents : aucun (2 captures, end_reason timeout, m1n1 revenu en proxy). Le mode SYNC sur SIO n'a pas gêné le boot.
+- Suite : capture avec doigt (EXPÉRIENCE HUMAINE) pour voir le chemin de l'image.
+
 ## 2026-11-10 00:19 — Claude — C17 : premier relevé du bus SPI du capteur sous macOS (registres seulement)
 - Trace : traces/20261110-001859_c17-spi-boot (boot macOS 240 s, sans doigt ; `TRACE_SCRIPT=hv/trace_sep_spi.py` : traceur SEP habituel + registres de spi2 + broches gpio0 48-51 et 195-196, mode ASYNC, aucune écriture). Analyse : `analysis/spi2_transfers.py <dossier> [--sep]`.
 - Vu : 84 échanges SPI. **Aucun accès à TXDATA/RXDATA** : les données passent par DMA (SIO), seuls les compteurs sont visibles. Réglages constants : CLKDIV = 3, CFG = 0x40042 (bit 1 = CPHA dans la table publique m1n1, bits 6:5 = 2), SHIFTCFG 0x80c07, PIN = 0. Tailles : lecture/écriture 0x17 (40 fois, entre presque tous les autres échanges), écritures seules 0x07, 0x0b, 0x2f, 0x40, 0x47, 0x49, 0x4d, 0x56, échanges 0x1b, 0x33, 0x4b, et deux gros envois **0x568e** (21 ms) et **0x70ce** (29 ms).

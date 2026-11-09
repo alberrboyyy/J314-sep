@@ -18,9 +18,11 @@ Sorties dans le dossier de sep.log :
 
 HYPOTHÈSES reprises du code public m1n1 proxyclient/hv/trace_mesa.py (écrit pour M1, 2022), NON vérifiées ici :
   - message TYPE 3, EP 0, PARAM 1 : DATA << 12 = IOVA du bloc de contrôle ;
-  - à la fin d'un transfert (TYPE 0x68) : canal 0x18 -> pointeur à +0xa8, taille à +0xb0 ;
-    canal 0x19 -> pointeur à +0x48, taille à +0x50.
-Si ces offsets sont faux sur t6001, les fichiers _ctrl.bin permettent de les retrouver hors ligne.
+  - trace_mesa.py lit : canal 0x18 -> pointeur à +0xa8, taille à +0xb0 ; canal 0x19 -> +0x48 / +0x50.
+VU dans C18 (traces/20261110-002417_c18-spi-dma-boot) : ce n'est pas le canal mais le champ DATA du message
+TYPE 6 qui choisit le descripteur : descripteur à +0x40 + DATA*0xc, pointeur à +8, taille à +0x10
+(DATA=0 -> +0x48/+0x50 ; DATA=8 -> +0xa8/+0xb0). Une écriture seule (canal 0x18, DATA=0) utilise donc +0x48.
+Le descripteur vu au TYPE 6 est mémorisé par canal et réutilisé à la fin du transfert (TYPE 0x68).
 SIO_ALL_EPS=1 : lire aussi le bloc de contrôle pour les autres canaux (défaut : 0x18 et 0x19 seulement).
 """
 import os, struct, time, atexit
@@ -34,7 +36,6 @@ DART_SIO_NODE = "/arm-io/dart-sio"
 SIO_CHANNELS = (0x18, 0x19)
 SIO_CTRL_SIZE = 0x400
 SIO_BUF_MAX = 0x10000
-SIO_PTR_OFF = {0x18: (0xa8, 0xb0), 0x19: (0x48, 0x50)}
 SIO_TOTAL_MAX = 64 << 20
 
 
@@ -48,6 +49,7 @@ class SIOMailboxObserver(ADTDevTracer):
         self.bufdir = bufdir
         self.seq = 0
         self.setup = {}
+        self.desc = {}
         self.dart = None
         self.sid = None
         self.written = 0
@@ -82,8 +84,11 @@ class SIOMailboxObserver(ADTDevTracer):
                 if d == ">" and typ == 3 and ep == 0:
                     self.setup[param] = data
                 want = ep in SIO_CHANNELS or (self.all_eps and ep != 0)
-                if want and ((d == ">" and typ == 6) or (d == "<" and typ == 0x68)):
-                    self._grab(ep, "setup" if typ == 6 else "done")
+                if want and d == ">" and typ == 6:
+                    self.desc[ep] = data
+                    self._grab(ep, "setup", data)
+                elif want and d == "<" and typ == 0x68 and ep in self.desc:
+                    self._grab(ep, "done", self.desc[ep])
             now = time.monotonic()
             if now - self._last > 0.5:
                 self.out.flush()
@@ -94,7 +99,7 @@ class SIOMailboxObserver(ADTDevTracer):
             except Exception:
                 pass
 
-    def _grab(self, ep, when):
+    def _grab(self, ep, when, slot):
         if self.written >= SIO_TOTAL_MAX or 1 not in self.setup:
             return
         iova = self.setup[1] << 12
@@ -106,9 +111,9 @@ class SIOMailboxObserver(ADTDevTracer):
         stem = os.path.join(self.bufdir, f"{self.seq:06d}_{ep:02x}_{when}")
         open(stem + "_ctrl.bin", "wb").write(ctrl)
         self.written += len(ctrl)
-        if ep not in SIO_PTR_OFF:
+        po, so = 0x40 + slot * 0xc + 8, 0x40 + slot * 0xc + 0x10
+        if so + 4 > len(ctrl):
             return
-        po, so = SIO_PTR_OFF[ep]
         ptr = struct.unpack_from("<Q", ctrl, po)[0]
         size = struct.unpack_from("<I", ctrl, so)[0]
         if not (0 < size <= SIO_BUF_MAX) or ptr < 0x4000:

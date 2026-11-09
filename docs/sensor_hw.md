@@ -53,3 +53,43 @@ Sources : `analysis/adt_pmgr_ps.py` sur `traces/20261108-162919_adt/adt.bin` (ho
 Réserve : un 5e groupe au même motif (116, 117, 118) n'a pas de contrôleur SPI connu dans l'ADT ; tant qu'il n'est pas
 expliqué, « spi2 = 48-50 » reste une hypothèse. Pour un DT Linux : `pinmux = <APPLE_PINMUX(48, 1)>, <APPLE_PINMUX(49, 1)>,
 <APPLE_PINMUX(50, 1)>` (iBoot les a déjà réglées ainsi : ne rien changer d'autre).
+
+## Dialogue SPI AP ↔ capteur sous macOS (C17, C18, C19 — 2026-11-10)
+Sources : `traces/20261110-001859_c17-spi-boot` (registres), `…002417_c18-spi-dma-boot` (contenu partiel),
+`…002829_c19-spi-dma-boot` (contenu complet : 147 buffers, 0 erreur de lecture). Outils : `hv/trace_sep_spi_dma.py`
+(écoute seule), `analysis/spi2_transfers.py`, `analysis/sio_dialog.py <dossier> [--sep] [--full]`.
+Statut général : **vu** (boots macOS sans doigt) ; les noms et rôles sont des **hypothèses**. Rien n'a été envoyé.
+
+### Transport (vu)
+- Les données ne passent pas par les registres FIFO de spi2 : transferts DMA par le coprocesseur SIO, canaux 0x18
+  (émission) et 0x19 (réception). Descripteur dans le bloc de contrôle SIO : `+0x40 + DATA*0xc`, pointeur à +8, taille à +0x10.
+- Réglages spi2 constants : CLKDIV 3, CFG 0x40042, SHIFTCFG 0x80c07, PIN 0. Les broches 48-51 ne sont jamais réécrites.
+- Alimentation : gpio0 196 en sortie, 0 puis 1 ; elle est coupée/remise deux fois (~11 ms) et toute l'initialisation est rejouée.
+
+### Trames (vu ; noms = hypothèses)
+En-tête d'émission : `80 <cmd> <longueur totale, 16 bits gros-boutiste> 00 00 00`, puis la charge.
+
+| cmd | Taille | Vu | Rôle supposé |
+|---|---|---|---|
+| 0x10 | 7 | 47 fois ; lecture simultanée de 0x17 octets dont les 16 derniers = `80 20 00 10 00000000` + 8 octets | demande d'état ; réponse 0x20 |
+| 0x13 | 0x0b, charge = longueur (32 bits petit-boutiste) | avant chaque lecture de réponse ; suivi d'une émission d'1 octet `00` puis d'une réception de cette longueur | « donne-moi la réponse de N octets » |
+| 0x78, 0x70 | 7 | au début de chaque allumage ; 0x70 → réponse 0x1b octets identique dans C18 et C19 (`80 d4 00 1b 00000000 70 02 19c0…`) | réveil ; identité du capteur |
+| 0x72 | 0x2f | après SEP `0x15` ; réponse 0x33 (type 0x72) puis SEP `0x16` | échange de clés (charge différente à chaque fois) |
+| 0x73 | 0x47 | après SEP `0x42` ; réponse 0x4b (type 0x73) puis SEP `0x18` | 1er message chiffré |
+| 0x60 + bloc | 7 puis 0x568e ou 0x70ce octets | après SEP `0x5f` (transfert OOL venant du SEP) | envoi du correctif du capteur |
+| 0x55 | 0x40, 0x49, 0x4d, 0x56 | après SEP `0x5d`, `0x5c`, `0x6a`, `0x6f`, `0x31` ; certaines ont une réponse 0x4b (type 0x75) suivie de SEP `0x32` | commandes chiffrées |
+| 0x30, 0x40 | 7 | une fois chacune en fin d'init / pendant l'attente | inconnu |
+
+Réponses : `80 d4 <longueur> 00000000 <type>` + charge. Dans l'état (réponse 0x20), l'avant-dernier groupe porte la longueur
+de la réponse en attente (0x1b, 0x33, 0x4b vus) : c'est elle que l'AP redemande avec 0x13.
+
+Enveloppe des messages 0x73 / 0x55 / 0x75 et des gros blocs : `3a 00…00`, un compteur de 8 octets (base différente à chaque
+allumage, +1 par message), puis une longueur et un contenu d'aspect aléatoire, différent d'un allumage à l'autre.
+
+### Interprété (hypothèses)
+- L'AP est un simple relais : chaque bloc envoyé au capteur suit une commande SEP de l'EP 0x08, chaque réponse du capteur
+  est suivie d'une commande SEP. Le contenu est chiffré entre le SEP et le capteur (cohérent avec la note publique de
+  `trace_mesa.py`). Un pilote Linux n'aurait donc à connaître que le transport ci-dessus ; le contenu vient du SEP.
+- Sans le service sbio du SEP (bloqué par xART, voir driver_plan), Linux peut au mieux allumer le capteur, lire son identité
+  (0x70) et son état (0x10) : ce sont les seules trames en clair.
+- Non vu : ce qui se passe quand un doigt est posé (interruption 195, lecture de l'image 0x7200) → capture avec doigt à faire.
