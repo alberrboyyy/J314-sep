@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-10 00:10 — Claude — Pourquoi 7/12 : ce qui précède sbio dans les boots macOS (lecture seule)
+- Trace : les 19 sep.log de traces/ (C1…C16) ; détail C1 : traces/20261107-033436_c1-boot/sep.log.
+- Vu : macOS envoie exactement la même séquence de boot que m1n1 (GET_STATUS, BOOT_TZ0, GET_STATUS, BOOT_IMG4 + SET_SHMEM) ; 7 endpoints (cntl, hdcp, xars, xarm, hibe, pnon, stac) annoncés ~0,6 s après, avec dès ce moment 1 message `< EP=0x13 TAG=0x02 TYPE=0x0e` et 2-3 messages `< EP=0x00` (0x0d, 0x29…) = **les 4 messages restés en attente dans SEP-BOOT** (1 sur 0x13, 3 sur EP 0). Les 5 autres (sbio…) sont annoncés ~3 s plus tard, **19/19 boots précédés de messages AP→SEP sur EP 0x13 (xART)** dans les 12 lignes d'avant.
+- Interprété (hypothèse renforcée, causalité non prouvée) : sbio/sks… n'apparaissent qu'après un échange xART avec l'AP ; m1n1 n'ayant pas répondu, SEPOS est resté à 7/12. Aucune écriture n'est justifiée tant que la cause iCloud n'est pas écartée (revue sceptique : lire dans Console la raison de la demande de connexion, ou 2 reboots natifs).
+- Incidents : aucun.
+
 ## 2026-11-09 23:50 — sceptique — Revue des conclusions SEP-BOOT / iCloud / SKS-1
 - Trace : traces/20261109-221029_sep_boot, traces/20261107-033436_c1-boot/sep.log (lecture seule)
 - Fait : relecture des 3 conclusions du jour ; détail dans docs/hypotheses.md « Revue sceptique du 2026-11-09 ».
