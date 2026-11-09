@@ -14,6 +14,15 @@ Format :
 
 ---
 
+## 2026-11-09 23:50 — sceptique — Revue des conclusions SEP-BOOT / iCloud / SKS-1
+- Trace : traces/20261109-221029_sep_boot, traces/20261107-033436_c1-boot/sep.log (lecture seule)
+- Fait : relecture des 3 conclusions du jour ; détail dans docs/hypotheses.md « Revue sceptique du 2026-11-09 ».
+- Vu : dans C1 (macOS), les mêmes 7 EP sont annoncés en 7 ms avant tout message AP ; les 5 autres arrivent 3,4 à 3,8 s plus tard, après SECMODE/CNTL/hdcp/stac/xART. Donc 7/12 est le comportement normal de la 1re phase : le boot m1n1 a probablement réussi.
+- Interprété : (a) cause « attend xART/pnon » non distinguée de « attend CNTL » ou d'un message sans réponse (les 4 messages en attente n'ont jamais été imprimés) ; (b) la reconnexion iCloud a au moins 5 autres causes (boot natif vs hyperviseur, reboots brutaux, horloge, serveur Apple...), et le SEP redémarre avec le Mac donc le mécanisme est peu clair ; (c) SKS-1 n'a aucune observation positive (jamais de 0x09 à l'état 0x0015).
+- Incidents : aucun. Aucun hardware, aucune écriture SEP.
+
+---
+
 ## 2026-11-09 23:40 — Claude — spi2 : adresse confirmée par l'ADT
 - Trace : traces/20261108-162919_adt/adt.txt L1042-1080
 - Vu : spi2 `reg = 0x19B108000` (taille 0x4000) → adresse CPU **0x39B108000** (= 0x200000000 + 0x19B108000), confirme la déduction du documentaliste ; interrupts [1108], clock-gates 144, `function-spi_cs0 = 1:null()` (pas de GPIO pour le chip-select) ; aucune propriété de broches (pinctrl) dans le nœud ; mesa `reg = 00000000 f4010000 00010108 …` (sens non décodé).

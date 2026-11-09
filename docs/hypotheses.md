@@ -791,3 +791,121 @@ Aucun désassemblage fait : lecture de `analysis/out/sks_symbols.txt` (396 noms)
 - HYPOTHÈSE (non vérifiée) : l'état « blocage bio » (0x0015) vient du SEP, donc le SEP l'applique très probablement lui-même ; macOS s'abstient en plus d'offrir Touch ID. Le déverrouillage du trousseau après match est fait par le SEP seul (pas de message AP) → pour Linux, `0x09` suffirait une fois le mot de passe validé via 0x12, mais le mot de passe doit passer par SKS.
 - NON TRANCHÉ : « refuse » vs « macOS s'abstient ». Seule expérience qui tranche : envoyer 0x09 (écriture SBIO) à l'état 0x0015 → script dans `pending/`, à lancer par Albert. Expérience passive possible (K-E1 bis) : doigt posé sur l'écran de login juste après boot, vérifier que macOS n'envoie pas 0x09 (confirme l'abstention de macOS, pas le refus du SEP).
 - Filtre [cyber] : pas déclenché cette fois (pas de désassemblage). Étude plus profonde du protocole 0x12 (format des TAG 0x18/0x41/0x2f) non faite.
+
+---
+
+# Revue sceptique du 2026-11-09 (agent sceptique)
+
+Sources relues : journal 2026-11-09 (SEP-PEEK, GETRAND, SEP-BOOT), traces/20261109-221029_sep_boot/boot.log, pending/sep_boot.sh,
+traces/20261107-033436_c1-boot/sep.log (macOS, référence), verification_status.md, driver_plan.md. Aucun hardware lancé, aucune écriture SEP.
+Légende des expériences : [LS] lecture seule faisable par l'agent ; [PEND] écriture, script dans `pending/`, décision d'Albert ;
+[LINUX] test sur le 2e Linux (10.67.0.94, tools/linux_ssh.sh, ne touche pas au SEP) ; [HUMAIN] demande Albert.
+
+## (a) « SEPOS n'annonce que 7/12 endpoints car il attend des réponses xART/pnon de l'AP »
+
+**Vu (fait)** : après BOOT OK, 30 s d'écoute, 7 annonces 0xFD (cntl, hdcp, xars, xarm, hibe, pnon, stac) ; manquent sbio 0x08, scrd 0x0a,
+sse 0x0c, sks 0x12, skdl 0x17 ; restent non lus : 3 messages EP 0x00 et 1 sur EP 0x13, **contenu jamais affiché** (le script ne les imprime pas).
+**Interprété** : « le SEP attend xART/pnon ». C'est une hypothèse de cause, pas un fait.
+
+Ce que la trace macOS C1 (sep.log L15-38, L99-107) apporte, fait nouveau pour cette revue :
+- Les MÊMES 7 annonces arrivent dans C1 en 7 ms, juste après BOOT_IMG4, **avant tout message AP** vers ces EP. Donc le 7/12 est le comportement
+  normal de la première phase, ce n'est pas une anomalie du boot par m1n1. Le boot sous m1n1 a donc probablement réussi aussi loin que macOS à ce stade.
+- Dans C1, les 5 autres arrivent 3,4 s (L106-107, sbio) à 3,8 s (L160, sks) plus tard, après : SECMODE (`>00/0x14`, réponse 3), les cinq
+  configurations CNTL (hdcp, stac, xarm), le travail sur hdcp (`>0e/0x28` x14) et stac (`>18 0x0f/0x0b`), puis un échange xART 0x13 (`>13 TAG2` 0x100,
+  `<13 0x13`, ... ) et enfin `<13 TYPE 0x1d PARAM 0x6f DATA="sbi..."` JUSTE avant l'annonce de sbio. Corrélation d'ordre, pas preuve de causalité.
+- Le fait que l'annonce de sbio suive immédiatement un xART TYPE 0x1d portant le nom de l'EP renforce une dépendance de sbio envers xART,
+  mais le facteur déclencheur peut aussi être CNTL ou stac ou hdcp (tous précèdent).
+
+**Explications concurrentes** (toutes compatibles avec les données) :
+1. **Délai** : 30 s est largement plus long que les 3,4 s de C1 ; très peu probable que ce soit le seul facteur, SAUF si SEPOS attend un timeout
+   plus long (ex. 60 s+) avant d'abandonner xART. Non réfuté, improbable. (dans C1 le SEP n'attendait pas : il a envoyé des demandes dès +3 s).
+2. **Annonces conditionnées à CNTL** : l'AP n'a rien envoyé sur EP 0x00 (SECMODE 0x14, configurations 0x04/0x02/0x05/0x03 d'adresses de buffers OOL).
+   Sans eux, SEPOS peut ne pas armer ses autres services. Compatible, aussi plausible que xART. Distinguer xART vs CNTL est possible dans C1 : voir [LS]1.
+3. **Message(s) en attente sans réponse** : les 3 messages EP 0x00 sont probablement 0x0d (OS actif), 0x29, 0x10 (C1 L34-35, L76) ; celui d'EP 0x13
+   ressemble à `<13 TAG2 TYPE 0x0e` (L30). SEPOS peut attendre la réponse à l'un d'eux. En C1 `<00/0x10` (wrapping) arrive APRÈS 14 échanges hdcp : il
+   dépend donc d'une action AP, ce qui est un indice que les 3 EP 0x00 ne sont pas tous « initiaux ». On ne sait pas lesquels sont dans la file.
+4. **État SEP après un boot précédent** : Mac n'était pas à froid (peek 21:05 : compteurs ≠ 0, ~21:10/22:00 deux reboots m1n1 puis proxy). SEPOS
+   a peut-être déjà tourné (iBoot l'a lancé) ; BOOT_IMG4 sur un SEP déjà amorcé peut donner un état dégradé (« BOOT OK » + services partiels).
+   Non distinguable avec une seule trace.
+5. **Artefact du script** : `_try_recv_msgs()` public est utilisé en sondage ; il peut avoir consommé les messages d'EP 0x00/0x13 dans `sep.msgs`
+   (conservés) mais le script n'a imprimé que les compteurs. Rien ne dit que les annonces n'ont pas besoin d'un dépilage régulier des FD TYPE 1
+   (tailles OOL) — mais les 7 reçus ont bien été traités.
+6. **Taille de shmem** : SET_SHMEM de m1n1 vs 0x580000/0x1c000 de macOS (uart, 1 boot). Un shmem différent pourrait suffire à bloquer des services.
+
+**Nombre de traces** : 1 trace SEP-BOOT (1 seule tentative réussie ; la 1re a planté avant tout envoi). Insuffisant : « hypothèse » forte, non vérifiée.
+La partie « macOS aussi voit 7 d'abord » est, elle, soutenue par ≥ 8 boots (C1..C12) : lecture seule.
+
+**Expériences**
+- [LS]1 Dans les 8+ boots macOS, calculer pour chaque annonce des 5 EP manquants : quel est le dernier message AP→SEP précédent, et ce qui change entre
+  C1 et un boot où l'ordre d'annonce diffère (C7, C9, 3 ordres connus). Prédiction : si « xART conditionne », les 5 suivent toujours un `<13 TYPE 0x1d` ;
+  si « CNTL/hdcp/stac », il y a des cas où elles précèdent xART. Coût 0, fait passer ou tue 2 des 6 explications.
+- [LS]2 Lister, par boot macOS, les messages SEP→AP émis AVANT le premier message AP (EP 0x00/0x13) : c'est ce que la file de 3+1 contient. Si les 4
+  sont `0x0d, 0x29, 0x0e, +1`, alors l'hypothèse « un message sans réponse » est testable sur sa liste précise.
+- [PEND] Même script `sep_boot.sh` modifié pour : (i) imprimer et journaliser les 4 messages en attente (pas d'écriture : amélioration de la LECTURE),
+  (ii) écoute 120 s au lieu de 30 s. C'est une relance du boot SEP (écriture BOOT_IMG4, déjà faite une fois) : **vu l'incident iCloud, pas sans
+  décision d'Albert** ; ce n'est pas indispensable avant [LS]1/[LS]2. Résultat attendu si vrai (« attend l'AP ») : même 7/12 à 120 s, mêmes 4 messages.
+  Si c'est un délai : 12/12 vers 60-120 s (très improbable).
+- [PEND, plus tard] répondre à un seul message (CNTL SECMODE 0x14 → DATA 3), en le séparant de xART : c'est ce qui distingue CNTL de xART. CNTL ne touche ni
+  disque ni trousseau ; xART/pnon oui : donc **commencer par CNTL**, jamais xART d'abord. Écriture vers EP 0x00 = ligne rouge ? (0x00 n'est pas dans
+  la liste interdite, mais reste écriture vers le SEP : script pending/ de toute façon).
+- [LINUX] aucun test utile pour (a) : le Linux ne démarre pas le SEP lui-même ; il peut seulement tester que l'ADT/DT de ce Linux contient le nœud `sep` (lecture).
+
+## (b) « La reconnexion au compte Apple vient du boot SEP par m1n1 »
+
+**Vu** : Albert a dû se reconnecter à iCloud au démarrage suivant (22:20). Rien d'autre. Touch ID non testé.
+**Interprété** : effet de bord du SEP lancé par m1n1. **Une seule observation, aucune expérience** : à garder au rang de « possible », pas de « probable ».
+
+Autres causes (aucune écartée) :
+1. **Mode de boot différent** : les ~20 boots précédents étaient des *invités sous hyperviseur* (macOS 13.5 via run_guest) ; ce retour est peut-être le
+   1er boot natif depuis longtemps. Si l'ancien chemin gardait une session/jeton et pas le natif (ou l'inverse), c'est le facteur de mode, pas le SEP.
+2. **Les reboots brutaux du jour** (21:10 reboot tout seul, 22:00 reboot sur crash m1n1 : arrêts non propres) : ils précèdent le retour sous macOS.
+3. **Expiration côté serveur Apple** (jeton, mot de passe changé ailleurs, vérification de sécurité) : indépendante de la machine.
+4. **Horloge** : la date/heure du Mac décalée après les reboots ; les jetons iCloud sont sensibles à l'heure (le RTC peut être perdu, l'horloge m1n1 a
+   `host_time_time` pour les traces mais l'heure système macOS vient d'ailleurs).
+5. **Mise à jour/état du trousseau** : le SEP « perd un état » : plausible, c'est l'hypothèse actuelle. Mécanisme concret non établi : le SEP du Mac
+   a redémarré complètement avec le Mac, donc un état volatil du SEPOS lancé par m1n1 n'a pas pu survivre à ce reboot ; seul un état PERSISTANT
+   (xART, stockage) aurait pu être changé, et le script n'a répondu à aucun xART. Cela rend l'hypothèse SEP **moins** plausible qu'annoncé, à moins que le reboot
+   n'ait pas réinitialisé le SEP (inconnu : le peek du 21:05 montre un SEP déjà actif ; réinitialisation au reboot non établie).
+6. **Coïncidence** (reconnexions iCloud sans cause sont courantes).
+
+**Expériences, du moins risqué au plus risqué**
+- [HUMAIN, sans risque] Albert regarde dans macOS (Console ou `log show` avec les processus accountsd / akd / cloudd à l'heure du boot) la raison écrite
+  de la demande de connexion. Prédiction si SEP : message sur keychain/jeton invalide ; si serveur : « session expirée » ; si horloge : erreur de certificat/date.
+  C'est l'expérience la plus informative et ne demande rien d'autre que de lire.
+- [HUMAIN, sans risque] Vérifier l'heure système et le fuseau juste après le boot (RTC).
+- [HUMAIN] Témoin : redémarrer sous macOS natif DEUX fois de suite sans passer par m1n1/SEP-BOOT : si la reconnexion apparaît encore, ce n'est pas le SEP.
+  Si c'est reproduit sous hyperviseur sans SEP-BOOT = pas le SEP non plus.
+- [PEND, déconseillé] Refaire exactement SEP-BOOT puis macOS. Seul test direct, mais ne se refait pas tant que (b) n'est pas éclairci : possible perte de
+  jetons/trousseau. Albert dit avoir un backup (journal) ; CLAUDE.md : « tant qu'il n'existe pas, aucune action risquée ». À confirmer par Albert si le backup est fait.
+- [LS] relire les traces macOS des boots récents : y a-t-il eu une reconnexion iCloud signalée lors d'autres boots hyperviseur ? Pas d'indice dans les journaux : on
+  ne peut pas le savoir sans Albert (pas de journal macOS dans le repo).
+- [LINUX] sans objet.
+**Règle** : ne pas citer « le boot SEP casse iCloud » dans driver_plan.md ni en justification d'une pause générale avant les 2 tests témoins ; la pause xART/pnon reste
+justifiée par prudence (disque/trousseau), pas par cette causalité.
+
+## (c) SKS-1 : « le blocage biométrique 0x0015 est probablement appliqué par le SEP »
+
+**Vu** : 0x0015 est un état annoncé SEP→AP (`<01`) au boot ; chemin doigt = aucune requête AP→0x12 avant le succès ; le SEP émet seul `<12 -501` pendant 0x09.
+**Interprété** : « le SEP applique le blocage ». Ce que les données montrent vraiment : le SEP *connaît et annonce* l'état. Annoncer ≠ imposer.
+
+Hypothèses concurrentes :
+1. **AP/userspace** : biometrickitd / LocalAuthentication / AppleKeyStore côté AP s'abstient (le noyau a l'état en cache, c'est le seul qui sait s'il faut offrir
+   Touch ID ; aucun 0x09 n'est envoyé). Cohérent avec « 0 requête 0x09 à l'état 0x0015 » (c'est justement l'abstention de macOS).
+2. **SEP, au niveau du match** : il répond -1 ou une erreur à 0x09 à l'état 0x0015.
+3. **SEP, au niveau du trousseau (le plus probable à mon avis)** : 0x09 renvoie une correspondance, mais le SEP *ne peut pas* déverrouiller les clés de classe sans le
+   secret du mot de passe (le match ne remplace pas l'entropie du code après un boot) : un match peut réussir sans effet. Ce cas donne, à l'état 0x0015, « 0x09 OK +
+   pas de notif -501 ». Il ne se distingue de 2 qu'avec la réponse de 0x09 ET l'absence de `<12 -501`.
+4. **Les deux** (défense en profondeur).
+
+**Nombre de traces** : aucun cas où 0x09 est envoyé à 0x0015 (ni refusé ni accepté). Le support est donc 0 ; seule l'absence est observée (n = quelques boots).
+Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n'a aucune observation positive. Statut : `hypothèse` faible. Ne pas la répéter dans driver_plan.md sans cette réserve.
+
+**Expériences**
+- [LS] Chercher dans toutes les traces un 0x09 (requête `>08 TYPE 0x09`) émis AVANT le premier `<01/..28` (mot de passe) d'un boot, et un `<01/08` avant tout mot de passe
+  (C3 « 8/9 en écran verrouillé ») : s'il existe un cas où macOS demande un match à l'état 0x0015, le comportement du SEP y est directement lisible. Prédiction « AP s'abstient » : 0 cas.
+- [LS] Même question pour l'état 0x0045/0x0055 (blocage après échecs) : 0x45 vu 1 fois (C3). Voir si 0x09 a alors été envoyé.
+- [HUMAIN, sans écriture] K-E1 bis : doigt posé sur l'écran de login juste après boot, trace sbio : confirme l'abstention de macOS (pas le refus du SEP).
+- [PEND] Envoi d'un seul 0x09 à l'état 0x0015 (après tout le préambule 57 commandes + images 0x65 déjà vues) : seule expérience qui distingue 1/2/3.
+  Risque : mauvais échantillon 3 fois = verrouillage biométrique à 5 échecs (déjà vu 0x45) → le mot de passe restera accepté. Mais cela demande un hôte qui
+  rejoue l'init : étape 6/7 du plan, pas avant.
+- [LINUX] aucune : le Linux ne tient pas de sbio.
