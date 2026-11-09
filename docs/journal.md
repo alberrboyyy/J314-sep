@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 21:21 — Albert (lancé), Claude (noté) — SEP-GETRAND : le SEP répond sous m1n1 seul
+- Trace : traces/20261109-212150_sep_getrand (pending/sep_getrand.sh corrigé)
+- Vu : appel de sep_get_random (EP 0xFF, commande 16) : réponse reçue, 4 octets aléatoires (6e 0a 78 60), aucun plantage, Mac resté en mode proxy.
+- Interprété (hypothèse) : le SEP répond au message de découverte « ROM » sans macOS, comme m1n1 l'attend à chaque boot Linux. Cela ne prouve PAS que SEPOS (le logiciel complet : biométrie, sbio) tourne : la doc publique Asahi attribue l'EP 0xFF à la ROM du SEP. À trancher : est-ce que les endpoints 0xFD (annonce des services) apparaissent sans macOS ?
+- Incidents : aucun.
+
 ## 2026-11-09 21:20 — Claude — Correction SEP-GETRAND : le plantage venait de MON adresse
 - Trace : traces/20261109-211835_check_sym et traces/20261109-211849_check_sym (tools/check_sep_sym.sh : lecture de 16 octets de m1n1, rien d'autre)
 - Vu : à base+0x40e40 (adresse que j'avais appelée) la mémoire contient des NOP ; la fonction sep_get_random est à base+0x30e40 (contrôle : octets lus = octets attendus, « ADRESSE BONNE »). Le décalage est celui de 0x10000 entre l'adresse du fichier ELF et le chargement du .bin.

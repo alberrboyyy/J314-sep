@@ -1,0 +1,1 @@
+symbole sep_get_random offset 0x0000000000040e40
