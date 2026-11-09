@@ -1,0 +1,77 @@
+20261107-033436_c1-boot: fetch SEP=22f USER=6178 SEPL(var)=88b6 ; Saving dans ce log : 10
+    SEP=22f retrouvé comme Saving dans : aucun log précédent
+    USER=6178 retrouvé comme Saving dans : aucun log précédent
+    SEPL=88b6 retrouvé comme Saving dans : aucun log précédent
+20261107-034313_c2a-boot: fetch SEP=ce9b USER=1f75 SEPL(var)=250e ; Saving dans ce log : 6
+    SEP=ce9b retrouvé comme Saving dans : [('20261107-033436', 'SEP-xART')]
+    USER=1f75 retrouvé comme Saving dans : [('20261107-033436', 'USER-xART')]
+    SEPL=250e retrouvé comme Saving dans : [('20261107-033436', 'SEP-xART Locker')]
+20261107-034841_c2b-boot: fetch SEP=4db8 USER=1f75 SEPL(var)=9ef0 ; Saving dans ce log : 3
+    SEP=4db8 retrouvé comme Saving dans : [('20261107-034313', 'SEP-xART')]
+    USER=1f75 retrouvé comme Saving dans : [('20261107-033436', 'USER-xART')]
+    SEPL=9ef0 retrouvé comme Saving dans : [('20261107-034313', 'SEP-xART Locker')]
+20261107-035422_c3-touchid: fetch SEP=a4b4 USER=1f75 SEPL(var)=cebc ; Saving dans ce log : 6
+    SEP=a4b4 retrouvé comme Saving dans : [('20261107-034841', 'SEP-xART')]
+    USER=1f75 retrouvé comme Saving dans : [('20261107-033436', 'USER-xART')]
+    SEPL=cebc retrouvé comme Saving dans : [('20261107-034841', 'SEP-xART Locker')]
+20261107-035930_c3-touchid: fetch SEP=da74 USER=1f75 SEPL(var)=88b5 ; Saving dans ce log : 58
+    SEP=da74 retrouvé comme Saving dans : [('20261107-035422', 'SEP-xART')]
+    USER=1f75 retrouvé comme Saving dans : [('20261107-033436', 'USER-xART')]
+    SEPL=88b5 retrouvé comme Saving dans : [('20261107-035422', 'SEP-xART Locker')]
+20261107-042414_c4-shmem: fetch SEP=41fe USER=530d SEPL(var)=f1f1 ; Saving dans ce log : 3
+    SEP=41fe retrouvé comme Saving dans : [('20261107-035930', 'SEP-xART')]
+    USER=530d retrouvé comme Saving dans : [('20261107-035930', 'USER-xART')]
+    SEPL=f1f1 retrouvé comme Saving dans : [('20261107-035930', 'SEP-xART Locker')]
+20261107-043309_c5-ool-boot: fetch SEP=328 USER=530d SEPL(var)=39fc ; Saving dans ce log : 3
+    SEP=328 retrouvé comme Saving dans : [('20261107-042414', 'SEP-xART')]
+    USER=530d retrouvé comme Saving dans : [('20261107-035930', 'USER-xART')]
+    SEPL=39fc retrouvé comme Saving dans : [('20261107-042414', 'SEP-xART Locker')]
+20261107-043828_c6-doigt-ool: fetch SEP=7a75 USER=530d SEPL(var)=4336 ; Saving dans ce log : 16
+    SEP=7a75 retrouvé comme Saving dans : [('20261107-043309', 'SEP-xART')]
+    USER=530d retrouvé comme Saving dans : [('20261107-035930', 'USER-xART')]
+    SEPL=4336 retrouvé comme Saving dans : [('20261107-043309', 'SEP-xART Locker')]
+20261107-045400_c7-ool-light: fetch SEP=706 USER=4add SEPL(var)=58dc ; Saving dans ce log : 3
+    SEP=706 retrouvé comme Saving dans : [('20261107-043828', 'SEP-xART')]
+    USER=4add retrouvé comme Saving dans : [('20261107-043828', 'USER-xART')]
+    SEPL=58dc retrouvé comme Saving dans : [('20261107-043828', 'SEP-xART Locker')]
+20261107_h2-notrace-2: fetch SEP=5a3d USER=5708 SEPL(var)=665d ; Saving dans ce log : 10
+    SEP=5a3d retrouvé comme Saving dans : aucun log précédent
+    USER=5708 retrouvé comme Saving dans : aucun log précédent
+    SEPL=665d retrouvé comme Saving dans : aucun log précédent
+20261107_h2-notrace: pas de Fetched (boot non couvert par ce log)
+20261108-004657_c8-doigt-ool: fetch SEP=f3c3 USER=4add SEPL(var)=fe2d ; Saving dans ce log : 24
+    SEP=f3c3 retrouvé comme Saving dans : [('20261107-045400', 'SEP-xART')]
+    USER=4add retrouvé comme Saving dans : [('20261107-043828', 'USER-xART')]
+    SEPL=fe2d retrouvé comme Saving dans : [('20261107-045400', 'SEP-xART Locker')]
+20261108-010915_c9-boot-ool-persist: fetch SEP=23b9 USER=1275 SEPL(var)=3868 ; Saving dans ce log : 3
+    SEP=23b9 retrouvé comme Saving dans : [('20261108-004657', 'SEP-xART')]
+    USER=1275 retrouvé comme Saving dans : [('20261108-004657', 'USER-xART')]
+    SEPL=3868 retrouvé comme Saving dans : [('20261108-004657', 'SEP-xART Locker')]
+20261108-012015_c10b-boot-ool-stable: fetch SEP=2713 USER=1275 SEPL(var)=d6e0 ; Saving dans ce log : 3
+    SEP=2713 retrouvé comme Saving dans : aucun log précédent
+    USER=1275 retrouvé comme Saving dans : [('20261108-004657', 'USER-xART')]
+    SEPL=d6e0 retrouvé comme Saving dans : aucun log précédent
+20261108-025802_c11-doigt-tranchant: fetch SEP=72c6 USER=1275 SEPL(var)=b830 ; Saving dans ce log : 56
+    SEP=72c6 retrouvé comme Saving dans : [('20261108-012015', 'SEP-xART')]
+    USER=1275 retrouvé comme Saving dans : [('20261108-004657', 'USER-xART')]
+    SEPL=b830 retrouvé comme Saving dans : [('20261108-012015', 'SEP-xART Locker')]
+20261108-032454_c12-boot-ho: fetch SEP=2620 USER=2505 SEPL(var)=9f3f ; Saving dans ce log : 3
+    SEP=2620 retrouvé comme Saving dans : [('20261108-025802', 'SEP-xART')]
+    USER=2505 retrouvé comme Saving dans : [('20261108-025802', 'USER-xART')]
+    SEPL=9f3f retrouvé comme Saving dans : [('20261108-025802', 'SEP-xART Locker')]
+20261108-163401_c13-ke1: fetch SEP=36f3 USER=2505 SEPL(var)=1dac ; Saving dans ce log : 3
+    SEP=36f3 retrouvé comme Saving dans : [('20261108-032454', 'SEP-xART')]
+    USER=2505 retrouvé comme Saving dans : [('20261108-025802', 'USER-xART')]
+    SEPL=1dac retrouvé comme Saving dans : [('20261108-032454', 'SEP-xART Locker')]
+20261108-171039_c14-ke1: fetch SEP=4ba USER=2505 SEPL(var)=3490 ; Saving dans ce log : 3
+    SEP=4ba retrouvé comme Saving dans : [('20261108-163401', 'SEP-xART')]
+    USER=2505 retrouvé comme Saving dans : [('20261108-025802', 'USER-xART')]
+    SEPL=3490 retrouvé comme Saving dans : [('20261108-163401', 'SEP-xART Locker')]
+20261108-181424_c15-ke1: fetch SEP=a01 USER=2505 SEPL(var)=7dfa ; Saving dans ce log : 20
+    SEP=a01 retrouvé comme Saving dans : [('20261108-171039', 'SEP-xART')]
+    USER=2505 retrouvé comme Saving dans : [('20261108-025802', 'USER-xART')]
+    SEPL=7dfa retrouvé comme Saving dans : [('20261108-171039', 'SEP-xART Locker')]
+20261108-183948_c16-ke1: fetch SEP=208d USER=c466 SEPL(var)=2634 ; Saving dans ce log : 18
+    SEP=208d retrouvé comme Saving dans : [('20261108-181424', 'SEP-xART')]
+    USER=c466 retrouvé comme Saving dans : [('20261108-181424', 'USER-xART')]
+    SEPL=2634 retrouvé comme Saving dans : [('20261108-181424', 'SEP-xART Locker')]

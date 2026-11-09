@@ -617,3 +617,94 @@ app »). Pour `TYPE=0x01 PARAM=0x53|0x9c` et `TYPE=0x06`, DATA>>16 = CRC affich�
 (L237 ↔ uart L1992 ; L1122 ↔ L2781 ; L1140 ↔ L2791 ; L1243 ↔ L2841 ; L1245 ↔ L2844…). `TYPE=0x1d` (op 29) porte un nom
 d'endpoint en ASCII (PARAM + DATA, ex. L106 `sbio`). Les lignes doc-asahi (`> TYPE 0`, `< TYPE 5/7 PARAM 0x10`) décrivent
 donc un sens qui n'est pas celui observé ici : à revoir (hypothèse : la doc décrit l'usage depuis m1n1/Linux).
+
+### xART au boot — traces (analyste, 2026-11-10, hors ligne, aucune écriture SEP)
+
+Sources : les 19 `sep.log` de `traces/` (C1 = `20261107-033436_c1-boot`, référence pour les numéros `Lnnn`) et leurs `hv_uart.log` (noyau).
+Scripts : `analysis/xart_boot.py` (fenêtre complète par trace → `analysis/out/xart_boot.txt`), `analysis/xart_cntl.py`
+(CNTL → `xart_cntl.txt`), `analysis/xart_boot_crc.py` + `analysis/xart_chain.py` (CRC noyau, enchaînement d'un boot au suivant →
+`xart_boot_crc.txt`, `xart_chain.txt`). Tout statut ci-dessous reste `hypothèse` ; les valeurs sont des faits lus.
+
+**Échange en 3 temps (C1, identique en structure dans 19/19)**
+
+| # | Ligne C1 | Dir | EP | TAG | TYPE | PARAM | DATA | Remarque (vu / interprété) |
+|---|----------|-----|----|-----|------|-------|------|----------------------------|
+| 0 | L16-L38 | `<` | 0xFD | 0 | 0/1 | ep | nom / tailles | annonces de 7 EP : hibe, stac, cntl, xars, xarm, pnon, hdcp (ordre variable : l'ordre de L16-L38 n'est pas le même dans toutes les traces) |
+| 1 | L30 | `<` | 0x13 | 0x02 | 0x0e | 0 | 0 | 1er message de xarm, 0,3 ms après son annonce ; **personne ne répond pendant 2,8 à 3,8 s** (tableau plus bas) |
+| 2 | L34, L35 | `<` | 0x00 | 0 | 0x0d, 0x29 | 0 | 0 | spontanés, juste après l'annonce de pnon, dans cet ordre (19/19) ; 0x29 = « unsolicited » pour le noyau |
+| 3 | L39-L40 | `>`/`<` | 0x00 | 7 ou 8 | 0x14 → 0x01 | 0 | 0 → 3 | requête d'info de l'AP, réponse DATA=3 (19/19) |
+| 4 | L41-L98 | `>`/`<` | 0x00 | 8 ou 7 | 4,2,5,3 → 0x01 | ep | taille / page | activation CNTL de 0x0e, 0x18, 0x13 (+ échanges 0x0e/0x18 hors sujet) ; ordre des 3 EP varie, voir plus bas |
+| 5 | L76 | `<` | 0x00 | 0 | 0x10 | 0 | 0 | spontané, 1 fois, avant la 1re réponse AP sur 0x13 (19/19) ; position exacte variable |
+| 6 | L99 | `>` | 0x13 | 0x02 | 0x00 | 0 | 0x00000100 | 1re réponse de l'AP (à la requête TAG 2 / TYPE 0x0e) |
+| 7 | L100-L101 | `<`,`>` | 0x13 | 0x01 | 0x13 ; 0x00 | 0 ; 0 | 0 ; 0 | requête SEP TYPE 0x13, réponse AP TYPE 0 DATA 0 (noyau : `Replied … 0x…0113`) |
+| 8 | L102-L103 | `<`,`>` | 0x13 | 0x03 | 0x00 ; 0x00 | 0 ; **0x64** | 0x100 ; **0x103** | noyau : « Fetched **SEP-xART** with CRC » juste avant (CRC variable) ; réponse noyau `0x0000010364000313` |
+| 9 | L104-L105 | `<`,`>` | 0x13 | 0x04 | 0x00 ; 0x00 | 0 ; **0xad** | 0 ; **0x07** | noyau : « Fetched **USER-xART** with CRC » (CRC variable) ; réponse `0x00000007ad000413` |
+| 10 | L106 | `<` | 0x13 | 0x00 | 0x1d | 0x6f | 0x00736269 | « sbi »+« o » = **sbio** ; annonce 0xFD de sbio 0,1 ms après (L107-L109) ; **0,122 s après la réponse TAG 4** (0,122 à 0,134 s sur 19) |
+| 11 | L110 | `>` | 0x13 | 0x00 | 0x16 | 0 | 0x00736200 | acquittement de l'AP : 2 premiers caractères (« sb »). Même schéma pour skdl (`sk`), sse (`ss`), sks (`sk`), scrd (`sc`) : L111-L128, 5 annonces `<` 0x1d / 5 acquittements `>` 0x16 |
+| 12 | L125-L159 | `<`,`>` | 0x13 | 5…0x0b | 5 ; 0 | 0x10 ; voir ci-dessous | 0x100 ; voir ci-dessous | 7 premières demandes « fetch locker », après les annonces sks/scrd |
+
+Sbio est annoncé en 6e (messages 0x13 de L99 à L106) ; les 4 autres (skdl L111, sse L115, sks L119, scrd L120) suivent dans les 14 lignes qui
+suivent. Dans les 19 traces l'annonce 0xFD de sbio, sks, scrd, sse, skdl vient **après** la 1re réponse AP sur 0x13 (19/19), et l'activation CNTL
+(`> EP=0x00 TYPE=4 PARAM=ep`) de chacun de ces 5 EP vient **après** son annonce (19/19). Les 7 EP du « sans macOS » (SEP-BOOT 2026-11-09) sont
+donc ceux annoncés avant tout échange AP→SEP sur 0x13.
+
+**Questions/réponses de type « fetch » (requête SEP `TYPE=5 PARAM=0x10`, réponse AP `TYPE=0`)** — valeurs lues dans C1 et identiques dans 19/19
+(ordre et valeurs, au jitter de quelques ms près) ; lien avec le noyau (`hv_uart.log` C1 L1502-L1545) :
+
+| TAG | Requête SEP (`<`) | Réponse AP (`>`) PARAM / DATA | Noyau (uart C1) | CRC noyau, 19 boots |
+|-----|-------------------|------------------------------|-----------------|---------------------|
+| 5, 6 | TYPE 5 P 0x10 D 0x100 | 0x82 / 0x10a | « Fetched SEP-xART Locker » ×2 | 0xc70f, constant |
+| 7, 8 | idem | 0xb6 / 0x100 | idem ×2 | 0xe0aa, constant |
+| 9 | **TYPE 7** P 0x10 D 0 | 0x00 / 0x00 | « USER_XART_LOCKER with uuid D15BC8DA-… **not found** » | — (uuid identique, 19/19) |
+| 0x0a, 0x0b | TYPE 5 P 0x10 D 0x100 | 0x01 / 0x102 | idem ×2 | 0xcf1d, constant |
+| 0x0c, 0x0d | idem | 0x28 / 0x100 | idem ×2 | 0x9ae7, constant |
+| 0x0e, 0x0f | TYPE 5 P 0x10 **D 0** | 0x7c / 0x00 | « Fetched USER-xART » **sans CRC** (×2) | — |
+| 0x10-0x12 | TYPE 5 P 0x10 D 0x100 | 0x1f / 0x101 | « Fetched SEP-xART Locker » ×3 | **variable** (0x88b6, 0x250e, 0x9ef0…) |
+
+Les 6 requêtes de type 5 ne contiennent **aucun identifiant** du locker demandé (header identique) : l'identité est donc ailleurs (mémoire
+partagée), non tracée. Les lockers 0xc70f, 0xe0aa, 0xcf1d, 0x9ae7 sont demandés dans le même ordre, avec les mêmes réponses, dans 19/19.
+Après TAG 0x12 viennent (C1) les 3 « Saving » (TAG 0x13, 0x14, 0x15 : `< TYPE 1 P 0x53 D CRC<<16|0x0103`, `< TYPE 6 P 0x2f D CRC<<16|0x0101`,
+`< TYPE 1 …`) ; la réponse AP **recopie le CRC** (DATA>>16 identique, 84/84 « Saving » SEP et 168/168 « Saving » USER, boot comme session) et met DATA bas à 0x0100
+(requêtes 0x0103/0x0101 → 0x0100 ; requête USER `…0007` → `…0000`, 168/168) ; PARAM de la réponse = 0.
+
+**Ce qui varie d'un boot à l'autre (vu)**
+- Horodatages ; **durée d'attente de l'AP** entre `<TAG2/0x0e` et `>TAG2` : 2,81 s à 3,82 s (19 boots) ; délai TAG 4 → 1er 0x1d : 0,122 s (17×), 0,133 s, 0,134 s.
+- **Contenu (CRC noyau) de « SEP-xART » (fetch TAG 3) : différent à chaque boot** (22f, ce9b, 4db8, a4b4, da74, 41fe, 328, 7a75, 706, f3c3, 23b9, 2713,
+  72c6, 2620, 36f3, 4ba, a01, 208d…). **« USER-xART » (TAG 4)** : change de temps en temps (6178, 1f75, 530d, 4add, 1275, 2505, c466…),
+  stable sur plusieurs boots entre deux. **Locker variable (TAG 0x10-0x12)** : différent à chaque boot.
+- Les 3 CRC des « Saving » de boot (TAG 0x13-0x15 en C1) : différents à chaque boot.
+- Entête de CNTL : TAG 7 ou 8 (l'un pour la requête 0x14, l'autre pour les 4/2/5/3 ; permuté d'un boot à l'autre, c10b et c15 mélangent les deux) ;
+  ordre d'activation CNTL des EP 0x0e/0x18/0x13 ; page de départ du buffer xarm (T2 = 0x14, 0x1c, 0x24, 0x2c ou 0x3c selon son rang d'activation ;
+  T4 = T5 = 0x8000 toujours). `xart_cntl.txt`.
+- Entrelacement local (quelques ms) des annonces 0x1d et des acquittements 0x16 (rangs 8-17 de l'échange) et d'un couple TAG5/acquittement (c5, c6, c8, c9…).
+- Trace C11 : 8 messages de plus avant le 1er `> EP=0x08` (TAG 0x16-0x19 : 4 fetch, réponses `P 0x14 D 0x120` ×2 et `P 0xb2 D 0` ×2) — fenêtre plus longue (sbio activé L348), pas une différence de boot.
+
+**Ce qui est identique (vu, 19/19)** : la suite des 46 premiers messages 0x13 (TAG, TYPE, PARAM, DATA, direction) hors jitter ; les 4 lockers constants ;
+les deux entêtes de réponse PARAM/DATA à SEP-xART (0x64/0x103) et USER-xART (0xad/0x07), **qui ne changent pas quand le CRC du contenu change** ;
+les noms (5 annonces) ; `0x0d` puis `0x29` puis requête `0x14` (réponse 3) puis `0x10` ; les 7 EP annoncés avant, les 5 après.
+
+**Dépendance à l'état du disque (contenu OOL/shmem) — vu**
+- Le noyau lit un « Gigalocker » : `init_data_protection: Gigalocker file (/System/Volumes/xarts/<UUID>.gl) exists`, volume `xART` monté juste avant
+  (hv_uart C1 L1463-L1501), puis « OS UUID is EFF3C698-… » puis les `Replied to xART app`.
+- **Enchaînement d'un boot au suivant** (`xart_chain.txt`) : le CRC « Fetched SEP-xART » d'un boot est égal au dernier « Saving SEP-xART » du boot tracé précédent
+  dans 15/15 paires consécutives (exceptions explicables : 1er boot, boots non tracés entre h2-notrace-2 et c8, c10 sans uart) ; « Fetched USER-xART » = dernier « Saving USER-xART »
+  précédent dans 16/16. Locker variable (TAG 0x10-0x12) = un des « Saving SEP-xART Locker » du boot précédent dans toutes les paires (le dernier seulement dans 7/16 :
+  ce n'est donc pas « le dernier » pour celui-là).
+- Conclusion de lecture : ce que l'AP renvoie dans ces 3 cas est **ce que le SEP lui avait fait enregistrer au boot précédent** (état persistant sur le disque macOS), pas une constante.
+  Les 4 lockers constants sont aussi relus du disque (fichiers fixes). L'entête de réponse (PARAM/DATA) ne porte que de la métadonnée (taille ? flags ?) : rôle non établi.
+- **Non tracé** : le contenu des buffers xarm (A = T2, B = T3 en CNTL, 0x8000 chacun) ; aucun `ool=` sur EP 0x13 dans les 19 traces (OOL capturé seulement pour 0x08).
+  Seuls les CRC 16 bits (DATA>>16 des « Saving », texte noyau des « Fetched ») sont connus. Tailles de blobs : inconnues (PARAM 0x64 = 100, 0xad = 173 : peut-être des tailles, hypothèse).
+- Remarque sur la table d'alignement noyau (début du fichier, « 14/36 diffèrent sur les bits ≥ 40 ») : pour les acquittements `TYPE 0x16`, le tracer lit DATA=`0x0073_6200`
+  (« sb ») alors que le noyau imprime `0x…6200…` (1 seul caractère, 'b'). Cause : le noyau n'affiche que le 2e caractère (vu sur les 5) ; hypothèse non vérifiée.
+
+**Un « rejeu » après un boot SEP par m1n1 est-il envisageable ? (jugement de l'analyste, hypothèse)**
+- Partie mécanique : **oui en principe**. Le SEP ne répond qu'une fois les 7 EP annoncés, il attend 3-4 s l'AP ; les entêtes de réponse sont des constantes lues
+  dans 19 boots (tableaux ci-dessus), l'ordre des demandes est fixe, et ces seules réponses ont suffi (dans les traces) à faire annoncer sbio, sks, scrd, sse, skdl 0,12 s plus tard.
+- Ce qui manque pour que ça marche : (1) le **contenu** des 6 blobs (SEP-xART, USER-xART, 4 lockers + 1 locker variable) à déposer dans la mémoire partagée xarm
+  avant chaque réponse — jamais capturé ; (2) savoir où et comment le SEP les lit (buffer A ou B, offsets, taille) ; (3) la source des blobs : fichier `.gl` du volume xART de macOS,
+  dont le SEP exige la version écrite au boot précédent (chaînage observé) — un rejeu avec un vieux contenu est un cas non testé ; (4) la **sauvegarde** : le SEP émet des
+  « Saving » (TAG 0x13-0x15 + ceux de la session) à stocker sur le disque, sinon le boot suivant (macOS ou m1n1) lira un état périmé ; la perte d'état est
+  un risque pour le Mac (le 2026-11-09 la session iCloud avait sauté après SEP-BOOT, cause non établie) ; (5) le comportement du SEP en cas de « not found » (TAG 9) et de TYPE 7 inconnus.
+- **Toute réponse sur EP 0x13 est une écriture vers le SEP : ligne rouge.** Si jamais tenté : script dans `pending/`, lancé par Albert, après décision sur ses données (backup non existant).
+- Capture manquante, en lecture seule, qui fermerait le point (1)-(2) : OOL sur EP 0x13 (tampons xarm), en sachant que les blobs xART contiennent probablement du
+  matériau sensible (jetons de keybag) : à décider avant de les écrire dans `traces/`. Non fait.

@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-10 00:50 — analyste — Échange xART (EP 0x13) et EP 0x00 avant sbio, 19 boots macOS (hors ligne)
+- Trace : les 19 `sep.log` + `hv_uart.log` de traces/ (lecture seule). Scripts : analysis/xart_boot.py, xart_cntl.py, xart_boot_crc.py, xart_chain.py ; sorties analysis/out/xart_*.txt.
+- Vu : 46 premiers messages 0x13 identiques en TAG/TYPE/PARAM/DATA dans 19/19 (hors jitter de quelques ms). SEP attend 2,8-3,8 s la 1re réponse de l'AP (TAG 2/0x0e), puis 4 requêtes (TAG 1, 3, 4) ; 0,122 s après la réponse TAG 4 il annonce sbio puis skdl, sse, sks, scrd (TYPE 0x1d, acquittés par `> TYPE 0x16`) ; 14 « fetch locker » suivent (TAG 5-0x12). EP 0x00 avant : 0x0d, 0x29, requête 0x14 (réponse 3), 0x10 ; CNTL TAG 7/8 permuté. Réponses AP : entêtes constants (PARAM/DATA), mais le contenu (CRC noyau) de SEP-xART, USER-xART et d'un locker varie ; il est égal à ce que le SEP a fait sauver au boot précédent (15/15 et 16/16 paires consécutives). Le CRC des « Saving » est recopié par l'AP (252/252).
+- Interprété (hypothèse) : réponses = entête constant + contenu d'état lu sur le disque ; rejeu mécanique possible sur le papier mais il manque le contenu des buffers xarm (jamais tracé : pas d'OOL sur 0x13), et toute réponse sur 0x13 est une écriture SEP (pending/, Albert). Détail dans docs/messages.md « xART au boot — traces ».
+- Incidents : aucun (aucun accès hardware).
+
 ## 2026-11-10 00:20 — Albert, Claude — Contrôle iCloud : 2 reboots natifs sans demande de connexion
 - Rapport d'Albert : deux redémarrages normaux sous macOS, aucun problème de login.
 - Interprété : la déconnexion n'est pas un état durable ; cause toujours non établie (effet unique du boot SEP par m1n1, ou événement indépendant). Pas de preuve contre le boot SEP, mais pas de dégât persistant observé.
