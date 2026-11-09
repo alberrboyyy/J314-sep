@@ -14,6 +14,11 @@ Format :
 
 ---
 
+## 2026-11-09 22:20 — Albert, Claude — Après SEP-BOOT : retour sous macOS
+- Rapport d'Albert : macOS démarre, tout va bien, **mais il a dû se reconnecter à son compte Apple** (iCloud).
+- Interprété (hypothèse) : effet de bord probable du démarrage du SEP par m1n1 (le SEP a perdu/invalidé un état lié aux jetons du compte), puisque ~20 reboots/captures sous hyperviseur avant n'avaient rien provoqué de tel (aucun signalement). Non prouvé : Touch ID non testé dans ce message.
+- Décision : **pause avant toute réponse xART/pnon** (zones liées au disque chiffré et au trousseau). Pas de nouveau boot SEP par m1n1 sans nouvelle décision d'Albert.
+
 ## 2026-11-09 22:10 — Albert (lancé), Claude (noté) — SEP-BOOT : SEPOS démarre depuis m1n1 seul
 - Trace : traces/20261109-221029_sep_boot (pending/sep_boot.sh corrigé : DART T6000 explicite)
 - Fait : séquence publique m1n1 (GET_STATUS → BOOT_TZ0 → GET_STATUS → BOOT_IMG4 + SET_SHMEM) avec le firmware SEPFW déjà en RAM, puis écoute 30 s.
