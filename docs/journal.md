@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-09 23:40 — Claude — spi2 : adresse confirmée par l'ADT
+- Trace : traces/20261108-162919_adt/adt.txt L1042-1080
+- Vu : spi2 `reg = 0x19B108000` (taille 0x4000) → adresse CPU **0x39B108000** (= 0x200000000 + 0x19B108000), confirme la déduction du documentaliste ; interrupts [1108], clock-gates 144, `function-spi_cs0 = 1:null()` (pas de GPIO pour le chip-select) ; aucune propriété de broches (pinctrl) dans le nœud ; mesa `reg = 00000000 f4010000 00010108 …` (sens non décodé).
+- Interprété (hypothèse) : le chip-select est le CS natif du contrôleur ; les broches SPI de spi2 ne sont pas listées dans l'ADT, donc soit fonction fixe, soit configurées par iBoot/pmgr : à ne pas deviner. Pour un overlay Linux : reg 0x39b108000, interruption 1108 (IRQ AIC, déjà connue des autres spi), power-domain ps_spi2 (pmgr 0x200), horloge fixe 24 MHz ; manque : pinctrl.
+- Incidents : aucun.
+
 ## 2026-11-09 23:30 — Claude (analyste) — messages.md : EP 0xFF/0xFE sans macOS, colonne « annoncé sans macOS »
 - Trace : traces/20261109-210517_sep_peek, 20261109-212150_sep_getrand, 20261109-221029_sep_boot (lecture seule)
 - Fait : nouvelle section « EP 0xFF / 0xFE (boot ROM) — traces du 2026-11-09 » dans docs/messages.md ; colonne « Annoncé sans macOS ? » dans la table des endpoints (oui : cntl, hdcp, xars, xarm, hibe, pnon, stac ; non vu : sbio, scrd, sse, sks, skdl).
