@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-10 01:10 — Claude — Test capteur sur le Linux de test : arrêt avant d'alimenter spi2
+- Trace : /root/live.dts sur 10.67.0.94 (dump du DT vivant, lecture seule) ; aucune charge de module.
+- Vu : DT vivant sans `__symbols__` (overlay par labels impossible, phandles numériques seulement) ; spi1 : power-domains 0x5f (pmgr `power-controller@1f8`, label spi1), clocks 0x31/0x5d, interrupt-parent 0x13 (AIC), pinctrl@39b028000 = 0x48 (255 broches). **Pas de domaine d'alimentation pour spi2** : `power-controller@200` existe seulement dans un autre bloc pmgr et s'appelle `afnc1_ls` (toujours allumé), donc l'hypothèse « ps_spi2 = pmgr 0x200 » du documentaliste ne tient pas dans ce DT. Pas de pinctrl spi2. Pas de configfs d'overlay (OF_OVERLAY=y seulement).
+- Interprété : alimenter et brancher spi2 demande de deviner un registre pmgr et des broches : risque matériel non justifié par le gain (le statut capteur brut n'est pas garanti lisible sans la requête du SEP). Test non fait.
+- Décision : pas d'overlay sur le Mac. Suite possible = lire l'ADT pmgr (power-state de spi2 côté macOS) en lecture seule via m1n1, ou arrêter.
+
 ## 2026-11-10 00:50 — analyste — Échange xART (EP 0x13) et EP 0x00 avant sbio, 19 boots macOS (hors ligne)
 - Trace : les 19 `sep.log` + `hv_uart.log` de traces/ (lecture seule). Scripts : analysis/xart_boot.py, xart_cntl.py, xart_boot_crc.py, xart_chain.py ; sorties analysis/out/xart_*.txt.
 - Vu : 46 premiers messages 0x13 identiques en TAG/TYPE/PARAM/DATA dans 19/19 (hors jitter de quelques ms). SEP attend 2,8-3,8 s la 1re réponse de l'AP (TAG 2/0x0e), puis 4 requêtes (TAG 1, 3, 4) ; 0,122 s après la réponse TAG 4 il annonce sbio puis skdl, sse, sks, scrd (TYPE 0x1d, acquittés par `> TYPE 0x16`) ; 14 « fetch locker » suivent (TAG 5-0x12). EP 0x00 avant : 0x0d, 0x29, requête 0x14 (réponse 3), 0x10 ; CNTL TAG 7/8 permuté. Réponses AP : entêtes constants (PARAM/DATA), mais le contenu (CRC noyau) de SEP-xART, USER-xART et d'un locker varie ; il est égal à ce que le SEP a fait sauver au boot précédent (15/15 et 16/16 paires consécutives). Le CRC des « Saving » est recopié par l'AP (252/252).
