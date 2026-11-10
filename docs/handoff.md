@@ -37,10 +37,11 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 
 ### Avec le Mac sur le Linux de test (joignable à 10.0.200.4), sans action d'Albert
 - [x] Recharger les modules et refaire le « bonjour » (reproductibilité) : FAIT 2026-11-10 sur 10.0.200.4, identité identique, avec le module rangé (transport). Entrée journal du jour.
-- [!] Lire l'état du capteur en boucle 30 s sans doigt : module mesa_statloop.c prêt (2e client du transport, compilé W=1), mais le VPN est retombé avant de le lancer. À faire : `cd /root/mesa && git… ` → en pratique pousser mesa_statloop.c + Makefile, recompiler, `rmmod mesa_probe 2>/dev/null; insmod mesa_statloop.ko enable=1 duree=30; dmesg | tail -40`.
+- [x] État du capteur en boucle 30 s sans doigt : stable (2026-11-10, mesa_statloop.c ; 0x18 seulement à la 1re lecture).
 
 ### Avec Albert devant le Mac (2 minutes)
-- [ ] Doigt posé sans la puce de sécurité : l'état du capteur change-t-il ? (attendu : non, car le logiciel interne du capteur n'est pas chargé).
+- [x] Doigt posé sans la puce de sécurité : l'état ne change pas (2026-11-10, 1 essai, doigt déclaré par Albert). Journal 06:08.
+- [ ] Même essai en regardant la broche d'interruption du capteur (gpio0 195) : bouge-t-elle quand le doigt se pose ?
 
 ### Décisions qui appartiennent à Albert
 - [ ] Faut-il s'inscrire au programme de vérification d'Anthropic pour débloquer l'étude du « coffre » ?

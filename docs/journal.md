@@ -14,6 +14,16 @@ Format :
 
 ---
 
+## 2026-11-10 06:08 — Albert (doigt), Claude — DOIGT-LINUX, 2e passe : doigt annoncé posé, état inchangé
+- Trace : — (Linux de test 10.0.200.4, dmesg ; `insmod mesa_statloop.ko enable=1 duree=30`, fenêtre 06:07:42 → 06:08:12 heure du Mac).
+- Fait : Albert a écrit « je le mets maintenant » ; boucle lancée aussitôt après son message (la 1re passe de 06:06 reste sans confirmation du doigt).
+- Vu : 31 lectures, les deux mêmes formes que sans doigt : 1re `… 09 60 00 00 18 00 00 00 00`, puis 30 × `… 09 60 00 00 00 00 00 00 00`. Capteur éteint.
+- Interprété : conforme à la prédiction écrite avant (docs/hypotheses.md DOIGT-LINUX) : allumé et réveillé par Linux seul, le capteur ne signale
+  pas le doigt dans sa réponse d'état. Statut : `vérifié (1 essai)` pour « l'état lu par 0x10 ne change pas avec le doigt », sous réserve que le
+  doigt soit resté posé pendant la fenêtre (déclaré par Albert, pas mesuré). Non testé : la broche d'interruption du capteur (gpio0 195), qui
+  pourrait bouger sans que l'état change ; lecture à 1 Hz seulement.
+- Incidents : aucun.
+
 ## 2026-11-10 06:07 — Claude (+ Albert à confirmer) — État du capteur en boucle depuis Linux : repos 30 s, puis essai DOIGT-LINUX 45 s
 - Trace : — (Linux de test 10.0.200.4, tools/linux_ssh.sh, dmesg ; module driver/linux/mesa_statloop.c ; trames 0x78 et 0x10 seulement, rien vers le SEP).
 - Fait : (1) sans doigt, `insmod mesa_statloop.ko enable=1 duree=30` ; (2) protocole DOIGT-LINUX de docs/hypotheses.md (prédiction écrite avant),

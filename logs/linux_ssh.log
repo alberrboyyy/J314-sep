@@ -55,3 +55,4 @@
 2026-11-10 12:05:27 run: cd /root/mesa && rmmod mesa_probe; insmod mesa_statloop.ko enable=1 duree=30; dmesg | grep -E 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|alimentation|échoué|non reconnu'
 2026-11-10 12:06:19 run: echo ok; lsmod | grep -c mesa_statloop
 2026-11-10 12:06:27 run: cd /root/mesa && rmmod mesa_statloop; date +%T; insmod mesa_statloop.ko enable=1 duree=45; date +%T; dmesg | grep 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|échoué|non reconnu' | tail -50
+2026-11-10 12:07:41 run: cd /root/mesa && rmmod mesa_statloop; date +%T; insmod mesa_statloop.ko enable=1 duree=30; date +%T; dmesg | grep 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|échoué|non reconnu' | tail -33
