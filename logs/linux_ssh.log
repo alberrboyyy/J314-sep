@@ -48,3 +48,10 @@
 2026-11-10 12:01:52 run: cd /root/mesa && cp mesa-spi2.dtbo /lib/firmware/ && insmod mesa_ovl.ko && insmod mesa_probe.ko enable=1; echo '=== dmesg ==='; dmesg | tail -30
 2026-11-10 12:03:02 put: driver/linux/mesa_statloop.c -> /root/mesa/mesa_statloop.c
 2026-11-10 12:03:13 run: echo ok
+2026-11-10 12:04:10 run: echo ok
+2026-11-10 12:05:17 put: driver/linux/mesa_statloop.c -> /root/mesa/mesa_statloop.c
+2026-11-10 12:05:18 put: driver/linux/Makefile -> /root/mesa/Makefile
+2026-11-10 12:05:19 run: cd /root/mesa && uptime && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E 'CC|LD|rror|arning: [^tp]' ; lsmod | grep mesa || echo 'aucun module mesa'
+2026-11-10 12:05:27 run: cd /root/mesa && rmmod mesa_probe; insmod mesa_statloop.ko enable=1 duree=30; dmesg | grep -E 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|alimentation|échoué|non reconnu'
+2026-11-10 12:06:19 run: echo ok; lsmod | grep -c mesa_statloop
+2026-11-10 12:06:27 run: cd /root/mesa && rmmod mesa_statloop; date +%T; insmod mesa_statloop.ko enable=1 duree=45; date +%T; dmesg | grep 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|échoué|non reconnu' | tail -50

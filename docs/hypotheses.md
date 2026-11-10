@@ -919,3 +919,12 @@ Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n
 - Attendu si relais pur : pour chaque essai, une ou plusieurs réceptions SPI dont le sha1 = celui du buffer OOL du 0x65.
   Sinon (contenu différent) : l'AP transforme l'image, hypothèse à revoir.
 - Risque : le mode SYNC sur SIO + SEP ralentit macOS ; Touch ID peut échouer ou être lent (à noter, pas grave).
+
+## EXPÉRIENCE HUMAINE — DOIGT-LINUX (2026-11-10) : doigt posé, capteur allumé par Linux seul, sans la puce de sécurité
+- Cadre : Linux de test (10.0.200.4), module `driver/linux/mesa_statloop.c` (trames en clair 0x78 et 0x10 seulement). Pas de m1n1, rien vers le SEP.
+- Référence sans doigt (faite juste avant, 31 lectures sur 30 s) : 1re lecture `80 20 00 10 000000 09 60 00 00 18 00 00 00 00`,
+  puis 30 lectures identiques `… 09 60 00 00 00 00 00 00 00`. État stable au repos ; l'octet 0x18 ne paraît qu'à la 1re lecture.
+- Protocole : boucle de 45 s (1 lecture/s). Albert pose le doigt vers 5-10 s, le garde ~15 s, le retire. Il dit ce qu'il a fait.
+- PRÉDICTION (écrite avant) : aucun changement de l'état (mêmes 2 formes que la référence), car le logiciel interne du capteur
+  n'est chargé que par l'échange chiffré avec le SEP. Si un octet change pendant le doigt : le capteur détecte le doigt
+  tout seul, et cet octet devient candidat « doigt présent » (à refaire une 2e fois avant de le dire vérifié).

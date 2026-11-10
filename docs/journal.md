@@ -14,6 +14,18 @@ Format :
 
 ---
 
+## 2026-11-10 06:07 — Claude (+ Albert à confirmer) — État du capteur en boucle depuis Linux : repos 30 s, puis essai DOIGT-LINUX 45 s
+- Trace : — (Linux de test 10.0.200.4, tools/linux_ssh.sh, dmesg ; module driver/linux/mesa_statloop.c ; trames 0x78 et 0x10 seulement, rien vers le SEP).
+- Fait : (1) sans doigt, `insmod mesa_statloop.ko enable=1 duree=30` ; (2) protocole DOIGT-LINUX de docs/hypotheses.md (prédiction écrite avant),
+  `duree=45`, fenêtre 06:06:27 → 06:07:13 (heure du Mac), Albert appelé par tools/appel_albert.sh au lancement pour poser le doigt ~15 s.
+- Vu : (1) 31 lectures : la 1re `80 20 00 10 000000 09 60 00 00 18 00 00 00 00`, les 30 suivantes `… 09 60 00 00 00 00 00 00 00`, toutes identiques.
+  (2) 46 lectures : exactement les deux mêmes formes (1 + 45), aucun autre octet ne bouge. Capteur éteint à la fin des deux essais.
+- Interprété : état stable au repos sur 30 s (vérifié, 1 essai). L'octet 0x18 n'est vu qu'à la 1re lecture après le réveil (hypothèse : drapeau
+  effacé par la lecture). Pour le doigt : résultat conforme à la prédiction SEULEMENT SI le doigt était bien posé pendant la fenêtre —
+  **non confirmé par Albert à l'heure de cette entrée** ; reste `hypothèse` jusqu'à sa réponse. Lecture à 1 Hz : un changement de moins d'1 s
+  entre deux lectures passerait inaperçu.
+- Incidents : aucun.
+
 ## 2026-11-10 — Claude — Reproductibilité du « bonjour » depuis Linux avec le module rangé (adresse VPN 10.0.200.4)
 - Trace : — (Linux de test, via tools/linux_ssh.sh ; nouvelle adresse 10.0.200.4 donnée par Albert, voir ci-dessous).
 - Fait : adresse du Linux de test passée à 10.0.200.4 (Albert l'a donnée en session ; mise à jour de tools/linux_ssh.sh,
