@@ -55,15 +55,26 @@ Classées de la plus sûre (rien vers le SEP) à la plus risquée (écriture, Al
   que relayer. Sans le SEP qui configure le capteur, pas de détection de doigt (`vérifié` 2026-11-10 : doigt posé, aucun changement).
 - **LR ?** Non. **Risque** : nul. **Donne Touch ID ?** Non, jamais seul. Sert de base matérielle, pas plus.
 
-### Voie B — Observer plus finement l'échange xART existant, sans y répondre (sûr, recommandé)
-- **Idée** : capturer le **corps** (OOL/shmem) des réponses fetch 0x13 **pendant un boot macOS normal** sous hyperviseur, pour
+### Voie B — Observer plus finement l'échange xART existant, sans y répondre (sûr, recommandé, PRÊT)
+- **Idée** : capturer le **corps** (OOL) des réponses fetch/save 0x13 **pendant un boot macOS normal** sous hyperviseur, pour
   enfin voir ce que contient un locker et comment l'AP le construit. Aujourd'hui on n'a que les en-têtes.
-- **Ce qu'il faut** : étendre le tracer pour suivre l'OOL de l'EP 0x13 (comme on l'a fait pour l'EP 0x08 du capteur, C19→C20).
-  Capture en **lecture seule** d'un boot macOS : l'AP, c'est macOS, c'est lui qui répond ; nous on écoute.
-- **LR ?** Non (lecture seule, c'est macOS qui dialogue avec le SEP, pas nous). **Risque** : celui d'une capture ordinaire.
+- **Prêt, aucun code à écrire** (vérifié dans `hv/trace_sep_filtered.py` le 2026-11-10) : le tracer lit déjà l'OOL de
+  **n'importe quel** endpoint via `SEP_OOL_EPS`. L'apprentissage du buffer passe par le CNTL (EP 0x00 TYPE 2/3/4/5), qui
+  tourne **même quand l'affichage est filtré sur 0x13** (ligne 495, hors du filtre `self.eps`). Le CNTL de l'EP 0x13 fournit
+  bien les deux buffers (0x8000 / 0x8000, `messages.md` L91-98). Lecture seule (traduction DART vérifiée, aucune écriture).
+- **Commande prête à lancer** (Albert, Mac en mode câble, après backup) :
+  ```
+  SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000 LIVE_EPS=0x13 \
+    ./tools/boot_and_trace.sh c21-xart-ool
+  ```
+  Donne `traces/<...>_c21-xart-ool/sep.log` (en-têtes 0x13 filtrés) + des `.bin` d'OOL : buffer A sur les `>` (réponse fetch
+  de l'AP = le locker rendu), buffer B sur les `<` (save du SEP = le blob confié). Le blob attendu est sur TYPE 0 (`>`, fetch)
+  et TYPE 1/6 (`<`, save) ; à confirmer sur la capture. Rien n'est envoyé au SEP (c'est macOS qui dialogue, on écoute).
+- **LR ?** Non (lecture seule, même classe que les captures C1-C20, ~20 déjà faites sans souci de données). **Risque** : celui
+  d'une capture ordinaire sous hyperviseur (l'incident iCloud venait du **boot SEP par m1n1**, pas d'une écoute de boot macOS).
 - **Ce que ça apporte** : savoir si une réponse xART est *fabriquable* hors macOS (probable **non** : blob chiffré par une clé
   du SEP/du disque), et au minimum documenter précisément le coffre. **C'est le prochain pas le plus utile et le moins risqué.**
-- **Note** : cette capture touche des zones liées au disque chiffré ; à faire quand Albert a son backup complet du Mac.
+- **Ne peut pas se faire à distance** : demande le câble USB rebranché et un reboot en mode câble → Albert devant le Mac.
 
 ### Voie C — Fournir au SEP, sous Linux, les blobs xART capturés sous macOS (écriture SEP — LR, Albert seul)
 - **Idée** : rejouer vers le SEP, depuis Linux, les réponses xART qu'on aurait capturées (voie B), pour le pousser à annoncer `sbio`.
@@ -99,6 +110,12 @@ Classées de la plus sûre (rien vers le SEP) à la plus risquée (écriture, Al
    capteur », pas « Touch ID déverrouille ». La Voie B dira si cette conclusion doit changer.
 
 ## 6. Ce qui manque pour avancer (sans franchir de ligne rouge)
-- [ ] Étendre le tracer à l'OOL de l'EP 0x13 (réutiliser la méthode OOL de l'EP 0x08, C19→C20).
-- [ ] Une capture macOS en lecture seule avec cet OOL, après backup complet du Mac (décision/fenêtre d'Albert).
-- [ ] Documenter le format d'un locker observé (taille, en-tête, ce qui est chiffré) dans `messages.md`.
+- [x] Tracer l'OOL de l'EP 0x13 : déjà supporté par `hv/trace_sep_filtered.py` (`SEP_OOL_EPS=0x13`), vérifié le 2026-11-10. Rien à coder.
+- [ ] Lancer la capture (commande voie B ci-dessus) : Mac en mode câble, Albert devant la machine, après backup complet. Pas faisable à distance.
+- [ ] Documenter le format d'un locker observé (taille, en-tête, ce qui est chiffré) dans `messages.md`, une fois la capture faite.
+
+## 7. État du 2026-11-10 (contexte)
+Backup : Albert a **un** backup (2026-11-10) — à préciser : couvre-t-il macOS/FileVault, ou seulement sa partition Linux ?
+La voie B écoute un boot macOS (zones liées au disque chiffré), donc le point à clarifier avant de lancer est : backup macOS inclus.
+Accès : Albert est à distance (école), Mac joignable seulement par la **partition Linux de test** via WireGuard (capteur, pas de SEP).
+Câble USB débranché → ni m1n1 ni capture macOS tant qu'il n'est pas rebranché. La voie B attend donc qu'Albert soit devant le Mac.

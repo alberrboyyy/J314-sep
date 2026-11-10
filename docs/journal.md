@@ -14,6 +14,16 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — Voie B (tracer l'OOL de l'EP 0x13) : déjà supportée, commande prête ; backup existe
+- Trace : — (revue de code hors ligne ; aucune action matérielle). Albert à distance (école), Mac joignable seulement par la partition Linux de test (VPN), câble USB débranché.
+- Fait : vérifié dans hv/trace_sep_filtered.py que la capture de l'OOL de l'EP 0x13 est déjà possible sans nouveau code : `SEP_OOL_EPS` est générique,
+  l'apprentissage du buffer via le CNTL (EP 0x00 TYPE 2/3/4/5, ligne 495) tourne hors du filtre d'affichage `self.eps`, et le CNTL de 0x13 fournit
+  les deux buffers (0x8000, messages.md L91-98). Commande voie B écrite dans docs/xart_options.md (SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000 ...).
+- Vu : lecture seule (traduction DART vérifiée, aucune écriture au SEP/DART/mémoire). Même classe de capture que C1-C20.
+- Interprété : la voie B ne demande que la capture physique (câble rebranché + reboot mode câble), donc Albert devant le Mac ; impossible à distance.
+  Albert signale avoir un backup (2026-11-10) ; à clarifier : couvre-t-il macOS/FileVault (la voie B écoute un boot macOS) ou seulement sa partition Linux ?
+- Incidents : aucun.
+
 ## 2026-11-10 — Claude (Opus 4.8) — Étude du « coffre » (xART) : écrite (filtre non déclenché cette fois)
 - Trace : — (analyse hors ligne, aucune action matérielle). Sources : docs/messages.md « xART au boot », journal analyste du 2026-11-10, doc Asahi/m1n1 déjà citées.
 - Fait : écrit docs/xart_options.md à la demande d'Albert (il a relancé une session, autre modèle). Rassemble public + nos traces sur l'EP 0x13,
