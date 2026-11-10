@@ -22,6 +22,8 @@ Format :
   pas le doigt dans sa réponse d'état. Statut : `vérifié (1 essai)` pour « l'état lu par 0x10 ne change pas avec le doigt », sous réserve que le
   doigt soit resté posé pendant la fenêtre (déclaré par Albert, pas mesuré). Non testé : la broche d'interruption du capteur (gpio0 195), qui
   pourrait bouger sans que l'état change ; lecture à 1 Hz seulement.
+- Précision d'Albert (après coup) : doigt posé à partir de ~06:07:55, donc présent pendant ~17 des 30 s (lectures 14 à 31 environ) ; aucune de ces lectures ne diffère.
+  Question d'Albert : sous macOS 13.5, écran éteint, poser le doigt rallume l'écran. Hypothèse (non testée) : sous macOS le capteur a été configuré par le dialogue chiffré avec le SEP et signale le doigt par sa broche d'interruption (gpio0 195) ; ici il est seulement allumé et réveillé. À départager aussi : toucher ou appuyer (le bouton d'alimentation est sous le capteur).
 - Incidents : aucun.
 
 ## 2026-11-10 06:07 — Claude (+ Albert à confirmer) — État du capteur en boucle depuis Linux : repos 30 s, puis essai DOIGT-LINUX 45 s
