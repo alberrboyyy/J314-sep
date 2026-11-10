@@ -36,7 +36,7 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [!] Étude du « coffre » (xART) et comparaison fine puce ↔ bus du capteur : arrêtées par le filtre de sécurité du modèle les 2026-11-10. Ne pas relancer ; voir avec Albert (programme de vérification Anthropic).
 
 - [ ] Transport : attendre la broche d'interruption (gpio0 195) au lieu de pauses fixes ; l'ajouter au device tree de test (irq-gpios).
-- [ ] Reporter dans docs/sensor_hw.md le comportement de la broche 195 et de l'octet 0x18.
+- [x] docs/sensor_hw.md : comportement de la broche 195 et de l'octet 0x18 reporté (2026-11-10).
 
 ### Avec le Mac sur le Linux de test (joignable à 10.0.200.4), sans action d'Albert
 - [x] Recharger les modules et refaire le « bonjour » (reproductibilité) : FAIT 2026-11-10 sur 10.0.200.4, identité identique, avec le module rangé (transport). Entrée journal du jour.

@@ -47,7 +47,7 @@ Sources : `analysis/adt_pmgr_ps.py` sur `traces/20261108-162919_adt/adt.bin` (ho
 | Domaine d'alimentation de spi2 | pmgr `SPI2` (id 144), registre CPU 0x28e580200 = `ps_spi2` (`power-controller@200`, parent `ps_spi_p`) du DT public | lu (ADT) + concordant avec le DT public ; allumé (0xff) sous m1n1 seul |
 | Broches SPI de spi2 | gpio0 48 (MISO, tirage bas), 49, 50, fonction périphérique 1 ; rôle horloge/MOSI de 49 et 50 non distingué | **hypothèse** (même motif que spi1/spi3/spi4, numérotation 48-51 / 52-55 / 56-59) |
 | Chip-select | aucun (`function-spi_cs0 = 1:null()`, broche 51 non configurée) | hypothèse |
-| IRQ capteur (gpio0 195) | entrée, tirage bas, lue à 1 sous m1n1 | lu |
+| IRQ capteur (gpio0 195) | entrée, tirage bas ; active haute : 0 capteur éteint, 1 après allumage, 0 après la 1re lecture d'état (Linux, 2026-11-10) | vérifié (Linux, 3 passes) |
 | mesa_pwr (gpio0 196) | non configurée sous m1n1 (ni sortie ni entrée) → capteur probablement éteint | lu / hypothèse |
 
 Réserve : un 5e groupe au même motif (116, 117, 118) n'a pas de contrôleur SPI connu dans l'ADT ; tant qu'il n'est pas
@@ -121,3 +121,19 @@ Colonne « sens » = **hypothèses** tirées du moment où la valeur apparaît ;
 
 À retenir pour un pilote : le premier octet sert d'état (`00` repos, `07` réponse prête, `11` balayage, `13` doigt), l'octet 2
 vaut `60` avant le correctif et `21`/`01` après. Sans le correctif (qui vient du SEP, chiffré), on ne voit que les lignes `60`.
+
+## Broche d'interruption et repos, capteur piloté par Linux seul (2026-11-10)
+Source : journal 06:07, 06:08 et 06:15 (modules `driver/linux/mesa_statloop.c` et `mesa_irqwatch.c`). Rien ne vient d'un kext.
+
+| Moment | Broche gpio0 195 | Réponse d'état (0x10) | Statut |
+|---|---|---|---|
+| capteur éteint | 0 | — | vérifié (3 passes) |
+| après allumage, après réveil 0x78 | 1 | — | vérifié (3 passes) |
+| 1re lecture d'état | retombe à 0 en moins de ~11 ms | `80 20 00 10 000000 09 60 00 00 18 00 00 00 00` | vérifié (macOS-indépendant, 4 passes pour l'état) |
+| lectures suivantes, au repos, 30 à 45 s | 0 | `… 09 60 00 00 00 00 00 00 00`, identique à chaque fois | vérifié |
+| aucune lecture d'état pendant 10 s | reste à 1 | — | vérifié (1 passe) |
+| doigt posé (sans appuyer) | 0, inchangée | inchangée | 2 essais, doigt déclaré par Albert |
+
+- Hypothèse : l'octet 0x18 de la 1re réponse est la raison de la demande (« je viens de démarrer ») ; lire l'état l'acquitte.
+- Hypothèse : sous macOS le doigt est signalé parce que le SEP a configuré le capteur par le dialogue chiffré ; non testable sans le SEP.
+- Limites : état lu à 1 Hz, broche scrutée à 20 ms.
