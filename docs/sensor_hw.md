@@ -102,3 +102,22 @@ allumage, +1 par message), puis une longueur et un contenu d'aspect aléatoire, 
 `tools/mesa_hello.sh` (m1n1 seul) : alimentation gpio0 196, spi2 en mode scruté (CLKDIV 3, CFG 0x40002), trames 0x78, 0x10, 0x70,
 0x13 → le capteur rend la même identité que sous macOS. Conséquences : les broches SPI n'ont pas besoin d'être réglées (état
 d'iBoot suffisant), pas de chip-select, CPHA = 1. Tout le reste du dialogue est chiffré et vient du SEP : non essayé.
+
+### Réponse d'état (trame 0x20) : valeurs vues dans C20 (analyse hors ligne, 2026-11-10)
+Les 9 octets qui suivent `80 20 00 10 00 00 00`. Comptes sur toute la capture C20 (login, 3 bons doigts, 2 mauvais).
+Colonne « sens » = **hypothèses** tirées du moment où la valeur apparaît ; rien n'a été testé.
+
+| Octets | Vu | Moment | Sens supposé |
+|---|---|---|---|
+| `00 60 00 00 00 52 33 00 00` (variantes `…18…`, `…08…`) | 13 | juste après l'allumage, avant l'envoi du gros bloc | repos, capteur sans correctif (octet 2 = `60`) |
+| `09 60 00 00 08 00 00 00 00` | 1 | après la trame 0x78 | vient d'être réveillé |
+| `07 60 00 00 88 LL 00 00 00` / `07 00 21 00 8c LL …` / `07 00 21 00 8e 00 72 00 00` | 37 | avant chaque lecture de réponse | réponse prête ; longueur = octets 5-6 (petit-boutiste) : 0x1b, 0x33, 0x4b, 0x7200 |
+| `00 29 01 00 7c 52 33 00 16`, `00 00 21 00 0c 52 33 00 16`, `00 00 01 00 5c 52 33 00 16` | 17 | après l'envoi du gros bloc ; après chaque résultat | repos avec correctif chargé (dernier octet `16`) |
+| `11 06 21 00 0c 00 00 00 00` | 9 | après la trame 0x40 | balayage qui démarre |
+| `11 02 21 80 04 80 80 80 80` | 218 | toutes les ~0,5 s en attente | armé, attend un doigt |
+| `13 00 21 00 0e 00 00 00 00` | 8 | ~80 ms avant « réponse prête 0x7200 » | doigt détecté, image en cours |
+| `11 05 21 XX 0c aa bb cc dd` | 3 | entre deux images d'une même pose | mesures du doigt (4 derniers octets variables) |
+| `10 02 21 00 06 00 00 00 00` | 14 | après un mauvais doigt, ~3 s | attend que le doigt se lève ? |
+
+À retenir pour un pilote : le premier octet sert d'état (`00` repos, `07` réponse prête, `11` balayage, `13` doigt), l'octet 2
+vaut `60` avant le correctif et `21`/`01` après. Sans le correctif (qui vient du SEP, chiffré), on ne voit que les lignes `60`.

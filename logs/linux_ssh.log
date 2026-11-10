@@ -37,3 +37,4 @@
 2026-11-10 01:13:08 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E "ERROR|error|LD \[M\]"; ls -la *.ko
 2026-11-10 01:13:16 run: cd /root/mesa && dmesg -C; insmod mesa_ovl.ko; echo "insmod=$?"; sleep 1; dmesg | tail -25; ls /sys/bus/spi/devices/; ls /sys/firmware/devicetree/base/soc | grep 39b108; ls /sys/bus/platform/devices | grep 39b10
 2026-11-10 01:13:24 run: cd /root/mesa && for d in /sys/bus/spi/devices/*; do echo "$d -> $(readlink $d | grep -o "39b10[0-9a-f]*.spi") $(cat $d/modalias)"; done; dmesg -C; insmod mesa_probe.ko enable=1; echo "insmod=$?"; sleep 2; dmesg | tail -40
+2026-11-10 11:31:11 run: uptime; ls /sys/bus/spi/devices/; lsmod | grep -E "mesa"; ls /root/mesa/*.ko
