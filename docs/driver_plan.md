@@ -123,3 +123,22 @@ Classe 4 — non bloquantes
 - VU : le SEP annonce sbio/skdl/sse/sks/scrd 0,122 s après la réponse de l'AP au TAG 4 de l'EP 0x13, 19/19. L'AP ne fait que rendre au SEP des blobs qu'il lui avait donnés à sauvegarder (CRC rendu = dernier « Saving » du boot précédent : 15/15 et 16/16 ; recopie des CRC 252/252). Contenu = état du disque macOS (fichier gigalocker du volume xART), non capturé.
 - INTERPRÉTÉ : un Linux qui veut voir sbio doit tenir ce stockage (fournir au SEP ses propres blobs). Un rejeu « à vide » ou périmé est probablement refusé ; le SEP peut aussi invalider son état s'il reçoit un blob qui ne correspond pas à ses compteurs (non vérifié). Risque pour macOS/FileVault/trousseau.
 - DÉCISION (Claude, CLAUDE.md) : pas de réponse 0x13, pas de capture des blobs (secrets probables). Étape 6 suspendue ici ; les étapes sans SEP (pilote capteur sur spi2, rejeu) continuent.
+
+## Mise à jour 2026-11-10 (nuit) : composant C-A (capteur) fait, étape 3 terminée
+Sources : docs/sensor_hw.md (« Alimentation et broches », « Dialogue SPI », « Essai sans macOS », table des états),
+docs/verification_status.md SPI-1 à SPI-4, journal du 2026-11-10 (C17-C20, MESA-HELLO, LINUX-HELLO).
+- **Étape 3 : faite et vérifiée sur le matériel.** spi2 (0x39b108000, IRQ AIC 1108, alimentation `ps_spi2`, horloge 24 MHz,
+  broches laissées par iBoot, pas de chip-select, CPHA = 1), alimentation du capteur par gpio0 196 (actif haut), trames en
+  clair 0x78 / 0x10 / 0x70 / 0x13. Le capteur rend la même identité sous macOS, depuis m1n1 et depuis Linux (pilote public
+  spi-apple + `driver/linux/mesa_ovl.c` qui ajoute le nœud à chaud + `mesa_probe.c`). Le reset par l'AOP craint à l'étape 3
+  n'est pas nécessaire pour ces trames.
+- **C-C (relais) précisé** : sous macOS l'AP relaie ; l'image lue sur SPI (0x7200 o, 12 tranches) est la charge de `> 0x65`
+  (vérifié macOS, C20). Les commandes au capteur après l'identité sont chiffrées et suivent chacune une commande sbio
+  (vu : 0x15 → trame 0x72, 0x42 → 0x73, 0x5f → 0x60 + gros bloc, 0x5d/0x5c/0x6a/0x6f/0x31 → 0x55) : un pilote n'a pas à
+  les fabriquer, seulement à les transporter (hypothèse pour tout sauf l'image).
+- **Ce que Linux peut faire aujourd'hui sans le SEP** : allumer le capteur, lire identité et état. Tous les états liés au
+  doigt n'apparaissent sous macOS qu'après l'envoi du gros bloc (correctif) fourni par le SEP.
+- **Blocage inchangé** : étape 6 (sbio absent sans échange xART). L'étude des voies possibles a été arrêtée par le filtre
+  de sécurité du modèle (journal 2026-11-10 01:05) : décision d'Albert en attente (docs/handoff.md, liste de tâches).
+- Prochain travail possible sans SEP : séparer dans `driver/linux` un petit transport (alimentation, état, lecture de
+  réponse) du test « bonjour ».

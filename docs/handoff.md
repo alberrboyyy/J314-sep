@@ -29,7 +29,7 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 ### Sans Albert, sans le Mac
 - [x] Table des réponses d'état du capteur (docs/sensor_hw.md, 2026-11-10).
 - [ ] Ranger le module Linux : séparer « transport » (allumer, état, lire une réponse) du test « bonjour », pour servir de base au pilote.
-- [ ] Relire docs/driver_plan.md et le mettre à jour avec ce qui est vérifié depuis le 2026-11-10 (bus, broches, trames en clair, Linux parle au capteur).
+- [x] docs/driver_plan.md mis à jour (2026-11-10 nuit).
 - [!] Étude du « coffre » (xART) et comparaison fine puce ↔ bus du capteur : arrêtées par le filtre de sécurité du modèle les 2026-11-10. Ne pas relancer ; voir avec Albert (programme de vérification Anthropic).
 
 ### Avec le Mac sur le Linux de test (joignable à 10.67.0.94), sans action d'Albert
