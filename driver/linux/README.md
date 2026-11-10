@@ -25,6 +25,9 @@
 - `mesa_statloop.c` : 2e client du transport. Avec `enable=1` il allume le capteur, le réveille, lit l'état toutes les
   secondes pendant `duree` secondes (défaut 30) sans doigt, puis l'éteint — pour voir si l'état est stable au repos.
   Ne pas charger en même temps que `mesa_probe` (même capteur). Montre que `mesa_transport.h` se réutilise tel quel.
+- `mesa_irqwatch.c` : 3e client du transport. Avec `enable=1` il allume le capteur et surveille sa broche d'interruption
+  (gpio0 195, lue seulement, toutes les 20 ms) pendant `duree` secondes, en lisant l'état toutes les `etat_ms` ms (0 = jamais).
+  Résultat du 2026-11-10 : la broche monte à l'allumage, retombe après la 1re lecture d'état, ne réagit pas au doigt.
 - `t6001-j314c-mesa.dtsi` : description du bus spi2 et du capteur. Chaque ligne est marquée VÉRIFIÉ, LU, CALQUÉ ou INCONNU.
 - `t6001-j314c-mesa-test.dts` : device tree de test = j314c public + le fragment ci-dessus, activé.
 - `Makefile` : module hors arbre.

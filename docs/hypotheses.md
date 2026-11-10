@@ -928,3 +928,12 @@ Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n
 - PRÉDICTION (écrite avant) : aucun changement de l'état (mêmes 2 formes que la référence), car le logiciel interne du capteur
   n'est chargé que par l'échange chiffré avec le SEP. Si un octet change pendant le doigt : le capteur détecte le doigt
   tout seul, et cet octet devient candidat « doigt présent » (à refaire une 2e fois avant de le dire vérifié).
+
+## EXPÉRIENCE HUMAINE — DOIGT-LINUX-IRQ (2026-11-10) : la broche d'interruption du capteur bouge-t-elle avec le doigt, sans le SEP ?
+- Cadre : Linux de test, `driver/linux/mesa_irqwatch.c` (broche gpio0 195 LUE seulement, toutes les 20 ms ; trames 0x78 et 0x10). Rien vers le SEP.
+- Étapes : (a) référence sans doigt, 15 s ; (b) 30 s avec lecture d'état chaque seconde, doigt posé ~15 s au milieu ;
+  (c) si (b) ne montre rien : 30 s sans aucune lecture d'état (`etat_ms=0`), doigt posé, au cas où lire l'état efface le signal.
+- PRÉDICTION (écrite avant) : la broche ne change pas quand le doigt se pose (le capteur n'a pas reçu la configuration chiffrée
+  que le SEP lui envoie sous macOS). Elle peut en revanche bouger à l'allumage, au réveil ou autour des lectures d'état (lu à 1 sous m1n1).
+  Si elle change au moment du doigt (et pas dans la référence) : le capteur détecte le doigt seul → à refaire pour le dire vérifié.
+- Limite : scrutation à 20 ms, une impulsion plus courte est invisible.

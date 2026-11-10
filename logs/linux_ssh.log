@@ -56,3 +56,10 @@
 2026-11-10 12:06:19 run: echo ok; lsmod | grep -c mesa_statloop
 2026-11-10 12:06:27 run: cd /root/mesa && rmmod mesa_statloop; date +%T; insmod mesa_statloop.ko enable=1 duree=45; date +%T; dmesg | grep 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|échoué|non reconnu' | tail -50
 2026-11-10 12:07:41 run: cd /root/mesa && rmmod mesa_statloop; date +%T; insmod mesa_statloop.ko enable=1 duree=30; date +%T; dmesg | grep 'mesa-statloop' | grep -E 'RX|RÉSULTAT|éteint|échoué|non reconnu' | tail -33
+2026-11-10 12:12:40 run: which gpioget gpioinfo gpiomon python3 2>&1; gpiodetect 2>&1 | head; ls /sys/kernel/debug/gpio 2>&1 | head -2
+2026-11-10 12:13:10 put: driver/linux/mesa_irqwatch.c -> /root/mesa/mesa_irqwatch.c
+2026-11-10 12:13:11 put: driver/linux/Makefile -> /root/mesa/Makefile
+2026-11-10 12:13:12 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD W=1 modules 2>&1 | grep -E 'CC|LD|rror|arning|undefined' | grep -v 'compiler differs\|pahole'; ls -la mesa_irqwatch.ko
+2026-11-10 12:13:24 run: cd /root/mesa && rmmod mesa_statloop 2>/dev/null; insmod mesa_irqwatch.ko enable=1 duree=15; dmesg | grep 'mesa-irqwatch' | grep -vE 'état TX'
+2026-11-10 12:13:48 run: cd /root/mesa && rmmod mesa_irqwatch; date +%T; insmod mesa_irqwatch.ko enable=1 duree=40; date +%T; dmesg | grep 'mesa-irqwatch' | grep -vE 'état TX' | tail -52
+2026-11-10 12:14:38 run: cd /root/mesa && rmmod mesa_irqwatch; insmod mesa_irqwatch.ko enable=1 duree=10 etat_ms=0; dmesg | grep 'mesa-irqwatch' | tail -7

@@ -14,6 +14,24 @@ Format :
 
 ---
 
+## 2026-11-10 06:15 — Albert (doigt), Claude — DOIGT-LINUX-IRQ : la broche d'interruption du capteur marche sous Linux, mais ne réagit pas au doigt
+- Trace : — (Linux de test 10.0.200.4, dmesg ; module driver/linux/mesa_irqwatch.c, broche gpio0 195 lue seulement toutes les 20 ms ; trames 0x78 et 0x10).
+  Protocole et prédiction écrits avant : docs/hypotheses.md « DOIGT-LINUX-IRQ ».
+- Fait : (a) 15 s sans doigt, état lu chaque seconde ; (b) 40 s, fenêtre 06:13:49 → 06:14:29, Albert annonce le doigt posé à 06:14:04
+  (sans appuyer, ~15 s demandées, heure de retrait non donnée) ; (c') 10 s sans doigt et sans aucune lecture d'état (`etat_ms=0`).
+- Vu : dans (a) et (b), même déroulé : broche = 0 capteur éteint, 1 après l'allumage, 1 après le réveil 0x78, puis **1 → 0 dans les 11 ms
+  qui suivent la 1re lecture d'état** (celle qui porte l'octet 0x18), et plus aucun changement ensuite (0 jusqu'à la fin, 0 après extinction).
+  (b) : aucun changement de la broche ni de l'état pendant le doigt (39 états identiques `… 09 60 00 00 00 00 00 00 00`).
+  (c') : sans lecture d'état, la broche reste à 1 pendant les 10 s, puis 0 à l'extinction.
+- Interprété :
+  - `vérifié` (3 passes concordantes) : gpio0 195 est bien la ligne « le capteur a quelque chose à dire », active haute ; le capteur la lève
+    seul après l'allumage et la baisse quand l'AP lit l'état. L'octet 0x18 de la 1re réponse d'état va avec cette demande (hypothèse sur son sens).
+  - conforme à la prédiction (1 essai, doigt déclaré par Albert) : allumé et réveillé par Linux seul, le capteur ne signale pas le doigt, ni par
+    l'état ni par la broche. Cohérent avec l'idée que la détection dépend de la configuration chiffrée envoyée par le SEP sous macOS (hypothèse).
+  - l'étape (c) prévue (doigt sans lecture d'état) n'a pas de sens : la broche étant déjà à 1 tant que l'état n'est pas lu, un doigt n'y serait pas visible. Abandonnée.
+- Limite : scrutation à 20 ms (impulsion plus courte invisible) ; un seul essai avec doigt.
+- Incidents : aucun.
+
 ## 2026-11-10 06:08 — Albert (doigt), Claude — DOIGT-LINUX, 2e passe : doigt annoncé posé, état inchangé
 - Trace : — (Linux de test 10.0.200.4, dmesg ; `insmod mesa_statloop.ko enable=1 duree=30`, fenêtre 06:07:42 → 06:08:12 heure du Mac).
 - Fait : Albert a écrit « je le mets maintenant » ; boucle lancée aussitôt après son message (la 1re passe de 06:06 reste sans confirmation du doigt).

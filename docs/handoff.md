@@ -35,13 +35,16 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [x] docs/driver_plan.md mis à jour (2026-11-10 nuit).
 - [!] Étude du « coffre » (xART) et comparaison fine puce ↔ bus du capteur : arrêtées par le filtre de sécurité du modèle les 2026-11-10. Ne pas relancer ; voir avec Albert (programme de vérification Anthropic).
 
+- [ ] Transport : attendre la broche d'interruption (gpio0 195) au lieu de pauses fixes ; l'ajouter au device tree de test (irq-gpios).
+- [ ] Reporter dans docs/sensor_hw.md le comportement de la broche 195 et de l'octet 0x18.
+
 ### Avec le Mac sur le Linux de test (joignable à 10.0.200.4), sans action d'Albert
 - [x] Recharger les modules et refaire le « bonjour » (reproductibilité) : FAIT 2026-11-10 sur 10.0.200.4, identité identique, avec le module rangé (transport). Entrée journal du jour.
 - [x] État du capteur en boucle 30 s sans doigt : stable (2026-11-10, mesa_statloop.c ; 0x18 seulement à la 1re lecture).
 
 ### Avec Albert devant le Mac (2 minutes)
 - [x] Doigt posé sans la puce de sécurité : l'état ne change pas (2026-11-10, 1 essai, doigt déclaré par Albert). Journal 06:08.
-- [ ] Même essai en regardant la broche d'interruption du capteur (gpio0 195) : bouge-t-elle quand le doigt se pose ?
+- [x] Même essai en regardant la broche d'interruption (gpio0 195) : elle marche sous Linux (1 à l'allumage, 0 après la 1re lecture d'état) mais ne réagit pas au doigt (2026-11-10, mesa_irqwatch.c, journal 06:15).
 
 ### Décisions qui appartiennent à Albert
 - [ ] Faut-il s'inscrire au programme de vérification d'Anthropic pour débloquer l'étude du « coffre » ?
