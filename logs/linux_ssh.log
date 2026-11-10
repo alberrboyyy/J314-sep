@@ -69,3 +69,6 @@
 2026-11-10 15:47:59 put: driver/linux/mesa_irqwatch.c -> /root/mesa/mesa_irqwatch.c
 2026-11-10 15:48:00 run: grep -c 'hello_pins' /root/mesa/mesa_irqwatch.c; cd /root/mesa && touch mesa_irqwatch.c && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E 'LD.*irqwatch|rror|arning: [^tp]'; modinfo -p mesa_irqwatch.ko | grep hello
 2026-11-10 15:48:07 run: cd /root/mesa && rmmod mesa_irqwatch 2>/dev/null; insmod mesa_irqwatch.ko enable=1 hello=1; dmesg | grep 'mesa-irqwatch' | grep -vE ' TX | RX ' | tail -24
+2026-11-10 15:50:47 put: driver/linux/mesa_transport.h -> /root/mesa/mesa_transport.h
+2026-11-10 15:50:48 put: driver/linux/mesa_probe.c -> /root/mesa/mesa_probe.c
+2026-11-10 15:50:49 run: cd /root/mesa && touch mesa_probe.c && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E 'LD.*mesa_probe|rror|arning: [^tp]'; rmmod mesa_irqwatch 2>/dev/null; rmmod mesa_probe 2>/dev/null; lsmod | grep -q mesa_ovl || insmod mesa_ovl.ko; insmod mesa_probe.ko enable=1; dmesg | grep 'mesa-probe' | grep -vE ' TX | RX ' | tail -12

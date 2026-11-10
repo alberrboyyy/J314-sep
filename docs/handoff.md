@@ -39,7 +39,8 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [ ] Voie B capture : Mac en mode câble, Albert devant la machine, backup macOS confirmé. `SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000 LIVE_EPS=0x13 ./tools/boot_and_trace.sh c21-xart-ool`. Pas faisable à distance (câble débranché).
 
 - [x] Caractérisé la broche gpio0 195 (2026-11-10, mesa_irqwatch hello=1) : ligne « donnée prête », remonte à chaque réponse en attente (y compris après 0x70), retombe à la lecture d'état. Pilotage par interruption possible.
-- [ ] Transport piloté par interruption : câbler l'IRQ dans l'overlay (irq-gpios/interrupts) + request_irq/attente dans le pilote, au lieu des pauses fixes. Testable sur le Linux de test.
+- [x] Transport réactif : mesa_wait_ready() attend la broche « donnée prête » (scrutation sûre) avant chaque lecture d'état ; identité toujours identique (2026-11-10).
+- [ ] (optionnel, risqué à distance) Vrai pilotage par interruption matérielle (request_irq) : seulement quand Albert peut power-cycler le Mac (rafale d'IRQ possible).
 - [x] docs/sensor_hw.md : comportement de la broche 195 et de l'octet 0x18 reporté (2026-11-10).
 
 ### Avec le Mac sur le Linux de test (joignable à 10.0.200.4), sans action d'Albert

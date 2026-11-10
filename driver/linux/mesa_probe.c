@@ -41,12 +41,14 @@ static int mesa_hello(struct mesa_dev *md)
 	ret = mesa_send(md, "réveil", mesa_wake, sizeof(mesa_wake));
 	if (ret)
 		return ret;
+	mesa_wait_ready(md);		/* réactif : attendre la montée « donnée prête » plutôt qu'une pause fixe */
 	ret = mesa_status(md);
 	if (ret < 0 && ret != -ENOMSG)
 		return ret;
 	ret = mesa_send(md, "identité", mesa_get_id, sizeof(mesa_get_id));
 	if (ret)
 		return ret;
+	mesa_wait_ready(md);		/* la réponse d'identité remonte la broche (vérifié 2026-11-10) */
 	pending = mesa_status(md);
 	if (pending < 0 && pending != -ENOMSG)
 		return pending;

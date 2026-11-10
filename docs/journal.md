@@ -14,6 +14,16 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — Transport réactif : « bonjour » attend la broche « donnée prête », identité toujours identique
+- Trace : — (Linux de test 10.0.200.4, dmesg ; mesa_probe.ko enable=1, transport mesa_transport.h). Compilé W=1.
+- Fait : ajouté mesa_wait_ready() au transport (scrutation bornée de gpio0 195, 50 ms max, repli si pas de montée ; broche lue seulement,
+  jamais d'interruption matérielle — choix sûr à distance, ne peut pas bloquer la machine). mesa_probe l'appelle avant chaque lecture d'état.
+- Vu : « RÉSULTAT : IDENTITÉ IDENTIQUE », aucun avertissement « pas montée » (donc la broche a bien été vue à chaque étape). Capteur éteint, fin 0.
+- Interprété : `vérifié` (1 essai, identité identique) : le transport peut attendre la broche au lieu de pauses fixes, sans changer le résultat.
+  mesa_probe reste la référence vérifiée, maintenant réactive. Le vrai pilotage par interruption matérielle (request_irq) reste un pas ultérieur,
+  à faire quand Albert peut power-cycler le Mac (risque de rafale d'IRQ qui bloquerait la machine à distance).
+- Incidents : aucun.
+
 ## 2026-11-10 — Claude (Opus 4.8) — La broche gpio0 195 = ligne « donnée prête » (remonte à chaque réponse en attente)
 - Trace : — (Linux de test 10.0.200.4, dmesg ; mesa_irqwatch.ko enable=1 hello=1 ; broche lue seulement ; trames en clair). Compilé W=1.
 - Fait : joué le « bonjour » en relevant la broche gpio0 195 avant/après chaque échange.
