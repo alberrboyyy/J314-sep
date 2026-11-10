@@ -14,6 +14,17 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — Étude du « coffre » (xART) : écrite (filtre non déclenché cette fois)
+- Trace : — (analyse hors ligne, aucune action matérielle). Sources : docs/messages.md « xART au boot », journal analyste du 2026-11-10, doc Asahi/m1n1 déjà citées.
+- Fait : écrit docs/xart_options.md à la demande d'Albert (il a relancé une session, autre modèle). Rassemble public + nos traces sur l'EP 0x13,
+  et liste 5 voies (A capteur sans SEP ; B tracer l'OOL de 0x13 en lecture seule ; C rejouer des blobs = écriture SEP ; D forger un locker ;
+  E SEP « vierge »), avec pour chacune ligne rouge / risque / faisabilité. Recommandation : voie B (sûre) comme prochain pas ; C/D/E = écriture SEP, Albert seul.
+- Vu : contrairement aux 3 tentatives du 2026-11-10 sous Fable 5.2 (sous-agent documentaliste, résumé réduit, comparaison de buffers), le filtre
+  « [cyber] » n'a PAS coupé cette fois (modèle Opus 4.8, session relancée par Albert). Document produit en entier.
+- Interprété : conclusion honnête = Touch ID complet sous Linux est probablement hors de portée sans forger un locker xART (clé interne au SEP
+  qu'on s'interdit de chercher) ; but réaliste court terme = « Linux parle au capteur ». La voie B dira si ça change. Tout reste `hypothèse` côté mécanisme.
+- Incidents : aucun.
+
 ## 2026-11-10 06:15 — Albert (doigt), Claude — DOIGT-LINUX-IRQ : la broche d'interruption du capteur marche sous Linux, mais ne réagit pas au doigt
 - Trace : — (Linux de test 10.0.200.4, dmesg ; module driver/linux/mesa_irqwatch.c, broche gpio0 195 lue seulement toutes les 20 ms ; trames 0x78 et 0x10).
   Protocole et prédiction écrits avant : docs/hypotheses.md « DOIGT-LINUX-IRQ ».

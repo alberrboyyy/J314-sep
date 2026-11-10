@@ -33,7 +33,8 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [x] Table des réponses d'état du capteur (docs/sensor_hw.md, 2026-11-10).
 - [x] Ranger le module Linux : transport (mesa_transport.h) séparé du test « bonjour » (mesa_probe.c), compile W=1 (2026-11-10).
 - [x] docs/driver_plan.md mis à jour (2026-11-10 nuit).
-- [!] Étude du « coffre » (xART) et comparaison fine puce ↔ bus du capteur : arrêtées par le filtre de sécurité du modèle les 2026-11-10. Ne pas relancer ; voir avec Albert (programme de vérification Anthropic).
+- [x] Étude du « coffre » (xART) : docs/xart_options.md écrit le 2026-11-10 (Opus 4.8, filtre non déclenché cette fois). 5 voies, recommandation = voie B (tracer l'OOL de 0x13 en lecture seule). Comparaison fine puce ↔ bus du capteur : pas encore refaite.
+- [ ] Voie B : étendre le tracer à l'OOL de l'EP 0x13, puis capture macOS en lecture seule (après backup complet du Mac). Voir docs/xart_options.md.
 
 - [ ] Transport : attendre la broche d'interruption (gpio0 195) au lieu de pauses fixes ; l'ajouter au device tree de test (irq-gpios).
 - [x] docs/sensor_hw.md : comportement de la broche 195 et de l'octet 0x18 reporté (2026-11-10).
