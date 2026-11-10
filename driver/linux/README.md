@@ -4,7 +4,13 @@
 (`tools/mesa_hello.sh`, `docs/verification_status.md` SPI-3). Rien ici ne parle au SEP.
 
 ## Fichiers
-- `mesa_probe.c` : petit module. Sans `enable=1` il ne fait rien du tout. Avec `enable=1` il refait la séquence vérifiée :
+- `mesa_transport.h` : **couche transport réutilisable, base du futur pilote.** Primitives sans logique de test :
+  `mesa_acquire`/`mesa_release` (prendre/relâcher le capteur : mode SPI vérifié, broche d'alimentation, contrôleur
+  maintenu allumé), `mesa_power_on`/`mesa_power_off` (allumer/éteindre avec les délais vérifiés), `mesa_send` (émettre
+  une commande), `mesa_read` (lire une réponse en attente), `mesa_status` (lire l'état, rend le nombre d'octets en
+  attente). Le vrai pilote inclura ce fichier au lieu de recopier la séquence.
+- `mesa_probe.c` : petit module = premier client du transport. Sans `enable=1` il ne fait rien du tout. Avec `enable=1`
+  il refait la séquence vérifiée (« bonjour »), rien d'autre :
   1. broche d'alimentation du capteur à 0, 40 ms, puis à 1, 60 ms ;
   2. réveil `80 78 00 07 00 00 00` ;
   3. état : `80 10 00 07 00 00 00` + 16 zéros, en lisant 0x17 octets (réponse `80 20 00 10 …` à partir de l'octet 7) ;
@@ -21,7 +27,9 @@
 - `Makefile` : module hors arbre.
 
 ## Vérifié hors ligne (2026-11-10)
-- `mesa_probe.c` compile sans avertissement (`W=1`) contre les en-têtes du noyau 7.2 du PC (x86 : contrôle de l'API seulement).
+- `mesa_probe.c` (+ `mesa_transport.h`) compile sans avertissement (`W=1`) contre les en-têtes du noyau 7.2 du PC
+  (x86 : contrôle de l'API seulement). `mesa_ovl.c` ne compile pas sur ce PC (fonction `of_find_all_nodes` absente des
+  en-têtes x86), mais compile sur le Linux de test Asahi ; sans rapport avec le capteur.
 - `t6001-j314c-mesa-test.dts` compile avec `cpp` + `dtc` contre les fichiers publics `arch/arm64/boot/dts/apple/` de Linux
   (branche master du 2026-11-10) : les étiquettes `aic`, `clkref`, `ps_spi2`, `pinctrl_ap` existent et le nœud spi2 produit
   a la même forme que spi3.

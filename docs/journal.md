@@ -14,6 +14,20 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude — Rangement du module Linux : couche transport séparée du test « bonjour »
+- Trace : — (travail hors ligne, hors Mac ; Albert installe le VPN de la partition de test).
+- Fait : extrait de `driver/linux/mesa_probe.c` une couche transport réutilisable `driver/linux/mesa_transport.h`
+  (`mesa_acquire`/`mesa_release`, `mesa_power_on`/`mesa_power_off`, `mesa_send`, `mesa_read`, `mesa_status` ;
+  struct `mesa_dev` avec tampons tx/rx hors pile). `mesa_probe.c` devient le premier client = la seule séquence « bonjour ».
+  Aucun changement de comportement, mêmes trames, même ordre, mêmes délais. Module toujours `mesa_probe.ko`,
+  Makefile et commande de rechargement inchangés. README mis à jour.
+- Vu : `mesa_probe.o` compile sans avertissement sous `W=1` contre les en-têtes du noyau du PC (x86, contrôle d'API).
+  `mesa_ovl.o` échoue sur ce PC (`of_find_all_nodes` absent des en-têtes x86 ; compile sur l'Asahi du Linux de test),
+  sans rapport avec le changement.
+- Interprété : but = servir de base au pilote (le pilote inclura `mesa_transport.h` au lieu de recopier la séquence).
+  Reste à vérifier sur le Mac : recharger et refaire « bonjour » (reproductibilité) quand 10.67.0.94 est joignable.
+- Incidents : aucun.
+
 ## 2026-11-10 00:52 — Claude — MESA-HELLO : le capteur répond sans macOS (m1n1 seul)
 - Trace : traces/20261110-005244_mesa_hello (tools/mesa_hello.sh ; écritures : broche 196 d'alimentation + registres spi2 en mode scruté ; rien vers le SEP, rien dans pmgr ni dans les broches SPI).
 - Fait : alimentation comme macOS (C17), puis seulement les trames en clair vues dans C19 : 0x78, 0x10, 0x70, 0x10, 0x13 (0x1b), lecture de 0x1b octets, 0x10. CLKDIV 3, CFG 0x40002 (CPHA, scruté), FIFO de 16.
