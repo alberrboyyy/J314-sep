@@ -22,3 +22,23 @@ Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Lin
 3. Reste ouvert : SKS-1 (le SEP refuse-t-il 0x09 avant le mot de passe ? hypothèse « oui, le SEP » ; tranche seulement par une écriture), 2e 0x209 inexpliqué après chaque lock, cause iCloud.
 4. FAIT depuis m1n1 (tools/mesa_hello.sh, 2026-11-10) : le capteur répond sans macOS aux trames en clair, identité identique (vérifié, 2 essais). FAIT aussi depuis Linux le 2026-11-10 (LINUX-HELLO) : sur le Linux de test, `insmod mesa_ovl.ko` (ajout à chaud de spi2 + capteur, rien d'installé, à refaire après chaque reboot : voir journal) puis `insmod mesa_probe.ko enable=1` → même identité. Le développement capteur peut continuer par ssh, Mac seul, sans câble. Au-delà (trames chiffrées) il faut le SEP, donc le blocage xART.
 État du Mac au 2026-11-10 00:55 : en mode proxy m1n1 après C20.
+
+## Liste de tâches (tenue à jour par Claude ; Albert peut ajouter des lignes en français normal)
+Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
+
+### Sans Albert, sans le Mac
+- [x] Table des réponses d'état du capteur (docs/sensor_hw.md, 2026-11-10).
+- [ ] Ranger le module Linux : séparer « transport » (allumer, état, lire une réponse) du test « bonjour », pour servir de base au pilote.
+- [ ] Relire docs/driver_plan.md et le mettre à jour avec ce qui est vérifié depuis le 2026-11-10 (bus, broches, trames en clair, Linux parle au capteur).
+- [!] Étude du « coffre » (xART) et comparaison fine puce ↔ bus du capteur : arrêtées par le filtre de sécurité du modèle les 2026-11-10. Ne pas relancer ; voir avec Albert (programme de vérification Anthropic).
+
+### Avec le Mac sur le Linux de test (joignable à 10.67.0.94), sans action d'Albert
+- [ ] Recharger les modules après reboot (commande dans le journal, entrée LINUX-HELLO) et refaire le « bonjour » une 2e fois (reproductibilité).
+- [ ] Lire l'état du capteur en boucle pendant 30 s sans doigt : est-il stable ?
+
+### Avec Albert devant le Mac (2 minutes)
+- [ ] Doigt posé sans la puce de sécurité : l'état du capteur change-t-il ? (attendu : non, car le logiciel interne du capteur n'est pas chargé).
+
+### Décisions qui appartiennent à Albert
+- [ ] Faut-il s'inscrire au programme de vérification d'Anthropic pour débloquer l'étude du « coffre » ?
+- [ ] Jusqu'où aller : s'arrêter au « Linux parle au capteur », ou viser un Touch ID complet (dépend du « coffre », risque pour macOS à évaluer).
