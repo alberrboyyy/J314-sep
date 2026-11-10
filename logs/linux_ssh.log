@@ -22,3 +22,18 @@
 2026-11-09 23:58:35 run: grep -n -A8 "power-controller@200 {" /root/live.dts | head -12; grep -n -B1 -A6 "clkref\"" /root/live.dts | head -12; grep -n -A12 "spi@39b10c000 {" /root/live.dts | grep -E "clocks|power-domains|pinctrl"; grep -n "pinctrl@" /root/live.dts | head -3; grep -n -B3 -A10 "gpio-controller;" /root/live.dts | grep -E "phandle|pinctrl@|gpio-ranges|ngpios" | head
 2026-11-09 23:58:48 run: sed -n 5053,5064p /root/live.dts; grep -n "interrupt-controller@" /root/live.dts | head -2; awk "/interrupt-controller@28e100000 \\{/,/\\};/" /root/live.dts | grep -E "phandle|compatible"; echo ---; grep -n "pinctrl-ap\|pinctrl_ap" /root/live.dts | head -2; sed -n 920,935p /root/live.dts
 2026-11-10 00:10:50 run: uname -r
+2026-11-10 01:11:32 run: uname -r; zcat /proc/config.gz 2>/dev/null | grep -E 'OF_OVERLAY|OF_DYNAMIC|SPI_APPLE|OF_CONFIGFS' ; grep -E 'OF_OVERLAY|OF_DYNAMIC|SPI_APPLE' /boot/config-$(uname -r) 2>/dev/null; grep -c of_overlay_fdt_apply /proc/kallsyms; ls /root
+2026-11-10 01:11:45 run: cd /root; grep -n 'power-controller@200 {' -A12 live.dts | head -40; grep -n 'spi@39b104000 {' -A22 live.dts; grep -n 'pinctrl@39b028000 {' -A12 live.dts | grep -n 'phandle\|gpio-controller'; grep -n 'interrupt-controller@28e100000 {' -A12 live.dts | grep phandle; grep -n '^\tsoc' -A6 live.dts | head -12; ls /root/mesa; ls /sys/firmware/devicetree/base/soc | grep -i 'spi\|power-management@28e58'
+2026-11-10 01:12:16 run: ls -d /sys/firmware/devicetree/base/soc/power-management@28e580000/power-controller@200 && cat /sys/firmware/devicetree/base/soc/power-management@28e580000/power-controller@200/label; echo; grep -n 'spi@39b10c000 {' -A10 /root/live.dts | grep -E 'clocks|power-domains|interrupts'; grep -n 'phandle = <0x5d>' -B8 /root/live.dts | grep -E 'name|compatible|clock-freq'; lsmod | grep -i spi; which dtc
+2026-11-10 01:12:47 put: driver/linux/mesa_probe.c -> /root/mesa/
+2026-11-10 01:12:48 put: driver/linux/mesa_ovl.c -> /root/mesa/
+2026-11-10 01:12:48 put: driver/linux/mesa-spi2-overlay.dts -> /root/mesa/
+2026-11-10 01:12:48 put: driver/linux/Makefile -> /root/mesa/
+2026-11-10 01:12:48 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | tail -15; dtc -I dts -O dtb -o mesa-spi2.dtbo mesa-spi2-overlay.dts 2>&1 | tail -5; ls -la *.ko *.dtbo
+2026-11-10 01:12:55 put: driver/linux/mesa_ovl.c -> /root/mesa/
+2026-11-10 01:12:56 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E "error|warning|LD \[M\]" ; ls -la *.ko && cp mesa-spi2.dtbo /lib/firmware/ && sync && echo copie_ok
+2026-11-10 01:13:01 run: cd /root/mesa && date && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | tail -12; ls -la --time-style=full-iso *.ko
+2026-11-10 01:13:08 put: driver/linux/mesa_ovl.c -> /root/mesa/
+2026-11-10 01:13:08 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E "ERROR|error|LD \[M\]"; ls -la *.ko
+2026-11-10 01:13:16 run: cd /root/mesa && dmesg -C; insmod mesa_ovl.ko; echo "insmod=$?"; sleep 1; dmesg | tail -25; ls /sys/bus/spi/devices/; ls /sys/firmware/devicetree/base/soc | grep 39b108; ls /sys/bus/platform/devices | grep 39b10
+2026-11-10 01:13:24 run: cd /root/mesa && for d in /sys/bus/spi/devices/*; do echo "$d -> $(readlink $d | grep -o "39b10[0-9a-f]*.spi") $(cat $d/modalias)"; done; dmesg -C; insmod mesa_probe.ko enable=1; echo "insmod=$?"; sleep 2; dmesg | tail -40

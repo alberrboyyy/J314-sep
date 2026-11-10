@@ -93,3 +93,18 @@ d'alimentation pour éteindre, puis rallumer normalement : rien n'est perdu, rie
 
 ## Hors périmètre
 Trames chiffrées (0x72, 0x73, 0x55, 0x60…), interruption du capteur, images, SEP, SKS, xART : rien de tout cela ici.
+
+## Essai réel du 2026-11-10 (LINUX-HELLO) : ça marche, sans câble et sans rien installer
+Sur le Linux de test, plus besoin de changer le démarrage : `mesa_ovl.ko` ajoute le bus spi2 et le capteur à chaud
+(fichiers `mesa_ovl.c`, `mesa-spi2-overlay.dts`). Un redémarrage enlève tout.
+```
+cd /root/mesa
+make -C /lib/modules/$(uname -r)/build M=$PWD modules
+dtc -I dts -O dtb -o mesa-spi2.dtbo mesa-spi2-overlay.dts && cp mesa-spi2.dtbo /lib/firmware/
+insmod mesa_ovl.ko                 # décrit le matériel, n'envoie rien au capteur
+insmod mesa_probe.ko enable=1      # allume le capteur, lit son identité, l'éteint
+dmesg | tail -20                   # doit finir par « IDENTITÉ IDENTIQUE »
+```
+Les numéros (phandles) du fichier overlay viennent du device tree de CE noyau (7.2.12-402.asahi.fc45) : après une mise à
+jour du noyau, les revérifier dans le DT vivant avant de charger. La section « Ce qu'Albert doit faire à la main » plus haut
+(envoi par câble) n'est plus nécessaire.

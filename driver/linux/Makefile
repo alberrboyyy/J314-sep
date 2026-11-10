@@ -1,2 +1,2 @@
-# Module hors arbre. Usage : make -C <sources du noyau compile> M=$PWD modules   (non essaye)
-obj-m += mesa_probe.o
+# Module hors arbre. Sur le Linux de test : make -C /lib/modules/$(uname -r)/build M=$PWD modules
+obj-m += mesa_probe.o mesa_ovl.o

@@ -106,3 +106,5 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
 - SPI-3 (2026-11-10, MESA-HELLO, traces/20261110-005244_mesa_hello) : sans macOS, alimentation par gpio0 196 + trames 0x78, 0x10,
   0x70, 0x13 sur spi2 (CLKDIV 3, CPHA 1, pas de CS, broches laissées par iBoot) → identité du capteur identique à celle lue sous
   macOS : `vérifié` (2 essais identiques, 2e : traces/20261110-005318_mesa_hello2). Rend SPI-2 `vérifié` pour ces 4 trames seulement.
+- SPI-4 (2026-11-10, LINUX-HELLO) : sous Linux (Fedora Asahi de test), spi2 ajouté à chaud (driver/linux/mesa_ovl.c + mesa-spi2-overlay.dts)
+  et mesa_probe enable=1 → même identité du capteur : `vérifié` (1 essai). Le pilote public spi-apple suffit pour le transport.

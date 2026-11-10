@@ -21,6 +21,14 @@ Format :
 - Interprété : passent à `vérifié` (expérience dédiée, 1er essai) : spi2 à 0x39b108000 atteint bien le capteur avec les broches telles qu'iBoot les laisse (donc sans pinctrl à ajouter), sans broche CS, alimentation active haute sur gpio0 196, CPHA = 1, et les 4 trames 0x78 / 0x10 / 0x70 / 0x13. Le groupe de broches 116-118 reste inexpliqué mais n'est pas nécessaire. Refait une fois (traces/20261110-005318_mesa_hello2) : même identité, même remise en état.
 - Incidents : aucun ; Mac resté en mode proxy.
 
+## 2026-11-10 01:20 — Claude — LINUX-HELLO : Linux parle au capteur (Linux de test, sans câble, sans rien installer)
+- Trace : sortie dmesg ci-dessous (Linux de test 10.67.0.94, noyau 7.2.12-402.asahi.fc45 ; via tools/linux_ssh.sh, voir logs/linux_ssh.log). Pas de dossier traces/ (aucun m1n1).
+- Fait : `driver/linux/mesa_ovl.ko` ajoute à chaud le nœud spi2 + capteur au device tree vivant (`of_overlay_fdt_apply`, fichier `mesa-spi2.dtbo` ; donne en mémoire un phandle au nœud ps_spi2 qui n'en avait pas ; phandles numériques relevés dans /root/live.dts). spi-apple a pris `39b108000.spi`, le capteur est apparu en `spi2.0`. Puis `insmod mesa_probe.ko enable=1` (module réécrit par l'agent driver : séquence de MESA-HELLO).
+- Vu : état `80 20 00 10 000000 09 60 00 00 18…`, puis 0x1b octets en attente, réponse `80 d4 00 1b 00000000 70 02 19 c0 5c 0f d2 aa 34 9a 81 c7 6e 03 02 00 d8 75 76` = **identité identique** à macOS et à m1n1 ; état final `…00 60 00 00 00 52 33 00 00` ; capteur éteint. 8 MHz demandés, mode 0x1 (CPHA).
+- Interprété : `vérifié` (1 essai) : le pilote public spi-apple pilote spi2 tel quel (son bit CS interne ne gêne pas, l'interruption AIC 1108 marche, ps_spi2 est géré par le noyau, horloge 24 MHz = phandle de spi3). Le développement du transport capteur peut se faire sur le Mac seul par ssh.
+- Incidents : aucun. Seuls messages annexes : avertissements « Failed to create device link » de thunderbolt-apple-acio à l'application de l'overlay (sans effet vu).
+- Pour refaire après un reboot : `cd /root/mesa && cp mesa-spi2.dtbo /lib/firmware/ && insmod mesa_ovl.ko && insmod mesa_probe.ko enable=1 && dmesg | tail -20`.
+
 ## 2026-11-10 01:05 — Claude — Étude « voies pour xART » : sous-agent arrêté par le filtre de sécurité du modèle
 - Trace : —
 - Fait : sous-agent documentaliste lancé à la demande d'Albert pour écrire docs/xart_options.md (sources publiques + nos traces, aucune action matérielle).

@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+/*
+ * Ajout À CHAUD du bus spi2 et du capteur Touch ID sur le Linux de test (Fedora Asahi, j314c), chargé par mesa_ovl.ko.
+ * Rien n'est installé : un redémarrage enlève tout.
+ * Le DT vivant n'a pas de __symbols__ : les références sont des phandles NUMÉRIQUES relevés dans /root/live.dts
+ * le 2026-11-10 (noyau 7.2.12-402.asahi.fc45) : 0x13 = AIC, 0x31 = horloge 24 MHz de spi3, 0x48 = pinctrl gpio0.
+ * 0xdeadbeef est remplacé par mesa_ovl.ko par le phandle qu'il donne au nœud ps_spi2 (qui n'en a pas).
+ * Valeurs : voir t6001-j314c-mesa.dtsi (mêmes statuts vérifié / calqué).
+ */
+/dts-v1/;
+/plugin/;
+/ {
+	fragment@0 {
+		target-path = "/soc";
+		__overlay__ {
+			spi@39b108000 {
+				compatible = "apple,t6000-spi", "apple,spi";
+				reg = <0x3 0x9b108000 0x0 0x4000>;
+				interrupt-parent = <0x13>;
+				interrupts = <0 0 1108 4>;
+				clocks = <0x31>;
+				power-domains = <0xdeadbeef>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				status = "okay";
+
+				biosensor@0 {
+					compatible = "biosensor,mesa";
+					reg = <0>;
+					spi-max-frequency = <8000000>;
+					spi-cpha;
+					pwr-gpios = <0x48 196 0>;
+				};
+			};
+		};
+	};
+};
