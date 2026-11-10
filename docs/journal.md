@@ -14,6 +14,17 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — C20 : 27 images lues sur le bus, 7 seulement transmises au SEP (les « 20 non transmises » quantifiées)
+- Trace : traces/20261110-003201_c20-doigt-spi (lecture seule). Script : analysis/count_sensor_vs_sep_images.py. Hors ligne.
+- Fait : compté les images 0x7200 lues sur le bus capteur (sio.bufs/*_done_data.bin, pleins) et les tranches 0x65 envoyées au SEP (sep.log).
+- Vu : 27 images lues sur le bus ; 14 tranches 0x65 vers le SEP = **7 images transmises** ; donc **20 images lues mais non transmises**.
+  Les 7 transmises se répartissent sur les poses (fp_good_1/2:2 tranches, fp_good_3:4 = 2 images, fp_bad_1/2:2, + 2 vers lock_g1) et sont
+  exactement les 7 retrouvées octet pour octet côté SEP (analysis/cmp_sensor_sep_image.py).
+- Interprété : résout (en le chiffrant) l'ancien point ouvert « rôle des 20 images non transmises ». `vérifié` pour les comptes (27 / 7 / 20).
+  Hypothèse pour le « pourquoi » : pendant une pose, le capteur (configuré par le SEP sous macOS) fournit plusieurs trames ; l'AP n'en relaie
+  qu'une (parfois deux) au SEP pour la comparaison, les autres étant des trames de prévisualisation/qualité non envoyées. Non testable sans le SEP.
+- Incidents : aucun.
+
 ## 2026-11-10 — Claude (Opus 4.8) — Transport réactif : « bonjour » attend la broche « donnée prête », identité toujours identique
 - Trace : — (Linux de test 10.0.200.4, dmesg ; mesa_probe.ko enable=1, transport mesa_transport.h). Compilé W=1.
 - Fait : ajouté mesa_wait_ready() au transport (scrutation bornée de gpio0 195, 50 ms max, repli si pas de montée ; broche lue seulement,
