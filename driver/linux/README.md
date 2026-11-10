@@ -8,7 +8,9 @@
   `mesa_acquire`/`mesa_release` (prendre/relâcher le capteur : mode SPI vérifié, broche d'alimentation, contrôleur
   maintenu allumé), `mesa_power_on`/`mesa_power_off` (allumer/éteindre avec les délais vérifiés), `mesa_send` (émettre
   une commande), `mesa_read` (lire une réponse en attente), `mesa_status` (lire l'état, rend le nombre d'octets en
-  attente). Le vrai pilote inclura ce fichier au lieu de recopier la séquence.
+  attente), `mesa_wait_ready` (attend, par scrutation bornée et sûre, que la broche « donnée prête » gpio0 195 monte avant
+  une lecture d'état, au lieu d'une pause fixe ; repli silencieux si la broche est absente ou ne monte pas). Le vrai pilote
+  inclura ce fichier au lieu de recopier la séquence.
 - `mesa_probe.c` : petit module = premier client du transport. Sans `enable=1` il ne fait rien du tout. Avec `enable=1`
   il refait la séquence vérifiée (« bonjour »), rien d'autre :
   1. broche d'alimentation du capteur à 0, 40 ms, puis à 1, 60 ms ;
