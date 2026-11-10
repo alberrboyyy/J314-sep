@@ -1,60 +1,63 @@
 // SPDX-License-Identifier: GPL-2.0+ OR MIT
 /*
- * Fragment de device tree : capteur Touch ID (ADT "biosensor,mesa") sur MacBook Pro 14" j314c / t6001.
- * HORS LIGNE, JAMAIS TESTE sur du materiel.
+ * Fragment de device tree : bus spi2 + capteur Touch ID (ADT "biosensor,mesa"), MacBook Pro 14" j314c / t6001.
+ * JAMAIS DÉMARRÉ sous Linux. Compilé hors ligne avec dtc contre les sources publiques (voir README).
  *
- * Valeurs LUES dans l'ADT : traces/20261108-162919_adt/mesa.txt (statut "verifie" en tant que lecture, voir
- * docs/verification_status.md ADT-1). Le role des broches reste une hypothese.
- * Tout ce qui est marque A VERIFIER est inconnu ou devine ; ne pas s'y fier.
+ * Légende des commentaires :
+ *   VÉRIFIÉ = confirmé par l'essai MESA-HELLO depuis m1n1 (docs/verification_status.md SPI-3, 2 essais) ;
+ *   LU      = lu dans l'ADT de la machine (traces/20261108-162919_adt) ou sur le Mac en lecture seule ;
+ *   CALQUÉ  = copié de la déclaration publique de spi1/spi3 (t600x-die0.dtsi), non vérifié pour spi2 ;
+ *   INCONNU = non établi.
  *
- * A inclure apres t6001-j314c.dts, par ex. : #include "t6001-j314c-mesa.dtsi"
+ * À inclure après t6001-j314c.dts (voir t6001-j314c-mesa-test.dts). Les deux nœuds sont « disabled » ici :
+ * c'est le fichier de test qui les active.
  */
 
 #include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/interrupt-controller/irq.h>
 
-/* Le noeud spi2 n'existe pas dans linux-asahi (seuls spi1 et spi3, docs/public_linux_state.md 2.2). */
+/* Le nœud spi2 n'existe pas dans le DT public (seuls spi1 et spi3). */
 &{/soc} {
-	spi2: spi@39b108000 {		/* LU : ADT spi2 reg = 0x19B108000 (+ base arm-io 0x200000000), taille 0x4000
-					 * (traces/20261108-162919_adt/adt.txt L1042-1055) ; confirme par le pas de spi1/spi3. */
-		compatible = "apple,t6000-spi", "apple,spi";
-		reg = <0x3 0x9b108000 0x0 0x4000>;
+	spi2: spi@39b108000 {
+		compatible = "apple,t6000-spi", "apple,spi";	/* CALQUÉ (spi1/spi3) ; MESA-HELLO a piloté spi2 avec la
+								 * séquence de registres de spi-apple.c : même bloc matériel */
+		reg = <0x3 0x9b108000 0x0 0x4000>;		/* LU : ADT spi2, entre spi1 (…104000) et spi3 (…10c000) ;
+								 * VÉRIFIÉ : c'est l'adresse utilisée par MESA-HELLO */
 		interrupt-parent = <&aic>;
-		interrupts = <AIC_IRQ 1108 IRQ_TYPE_LEVEL_HIGH>;	/* LU : ADT interrupts = [1108] ; type : A VERIFIER (copie de spi1/spi3) */
-		power-domains = <&ps_spi2>;	/* LU : ADT pmgr SPI2 (id 144) -> registre 0x28e580200 = ps_spi2 (reg 0x200) de t600x-pmgr.dtsi ;
-						 * allume (0xff) sous m1n1 seul (traces/20261110-001208_gpio_peek) */
-		clocks = <&clkref>;		/* A VERIFIER : l'ADT dit clock-gates 144 / clock-ids 378 ; macOS voit CCLK 24 MHz */
-		/* HYPOTHESE (docs/sensor_hw.md, 2026-11-10) : broches gpio0 48, 49, 50 en fonction 1, deja reglees par iBoot
-		 * (meme motif que spi1/spi3/spi4). VERIFIE sans macOS le 2026-11-10 (tools/mesa_hello.sh) : le capteur repond
-		 * avec ces broches telles quelles. Laisse en commentaire : rien a regler si iBoot l'a deja fait.
-		 * pinctrl-0 = <&spi2_pins>; pinctrl-names = "default";
-		 * &pinctrl_ap { spi2_pins: spi2-pins { pinmux = <APPLE_PINMUX(48, 1)>, <APPLE_PINMUX(49, 1)>, <APPLE_PINMUX(50, 1)>; }; };
-		 */
+		interrupts = <AIC_IRQ 0 1108 IRQ_TYPE_LEVEL_HIGH>;	/* numéro LU (ADT = 1108, entre 1107 et 1109) ;
+									 * forme et type CALQUÉS ; jamais vue se déclencher */
 		#address-cells = <1>;
 		#size-cells = <0>;
-		status = "disabled";		/* active seulement par le noeud ci-dessous quand on teste */
+		clocks = <&clkref>;		/* CALQUÉ sur spi3 (24 MHz). Indice : macOS annonce « CCLK 24 MHz » pour spi2
+						 * comme pour spi3 (trace C1). Lien exact avec l'ADT (clock-ids 378) : INCONNU */
+		power-domains = <&ps_spi2>;	/* LU : pmgr SPI2 = registre 0x28e580200 = ps_spi2 du DT public ; allumé sous m1n1.
+						 * Sous Linux ce domaine sera coupé/rallumé par le noyau : jamais essayé */
+		/*
+		 * Pas de pinctrl : VÉRIFIÉ que le capteur répond avec les broches telles qu'iBoot les laisse.
+		 * (Broches supposées : gpio0 48, 49, 50, fonction 1 ; hypothèse, docs/sensor_hw.md.)
+		 * Pas de cs-gpios : ce bus n'a pas de broche chip-select (LU : ADT function-spi_cs0 = null).
+		 */
+		status = "disabled";
 
 		mesa: biosensor@0 {
-			compatible = "biosensor,mesa";	/* LU : ADT compatible = [biosensor,mesa] */
-			reg = <0>;			/* ADT : function-spi_cs0 = null() -> pas de broche CS (broche 51 non configuree) ; hypothese */
-			spi-max-frequency = <8000000>;	/* LU : ADT spi-frequency = 8000000 */
-			spi-cpha;			/* VERIFIE (MESA-HELLO 2026-11-10) : CPHA = 1, CPOL = 0 ; macOS utilise CLKDIV 3 (6 MHz) */
-
-			/* LU : ADT interrupt-parent = 132 = gpio0, interrupts = [195, 3] */
-			interrupts-extended = <&pinctrl_ap 195 IRQ_TYPE_EDGE_BOTH>;	/* "3" = EDGE_BOTH : A VERIFIER */
-
-			/* LU : ADT function-mesa_pwr = 132:GPIO(0xc4, 0x101). 0xc4 = 196. Sens actif (flags 0x101) : A VERIFIER */
-			pwr-gpios = <&pinctrl_ap 196 GPIO_ACTIVE_HIGH>;
-
-			/* LU : power-on-delay = 7, power-off-delay = 10. Unite (ms ?) : A VERIFIER */
-			apple,power-on-delay = <7>;
-			apple,power-off-delay = <10>;
+			compatible = "biosensor,mesa";	/* LU : nom de l'ADT ; ce n'est pas un nom officiel Linux */
+			reg = <0>;			/* imposé par Linux ; aucune broche derrière (voir README, chip-select) */
+			/*
+			 * VÉRIFIÉ : registre diviseur = 3 (macOS et MESA-HELLO). spi-apple.c calcule
+			 * diviseur = arrondi_sup(horloge / fréquence) : avec 24 MHz, 8000000 donne 3 (comme vérifié),
+			 * 6000000 donnerait 4 (plus lent, jamais essayé). L'ADT dit aussi 8000000 (LU).
+			 * Fréquence réelle sur le fil : 8 MHz (24/3) ou 6 MHz (24/(3+1)) : INCONNU. Ne vaut que si clocks = 24 MHz.
+			 */
+			spi-max-frequency = <8000000>;
+			spi-cpha;			/* VÉRIFIÉ : CPHA = 1, CPOL = 0 */
+			pwr-gpios = <&pinctrl_ap 196 GPIO_ACTIVE_HIGH>;	/* VÉRIFIÉ : gpio0 196, 0 = éteint, 1 = allumé */
 
 			/*
-			 * INCONNU, volontairement absent :
-			 *  - reset du capteur : "function-mesa_reset" passerait par l'AOP (hypothese, kext) ; rien de public sous Linux ;
-			 *  - alim 1,8 V ("function-mesa_pwr1v8") : non lue dans l'ADT de notre machine ;
-			 *  - canaux DMA / SIO : spi-apple n'utilise pas le DMA.
+			 * Volontairement absent :
+			 *  - interruption du capteur (LU : gpio0 195, drapeau 3) : la déclarer ferait régler la broche 195 par
+			 *    Linux dès le démarrage, ce que MESA-HELLO n'a pas fait. Type front/niveau : INCONNU.
+			 *    interrupts-extended = <&pinctrl_ap 195 IRQ_TYPE_EDGE_BOTH>;
+			 *  - délais de l'ADT (7 et 10, unité inconnue) : le module utilise les délais vérifiés (40 et 60 ms) ;
+			 *  - reset, alimentation 1,8 V, DMA : non utilisés par MESA-HELLO.
 			 */
 			status = "disabled";
 		};

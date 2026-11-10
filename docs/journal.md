@@ -21,6 +21,13 @@ Format :
 - Interprété : passent à `vérifié` (expérience dédiée, 1er essai) : spi2 à 0x39b108000 atteint bien le capteur avec les broches telles qu'iBoot les laisse (donc sans pinctrl à ajouter), sans broche CS, alimentation active haute sur gpio0 196, CPHA = 1, et les 4 trames 0x78 / 0x10 / 0x70 / 0x13. Le groupe de broches 116-118 reste inexpliqué mais n'est pas nécessaire. Refait une fois (traces/20261110-005318_mesa_hello2) : même identité, même remise en état.
 - Incidents : aucun ; Mac resté en mode proxy.
 
+## 2026-11-10 01:05 — Claude — Étude « voies pour xART » : sous-agent arrêté par le filtre de sécurité du modèle
+- Trace : —
+- Fait : sous-agent documentaliste lancé à la demande d'Albert pour écrire docs/xart_options.md (sources publiques + nos traces, aucune action matérielle).
+- Vu : arrêté dès le début par le filtre « [cyber] » de Fable 5.2 (même comportement que l'étude SKS du 2026-11-08). Aucun fichier produit.
+- Décision : ne pas insister ni refaire l'étude autrement dans cette session. Options pour Albert : programme « Cyber Verification » d'Anthropic (réduit ces coupures), ou lire lui-même la doc publique Asahi sur le SEP.
+- Incidents : aucun (aucun hardware).
+
 ## 2026-11-10 00:55 — Albert (doigt), Claude — C20 : doigt posé avec écoute du bus SPI du capteur
 - Trace : traces/20261110-003201_c20-doigt-spi (`TRACE_SCRIPT=hv/trace_sep_spi_dma.py SEP_OOL_EPS=0x08`, tools/guide_doigt.sh ; 16 marques ; arrêt demandé après `end`). Protocole et prédiction écrits avant : docs/hypotheses.md « C20 ».
 - Actions d'Albert (notes.txt) : mot de passe au login, 3 bons doigts = déverrouillé (o, o, o), 2 mauvais doigts = refusé (n, n), puis mot de passe. « tout bon ». ~2 min entre le login et le 1er verrouillage (Mac lent sous écoute).

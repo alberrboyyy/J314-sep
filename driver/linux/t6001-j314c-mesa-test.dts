@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+/*
+ * Device tree de TEST : MacBook Pro 14" M1 Max (j314c) public + bus spi2 + capteur Touch ID.
+ * À copier avec t6001-j314c-mesa.dtsi dans arch/arm64/boot/dts/apple/ des sources Linux. Jamais démarré.
+ * Sans le module mesa_probe chargé avec enable=1, le capteur reste éteint ; seul le contrôleur spi2 est initialisé.
+ */
+#include "t6001-j314c.dts"
+#include "t6001-j314c-mesa.dtsi"
+
+&spi2 {
+	status = "okay";
+};
+
+&mesa {
+	status = "okay";
+};
