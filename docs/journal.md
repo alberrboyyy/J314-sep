@@ -14,6 +14,20 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude — Reproductibilité du « bonjour » depuis Linux avec le module rangé (adresse VPN 10.0.200.4)
+- Trace : — (Linux de test, via tools/linux_ssh.sh ; nouvelle adresse 10.0.200.4 donnée par Albert, voir ci-dessous).
+- Fait : adresse du Linux de test passée à 10.0.200.4 (Albert l'a donnée en session ; mise à jour de tools/linux_ssh.sh,
+  CLAUDE.md, handoff, hypotheses). Poussé les sources rangées (mesa_transport.h + mesa_probe.c), recompilé sur place,
+  puis séquence « bonjour » : `cp mesa-spi2.dtbo /lib/firmware/ && insmod mesa_ovl.ko && insmod mesa_probe.ko enable=1`.
+  Même noyau qu'avant (7.2.12-402.asahi.fc45), overlay toujours valide (ps_spi2 phandle 0x130).
+- Vu : identité `80 d4 00 1b 00000000 70 02 19 c0 5c 0f d2 aa 34 9a 81 c7 6e 03 02 00 d8 75 76` = **identique** à macOS,
+  m1n1 et au 1er LINUX-HELLO ; « RÉSULTAT : IDENTITÉ IDENTIQUE » ; état final `…00 60 00 00 00 52 33 00 00`, capteur éteint.
+- Interprété : `vérifié` (2e essai depuis Linux, reproductible) : le capteur répond à l'identique depuis Linux, et la refonte
+  de mesa_probe.c sur la couche transport mesa_transport.h n'a rien changé au comportement (même trames, même ordre).
+- Incidents : après l'essai, le lien VPN est retombé (ssh timeout sur 10.0.200.4). La 2e expérience prévue — lire l'état en
+  boucle 30 s sans doigt (module mesa_statloop.c, 2e client du transport, écrit et compilé W=1, poussé non) — n'a pas pu être
+  lancée. À reprendre quand le VPN revient.
+
 ## 2026-11-10 — Claude — Rangement du module Linux : couche transport séparée du test « bonjour »
 - Trace : — (travail hors ligne, hors Mac ; Albert installe le VPN de la partition de test).
 - Fait : extrait de `driver/linux/mesa_probe.c` une couche transport réutilisable `driver/linux/mesa_transport.h`
@@ -25,7 +39,7 @@ Format :
   `mesa_ovl.o` échoue sur ce PC (`of_find_all_nodes` absent des en-têtes x86 ; compile sur l'Asahi du Linux de test),
   sans rapport avec le changement.
 - Interprété : but = servir de base au pilote (le pilote inclura `mesa_transport.h` au lieu de recopier la séquence).
-  Reste à vérifier sur le Mac : recharger et refaire « bonjour » (reproductibilité) quand 10.67.0.94 est joignable.
+  Reste à vérifier sur le Mac : recharger et refaire « bonjour » (reproductibilité) quand 10.0.200.4 est joignable.
 - Incidents : aucun.
 
 ## 2026-11-10 00:52 — Claude — MESA-HELLO : le capteur répond sans macOS (m1n1 seul)

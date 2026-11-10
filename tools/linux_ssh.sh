@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Accès au Linux de test (root@10.67.0.94 UNIQUEMENT), exception décrite dans CLAUDE.md.
+# Accès au Linux de test (root@10.0.200.4 UNIQUEMENT), exception décrite dans CLAUDE.md.
 # Usage : ./tools/linux_ssh.sh run "<commande>"      exécute une commande sur le Linux de test
 #         ./tools/linux_ssh.sh put <local> <distant>  copie un fichier/dossier vers le Linux de test
 #         ./tools/linux_ssh.sh get <distant> <local>  rapatrie un fichier/dossier
 # Journal de tout ce qui est lancé : logs/linux_ssh.log
 set -euo pipefail
 cd "$(dirname "$0")/.."
-HOST="root@10.67.0.94"
+HOST="root@10.0.200.4"
 OPTS=(-o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
 mkdir -p logs
 log() { printf '%s %s\n' "$(date +%F\ %T)" "$*" >> logs/linux_ssh.log; }

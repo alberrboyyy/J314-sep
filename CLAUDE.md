@@ -77,5 +77,5 @@ passer aux tâches hors hardware (analyse, outillage).
 
 ## Exception : 2e Linux de test (accord d'Albert)
 
-- Sur le Linux de test `root@10.67.0.94` (partition Asahi d'Albert, jetable) uniquement : l'agent peut y agir en root, via `tools/linux_ssh.sh` seulement, pour compiler et charger les modules de `driver/linux/`.
+- Sur le Linux de test `root@10.0.200.4` (partition Asahi d'Albert, jetable) uniquement : l'agent peut y agir en root, via `tools/linux_ssh.sh` seulement, pour compiler et charger les modules de `driver/linux/`.
 - Interdit même là : partitionner, toucher à m1n1, à la boot policy ou à macOS, et envoyer quoi que ce soit au SEP (0x12, 0x13, 0x10, 0x15, gigalockers, IMG4).

@@ -39,3 +39,12 @@
 2026-11-10 01:13:24 run: cd /root/mesa && for d in /sys/bus/spi/devices/*; do echo "$d -> $(readlink $d | grep -o "39b10[0-9a-f]*.spi") $(cat $d/modalias)"; done; dmesg -C; insmod mesa_probe.ko enable=1; echo "insmod=$?"; sleep 2; dmesg | tail -40
 2026-11-10 11:31:11 run: uptime; ls /sys/bus/spi/devices/; lsmod | grep -E "mesa"; ls /root/mesa/*.ko
 2026-11-10 11:39:21 run: uptime
+2026-11-10 11:50:27 run: uname -r && uptime
+2026-11-10 12:01:07 run: uname -r && hostnamectl --static 2>/dev/null; echo ---; ls /root/mesa 2>/dev/null
+2026-11-10 12:01:28 put: driver/linux/mesa_transport.h -> /root/mesa/mesa_transport.h
+2026-11-10 12:01:29 put: driver/linux/mesa_probe.c -> /root/mesa/mesa_probe.c
+2026-11-10 12:01:30 run: lsmod | grep mesa || echo 'aucun module mesa chargé'
+2026-11-10 12:01:36 run: cd /root/mesa && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | tail -15
+2026-11-10 12:01:52 run: cd /root/mesa && cp mesa-spi2.dtbo /lib/firmware/ && insmod mesa_ovl.ko && insmod mesa_probe.ko enable=1; echo '=== dmesg ==='; dmesg | tail -30
+2026-11-10 12:03:02 put: driver/linux/mesa_statloop.c -> /root/mesa/mesa_statloop.c
+2026-11-10 12:03:13 run: echo ok

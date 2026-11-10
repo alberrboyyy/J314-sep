@@ -799,7 +799,7 @@ Aucun désassemblage fait : lecture de `analysis/out/sks_symbols.txt` (396 noms)
 Sources relues : journal 2026-11-09 (SEP-PEEK, GETRAND, SEP-BOOT), traces/20261109-221029_sep_boot/boot.log, pending/sep_boot.sh,
 traces/20261107-033436_c1-boot/sep.log (macOS, référence), verification_status.md, driver_plan.md. Aucun hardware lancé, aucune écriture SEP.
 Légende des expériences : [LS] lecture seule faisable par l'agent ; [PEND] écriture, script dans `pending/`, décision d'Albert ;
-[LINUX] test sur le 2e Linux (10.67.0.94, tools/linux_ssh.sh, ne touche pas au SEP) ; [HUMAIN] demande Albert.
+[LINUX] test sur le 2e Linux (10.0.200.4, tools/linux_ssh.sh, ne touche pas au SEP) ; [HUMAIN] demande Albert.
 
 ## (a) « SEPOS n'annonce que 7/12 endpoints car il attend des réponses xART/pnon de l'AP »
 

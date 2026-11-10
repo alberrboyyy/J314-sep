@@ -22,6 +22,9 @@
   (`dmesg`), avec une ligne `RÉSULTAT :` qui dit si l'identité est celle lue sous macOS
   (`80d4001b00000000700219c05c0fd2aa349a81c76e030200d87576`). Le module ne reste pas chargé « lié » au capteur :
   pour recommencer, le décharger et le recharger.
+- `mesa_statloop.c` : 2e client du transport. Avec `enable=1` il allume le capteur, le réveille, lit l'état toutes les
+  secondes pendant `duree` secondes (défaut 30) sans doigt, puis l'éteint — pour voir si l'état est stable au repos.
+  Ne pas charger en même temps que `mesa_probe` (même capteur). Montre que `mesa_transport.h` se réutilise tel quel.
 - `t6001-j314c-mesa.dtsi` : description du bus spi2 et du capteur. Chaque ligne est marquée VÉRIFIÉ, LU, CALQUÉ ou INCONNU.
 - `t6001-j314c-mesa-test.dts` : device tree de test = j314c public + le fragment ci-dessus, activé.
 - `Makefile` : module hors arbre.
