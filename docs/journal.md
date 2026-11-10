@@ -14,6 +14,17 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — La broche gpio0 195 = ligne « donnée prête » (remonte à chaque réponse en attente)
+- Trace : — (Linux de test 10.0.200.4, dmesg ; mesa_irqwatch.ko enable=1 hello=1 ; broche lue seulement ; trames en clair). Compilé W=1.
+- Fait : joué le « bonjour » en relevant la broche gpio0 195 avant/après chaque échange.
+- Vu : allumage 1 ; réveil 1 ; après 1er état 0 ; **après demande d'identité (0x70) 1** ; 2e état annonce 27 (0x1b) octets puis broche 0 ;
+  après lecture de la réponse 0 ; état final 0 ; extinction 0.
+- Interprété : `vérifié` (1 passe pour la remontée post-0x70, cohérent avec les boucles d'état antérieures pour réveil→état) : la broche est une
+  ligne « donnée prête / attention », active haute, qui monte dès qu'une réponse est en attente et retombe quand l'AP lit l'état (0x10).
+  Conséquence : le transport peut être piloté par interruption (attendre la montée) au lieu de pauses fixes. Prochain pas : câbler l'IRQ dans
+  l'overlay (irq-gpios / interrupts) et requérir l'interruption dans le pilote.
+- Incidents : 1er insmod avec l'ancien module (push raté pendant la coupure VPN) a rejoué la boucle d'état ; re-poussé, rebuild, relancé : OK.
+
 ## 2026-11-10 — Claude (Opus 4.8) — Expérience prête : la broche d'interruption pendant toute la séquence « bonjour »
 - Trace : — (code préparé hors ligne ; VPN retombé avant de lancer, Albert à l'école). Compilé W=1 sur le PC.
 - Fait : ajouté un mode `hello=1` à driver/linux/mesa_irqwatch.c : joue le « bonjour » (réveil, état, identité, état, lecture, état) en

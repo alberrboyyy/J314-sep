@@ -130,10 +130,12 @@ Source : journal 06:07, 06:08 et 06:15 (modules `driver/linux/mesa_statloop.c` e
 | capteur éteint | 0 | — | vérifié (3 passes) |
 | après allumage, après réveil 0x78 | 1 | — | vérifié (3 passes) |
 | 1re lecture d'état | retombe à 0 en moins de ~11 ms | `80 20 00 10 000000 09 60 00 00 18 00 00 00 00` | vérifié (macOS-indépendant, 4 passes pour l'état) |
+| demande d'identité 0x70, puis nouvelle réponse en attente | **remonte à 1** | 2e état annonce 0x1b (27) octets | vérifié (1 passe, hello=1) |
 | lectures suivantes, au repos, 30 à 45 s | 0 | `… 09 60 00 00 00 00 00 00 00`, identique à chaque fois | vérifié |
 | aucune lecture d'état pendant 10 s | reste à 1 | — | vérifié (1 passe) |
 | doigt posé (sans appuyer) | 0, inchangée | inchangée | 2 essais, doigt déclaré par Albert |
 
+- La broche est une ligne « donnée prête / attention » : elle passe à 1 dès que le capteur a une réponse en attente (démarrage, puis après chaque demande comme 0x70) et retombe à 0 quand l'AP lit l'état (0x10). Active haute. Mesuré sur toute la séquence « bonjour » (mesa_irqwatch.ko hello=1, 2026-11-10). => un pilote piloté par interruption est possible (attendre la montée au lieu de pauses fixes).
 - Hypothèse : l'octet 0x18 de la 1re réponse est la raison de la demande (« je viens de démarrer ») ; lire l'état l'acquitte.
 - Hypothèse : sous macOS le doigt est signalé parce que le SEP a configuré le capteur par le dialogue chiffré ; non testable sans le SEP.
 - Limites : état lu à 1 Hz, broche scrutée à 20 ms.
