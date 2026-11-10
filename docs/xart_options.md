@@ -72,23 +72,37 @@ Classées de la plus sûre (rien vers le SEP) à la plus risquée (écriture, Al
   et TYPE 1/6 (`<`, save) ; à confirmer sur la capture. Rien n'est envoyé au SEP (c'est macOS qui dialogue, on écoute).
 - **LR ?** Non (lecture seule, même classe que les captures C1-C20, ~20 déjà faites sans souci de données). **Risque** : celui
   d'une capture ordinaire sous hyperviseur (l'incident iCloud venait du **boot SEP par m1n1**, pas d'une écoute de boot macOS).
-- **Ce que ça apporte** : savoir si une réponse xART est *fabriquable* hors macOS (probable **non** : blob chiffré par une clé
-  du SEP/du disque), et au minimum documenter précisément le coffre. **C'est le prochain pas le plus utile et le moins risqué.**
+- **Ce que ça apporte** : voir le contenu réel des lockers et, surtout, préparer la voie C (**rejouer** ces blobs, pas les
+  forger). On cherche notamment s'il y a un compteur / nonce par boot dans l'échange, qui déciderait si un rejeu passe.
+  **C'est le prochain pas le plus utile et le moins risqué.**
 - **Ne peut pas se faire à distance** : demande le câble USB rebranché et un reboot en mode câble → Albert devant le Mac.
 
-### Voie C — Fournir au SEP, sous Linux, les blobs xART capturés sous macOS (écriture SEP — LR, Albert seul)
-- **Idée** : rejouer vers le SEP, depuis Linux, les réponses xART qu'on aurait capturées (voie B), pour le pousser à annoncer `sbio`.
-- **Problèmes** : (1) **écriture vers 0x13** = ligne rouge absolue → script `pending/`, lancé par Albert, jamais par un agent.
-  (2) L'anti-replay est fait pour **refuser** un blob qui n'est pas le dernier sauvé ; un blob capturé lors d'un boot macOS
-  sera *périmé* dès que macOS reboote et sauve une nouvelle version. (3) Risque direct FileVault/trousseau si le SEP accepte
-  puis se désynchronise. **Probabilité de succès : faible**, risque élevé. À ne pas viser tant que B n'a pas montré que c'est jouable.
+### Voie C — RELAYER (pas forger) les blobs xART : Linux joue le rôle de stockage que macOS tient (écriture SEP — LR, Albert seul)
+- **Idée (précisée avec Albert le 2026-11-10)** : le SEP n'a **pas de disque** ; il confie ses blobs à l'AP qui les stocke et les
+  lui rend au boot. macOS tient ce rôle. **Rien n'oblige à comprendre les blobs** (ils restent chiffrés par une clé interne du
+  SEP) : il suffirait que **Linux les stocke et les rende** comme macOS. On ne **forge** rien (ça, c'est impossible, voie D) ; on
+  **relaie** l'état que le SEP a lui-même fait sauver. Si le SEP valide, il annonce `sbio` → et c'est **lui** qui fait ensuite la
+  comparaison d'empreinte (on n'a jamais besoin de sa clé). Donc le Touch ID n'est **pas** mort par conception : il est derrière cette question.
+- **La vraie inconnue (à trancher par la voie B, sans écrire)** : l'anti-rejeu accepte-t-il un **rejeu fidèle de l'état courant** ?
+  - Rendre **exactement** le dernier état sauvé (inchangé depuis) = ce que fait un boot normal → devrait passer.
+  - Mais s'il existe un **compteur/nonce par boot** que le SEP incrémente et vérifie, un rejeu passif serait refusé. Inconnu ; la
+    voie B doit chercher ce compteur dans l'échange.
+- **Ce qu'il faut, concrètement** : (1) les **vrais fichiers de lockers** (gigalockers `/System/Volumes/xarts/<UUID>.gl` + le
+  contenu shmem non tracé), pas seulement les en-têtes ; les lire sur le disque macOS (lecture seule). (2) Un composant Linux qui
+  réponde sur l'EP 0x13 avec ces blobs. (3) Un SEP démarré par m1n1 (on sait le faire : SEP-BOOT).
+- **Lignes rouges et risque** : répondre sur 0x13 = **écriture SEP** → script `pending/` relu et lancé par **Albert**, jamais un agent.
+  Risque de désynchroniser macOS (acceptable pour Albert : il n'a pas besoin de macOS) **MAIS** il faut garantir **aucun brick** et
+  **aucune atteinte à la partition Linux** (ses deux seules règles). L'effet de bord iCloud du boot SEP précédent reste inexpliqué :
+  prudence. À ne tenter qu'après la voie B et avec le feu vert d'Albert.
+- **Verdict** : voie **réaliste** (pas une impasse), mais risquée et conditionnée à la voie B. C'est la seule piste crédible vers un Touch ID complet.
 
 ### Voie D — Faire tenir le dialogue xART par un composant de confiance (très lourd, hypothétique)
 - **Idée** : réimplémenter côté Linux un « stockage xART » qui se comporte comme l'AP macOS (fetch/save cohérents, monotones),
   avec son propre fichier de lockers, pour amener le SEP à un état où `sbio` est annoncé **sans dépendre du disque macOS**.
-- **Problèmes** : il faut que le SEP accepte des lockers **qu'on génère** ; or ils sont chiffrés/authentifiés par une clé
-  interne au SEP. Sans cette clé (qu'on ne cherche pas : ligne rouge « aucune clé extraite »), on ne peut pas forger un locker
-  valide. **Donc cette voie bute sur la même impossibilité que C**, en plus compliqué. Documentée pour être écartée, pas suivie.
+- **Différence avec C** : ici on **génère/forge** des lockers (état inventé), là où la voie C se contente de **rejouer** l'état
+  réel que le SEP a fait sauver. Forger exige que le SEP accepte des lockers **qu'on fabrique** ; or ils sont chiffrés/authentifiés
+  par une clé **interne au SEP**, qu'on s'interdit de chercher (ligne rouge « aucune clé extraite »). **Impossible.** C'est bien la
+  voie C (rejeu), pas D (forge), qui est la piste crédible. D documentée seulement pour être écartée.
 
 ### Voie E — Contourner xART : démarrer un SEP « neuf » sans état (à creuser, prudence)
 - **Idée** : existe-t-il un mode où le SEP démarre sans réclamer de coffre (première initialisation, « SEP vierge ») et annonce
@@ -104,15 +118,22 @@ Classées de la plus sûre (rien vers le SEP) à la plus risquée (écriture, Al
    l'EP 0x13) pour une future capture macOS en lecture seule. C'est le seul pas qui augmente vraiment ce qu'on sait du coffre
    sans rien écrire ni risquer les données.
 2. **Décision d'Albert, pas d'un agent** : toute Voie C/D/E implique une écriture vers le SEP (0x13), donc un script `pending/`
-   relu et lancé par lui, **et** un backup complet du Mac existant, **et** la cause de la reconnexion iCloud écartée.
-3. **Honnête** : avec ce qu'on sait, Touch ID complet sous Linux est **probablement hors de portée sans forger un locker xART**,
-   ce qui demanderait une clé interne au SEP qu'on s'interdit de chercher. Le but réaliste à court terme reste « Linux parle au
-   capteur », pas « Touch ID déverrouille ». La Voie B dira si cette conclusion doit changer.
+   relu et lancé par lui. Backup : Albert n'a qu'un backup Linux et accepte de perdre macOS ; ses deux règles sont **ne pas
+   bricker** et **ne pas toucher la partition Linux** (voir CLAUDE.md et mémoire). La cause de la reconnexion iCloud reste à garder en tête.
+3. **Honnête (corrigé le 2026-11-10 avec Albert)** : le Touch ID complet n'est **pas mort par conception**. On ne peut pas **forger**
+   les lockers (chiffrés, voie D impossible), mais on peut peut-être les **rejouer** (voie C) : le SEP n'a pas de disque, il compte
+   sur l'AP pour lui rendre ses blobs ; Linux pourrait tenir ce rôle sans jamais les comprendre. Le Touch ID est donc **derrière une
+   seule question** : l'anti-rejeu accepte-t-il un rejeu fidèle de l'état courant, ou y a-t-il un compteur/nonce par boot ? La voie B
+   (lecture seule) doit trancher cela avant tout essai en écriture. But court terme garanti : « Linux parle au capteur » (atteint).
 
 ## 6. Ce qui manque pour avancer (sans franchir de ligne rouge)
 - [x] Tracer l'OOL de l'EP 0x13 : déjà supporté par `hv/trace_sep_filtered.py` (`SEP_OOL_EPS=0x13`), vérifié le 2026-11-10. Rien à coder.
 - [ ] Lancer la capture (commande voie B ci-dessus) : Mac en mode câble, Albert devant la machine, après backup complet. Pas faisable à distance.
 - [ ] Documenter le format d'un locker observé (taille, en-tête, ce qui est chiffré) dans `messages.md`, une fois la capture faite.
+- [ ] Voie C (après B) : chercher un **compteur/nonce par boot** dans l'échange 0x13 (le point qui décide si un rejeu passe).
+- [ ] Voie C : lire les **gigalockers** du disque macOS (`/System/Volumes/xarts/<UUID>.gl`) en lecture seule, pour avoir les vrais blobs.
+- [ ] Voie C (écriture, Albert) : seulement si B dit que c'est jouable → script `pending/` qui répond sur 0x13 avec les blobs rejoués ;
+      garanties obligatoires : aucun risque de brick, aucune écriture vers la partition Linux. Lancé par Albert.
 
 ## 7. État du 2026-11-10 (contexte)
 Backup : Albert a **un** backup (2026-11-10) — à préciser : couvre-t-il macOS/FileVault, ou seulement sa partition Linux ?

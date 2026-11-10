@@ -14,6 +14,18 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — xART : distinction rejeu vs forge (voie C réhabilitée, avec Albert)
+- Trace : — (mise à jour de doc, discussion avec Albert). Aucune action matérielle.
+- Fait : corrigé docs/xart_options.md. Albert a fait remarquer que le SEP n'a pas de disque et compte sur l'AP pour lui rendre ses blobs :
+  donc **rejouer** l'état réel (voie C) ≠ **forger** un état (voie D, impossible sans clé interne). La voie C ne demande pas de comprendre
+  les blobs (ils restent chiffrés), seulement de les stocker/rendre comme macOS.
+- Vu : — (analyse). Verdict corrigé : le Touch ID complet n'est pas « mort par conception » ; il est derrière une seule question — l'anti-rejeu
+  accepte-t-il un rejeu fidèle de l'état courant, ou y a-t-il un compteur/nonce par boot ? La voie B (lecture seule) doit la trancher.
+- Interprété : la voie C devient la seule piste crédible vers un Touch ID complet, mais reste une **écriture SEP** (pending/ + Albert), conditionnée
+  à la voie B, et bornée par les deux règles d'Albert (pas de brick, pas toucher Linux ; macOS sacrifiable). Idée 1 d'Albert (sommeil profond,
+  RAM en auto-refresh, réveil au lid) = vrai sommeil profond mais géré par le power management / AOP, pas le SEP (hedge : partage de rôles non certifié).
+- Incidents : aucun.
+
 ## 2026-11-10 — Claude (Opus 4.8) — Piste hibernation/veille via le SEP : étudiée, SEP probablement pas le bon levier
 - Trace : — (analyse hors ligne : grep des 23 sep.log + doc publique). Rien vers Asahi. Aucune action matérielle.
 - Fait : vérifié l'activité de `hibe` (EP 0x14) dans nos traces ; recherche publique sur la veille Asahi et le rôle du SEP. Doc : docs/power_sep_options.md.
