@@ -142,3 +142,22 @@ docs/verification_status.md SPI-1 à SPI-4, journal du 2026-11-10 (C17-C20, MESA
   de sécurité du modèle (journal 2026-11-10 01:05) : décision d'Albert en attente (docs/handoff.md, liste de tâches).
 - Prochain travail possible sans SEP : séparer dans `driver/linux` un petit transport (alimentation, état, lecture de
   réponse) du test « bonjour ».
+
+## Mise à jour 2026-11-10 (Opus 4.8) : transport propre et réactif, xART étudié, images chiffrées
+Sources : journal du 2026-11-10 (entrées Opus 4.8), docs/verification_status.md SPI-1, docs/xart_options.md, docs/sensor_hw.md.
+- **Transport isolé et réactif.** `driver/linux/mesa_transport.h` (couche réutilisable : acquire/release, power on/off, send,
+  read, status, **wait_ready**) ; `mesa_probe.c` = 1er client « bonjour », `mesa_statloop.c`/`mesa_irqwatch.c` = clients de test.
+  Le transport attend la broche « donnée prête » (gpio0 195) avant chaque lecture d'état au lieu d'une pause fixe ;
+  identité toujours identique (vérifié sur le Mac via le Linux de test). Étape 3 : non seulement faite, mais maintenant propre.
+- **Broche gpio0 195 caractérisée** (vérifié) : ligne « donnée prête » active haute, monte à chaque réponse en attente (démarrage,
+  puis après 0x70), retombe à la lecture d'état. => pilotage par interruption possible plus tard (request_irq), mais risque de
+  rafale bloquante à distance : réservé au moment où Albert peut power-cycler (handoff).
+- **C-C (relais image) renforcé** (vérifié octet pour octet, analysis/cmp_sensor_sep_image.py) : l'image (0x7200 o) est relayée au
+  SEP telle quelle par l'OOL de l'EP 0x08, en 2 tranches de 0x4000 précédées d'un entête de 0x1c o
+  (`[1]=longueur totale [2]=offset [5]=type 0x65 [6]=longueur de tranche`). Chiffrée bout en bout capteur↔SEP (2 images ne
+  partagent rien) : **un pilote Linux ne peut que transporter, jamais interpréter**. Sur C20 : 27 images lues sur le bus, 7 seulement
+  transmises au SEP (20 non transmises = trames de prévisualisation, hypothèse ; analysis/count_sensor_vs_sep_images.py).
+- **Étape 6 (blocage) étudiée** : docs/xart_options.md (5 voies). La voie B (tracer l'OOL de l'EP 0x13 au boot macOS, en lecture
+  seule) est **prête sans nouveau code** (`SEP_OOL_EPS=0x13`), attend le câble USB + Albert. Les voies qui écrivent vers le SEP
+  (rejeu/forge de lockers) butent sur une clé interne au SEP qu'on s'interdit de chercher : Touch ID complet probablement hors de
+  portée sans elle. But réaliste court terme : « Linux parle au capteur », atteint.
