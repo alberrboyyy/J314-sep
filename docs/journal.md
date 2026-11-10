@@ -14,6 +14,19 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — Image capteur ↔ SEP comparée octet pour octet (3e item du filtre, fait)
+- Trace : traces/20261110-003201_c20-doigt-spi (lecture seule). Script neuf, reproductible : analysis/cmp_sensor_sep_image.py. Hors ligne, aucun hardware.
+- Fait : comparé l'image lue sur le bus SPI du capteur (sio.bufs/*_done_data.bin, 0x7200 o) aux buffers OOL échangés avec le SEP sur l'EP 0x08
+  (sep.log.ool/*_08_A.bin). C'était la 3e analyse coupée par le filtre le 2026-11-10 sous Fable ; passée ici sous Opus 4.8.
+- Vu : 7 images complètes de 0x7200 o = concaténation de **deux** buffers A de 0x4000, chacun après un entête de 0x1c o, **identiques octet pour octet**
+  des deux côtés (22 autres images : buffer SEP hors fenêtre de capture, non comparables). Entête décodé (LE32) : [0]=1, [1]=0x7200 (longueur totale),
+  [2]=offset de tranche (0, puis 0x3fe4), [3]=0, [4]=0, [5]=0x65 (type image), [6]=longueur de tranche (0x3fe4, puis 0x321c ; somme 0x7200).
+  Contrôle : 2 images différentes partagent 0 run de 32 o.
+- Interprété : `vérifié` (octet pour octet) que l'AP relaie l'image au SEP **telle quelle** par l'OOL de l'EP 0x08, découpée en tranches de 0x4000
+  avec un descripteur de 0x1c o (type 0x65). Lève la réserse de SPI-1 (verification_status.md). Le contenu est chiffré bout en bout capteur↔SEP
+  (2 images ne partagent rien) : l'AP ne voit que du chiffré, donc Linux ne pourrait que relayer, pas interpréter. Sens des champs [0]/[3]/[4] = hypothèse.
+- Incidents : aucun.
+
 ## 2026-11-10 — Claude (Opus 4.8) — Voie B (tracer l'OOL de l'EP 0x13) : déjà supportée, commande prête ; backup existe
 - Trace : — (revue de code hors ligne ; aucune action matérielle). Albert à distance (école), Mac joignable seulement par la partition Linux de test (VPN), câble USB débranché.
 - Fait : vérifié dans hv/trace_sep_filtered.py que la capture de l'OOL de l'EP 0x13 est déjà possible sans nouveau code : `SEP_OOL_EPS` est générique,

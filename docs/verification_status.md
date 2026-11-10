@@ -101,6 +101,14 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
 
 - SPI-1 (2026-11-10, C20) : la charge de `> 0x65` est l'image lue par l'AP sur le bus SPI du capteur, non transformée :
   `vérifié (macOS)` (prédiction écrite avant, 7/7 poses, 113/114 blocs de 256 o ; réserve : pas de sha du transfert réassemblé).
+  **Réserve levée (2026-11-10, analysis/cmp_sensor_sep_image.py) :** image réassemblée comparée octet pour octet. 7 images
+  complètes de 0x7200 o lues sur le bus (sio.bufs/*_done_data.bin) sont **identiques octet pour octet** à la concaténation de
+  deux buffers OOL de l'EP 0x08 côté SEP (sep.log.ool/*_08_A.bin), chacun après un entête de 0x1c o ; les 22 autres images ne
+  sont pas comparables (leur buffer SEP n'a pas été dumpé, hors fenêtre). Entête de tranche décodé (champs 32 bits LE) :
+  `[0]=1 [1]=0x7200 (longueur totale) [2]=offset de la tranche [3]=0 [4]=0 [5]=0x65 (type image) [6]=longueur de la tranche`
+  (tranche 1 : offset 0, len 0x3fe4 ; tranche 2 : offset 0x3fe4, len 0x321c ; somme = 0x7200). Confirme l'entête OOL de la ligne
+  « En-tête OOL 0x1c o » sur le chemin de l'image. Contrôle : 2 images différentes ne partagent **aucun** run de 32 o (chiffrement
+  bout en bout capteur↔SEP, l'AP ne voit que du chiffré). Reste hypothèse : sens des champs [0], [3], [4] ; généralisation aux autres boots.
 - SPI-2 (C17-C20) : transport SPI AP ↔ capteur (trames `80 <cmd> <len>`, état 0x10/0x20, lecture 0x13, DMA SIO 0x18/0x19) : `vu`
   dans 4 captures, noms des commandes = hypothèses ; jamais rejoué par nous. Broches spi2 = 48/49/50 : hypothèse.
 - SPI-3 (2026-11-10, MESA-HELLO, traces/20261110-005244_mesa_hello) : sans macOS, alimentation par gpio0 196 + trames 0x78, 0x10,

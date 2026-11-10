@@ -33,7 +33,8 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [x] Table des réponses d'état du capteur (docs/sensor_hw.md, 2026-11-10).
 - [x] Ranger le module Linux : transport (mesa_transport.h) séparé du test « bonjour » (mesa_probe.c), compile W=1 (2026-11-10).
 - [x] docs/driver_plan.md mis à jour (2026-11-10 nuit).
-- [x] Étude du « coffre » (xART) : docs/xart_options.md écrit le 2026-11-10 (Opus 4.8, filtre non déclenché cette fois). 5 voies, recommandation = voie B (tracer l'OOL de 0x13 en lecture seule). Comparaison fine puce ↔ bus du capteur : pas encore refaite.
+- [x] Étude du « coffre » (xART) : docs/xart_options.md écrit le 2026-11-10 (Opus 4.8, filtre non déclenché). 5 voies, reco = voie B.
+- [x] Comparaison fine image puce ↔ bus ↔ SEP : faite le 2026-11-10 (analysis/cmp_sensor_sep_image.py). Image relayée octet pour octet au SEP (OOL 0x08, entête 0x1c, type 0x65), chiffrée bout en bout. verification_status.md SPI-1.
 - [x] Voie B outillage : l'OOL de l'EP 0x13 est déjà traçable (SEP_OOL_EPS=0x13), commande prête dans docs/xart_options.md. Rien à coder.
 - [ ] Voie B capture : Mac en mode câble, Albert devant la machine, backup macOS confirmé. `SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000 LIVE_EPS=0x13 ./tools/boot_and_trace.sh c21-xart-ool`. Pas faisable à distance (câble débranché).
 
