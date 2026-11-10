@@ -38,7 +38,7 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [x] Voie B outillage : l'OOL de l'EP 0x13 est déjà traçable (SEP_OOL_EPS=0x13), commande prête dans docs/xart_options.md. Rien à coder.
 - [ ] Voie B capture : Mac en mode câble, Albert devant la machine, backup macOS confirmé. `SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000 LIVE_EPS=0x13 ./tools/boot_and_trace.sh c21-xart-ool`. Pas faisable à distance (câble débranché).
 
-- [ ] Transport : attendre la broche d'interruption (gpio0 195) au lieu de pauses fixes ; l'ajouter au device tree de test (irq-gpios).
+- [~] Transport piloté par interruption : d'abord caractériser la broche. Expérience prête (mesa_irqwatch.ko enable=1 hello=1) : relève gpio0 195 à chaque étape du « bonjour ». À lancer quand le VPN revient (compilée W=1, pas encore exécutée).
 - [x] docs/sensor_hw.md : comportement de la broche 195 et de l'octet 0x18 reporté (2026-11-10).
 
 ### Avec le Mac sur le Linux de test (joignable à 10.0.200.4), sans action d'Albert

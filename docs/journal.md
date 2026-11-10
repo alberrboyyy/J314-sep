@@ -14,6 +14,15 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — Expérience prête : la broche d'interruption pendant toute la séquence « bonjour »
+- Trace : — (code préparé hors ligne ; VPN retombé avant de lancer, Albert à l'école). Compilé W=1 sur le PC.
+- Fait : ajouté un mode `hello=1` à driver/linux/mesa_irqwatch.c : joue le « bonjour » (réveil, état, identité, état, lecture, état) en
+  relevant la broche gpio0 195 avant et après chaque échange. But : savoir si la broche remonte à CHAQUE réponse en attente (pas seulement
+  après le réveil) ; si oui, le pilote pourra être piloté par interruption au lieu de pauses fixes. Lecture seule de la broche, trames en clair.
+- Vu : — (pas encore lancé : `ssh 10.0.200.4` timeout).
+- Interprété : à lancer quand le VPN revient : `cd /root/mesa && make ... modules && rmmod mesa_irqwatch 2>/dev/null; insmod mesa_irqwatch.ko enable=1 hello=1; dmesg | grep mesa-irqwatch | grep -v 'TX\|RX'`.
+- Incidents : VPN de la partition de test intermittent (timeouts répétés).
+
 ## 2026-11-10 — Claude (Opus 4.8) — Image capteur ↔ SEP comparée octet pour octet (3e item du filtre, fait)
 - Trace : traces/20261110-003201_c20-doigt-spi (lecture seule). Script neuf, reproductible : analysis/cmp_sensor_sep_image.py. Hors ligne, aucun hardware.
 - Fait : comparé l'image lue sur le bus SPI du capteur (sio.bufs/*_done_data.bin, 0x7200 o) aux buffers OOL échangés avec le SEP sur l'EP 0x08

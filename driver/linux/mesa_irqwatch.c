@@ -37,13 +37,65 @@ static unsigned int broche = 195;
 module_param(broche, uint, 0444);
 MODULE_PARM_DESC(broche, "numéro de la broche à surveiller sur le contrôleur de la broche d'alimentation (défaut 195)");
 
-#define MESA_IRQ_POLL_MS	20
+static bool hello;
+module_param(hello, bool, 0444);
+MODULE_PARM_DESC(hello, "1 = jouer la séquence « bonjour » en relevant la broche à chaque étape (au lieu de la boucle d'état)");
 
-static const u8 mesa_wake[] = { 0x80, 0x78, 0x00, 0x07, 0x00, 0x00, 0x00 };
+#define MESA_IRQ_POLL_MS	20
+#define MESA_ID_LEN		0x1b
+
+static const u8 mesa_wake[]    = { 0x80, 0x78, 0x00, 0x07, 0x00, 0x00, 0x00 };
+static const u8 mesa_get_id[]  = { 0x80, 0x70, 0x00, 0x07, 0x00, 0x00, 0x00 };
+static const u8 mesa_read_id[] = { 0x80, 0x13, 0x00, 0x0b, 0x00, 0x00, 0x00, MESA_ID_LEN, 0x00, 0x00, 0x00 };
 
 static int mesa_pin(struct gpio_desc *irq)
 {
 	return gpiod_get_raw_value_cansleep(irq);
+}
+
+/* Joue le « bonjour » en relevant la broche avant et après chaque échange, pour voir si elle
+ * remonte à chaque réponse en attente (condition pour un pilote piloté par interruption). */
+static int mesa_hello_pins(struct mesa_dev *md, struct gpio_desc *irq)
+{
+	struct device *dev = &md->spi->dev;
+	int ret, pending;
+
+#define PIN(ou) dev_info(dev, "broche %u %s : %d\n", broche, ou, mesa_pin(irq))
+	mesa_power_on(md);
+	PIN("après allumage");
+	ret = mesa_send(md, "réveil", mesa_wake, sizeof(mesa_wake));
+	if (ret)
+		return ret;
+	PIN("après réveil (avant 1er état)");
+	pending = mesa_status(md);
+	if (pending < 0 && pending != -ENOMSG)
+		return pending;
+	PIN("après 1er état");
+	ret = mesa_send(md, "identité", mesa_get_id, sizeof(mesa_get_id));
+	if (ret)
+		return ret;
+	PIN("après demande d'identité (avant 2e état)");
+	pending = mesa_status(md);
+	if (pending < 0 && pending != -ENOMSG)
+		return pending;
+	dev_info(dev, "octets en attente annoncés : %d\n", pending < 0 ? 0 : pending);
+	PIN("après 2e état");
+	if (pending == MESA_ID_LEN) {
+		ret = mesa_send(md, "demande lecture", mesa_read_id, sizeof(mesa_read_id));
+		if (ret)
+			return ret;
+		PIN("après demande de lecture (avant réponse)");
+		ret = mesa_read(md, "réponse", MESA_ID_LEN);
+		if (ret)
+			return ret;
+		PIN("après lecture de la réponse");
+		pending = mesa_status(md);
+		if (pending < 0 && pending != -ENOMSG)
+			return pending;
+		PIN("après état final");
+	}
+#undef PIN
+	return 0;
 }
 
 static int mesa_irqwatch(struct mesa_dev *md, struct gpio_desc *irq)
@@ -109,7 +161,7 @@ static int mesa_iw_probe(struct spi_device *spi)
 		return dev_err_probe(&spi->dev, PTR_ERR(irq), "broche %u introuvable\n", broche);
 	}
 
-	ret = mesa_irqwatch(md, irq);
+	ret = hello ? mesa_hello_pins(md, irq) : mesa_irqwatch(md, irq);
 	mesa_power_off(md);
 	dev_info(&spi->dev, "broche %u après extinction : %d\n", broche, mesa_pin(irq));
 	mesa_release(md);
