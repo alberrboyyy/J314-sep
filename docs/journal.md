@@ -14,6 +14,17 @@ Format :
 
 ---
 
+## 2026-11-10 — Claude (Opus 4.8) — Piste hibernation/veille via le SEP : étudiée, SEP probablement pas le bon levier
+- Trace : — (analyse hors ligne : grep des 23 sep.log + doc publique). Rien vers Asahi. Aucune action matérielle.
+- Fait : vérifié l'activité de `hibe` (EP 0x14) dans nos traces ; recherche publique sur la veille Asahi et le rôle du SEP. Doc : docs/power_sep_options.md.
+- Vu : `hibe` n'apparaît que comme annonce de nom (0 message) dans 23/23 captures → aucune donnée de protocole. Public : Asahi n'a que s2idle
+  (~1,3-2 W, vide la batterie en une nuit = symptôme d'Albert) ; le vrai sommeil profond (S3, que macOS utilise) n'est pas implémenté, bloqué
+  par la gestion d'alimentation des périphériques, **pas par le SEP** ; hibernation absente aussi, clé d'image d'hibernation non documentée publiquement.
+- Interprété : pour la batterie qui se vide la nuit, le levier est le sommeil profond / power management du noyau Asahi, hors de ce projet SEP.
+  `hibe` reste intéressant car PAS derrière le coffre xART (contrairement au Touch ID), mais spéculatif : il faudrait d'abord le capturer pendant
+  une vraie hibernation macOS (lecture seule), et l'utiliser = écriture SEP (pending/ + Albert). Décision de direction à Albert.
+- Incidents : une recherche web (mode étendu) refusée par Albert ; les deux autres ont suffi.
+
 ## 2026-11-10 — Claude (Opus 4.8) — C20 : 27 images lues sur le bus, 7 seulement transmises au SEP (les « 20 non transmises » quantifiées)
 - Trace : traces/20261110-003201_c20-doigt-spi (lecture seule). Script : analysis/count_sensor_vs_sep_images.py. Hors ligne.
 - Fait : compté les images 0x7200 lues sur le bus capteur (sio.bufs/*_done_data.bin, pleins) et les tranches 0x65 envoyées au SEP (sep.log).
