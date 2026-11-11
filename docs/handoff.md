@@ -1,5 +1,38 @@
 Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 11).
 
+## Mise à jour 2026-11-11 (journée, Opus 4.8) — EXPÉRIENCE VOIE C PRÊTE À LANCER
+
+**Contexte matériel nouveau** : le MacBook n'est pas en USB local mais derrière un **relais TCP**
+(`10.0.200.5`, ports 4000 proxy / 4001 console). Monter le lien : `./tunnel.py` (robuste, PTY stable),
+puis `export M1N1DEVICE=/tmp/m1n1 HV_UART=/tmp/m1n1-console`. **Pour le boot macOS (run_guest) : `export
+M1N1TIMEOUT=20`** (le défaut 3 s est trop court sur ce lien → UartTimeout ; c'était LA cause des échecs,
+pas le tunnel). Détails + récup : mémoire `tunnel-relais-mac`. (Côté relais, bridge avec `fork`.)
+
+**Ce qui est fait et commité aujourd'hui** :
+- `tunnel.py` : lien relais fiable (chainload 6/6).
+- `pending/sep_xart_replay.sh` **v2** : rejeu xART avec le rôle AP complet (SECMODE + allocation/mapping/
+  annonce des tampons OOL via CNTL, protocole du kext §3/§5), puis rejeu fidèle des lockers depuis une
+  capture S_new. **Validé** : SELFTEST OK, et surtout le protocole CNTL est **confirmé octet pour octet**
+  contre la capture réelle non filtrée `traces/20261111-111740_cntl-study3` (ordre 0x14→0x04/0x02/0x05/0x03,
+  IOVA 0x2c/0x38, ack TYPE 0x01 même tag).
+- `CLAUDE.md` : décompilation élargie (tout binaire Apple pertinent) ; leçon RTFM M1N1TIMEOUT.
+- Docs : `voie_c_design.md` « Correctif voie C » (protocole complet), journal, mémoires à jour.
+
+**ÉTAT : expérience prête.** S_new = `traces/20261111-111740_cntl-study3` (capturé aujourd'hui, valide tant
+qu'aucun boot macOS n'a lieu — reboots m1n1 OK car m1n1 = startup disk). Mac au m1n1 propre.
+
+**LANCEMENT (Albert uniquement, écriture SEP)** — après relecture de l'en-tête du script :
+```
+M1N1TIMEOUT=20 M1N1DEVICE=/tmp/m1n1 HV_UART=/tmp/m1n1-console ./pending/sep_xart_replay.sh traces/20261111-111740_cntl-study3
+```
+Succès = `>>> sbio PRÉSENT`. Modes d'échec = sorties propres (exit 2/3) AVANT toute écriture risquée.
+
+**À VÉRIFIER AVANT DE LANCER (si session neuve)** : une relecture sceptique FINALE de la v2 était en cours
+au moment du clear (focus : SECMODE/provisioning, tampons 0x18/0x0e aussi posés par macOS avant xART, flux
+DART). **Si ses conclusions ne sont pas dans le journal, relancer le sceptique sur `pending/sep_xart_replay.sh`
+avant lancement.** Incertitudes de fond (tranchées par l'essai) : IOVA/stream DART que xarm lit vraiment ;
+faut-il aussi poser les tampons de 0x18/0x0e ; le SEP sous m1n1 enchaîne-t-il l'échange xART.
+
 ## Mise à jour nuit du 2026-11-11 (session autonome, Opus 4.8)
 - VOIE B FAITE. Contenu du coffre xART capturé en lecture seule sur 3 boots macOS : c21/c23/c24 = traces T-45/T-46/T-47. Outils déjà en place (SEP_OOL_EPS=0x13). c22 a raté (boot à chaud), ignoré.
 - Résultat clé (vérifié octet pour octet, journal + messages.md « xART — contenu OOL » + verification_status « xART-CHAIN ») : sur 10 lockers rendus au SEP, 8 sont identiques sur les 3 boots ; 2 changent = SEP-xART (TAG 0x03) et un locker Credential Manager (TAG 0x10, UUID 8624497a…). USER-xART (TAG 0x04) est STABLE. Chaînage save(N)=fetch(N+1) prouvé sur le contenu. Aucun compteur en clair ; fraîcheur = préfixe 16 o (nonce/MAC) + corps chiffré renouvelé = hypothèse.
