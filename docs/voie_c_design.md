@@ -101,3 +101,32 @@ de 16 octets que le SEP passe dans le buffer B avant un fetch ; le script l'y li
 
 **Reste à établir avant d'écrire le script** : l'ordre complet au-delà de TAG 0x0f, et la correspondance exacte étiquette →
 locker pour chaque fetch. Tout cela se lit dans les captures, sans rien envoyer.
+
+## Table de rejeu de la phase de boot (lecture seule, c24)
+
+Les dix lockers que l'AP rend au SEP pendant la phase de boot, dans l'ordre, avec le TAG de la requête, l'en-tête de
+réponse à renvoyer, la taille utile et l'étiquette de 16 octets que le SEP passe dans le buffer B juste avant le fetch.
+Les deux premiers sont des blocs nommés sans étiquette ; les suivants sont désignés par étiquette.
+
+| Ordre | TAG | réponse PARAM / DATA | taille utile | étiquette de 16 octets réclamée | locker |
+|---|---|---|---|---|---|
+| 1 | 0x03 | 0x64 / 0x00000103 | 843  | aucune | SEP-xART |
+| 2 | 0x04 | 0x14 / 0x00000008 | 2043 | aucune | USER-xART |
+| 3 | 0x05 | 0x0c / 0x0000010c | 3073 | 407e94c4f60495b3f2fbf5a8a31ae719 | |
+| 4 | 0x07 | 0xb6 / 0x00000100 | 3075 | e01e3b5e2c38f5960968a4d52ae2b22b | |
+| 5 | 0x0a | 0x01 / 0x00000102 | 3072 | 2438821b3dc0faf876d7aad6ca4dc668 | |
+| 6 | 0x0c | 0x28 / 0x00000100 | 3072 | 9133c5d52d8f276460f2ff4851d26065 | |
+| 7 | 0x0e | 0x7c / 0x00000000 | 3074 | f86488fdcf52da496934d4ec1d6b35dd | |
+| 8 | 0x10 | 0x53 / 0x00000101 | 3074 | 8624497a8c2ff2582625a036fab3b8e3 | Credential Manager |
+| 9 | 0x16 | 0x14 / 0x00000120 | 8182 | 8624497a8c2ff2582625a036fab3b8e3 | Credential Manager |
+| 10 | 0x18 | 0xb2 / 0x00000000 | 8183 | 8624497a8c2ff2582625a036fab3b8e3 | Credential Manager |
+
+Entre les lockers 2 et 3, le SEP annonce `sbio` puis `skdl`, `sse`, `sks`, `scrd` (requêtes TYPE 0x1d) que l'AP acquitte par
+une réponse TYPE 0x16 reprenant les deux premiers caractères du nom. L'étiquette `8624497a…` est réclamée trois fois : c'est
+le locker Credential Manager, lu sous trois tailles. Les lockers 1, 2 et 8 sont les trois qui changent d'un boot à l'autre ;
+les sept autres sont figés (voir le chapitre « Le coffre xART » du guide).
+
+**Ce que le script de rejeu fait, par locker** : à la requête du SEP, lire l'étiquette dans le buffer B, choisir le locker
+capturé correspondant, écrire ses octets dans le buffer A, renvoyer le mot de réponse de la colonne PARAM/DATA. Pour les
+lockers 1 et 2, sans étiquette, se repérer par l'ordre et le TAG. Les IOVA des buffers A et B sont relus à la volée au
+démarrage du SEP par m1n1, jamais codés en dur. Reste la seule inconnue de fond : l'anti-rejeu accepte-t-il ce rejeu fidèle.
