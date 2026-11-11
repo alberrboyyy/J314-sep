@@ -1,8 +1,8 @@
 # 🔴 RÉCUPÉRATION DU MAC — À FAIRE EN PRIORITÉ (session fraîche)
 
-> Pour l'agent de la session fraîche : lis ce fichier EN ENTIER avant toute action.
+> Lire ce fichier EN ENTIER avant toute action.
 > Le Mac n'est plus utilisable normalement. On NE relance AUCUN essai SEP (voie C) tant
-> qu'il n'est pas récupéré. Parle à Albert en français simple, sans jargon.
+> qu'il n'est pas récupéré.
 
 ## Ce qui s'est passé (2026-11-11)
 Pendant les essais « voie C » (rejeu de lockers xART au SEP, lancés par Albert), l'état
@@ -16,13 +16,13 @@ scellé de la puce (SEP) a été bousculé. Depuis :
   pas à zéro l'état scellé du SEP). Message final attendu : « Gave up waiting … RestoreOS → BootedOS »
   = normal car le Mac boote m1n1 et pas un macOS ; le firmware a bien été réinstallé.
 
-## Ce qui est SÛR (à répéter à Albert pour le rassurer)
-- **Asahi ALARM (son Linux de tous les jours) + toutes les données = INTACTES** : aucune écriture
-  disque n'a jamais été faite par le projet, et Revive n'efface rien.
-- **Albert a un backup** de sa partition Linux.
-- Le Mac **n'est PAS brické** (m1n1 démarre).
-- Albert avait **volontairement** mis m1n1 en défaut (pour faciliter les reboots du projet). C'est
-  pour ça que ça boote m1n1. Son Linux est juste « plus sélectionnable » car le menu est cassé.
+## État des données
+- **Asahi ALARM (Linux quotidien) + données = intactes** : aucune écriture disque n'a jamais été
+  faite par le projet, et Revive n'efface rien.
+- Backup de la partition Linux disponible.
+- Le Mac **n'est pas brické** (m1n1 démarre).
+- m1n1 a été mis en défaut volontairement (pour faciliter les reboots du projet) : c'est pour ça
+  que ça boote m1n1. Le Linux est juste « plus sélectionnable » car le menu est cassé.
 
 ## Partitions du Mac (d'après Albert)
 1. macOS (principal)  2. macOS 13.5 + m1n1 (projet)  3. **Asahi ALARM (Linux quotidien = la cible)**
@@ -68,7 +68,7 @@ python3 m1n1/proxyclient/tools/linux.py \
 ```
 Succès = logos « pingouins » au framebuffer, puis le boot Linux d'ALARM à l'écran du Mac.
 
-### Risques (à dire à Albert)
+### Risques
 - Le noyau **monte la racine en écriture** → un mauvais `root=` ou un mauvais DTB peut **corrompre**
   des fichiers. Donc : **backup confirmé** avant, et bien vérifier X + le DTB. Les commandes
   elles-mêmes n'écrivent pas sur le disque (noyau envoyé en RAM par USB).
@@ -101,7 +101,5 @@ Succès = logos « pingouins » au framebuffer, puis le boot Linux d'ALARM à l'
 - Config noyau linux-asahi : https://github.com/AsahiLinux/PKGBUILDs/blob/main/linux-asahi/config
 - Revive/Restore Apple : https://support.apple.com/en-us/108900
 
-## Comment démarrer la session fraîche (pour Albert)
-Ouvre une nouvelle session Claude dans ce dossier et dis simplement :
-« **Récupération du Mac — lis docs/RECUPERATION_MAC.md et guide-moi pour le tethered boot.** »
-Aie sous la main : le MacBook, un câble USB-C data, et (idéalement) le MacBook branché direct sur ce PC.
+## Matériel à prévoir
+MacBook, câble USB-C data, MacBook branché direct sur le PC (idéal) ou via le relais/tunnel.

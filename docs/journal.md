@@ -14,6 +14,44 @@ Format :
 
 ---
 
+## 2026-11-11 (nuit) — Albert + Claude (Opus 4.8) — RÉCUPÉRATION : ALARM bootable par tethered boot (Mac usable malgré le côté Apple cassé)
+- Trace : — (aucune capture SEP ; récupération système).
+- Fait :
+  - **ALARM récupéré par tethered boot** depuis le PC, non destructif. Outil créé : `tools/tethered_boot.sh`
+    (mode `shell` = s'arrête dans l'initramfs en lecture seule ; mode `alarm` = boot complet, auto-unlock
+    LUKS via clé embarquée, monte `@`, lance sshd, notch).
+  - Noyau + initramfs + DTB extraits du backup **restic** `/latif/data/backup/m1max` (dépôt local ;
+    mdp vaultwarden « restic m1max », mis par Albert dans `~/.rp` pour l'autonomie) :
+    `restic restore latest --include /boot` → `~/alarm-recovery/boot/`.
+  - Nettoyé `docs/RECUPERATION_MAC.md` (retrait des formulations « à répéter à Albert pour le rassurer »,
+    « à dire à Albert », etc. — demande d'Albert).
+- Vu (FAITS, obstacles franchis dans l'ordre) :
+  1. Noyau `vmlinuz-linux-asahi` = Image ARM64 **brute** → `linux.py --compression none` (sinon ValueError).
+  2. m1n1 `kboot_prepare_dt` échoue « failed to add node 'smbios' » : le DTB contenait **déjà** un nœud
+     `smbios` (+ DTB compacté, 0 octet libre). Fix côté nous : « open_into » maison (+16 Ko d'espace) et
+     neutralisation du nœud `smbios` existant (NOP).
+  3. Puis « DT CPU MPIDR mismatch / CPU 0 not alive » : le DTB `dtbs-pmp/t6001-j314c-pmp.dtb` (vieux projet
+     d'Albert) a les CPU **dans le désordre** (`cpu@0` pas en premier). Mauvais DTB.
+  4. Le DTB `asahi-boot` (73 Ko) passe le boot mais ALARM est **dégradé** : pas de clavier interne / trackpad,
+     wifi KO, écran/notch faux. Cause : ce DTB **manque les nœuds** hid(clavier/trackpad)=0 et dcp(écran)=2.
+  5. **Le bon DTB = le DTB complet du noyau** `/usr/lib/modules/<ver>/dtbs/t6001-j314c.dtb` (~101 Ko :
+     hid=2, dcp=25). Préparé en `~/alarm-recovery/boot/t6001-j314c-full.dtb` (open_into +16 Ko). Avec lui :
+     ALARM complet — clavier interne + trackpad OK, écran 3024x1964 @1.33x 120 Hz, Hyprland, réseau via **wg10**
+     (10.0.200.3, le tunnel du projet ; pas de wifi en tethered). Bootarg `appledrm.show_notch=1` ajouté.
+  - Chainload de m1n1 **redondant** (le m1n1 installé = même version que notre build) → `CHAIN=1` optionnel.
+  - Après chaque boot du noyau, le proxy USB m1n1 **disparaît** (plus de console vers le PC pendant qu'ALARM
+    tourne) → il faut un **power-cycle physique** du Mac pour relancer un boot.
+- Interprété : macOS/recovery/**Startup Options** restent cassés (état scellé SEP bousculé par la voie C ;
+  Revive n'y change rien). Réparer le côté Apple = **DFU Restore** destructif (2e Mac) → `RESTORE.md` du backup.
+  Reporté : on reste en tethered le temps du SEP (ça garde m1n1 en proxy, nécessaire pour tracer macOS sous hv).
+- Décision : (a) ALARM se lance via `tools/tethered_boot.sh alarm` quand on en a besoin ; (b) **aucune
+  réécriture SEP** sans faire l'**image disque** d'abord (la voie C a cassé le boot) ; (c) répa Apple = plus tard.
+  m1n1 interdit l'IA côté projet (`m1n1/CLAUDE.md`) : usage privé local d'Albert = OK, on ne modifie pas leur
+  code et rien ne sort vers Asahi.
+- Incidents : plusieurs boots échoués avant le bon DTB (compression, smbios en double, ordre CPU, flakiness smp
+  due aux chainloads empilés). Aucune perte de données, non destructif (noyau en RAM). m1n1 recollé par
+  power-cycle à chaque fois. Mémoire `mac-boot-casse-recuperation` mise à jour.
+
 ## 2026-11-11 (soir) — Albert + Claude (Opus 4.8) — INCIDENT : le Mac ne démarre plus (menu Apple cassé) après voie C
 - Fait : après l'essai voie C reproduit (rejeu xART au SEP), le Mac ne charge plus le menu de démarrage ni la récupération 1TR (bootloop) ; macOS boucle ; seul m1n1 démarre (« Running proxy… »). DFU Revive fait (firmware rafraîchi) → n'a PAS réparé (Revive ne reset pas l'état scellé du SEP). Double-appui maintenu + maintien 15 s (1TR) testés : rien.
 - Interprété : les écritures SEP de la voie C ont bousculé l'état scellé de la puce → le boot sécurisé Apple (menu/1TR/macOS) échoue ; seul le boot permissif m1n1 passe. Le risque « brick faible mais non nul / macOS perturbé » de l'en-tête du script s'est matérialisé, et a débordé sur le menu (donc sur l'accès à ALARM).
