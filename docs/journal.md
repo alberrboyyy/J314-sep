@@ -14,6 +14,15 @@ Format :
 
 ---
 
+## 2026-11-11 (fin journée) — Albert lance / Claude (Opus 4.8) — essai 1 REPRODUIT (n=2) ; m1n1 coincé ; observation pas encore capturée
+- Trace : traces/20261111-124327_… (échec chainload), 20261111-12xx (run 2 OK, même sortie que l'essai 1), 20261111-125023/125142 (chainload desync/0 octet).
+- Fait : après rallumage des 2 Macs, lien proxy désynchronisé → relancé tunnel.py (2×, via Albert qui approuve le kill ; script tools/restart_tunnel.sh ajouté). Sur lien propre, 1 run complet = REPRODUCTION exacte de l'essai 1.
+- Vu (FAIT, n=2 maintenant) : 4 lockers rejoués (090/092/094/096), sbio/scrd/sse/skdl annoncés, DIVERGENCE à TAG=0x05 TYPE=0x01 (= SAVE, vs TYPE=0x05=FETCH macOS). Identique à l'essai 1 → le point de bifurcation est reproductible. Message du script corrigé (« 4 lockers rejoués puis divergence », plus « tampons seuls »).
+- Incident : le lien redécroche après CHAQUE run (octets périmés → chainload suivant desync ; puis m1n1 « 0 octet » = coincé). Récup partielle = relancer tunnel.py ; mais un m1n1 coincé = reboot PHYSIQUE (Mac distant chez Erdem, impossible sur le moment). Albert part en cours.
+- Observation (essai A) PAS encore obtenue : la lecture de B à la divergence n'a pas pu tourner (Albert relançait la commande sans OBSERVE puis le lien a lâché). OBSERVE est désormais le DÉFAUT du script → le prochain run sain capturera B automatiquement.
+- Statut : point de divergence = reproductible (vérifié n=2). Contenu de B à la divergence (SAVE ~849 o ?) = à capturer au prochain run sain. NE PAS conclure « voie C gagnée ».
+- À reprendre (session future, hardware sain) : relancer tunnel.py si besoin, 1 run (OBSERVE par défaut) sur traces/20261111-113919_snew-reel si macOS pas rebooté (sinon recapturer S_new), lire B à la divergence.
+
 ## 2026-11-11 (fin journée) — Claude (Opus 4.8) — hardware hors ligne ; essai A (OBSERVE) prêt et en attente
 - Fait : préparé l'essai A observationnel dans pending/sep_xart_replay.sh (OBSERVE=1 : rejoue puis écoute B en lecture seule sans répondre sur 0x13, n'acquitte pas le SAVE). SELFTEST + compile Python OK. Commité.
 - Incident : après reboot_mac.sh, proxy en UartTimeout. Cause confirmée par Albert : le MacBook ET le Mac relais d'Erdem (10.0.200.5) sont ÉTEINTS — plus de lien. (Restart tunnel.py inutile ; de toute façon le kill est bloqué par le mode auto.) Conforme à CLAUDE.md : ne pas insister, passer aux tâches hors hardware.

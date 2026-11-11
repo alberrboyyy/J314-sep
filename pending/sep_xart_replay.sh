@@ -95,7 +95,7 @@ SNEW="${1:?usage: $0 <dossier_capture_S_new (contenant sep.log et sep.log.ool/)>
 
 export SNEW M1N1_PROXYCLIENT="$M1N1_DIR/proxyclient"
 export SELFTEST="${SELFTEST:-0}"
-export OBSERVE="${OBSERVE:-0}"
+export OBSERVE="${OBSERVE:-1}"   # observation (lecture seule de B) activée par défaut ; OBSERVE=0 pour l'ancien comportement
 
 if [ "$SELFTEST" != 1 ]; then
   require_mac
@@ -480,9 +480,10 @@ sbio_la = "sbio" in sep.epname2num
 if sbio_la and not diverged and replay_done == replay_total:
     print(">>> sbio PRÉSENT après un rejeu COMPLET sans divergence : rejeu plausiblement accepté.", flush=True)
 elif sbio_la and (diverged or replay_done < replay_total):
-    print(f">>> sbio PRÉSENT MAIS le rejeu a divergé/avorté ({replay_done}/{replay_total}). "
-          f"sbio ne vient donc PAS du contenu rejoué : réveil obtenu par le boot SEP + mise en "
-          f"place des tampons seuls. À interpréter avec le sceptique, NE PAS conclure 'voie C gagnée'.", flush=True)
+    print(f">>> sbio PRÉSENT après {replay_done} lockers rejoués, puis divergence ({replay_done}/{replay_total}). "
+          f"sbio est annoncé pendant un échange xART PARTIEL (au point normal, comme macOS) : ce n'est PAS "
+          f"une preuve que le rejeu est accepté. 'annoncé' != 'fonctionnel'. NE PAS conclure 'voie C gagnée' ; "
+          f"voir l'observation de B ci-dessus pour ce que le SEP réclame à la divergence.", flush=True)
 else:
     print(">>> sbio ABSENT. Le réveil de la biométrie n'a pas eu lieu ici.", flush=True)
 PY
