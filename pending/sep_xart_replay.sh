@@ -47,7 +47,13 @@
 #      n'avance pas le compteur ; seul un BOOT de macOS l'avancerait et périmerait S_new).
 #   3. Lancer CE script en lui passant le dossier de capture S_new.
 #
-# ÉTAT : v2 — le rôle AP est implémenté (allocation + mapping + annonce des tampons OOL via CNTL,
+# ÉTAT : v2.1 — ESSAI 1 LANCÉ (2026-11-11, Albert) : 4 lockers rejoués (dont SEP-xART+USER-xART),
+#   sbio/scrd/sse/skdl annoncés, puis divergence à la 5e transaction (SEP demande TAG=0x05
+#   TYPE=0x01=SAVE au lieu de TYPE=0x05=FETCH). PROCHAIN PAS recommandé (sceptique) : OBSERVE=1
+#   (ESSAI A) — rejoue pareil puis écoute B en lecture seule sans répondre, pour voir ce que le
+#   SEP réclame après les 4 lockers. NE PAS acquitter le SAVE (compteur anti-rejeu). Détails :
+#   docs/hypotheses.md « Revue sceptique — ESSAI VOIE C n°1 », docs/journal.md.
+# ÉTAT v2 : le rôle AP est implémenté (allocation + mapping + annonce des tampons OOL via CNTL,
 #   protocole du kext : docs/kext_sepmanager.md §3/§5). NON ENCORE LANCÉE.
 #   Ce qui reste INCERTAIN, tranché seulement par l'essai (Albert lance) :
 #   >>> le flux/IOVA DART : on mappe A/B à 0x2c000/0x38000 (valeurs macOS) ; pas garanti que
@@ -70,6 +76,11 @@
 #
 # Usage :
 #   ./pending/sep_xart_replay.sh <dossier_capture_S_new>      # lancement réel (Albert)
+#   OBSERVE=1 ./pending/sep_xart_replay.sh <dossier_capture>  # ESSAI A (observationnel) : rejoue
+#                 jusqu'à la divergence puis ÉCOUTE ~20 s en lisant le tampon B (LECTURE SEULE),
+#                 sans JAMAIS répondre sur 0x13 (donc n'acquitte PAS le SAVE -> n'avance pas le
+#                 compteur anti-rejeu, S_new préservé). But : voir ce que le SEP demande après
+#                 les 4 lockers (SAVE ? FETCH ? quel UUID / quelle taille de blob en B ?).
 #   SELFTEST=1 ./pending/sep_xart_replay.sh <dossier_capture> # test hors-ligne, NE TOUCHE PAS le Mac
 #   SKIP_CHAINLOAD=1 ...                                       # si un m1n1 frais tourne déjà
 #
@@ -84,6 +95,7 @@ SNEW="${1:?usage: $0 <dossier_capture_S_new (contenant sep.log et sep.log.ool/)>
 
 export SNEW M1N1_PROXYCLIENT="$M1N1_DIR/proxyclient"
 export SELFTEST="${SELFTEST:-0}"
+export OBSERVE="${OBSERVE:-0}"
 
 if [ "$SELFTEST" != 1 ]; then
   require_mac
@@ -101,6 +113,7 @@ fi
 timeout 400 "$M1N1_PYTHON" - <<'PY' 2>&1 | tee "${OUT:-/tmp}/xart_replay.log"
 import os, sys, re, time, struct, glob
 SELFTEST = os.environ["SELFTEST"] == "1"
+OBSERVE = os.environ["OBSERVE"] == "1"
 SNEW = os.environ["SNEW"]
 sys.path.insert(0, os.environ["M1N1_PROXYCLIENT"])
 
@@ -361,6 +374,50 @@ def next_sep_13(timeout_s=10):
         time.sleep(0.01)
     return None
 
+import hashlib
+def read_B(n=0x400):
+    """LECTURE SEULE du tampon B (SEP->AP). On lit directement phys_B (qu'on a alloué et mappé
+    en IOVA_B) : aucun message envoyé, strictement équivalent au readmem du traceur. Renvoie
+    (nbytes_non_nuls_sur_n, sha8, 32_premiers_octets_hex)."""
+    try:
+        data = iface.readmem(phys_B, n)
+    except Exception as e:
+        return (-1, "????????", f"<lecture B impossible: {e}>")
+    nz = sum(1 for b in data if b)
+    sha = hashlib.sha256(data).hexdigest()[:8]
+    return (nz, sha, data[:32].hex())
+
+def observe_loop(seconds=20):
+    """ESSAI A : après la divergence, on N'ENVOIE RIEN sur 0x13 (surtout pas d'acquittement de
+    SAVE, qui pourrait avancer le compteur anti-rejeu et périmer le S_new). On draine passivement
+    les messages 0x13 du SEP et, pour chacun, on LIT B (read-only). pump_ep0 ne touche que l'EP 0
+    (NAP keepalive), jamais 0x13. But : identifier ce que le SEP demande après les 4 lockers."""
+    print(f"--- OBSERVATION {seconds}s (lecture seule, RIEN envoyé sur 0x13) ---", flush=True)
+    seen = []
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        pump_ep0()
+        while sep.msgs[0x13]:
+            m = sep.msgs[0x13].popleft()
+            nz, sha, head = read_B()
+            kind = {0x05: "FETCH", 0x01: "SAVE", 0x06: "SAVE2", 0x07: "?07"}.get(m.TYPE, "?")
+            print(f"  SEP> TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x} PARAM=0x{m.PARAM:02x} "
+                  f"DATA=0x{m.DATA:08x} [{kind}]  B: nz={nz} sha={sha} head={head}", flush=True)
+            seen.append((m.TYPE, nz))
+        time.sleep(0.02)
+    if seen:
+        saves = sum(1 for t, _ in seen if t in (0x01, 0x06))
+        fetches = sum(1 for t, _ in seen if t == 0x05)
+        big = [nz for t, nz in seen if nz > 100]
+        print(f"--- bilan observation : {len(seen)} messages SEP (FETCH={fetches}, SAVE={saves}). "
+              f"B gros (>100 o non nuls) : {big} ---", flush=True)
+        print("  Lecture : B~16 o = FETCH (UUID demandé) ; B~800+ o = SAVE (blob frais à sceller). "
+              "SAVE juste après 4 FETCH = le SEP sous Linux ne réclame que 4 lockers (voie C vivante).",
+              flush=True)
+    else:
+        print("--- bilan observation : AUCUN message 0x13 reçu pendant l'écoute "
+              "(le SEP attend peut-être une réponse qu'on ne donne pas, ou s'est arrêté) ---", flush=True)
+
 # ---------------------------------------------------------------------------
 # 4. REJEU : on suit la séquence enregistrée. Pour chaque 'recv' on attend une
 #    requête du SEP ; pour chaque 'send' on écrit le locker dans A (si la capture
@@ -380,9 +437,13 @@ for idx, s in enumerate(steps):
         if m.TAG != s[1] or m.TYPE != s[2]:
             # Échec FERMÉ : si le SEP sous m1n1 diverge de la capture, on NE continue PAS à
             # pousser des réponses enregistrées (ça mettrait le SEP dans un état non maîtrisé).
-            print(f"[{idx}] DIVERGENCE: reçu TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x}, "
-                  f"attendu TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x}. Arrêt immédiat, rien de plus "
-                  f"envoyé au SEP.", flush=True)
+            extra = ""
+            if OBSERVE:
+                nz, sha, head = read_B()
+                extra = f"  [message complet : PARAM=0x{m.PARAM:02x} DATA=0x{m.DATA:08x} ; B: nz={nz} sha={sha} head={head}]"
+            print(f"[{idx}] DIVERGENCE après {replay_done} lockers rejoués : reçu TAG=0x{m.TAG:02x} "
+                  f"TYPE=0x{m.TYPE:02x}, attendu TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x}. "
+                  f"Rien de plus envoyé au SEP.{extra}", flush=True)
             diverged = True
             break
     else:
@@ -393,10 +454,17 @@ for idx, s in enumerate(steps):
         replay_done += 1
 
 print(f"--- rejeu terminé ({replay_done}/{replay_total} réponses rejouées"
-      f"{', DIVERGENCE' if diverged else ''}), écoute 10 s des endpoints ---", flush=True)
-t0 = time.time()
-while time.time() - t0 < 10:
-    pump_ep0(); time.sleep(0.03)
+      f"{', DIVERGENCE' if diverged else ''}) ---", flush=True)
+
+# ESSAI A : après le rejeu (divergé ou complet), on observe passivement ce que le SEP demande,
+# SANS rien lui renvoyer sur 0x13. Sinon, simple écoute des annonces d'endpoints (EP 0).
+if OBSERVE:
+    observe_loop(20)
+else:
+    print("--- écoute 10 s des endpoints ---", flush=True)
+    t0 = time.time()
+    while time.time() - t0 < 10:
+        pump_ep0(); time.sleep(0.03)
 
 print("Endpoints annoncés par le SEP :", flush=True)
 for num, name in sorted(sep.epnum2name.items()):
@@ -404,8 +472,10 @@ for num, name in sorted(sep.epnum2name.items()):
     print(f"  0x{num:02x} {name}{star}", flush=True)
 # ATTENTION : la présence de sbio NE prouve PAS à elle seule que le rejeu est accepté.
 # On ne peut parler de "rejeu accepté" que si le rejeu s'est déroulé SANS divergence.
-# (Essai 1, 2026-11-11 : sbio est apparu alors que le rejeu a divergé au 1er pas, donc
-#  rien n'avait été rejoué -> sbio vient du boot SEP + tampons, PAS du contenu du coffre.)
+# (Essai 1, 2026-11-11 : 4 lockers rejoués — dont SEP-xART et USER-xART — puis le SEP a
+#  divergé à la 5e transaction (TAG=0x05 TYPE=0x01=SAVE au lieu de TYPE=0x05=FETCH). sbio
+#  a été annoncé pendant cet échange partiel, au point normal, PAS depuis les seuls tampons.
+#  "annoncé" != "fonctionnel" ; sks (0x12) restait absent.)
 sbio_la = "sbio" in sep.epname2num
 if sbio_la and not diverged and replay_done == replay_total:
     print(">>> sbio PRÉSENT après un rejeu COMPLET sans divergence : rejeu plausiblement accepté.", flush=True)

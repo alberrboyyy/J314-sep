@@ -12,6 +12,148 @@ Format :
 
 ---
 
+# Revue sceptique — ESSAI VOIE C n°1 (4 lockers rejoués, sbio annoncé, puis BIFURCATION du SEP) — 2026-11-11 (agent sceptique)
+
+> **RÉVISION 2026-11-11 (fin journée)** : une 1re version de cette section reposait sur un fait FAUX transmis puis corrigé par
+> le coordinateur (« l'essai 1 a répondu 0 fois / 0 locker rejoué »). **C'est faux.** Vérifié par moi dans
+> `traces/20261111-113919_snew-reel/sep.log` (+ `sep.log.ool/`) : l'essai 1 a bel et bien **rejoué 4 lockers** avant de bifurquer.
+> Toute la lecture « sbio vient des seuls tampons » (ancienne HV1) **tombe**. Section réécrite ci-dessous.
+
+Sources : `docs/journal.md` (entrée « ESSAI VOIE C n°1 »), `traces/20261111-120142_xart_replay/xart_replay.log`,
+`pending/sep_xart_replay.sh`, et surtout la capture macOS de référence `traces/20261111-113919_snew-reel/sep.log` (+ `.ool`,
+lignes 10-117). Aucun hardware lancé, aucune écriture SEP par l'agent.
+
+**Rappel de contrainte** : amorcer/booter le SEP, envoyer un CNTL, rejouer/répondre sur 0x13 = **écriture SEP**. Tout essai
+ci-dessous = **script `pending/` + lancé par Albert** (jamais par un agent ni par moi). Les étapes **[LS]** (analyse de logs
+déjà capturés) sont faisables tout de suite en observation pure ; celles ci-dessous sont **déjà faites** dans cette revue.
+
+## FAITS (VU)
+
+### Côté macOS — le protocole xART au boot (trace `snew-reel`, [LS] fait)
+Les transactions SEP→AP (`<`) sont numérotées en **série** par TAG (0x02, 0x01, 0x03, 0x04, 0x05, 0x06, … 0x12, 0x13, 0x14…).
+Deux **types d'opération** distincts, lisibles aux tampons OOL :
+- **TYPE=0x05 = FETCH** (le SEP réclame un locker) : au `<`, le tampon **B** contient **16 octets non nuls = l'UUID** du locker
+  voulu (ex. L44 TAG=0x05 : `buf=B nz=16`). L'AP répond en **écrivant le locker dans A** (ex. L56-57 : `> A` seq 132, le locker).
+  macOS enchaîne **14 FETCH** (TAG 0x05→0x12) pour restaurer tout le coffre.
+- **TYPE=0x01 = SAVE/commit** (le SEP rend un blob à stocker) : au `<` (L111 TAG=0x13 TYPE=0x01 PARAM=0x53 DATA=0x89290103), le
+  tampon **B** contient **~849 octets** (`nz=849`, seq 219) = un blob frais ; l'AP se contente d'**acquitter** (L113 `> TAG=0x13
+  TYPE=0x00 DATA=0x89290100`, octet bas 03→00, **aucun locker rendu en A**). TAG=0x14 TYPE=0x06 est un autre SAVE (B `nz=850`).
+- L'annonce des endpoints (sbio/scrd/sse/skdl, via `< TYPE=0x1d`) tombe chez macOS **entre TAG 0x04 et 0x05**, c.-à-d. après les
+  4 premières transactions, **avant** la boucle de FETCH.
+
+### Côté m1n1 — ce que l'essai 1 a réellement fait (log + recoupement sep.log)
+- BOOT OK (7 endpoints), SECMODE acquitté, 4 CNTL tampons 0x13 acquittés.
+- **4 lockers REJOUÉS et envoyés** : transactions TAG 0x02 → 0x01 → 0x03 → 0x04 (tampons A seq **090/092/094/096**).
+  **094 = SEP-xART** (TAG 0x03, le blob maître « frais ») et **096 = USER-xART** (TAG 0x04) — soit les 2 blobs variables du coffre.
+- Le SEP a **annoncé ses endpoints (dont sbio) au point normal, entre TAG 0x04 et 0x05**, exactement comme macOS.
+- **À la 5e transaction, bifurcation** : le SEP a envoyé **TAG=0x05 TYPE=0x01** (macOS : TAG=0x05 **TYPE=0x05**). `grep` confirme
+  (coordinateur) : **`TAG=0x05 TYPE=0x01` n'existe nulle part dans la capture macOS** ; TYPE=0x01 n'y apparaît qu'au **TAG=0x13**.
+- Donc, sous m1n1, le SEP a **sauté les 14 FETCH (TAG 0x05→0x12)** de macOS et est passé **directement à une opération TYPE=0x01
+  (SAVE)**, celle que macOS ne fait qu'au TAG=0x13. Le script, lui, attendait un FETCH (TYPE=0x05) → il a vu « divergence » et
+  s'est arrêté **avant d'y répondre**. Puis écoute : **11 endpoints, sbio présent, sks (0x12) ABSENT**.
+- Précondition : S_new macOS tournait **juste avant** (reboot matériel → m1n1 → script).
+
+## Ce que ces faits changent (par rapport à l'ancienne lecture « tampons seuls »)
+- **sbio n'est PAS apparu grâce aux seuls tampons** : il est apparu **à l'intérieur d'un vrai échange xART partiel**, après
+  l'acceptation apparente de 4 lockers, **au point exact** où macOS l'annonce. C'est un signe **encourageant** (le rejeu n'a pas
+  été rejeté d'entrée), mais `n=1`.
+- Les anciens témoins `secmode` / `buffers` **n'isolent plus la bonne question** : la vraie question n'est plus « qui réveille
+  sbio » mais **« pourquoi le SEP sous m1n1 saute les FETCH et passe au SAVE dès TAG=0x05 »**.
+
+## HV1 (révisée) — Sous m1n1, le SEP accepte les 4 premiers lockers puis passe en phase SAVE plus tôt que macOS
+- Statut : **ouverte** (n=1, divergé).
+- VU : 4 lockers rejoués (dont SEP-xART + USER-xART), endpoints annoncés au point normal, puis TYPE=0x01 (SAVE) dès TAG=0x05.
+- **Explications concurrentes à départager** (c'est le cœur) :
+  - **(A) « moins de lockers à réclamer »** [encourageant] : l'état du SEP sous m1n1 n'a besoin que des 4 premiers blobs ; une fois
+    restaurés, il n'a **rien d'autre à réclamer** et passe au SAVE. Les 14 FETCH de macOS correspondraient à des lockers liés à
+    une session/état que ce boot n'a pas. Si vrai, la voie C est **vivante**.
+  - **(B) « rejet silencieux + re-scellement »** [mauvais] : le SEP a **reçu** les 4 blobs mais les a jugés **invalides**
+    (anti-rejeu / clé / contexte), a conclu « pas d'état restaurable » et tente de **re-sceller un état neuf** (le SAVE TYPE=0x01).
+    « Transaction passée » = « reçue », pas « acceptée ». Si vrai, le rejeu est **refusé au niveau crypto** malgré l'apparence.
+  - **(C) divergence d'environnement** : le SEP sous m1n1 ne lit pas correctement A (stream/IOVA DART), obtient des blobs
+    inutilisables et abandonne le FETCH. (Mais sbio annoncé au point normal plaide **contre** un abandon précoce.)
+- **Ce qui distingue A de B sans rien envoyer de risqué** : le SAVE TYPE=0x01 écrit un blob dans **B** (que l'AP peut **lire**,
+  c'est passif). Si ce blob **ressemble** à un re-scellement d'état restauré (et si le SEP a demandé en B, aux TAG 0x02/01/03/04,
+  **les mêmes UUID** que macOS) → (A). S'il part d'un état vide/différent → (B). Les blobs sont chiffrés (contenu opaque), mais
+  **la taille, l'UUID réclamé, et le point d'annonce des endpoints** sont observables. → Essai A ci-dessous.
+
+## HV2 (révisée) — La bifurcation TAG=0x05 TYPE=0x01 est RÉELLE (pas un ack CNTL décalé, pas un résidu)
+- Statut : **ouverte**, mais l'hypothèse « ack retardé / désalignement du script » de la 1re version est **écartée** : `grep`
+  montre que TYPE=0x01 sur 0x13 est une **opération SAVE** bien présente côté macOS (au TAG=0x13), et que `TAG=0x05 TYPE=0x01` est
+  **absent** de la capture macOS. Le SEP sous m1n1 réclame donc bien une **opération différente** à la 5e transaction. Ce n'est
+  pas bénin : c'est une **bifurcation de la machine à états xART**.
+- Reste à savoir **ce que** cette opération attend et **si y répondre est sûr** (un SAVE acquitté pourrait faire **avancer le
+  compteur anti-rejeu interne** du SEP → périmerait le S_new, voire re-scellerait l'état). → ne PAS y répondre avant d'avoir observé.
+- Piste désassemblage (phase 2, autorisé) : la machine à états `xarm` (AppleSEPManager / kext xART) dirait pourquoi le SEP passe
+  au SAVE après 4 restaurations. **Notée, pas exigée** ; à faire si l'observation ne tranche pas A/B.
+
+## HV3 (maintenue) — « sbio annoncé » ≠ « sbio fonctionnel » ; sks (0x12) absent = état probablement incomplet
+- Statut : **ouverte**.
+- VU : 11 endpoints annoncés, **sbio présent mais sks (0x12, trousseau) absent**. Dans les boots macOS, sks **est** annoncé, et un
+  déverrouillage Touch ID réel (C1) s'accompagne de notifications **SKS** (`<12 -501`, déverrouillage du keybag). Sans sks, même un
+  match sbio réussi ne déverrouillerait pas le trousseau → Touch ID **ne se terminerait pas**.
+- Renforcé par la révision : le SEP est passé en **phase SAVE** sans jamais annoncer sks → cohérent avec « l'état restauré n'est
+  pas complet » (il manque la boucle de FETCH qui, chez macOS, précède sks). HYPOTHÈSE.
+- **Autre explication** (sks absent) : sks pourrait exiger ses **propres** tampons CNTL (0x12) non posés par l'essai 1 → ne pas
+  conclure « sks absent prouve l'échec du rejeu ».
+- Expérience « annoncé vs fonctionnel » SANS doigt (point 4), du moins au plus intrusif :
+  - **[LS — tout de suite, dès qu'un log imprime tous les messages]** après l'annonce de sbio, le SEP émet-il un **trafic sbio
+    spontané** (init type C1 L320-449 : 0x17/0x15/0x16…) ou **seulement son nom** puis silence ? (L'essai 1 n'imprimait pas ces
+    messages → amélioration de LECTURE à ajouter au script, cf. Essai A.)
+  - **[pending/ + Albert — SANS doigt]** après annonce de sbio, envoyer **une seule** commande sbio **de lecture** (statut /
+    énumération, début de l'init C1 0x17/0x15) et comparer à la réponse d'init macOS. Cohérente → sbio vit ; erreur/silence →
+    simple nom. Écriture SEP vers 0x08 → `pending/`, décision d'Albert ; **pas** de doigt. (À ne faire qu'après Essai A.)
+
+---
+
+# Prochain essai — autour de LA vraie question : pourquoi le SEP bifurque à TAG=0x05
+
+> Tous ces essais = **écriture SEP** (boot + CNTL + rejeu des 4 lockers). Script `pending/` **lancé par Albert**. L'incrément de
+> risque vs l'essai 1 est **nul à faible** : Essai A rejoue exactement les mêmes 4 lockers que l'essai 1 (déjà lancé sans
+> incident) et, à la bifurcation, **ne fait que LIRE** (aucune réponse envoyée au SAVE).
+
+## Essai A (priorité 1) — REJEU OBSERVATIONNEL (apprendre l'opération voulue sans y répondre)
+- Modif de `pending/sep_xart_replay.sh` : au lieu de s'arrêter net à la divergence, **ne rien envoyer** mais **journaliser
+  passivement** pendant ~15-20 s : (i) chaque message SEP→AP sur 0x13 (TAG/TYPE/PARAM/DATA) ; (ii) pour chacun, **lire le tampon
+  B** (read-only, comme le tracer) et noter `nz`, `sha`, et les premiers octets ; (iii) tous les autres EP (dont trafic sbio
+  spontané, cf. HV3). Puis couper. **Aucune écriture au-delà des 4 lockers déjà rejoués ; aucune réponse au SAVE.**
+- Ce que ça tranche :
+  - **B à la bifurcation ≈ 849 octets (blob)** comme le TAG=0x13 macOS → confirme que le SEP est en **phase SAVE** (il a sauté les
+    FETCH). **B ≈ 16 octets (UUID)** → c'est encore une **FETCH** (et TYPE=0x01 voudrait dire autre chose : à creuser).
+  - **UUID réclamés aux TAG 0x02/01/03/04** (lus en B) **== ceux de macOS** → les 4 premières transactions sont bien les mêmes →
+    bifurcation **après** restauration (penche vers HV1-A). **UUID différents / B vide** → le SEP ne réclame pas la même chose →
+    penche vers HV1-B/C.
+  - **Trafic sbio spontané** présent ou non → amorce HV3 (annoncé vs vivant) sans rien envoyer.
+- À comparer dans la trace macOS (déjà localisé, [LS] fait) : la transaction **TAG=0x13 TYPE=0x01 PARAM=0x53 DATA=0x89290103**
+  (L111-114) : l'AP y **lit B (849 o)** puis **acquitte** `TYPE=0x00 PARAM=0x00 DATA=0x89290100` **sans écrire A**. C'est le gabarit
+  d'une réponse à un SAVE — utile **si**, plus tard et avec Albert, on décide de répondre (voir Essai C).
+
+## Essai B (priorité 2) — « moins de lockers » : l'état Linux atteint-il le SAVE plus tôt, sans doigt ni écriture trousseau ?
+- Entièrement **inclus dans le log de l'Essai A** (pas de script séparé) : comparer la **liste ordonnée des UUID** que le SEP
+  réclame (lus en B) sous m1n1 à la liste macOS (TAG 0x02…0x12). 
+  - Sous m1n1 : **exactement les 4 mêmes UUID puis SAVE** → le SEP ne « veut » que 4 lockers = HV1-A (**moins à réclamer**),
+    explication **encourageante** et obtenue **sans aucun doigt ni écriture de trousseau** (lecture de B seulement).
+  - Sous m1n1 : UUID partiels/différents, ou B vide à la bifurcation → HV1-B/C.
+- Pourquoi c'est la bonne façon de tester la piste (2) du coordinateur sans risque : on **n'ajoute pas** de réponse ; on **lit**
+  ce que le SEP demande. Répondre à TAG=0x05 (le SAVE) resterait réservé à l'Essai C, décidé séparément.
+
+## Essai C (plus tard, seulement si A/B penchent vers HV1-A) — répondre AU SAVE (acquitter) pour continuer
+- **Ne pas faire avant A/B.** Acquitter le SAVE TYPE=0x01 (gabarit macOS TAG=0x13 : lire B, renvoyer `TYPE=0x00 PARAM=0x00` avec
+  l'octet bas remis à 0) **ferait avancer** l'état interne du SEP → **risque de périmer le S_new** et de re-sceller. À ne tenter
+  qu'après avoir compris le SAVE (A) et **re-capturé un S_new frais** si macOS a rebooté entre-temps. Décision d'Albert.
+
+## Reproductibilité — pour dire « le SEP bifurque à TAG=0x05 » = vérifié (point 3)
+- Essai 1 = **n=1** → `hypothèse`.
+- Seuil : **≥ 3 exécutions de l'Essai A**, **reboot m1n1 entre chaque** (reboot matériel n'avance pas le compteur macOS ;
+  **ne pas booter macOS** entre les runs, sinon re-capturer S_new), **même dossier S_new**. Attendu si reproductible : **même point
+  de bifurcation (TAG=0x05), même TYPE=0x01, même taille de blob B** à chaque run. Si le point de bifurcation **varie** d'un run à
+  l'autre → la séquence est **non déterministe** (timing / état DART / file de messages) : fait important en soi, à documenter.
+- Contrôle secondaire (résidu) : **une** exécution de l'Essai A **à froid, sans macOS depuis l'allumage**. Si les 4 lockers sont
+  encore acceptés et sbio annoncé → ce n'est pas un résidu du boot macOS précédent. (Priorité basse : l'annonce au point normal
+  d'un échange réel rend déjà le résidu peu probable.)
+
+---
+
 ## H1 — Le SEP refuse Touch ID en mode de sécurité Permissive
 - Statut : **réfutée** (2026-11-07, Albert)
 - Fondée sur : `bputil -d` → « Security Mode: Permissive » (coih absent), après `bputil -nkcas` + `csrutil disable`
