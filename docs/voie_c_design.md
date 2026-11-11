@@ -75,3 +75,29 @@ Les deux règles d'Albert : ne pas bricker, ne pas toucher la partition Linux. m
 Ce plan ne s'exécute pas tant que : Albert l'a relu et validé ; un script `pending/` a été écrit avec son en-tête but,
 risque, résultat attendu, et relu pour la garantie « aucune opération disque » ; et Albert le lance lui-même. L'étape 1,
 la capture en lecture seule de `S_new`, est sans risque et peut se faire quand le Mac est en mode câble.
+
+## Annexe technique — séquence de rejeu et buffers (lecture seule, c24)
+
+Extrait du `sep.log` de T-47 (c24). Donne les morceaux qui manquaient au plan : les adresses des buffers OOL de
+`xarm` et la suite exacte des réponses que l'AP doit renvoyer. Rien n'est envoyé ; c'est une lecture de trace.
+
+**Buffers OOL de l'EP 0x13, appris par le CNTL au boot** :
+- buffer A, sens AP→SEP = là où l'AP écrit le locker rendu : IOVA `0x2c000`, taille `0x8000`.
+- buffer B, sens SEP→AP = là où le SEP écrit ce qu'il fait sauver : IOVA `0x38000`, taille `0x8000`.
+- Ces IOVA sont ceux d'une session macOS. Sous un démarrage du SEP par m1n1, le SEP refait ses propres CNTL ; le script
+  doit apprendre les IOVA à la volée, exactement comme le traceur le fait avec `SEP_OOL_EPS`, et non les coder en dur.
+
+**Suite des réponses de l'AP à rejouer** (chaque `>` est une réponse à la requête `<` du SEP qui la précède) :
+- TAG 0x02, TYPE 0x00, PARAM 0x00, DATA 0x00000100 — réponse à la première requête.
+- TAG 0x01, TYPE 0x00, PARAM 0x00, DATA 0x00000000.
+- TAG 0x03, TYPE 0x00, PARAM 0x64, DATA 0x00000103 — **fetch SEP-xART** : placer le locker SEP-xART dans le buffer A.
+- TAG 0x04, TYPE 0x00, PARAM 0x14, DATA 0x00000008 — **fetch USER-xART** : placer le locker USER-xART dans le buffer A.
+- Puis les acquittements TAG 0x00 TYPE 0x16 des cinq annonces d'endpoints `0x1d`, et la série de fetch TAG 0x05 à 0x0f et
+  au-delà, chacun plaçant le locker demandé dans le buffer A avec le PARAM/DATA de réponse observé.
+
+**Ce que le script doit faire, à chaque requête du SEP** : reconnaître le TAG, écrire dans le buffer A les octets du locker
+correspondant capturé juste avant, puis renvoyer le mot de réponse `>` observé. L'identité du locker demandé est l'étiquette
+de 16 octets que le SEP passe dans le buffer B avant un fetch ; le script l'y lit pour choisir le bon locker.
+
+**Reste à établir avant d'écrire le script** : l'ordre complet au-delà de TAG 0x0f, et la correspondance exacte étiquette →
+locker pour chaque fetch. Tout cela se lit dans les captures, sans rien envoyer.
