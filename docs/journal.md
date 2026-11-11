@@ -14,6 +14,11 @@ Format :
 
 ---
 
+## 2026-11-11 (fin journée) — Claude (Opus 4.8) — hardware hors ligne ; essai A (OBSERVE) prêt et en attente
+- Fait : préparé l'essai A observationnel dans pending/sep_xart_replay.sh (OBSERVE=1 : rejoue puis écoute B en lecture seule sans répondre sur 0x13, n'acquitte pas le SAVE). SELFTEST + compile Python OK. Commité.
+- Incident : après reboot_mac.sh, proxy en UartTimeout. Cause confirmée par Albert : le MacBook ET le Mac relais d'Erdem (10.0.200.5) sont ÉTEINTS — plus de lien. (Restart tunnel.py inutile ; de toute façon le kill est bloqué par le mode auto.) Conforme à CLAUDE.md : ne pas insister, passer aux tâches hors hardware.
+- En attente : quand les Macs reviennent, relancer tunnel.py si besoin, puis Albert lance la commande OBSERVE sur traces/20261111-113919_snew-reel (toujours valide tant que macOS n'a pas rebooté ; sinon recapturer un S_new). Reproductibilité : 3 runs OBSERVE, reboot m1n1 entre chaque, sans boot macOS.
+
 ## 2026-11-11 (fin journée) — Albert lance / Claude (Opus 4.8) — ESSAI VOIE C n°1 : sbio RÉVEILLÉ, mais le rejeu a DIVERGÉ (sbio ≠ rejeu accepté)
 - Trace : traces/20261111-120142_xart_replay/ (xart_replay.log, chainload.log) — PREMIÈRE écriture SEP du projet, lancée par Albert.
 - Fait : pending/sep_xart_replay.sh sur le S_new traces/20261111-113919_snew-reel. m1n1 démarre le SEP, met en place les tampons xART (A iova=0x2c000, B iova=0x38000, sid=0) via CNTL (SECMODE + 4 CNTL acquittés), puis tente le rejeu de l'échange EP 0x13.

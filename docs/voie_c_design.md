@@ -1,8 +1,38 @@
 # Essai de rejeu xART (voie C) — plan et analyse de sûreté
 
-État : **plan seulement**. Aucun script exécutable n'est écrit. Toute écriture vers le SEP reste un script `pending/`
-relu et lancé par Albert, jamais par un agent, et seulement après validation de ce plan. Ce document existe pour décider
-en connaissance de cause.
+État : **essai 1 lancé** (2026-11-11, par Albert) — voir « Résultats » ci-dessous. Le script existe
+(`pending/sep_xart_replay.sh`) ; toute écriture vers le SEP reste lancée par Albert, jamais par un agent.
+
+## Résultats — essai 1 (2026-11-11) et sémantique xART
+
+Source : `traces/20261111-120142_xart_replay/` (essai) + `traces/20261111-113919_snew-reel/sep.log` (S_new).
+Détail et revue sceptique : `docs/journal.md` et `docs/hypotheses.md` « Revue sceptique — ESSAI VOIE C n°1 ».
+
+**VU (faits) :**
+- Le SEP démarré par m1n1 a accepté la mise en place des tampons xART (SECMODE + 4 CNTL acquittés,
+  A iova=0x2c000, B iova=0x38000, sid=0), puis a **engagé l'échange xART** : il a fetché **4 lockers**
+  (tampons A 090/092/094/096, dont 094=SEP-xART et 096=USER-xART, les 2 « frais ») et **annoncé
+  `sbio`/`scrd`/`sse`/`skdl`** au point normal (entre TAG 0x04 et 0x05, comme macOS). `sks` (0x12) absent.
+- Puis **divergence** à la 5e transaction : le SEP envoie `TAG=0x05 TYPE=0x01` là où macOS envoie `TYPE=0x05`.
+  `TAG=0x05 TYPE=0x01` n'existe nulle part dans la capture macOS (grep) → vraie bifurcation, pas un décalage.
+- Sémantique du protocole xART au boot (lue dans le sep.log S_new, lignes 10-117) :
+  - **`TYPE=0x05` = FETCH** : le SEP met 16 o (UUID du locker voulu) dans B ; l'AP rend le locker en écrivant A.
+    macOS enchaîne 14 FETCH (TAG 0x05→0x12).
+  - **`TYPE=0x01` = SAVE/commit** : le SEP met un blob frais (~849 o) dans B ; l'AP se contente d'acquitter
+    (`TYPE=0x00 PARAM=0x00`, octet bas remis à 0), **sans rien rendre en A**. (`TYPE=0x06` = un autre SAVE.)
+
+**HYPOTHÈSE (n=1, à trancher) :** sous m1n1 le SEP a sauté les 14 FETCH de macOS et demandé directement un SAVE
+→ il ne réclamerait que **4 lockers** avant de sauver (voie C vivante). À confirmer par l'essai A observationnel
+(ci-dessous). Réserves : « sbio annoncé » ≠ « Touch ID fonctionne » ; `sks` absent = état probablement incomplet ;
+la bifurcation pourrait aussi être un rejet silencieux ou une divergence DART — l'observation tranchera.
+
+**PROCHAIN PAS — essai A (observationnel), prêt :** `OBSERVE=1 ... ./pending/sep_xart_replay.sh <S_new>`.
+Rejoue jusqu'à la divergence puis **écoute B en lecture seule ~20 s sans répondre sur 0x13** (donc **n'acquitte
+PAS le SAVE** — un ack de SAVE pourrait avancer le compteur anti-rejeu et périmer le S_new). Tranche :
+B≈849 o à la bifurcation ⇒ phase SAVE (le SEP a bien sauté les FETCH) ; B≈16 o ⇒ encore une FETCH.
+
+---
+
 
 ## But
 
