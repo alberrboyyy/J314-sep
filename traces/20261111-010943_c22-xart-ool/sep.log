@@ -1,0 +1,4 @@
+# trace_sep_filtered start 1794355793.324828 node=/arm-io/sep base=0x396400000 mode=SYNC(forcé par SEP_OOL_EPS) eps=0x13 shmem=off ool=on(eps=0x13,bytes=0x8000,full_types=0x5b,0x5f,0x65,0x6d,split_dir=1,revalidate_n=64,max_mb=64) ts=host_time_time
+# format: <ts> <dir> EP=0x.. TAG=0x.. TYPE=0x.. PARAM=0x.. DATA=0x.. [ool=...] ; '>' AP->SEP (INBOX), '<' SEP->AP (OUTBOX)
+# ool_stats 1794356029.504729 n=0 mean_ms=0.00 max_ms=0.00 total_ms=0.0 bytes=0 xlat=0 
+# end 1794356029.504737 seen=0 logged=0

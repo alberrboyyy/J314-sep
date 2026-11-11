@@ -1,0 +1,140 @@
+# trace_sep_filtered start 1794355413.336717 node=/arm-io/sep base=0x396400000 mode=SYNC(forcé par SEP_OOL_EPS) eps=0x13 shmem=off ool=on(eps=0x13,bytes=0x8000,full_types=0x5b,0x5f,0x65,0x6d,split_dir=1,revalidate_n=64,max_mb=64) ts=host_time_time
+# format: <ts> <dir> EP=0x.. TAG=0x.. TYPE=0x.. PARAM=0x.. DATA=0x.. [ool=...] ; '>' AP->SEP (INBOX), '<' SEP->AP (OUTBOX)
+# epname 1794355416.157229 EP=0x14 NAME='hibe'
+# epname 1794355416.159077 EP=0x18 NAME='stac'
+# epname 1794355416.160793 EP=0x00 NAME='cntl'
+# epname 1794355416.162540 EP=0x10 NAME='xars'
+# epname 1794355416.164288 EP=0x13 NAME='xarm'
+1794355416.166040 < EP=0x13 TAG=0x02 TYPE=0x0e PARAM=0x00 DATA=0x00000000
+# ool_error 1794355416.166040 seq=23 EP=0x13 buffers inconnus (pas encore de CNTL TYPE 2/3/4/5 PARAM=0x13) ; messages suivants de cet EP ignorés sans autre ligne jusqu'à apprentissage
+# epname 1794355416.166916 EP=0x15 NAME='pnon'
+# epname 1794355416.169815 EP=0x0e NAME='hdcp'
+# ool learn 1794355416.525167 seq=79 EP=0x13 buf=A size=0x8000 (CNTL TYPE=0x04 DATA=0x00008000)
+# ool learn 1794355416.527079 seq=81 EP=0x13 buf=A iova=0x3c000 (CNTL TYPE=0x02 DATA=0x0000003c)
+# ool learn 1794355416.528882 seq=83 EP=0x13 buf=B size=0x8000 (CNTL TYPE=0x05 DATA=0x00008000)
+# ool learn 1794355416.530782 seq=85 EP=0x13 buf=B iova=0x48000 (CNTL TYPE=0x03 DATA=0x00000048)
+1794355419.750191 > EP=0x13 TAG=0x02 TYPE=0x00 PARAM=0x00 DATA=0x00000100
+# ool 1794355419.750191 seq=90 EP=0x13 dir=> buf=A sha=c3502047 nz=0 changed=init len=0x8000 elapsed_ms=4.09 full=0 xlat=miss rm=1 file=000090_13_A.bin
+1794355419.755642 < EP=0x13 TAG=0x01 TYPE=0x13 PARAM=0x00 DATA=0x00000000
+# ool 1794355419.755642 seq=91 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=init len=0x8000 elapsed_ms=3.97 full=0 xlat=miss rm=1 file=000091_13_B.bin
+1794355419.760395 > EP=0x13 TAG=0x01 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+# ool 1794355419.760395 seq=92 EP=0x13 dir=> buf=A sha=101bbe62 nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000092_13_A.bin
+1794355419.766224 < EP=0x13 TAG=0x03 TYPE=0x00 PARAM=0x00 DATA=0x00000100
+# ool 1794355419.766224 seq=93 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+1794355419.769768 > EP=0x13 TAG=0x03 TYPE=0x00 PARAM=0x64 DATA=0x00000103
+# ool 1794355419.769768 seq=94 EP=0x13 dir=> buf=A sha=24e824f0 nz=847 changed=0x0+0x10,0x11+0xc6,0xd8+0x33,0x10c+0xba,0x1c7+0xcd,0x295+0xcf len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000094_13_A.bin
+1794355419.896699 < EP=0x13 TAG=0x04 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+# ool 1794355419.896699 seq=95 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355419.903691 > EP=0x13 TAG=0x04 TYPE=0x00 PARAM=0x14 DATA=0x00000008
+# ool 1794355419.903691 seq=96 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=0x11+0x24f,0x261+0x5,0x267+0x191,0x3f9+0x8c,0x486+0x184,0x60b+0x158,0x764+0xb0 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000096_13_A.bin
+1794355420.030042 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x6f DATA=0x00736269
+# ool 1794355420.030042 seq=97 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+# epname 1794355420.033830 EP=0x08 NAME='sbio'
+1794355420.037732 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736200
+# ool 1794355420.037732 seq=100 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.044412 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x6c DATA=0x00736b64
+# ool 1794355420.044412 seq=101 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+# epname 1794355420.048230 EP=0x17 NAME='skdl'
+1794355420.049942 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x20 DATA=0x00737365
+# ool 1794355420.049942 seq=104 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000104_13_B.bin
+# epname 1794355420.053823 EP=0x0c NAME='sse '
+1794355420.055556 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x20 DATA=0x00736b73
+# ool 1794355420.055556 seq=107 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355420.059318 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x64 DATA=0x00736372
+# ool 1794355420.059318 seq=108 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+# epname 1794355420.063074 EP=0x0a NAME='scrd'
+1794355420.064819 < EP=0x13 TAG=0x05 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.064819 seq=111 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355420.073567 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736b00
+# ool 1794355420.073567 seq=112 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.84 full=0 xlat=hit rm=1
+1794355420.099503 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00737300
+# ool 1794355420.099503 seq=121 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+1794355420.110295 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736b00
+# ool 1794355420.110295 seq=122 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.127354 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736300
+# ool 1794355420.127354 seq=131 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.139003 > EP=0x13 TAG=0x05 TYPE=0x00 PARAM=0x0c DATA=0x0000010c
+# ool 1794355420.139003 seq=133 EP=0x13 dir=> buf=A sha=fe5ca890 nz=3073 changed=0x0+0x51,0x52+0x4,0x57+0x198,0x1f0+0x34,0x225+0x31f,0x545+0x150,0x696+0x3a,0x6d1+0x1e4,0x8b6+0x33,0x8ea+0x1cb,0xab6+0x156 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000133_13_A.bin
+1794355420.144239 < EP=0x13 TAG=0x06 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.144239 seq=135 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.154837 > EP=0x13 TAG=0x06 TYPE=0x00 PARAM=0x0c DATA=0x0000010c
+# ool 1794355420.154837 seq=136 EP=0x13 dir=> buf=A sha=fe5ca890 nz=3073 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355420.356481 < EP=0x13 TAG=0x07 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.356481 seq=137 EP=0x13 dir=< buf=B sha=abaea948 nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000137_13_B.bin
+1794355420.363792 > EP=0x13 TAG=0x07 TYPE=0x00 PARAM=0xb6 DATA=0x00000100
+# ool 1794355420.363792 seq=138 EP=0x13 dir=> buf=A sha=c2d5cc61 nz=3075 changed=0x0+0xb6 len=0x8000 elapsed_ms=2.84 full=0 xlat=hit rm=1 file=000138_13_A.bin
+1794355420.367936 < EP=0x13 TAG=0x08 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.367936 seq=139 EP=0x13 dir=< buf=B sha=abaea948 nz=16 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.378879 > EP=0x13 TAG=0x08 TYPE=0x00 PARAM=0xb6 DATA=0x00000100
+# ool 1794355420.378879 seq=140 EP=0x13 dir=> buf=A sha=c2d5cc61 nz=3075 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.430061 < EP=0x13 TAG=0x09 TYPE=0x07 PARAM=0x10 DATA=0x00000000
+# ool 1794355420.430061 seq=141 EP=0x13 dir=< buf=B sha=40bffe4f nz=16 changed=0x0+0xe,0xf+0x1 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000141_13_B.bin
+1794355420.438566 > EP=0x13 TAG=0x09 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+# ool 1794355420.438566 seq=142 EP=0x13 dir=> buf=A sha=c2d5cc61 nz=3075 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355420.442635 < EP=0x13 TAG=0x0a TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.442635 seq=143 EP=0x13 dir=< buf=B sha=3593a0d3 nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000143_13_B.bin
+1794355420.453436 > EP=0x13 TAG=0x0a TYPE=0x00 PARAM=0x01 DATA=0x00000102
+# ool 1794355420.453436 seq=144 EP=0x13 dir=> buf=A sha=3c4ee0d9 nz=3072 changed=0x0+0x1c2,0x1c3+0x3e len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000144_13_A.bin
+1794355420.457740 < EP=0x13 TAG=0x0b TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.457740 seq=145 EP=0x13 dir=< buf=B sha=3593a0d3 nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355420.468469 > EP=0x13 TAG=0x0b TYPE=0x00 PARAM=0x01 DATA=0x00000102
+# ool 1794355420.468469 seq=146 EP=0x13 dir=> buf=A sha=3c4ee0d9 nz=3072 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+# epname 1794355420.472556 EP=0x12 NAME='sks '
+1794355420.487966 < EP=0x13 TAG=0x0c TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.487966 seq=160 EP=0x13 dir=< buf=B sha=46c689ee nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000160_13_B.bin
+1794355420.504621 > EP=0x13 TAG=0x0c TYPE=0x00 PARAM=0x28 DATA=0x00000100
+# ool 1794355420.504621 seq=164 EP=0x13 dir=> buf=A sha=da9324d1 nz=3072 changed=0x0+0x28 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000164_13_A.bin
+1794355420.509660 < EP=0x13 TAG=0x0d TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355420.509660 seq=166 EP=0x13 dir=< buf=B sha=46c689ee nz=16 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355420.521188 > EP=0x13 TAG=0x0d TYPE=0x00 PARAM=0x28 DATA=0x00000100
+# ool 1794355420.521188 seq=168 EP=0x13 dir=> buf=A sha=da9324d1 nz=3072 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355422.144150 < EP=0x13 TAG=0x0e TYPE=0x05 PARAM=0x10 DATA=0x00000000
+# ool 1794355422.144150 seq=181 EP=0x13 dir=< buf=B sha=7dfa3a7e nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000181_13_B.bin
+1794355422.151626 > EP=0x13 TAG=0x0e TYPE=0x00 PARAM=0x7c DATA=0x00000000
+# ool 1794355422.151626 seq=182 EP=0x13 dir=> buf=A sha=63e8087f nz=3074 changed=0x0+0x7c len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000182_13_A.bin
+1794355422.155923 < EP=0x13 TAG=0x0f TYPE=0x05 PARAM=0x10 DATA=0x00000000
+# ool 1794355422.155923 seq=183 EP=0x13 dir=< buf=B sha=7dfa3a7e nz=16 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355422.166788 > EP=0x13 TAG=0x0f TYPE=0x00 PARAM=0x7c DATA=0x00000000
+# ool 1794355422.166788 seq=184 EP=0x13 dir=> buf=A sha=63e8087f nz=3074 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355430.272887 < EP=0x13 TAG=0x10 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355430.272887 seq=221 EP=0x13 dir=< buf=B sha=96e3552f nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000221_13_B.bin
+1794355430.280264 > EP=0x13 TAG=0x10 TYPE=0x00 PARAM=0x53 DATA=0x00000101
+# ool 1794355430.280264 seq=222 EP=0x13 dir=> buf=A sha=16bfaf55 nz=3073 changed=0x0+0x116,0x117+0x3c len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000222_13_A.bin
+1794355430.284437 < EP=0x13 TAG=0x11 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355430.284437 seq=223 EP=0x13 dir=< buf=B sha=96e3552f nz=16 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355430.295333 > EP=0x13 TAG=0x11 TYPE=0x00 PARAM=0x53 DATA=0x00000101
+# ool 1794355430.295333 seq=224 EP=0x13 dir=> buf=A sha=16bfaf55 nz=3073 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355430.299395 < EP=0x13 TAG=0x12 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355430.299395 seq=225 EP=0x13 dir=< buf=B sha=96e3552f nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794355430.310208 > EP=0x13 TAG=0x12 TYPE=0x00 PARAM=0x53 DATA=0x00000101
+# ool 1794355430.310208 seq=226 EP=0x13 dir=> buf=A sha=16bfaf55 nz=3073 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355430.432477 < EP=0x13 TAG=0x13 TYPE=0x01 PARAM=0x53 DATA=0xaf3f0103
+# ool 1794355430.432477 seq=227 EP=0x13 dir=< buf=B sha=5921c8be nz=851 changed=0x0+0x353 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000227_13_B.bin
+1794355430.452556 > EP=0x13 TAG=0x13 TYPE=0x00 PARAM=0x00 DATA=0xaf3f0100
+# ool 1794355430.452556 seq=228 EP=0x13 dir=> buf=A sha=16bfaf55 nz=3073 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355430.511147 < EP=0x13 TAG=0x14 TYPE=0x06 PARAM=0x63 DATA=0x69590101
+# ool 1794355430.511147 seq=229 EP=0x13 dir=< buf=B sha=150a6257 nz=849 changed=0x0+0x163 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000229_13_B.bin
+1794355430.531430 > EP=0x13 TAG=0x14 TYPE=0x00 PARAM=0x00 DATA=0x69590100
+# ool 1794355430.531430 seq=230 EP=0x13 dir=> buf=A sha=16bfaf55 nz=3073 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355430.653102 < EP=0x13 TAG=0x15 TYPE=0x01 PARAM=0x53 DATA=0xe4c00103
+# ool 1794355430.653102 seq=231 EP=0x13 dir=< buf=B sha=9ad6d035 nz=848 changed=0x0+0xff,0x100+0x25,0x126+0xb1,0x1d8+0x74,0x24d+0x106 len=0x8000 elapsed_ms=2.68 full=0 xlat=hit rm=1 file=000231_13_B.bin
+1794355430.663417 > EP=0x13 TAG=0x15 TYPE=0x00 PARAM=0x00 DATA=0xe4c00100
+# ool 1794355430.663417 seq=232 EP=0x13 dir=> buf=A sha=16bfaf55 nz=3073 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355459.298305 < EP=0x13 TAG=0x16 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355459.298305 seq=532 EP=0x13 dir=< buf=B sha=160e5ffe nz=848 changed=0x0+0x10 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000532_13_B.bin
+1794355459.302312 > EP=0x13 TAG=0x16 TYPE=0x00 PARAM=0x14 DATA=0x00000120
+# ool 1794355459.302312 seq=533 EP=0x13 dir=> buf=A sha=7ac4ba15 nz=8182 changed=0x0+0x13,0x14+0x61,0x76+0x69,0xe0+0xf6,0x1d7+0x103,0x2db+0xff,0x3db+0x10a,0x4e6+0xcf,0x5b6+0x1c,0x5d3+0x275,0x849+0x295,0xadf+0x16e,0xc4e+0x87,0xcd6+0x24,0xcfb+0xa3,0xd9f+0x117,...(+13) len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000533_13_A.bin
+1794355459.306778 < EP=0x13 TAG=0x17 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794355459.306778 seq=534 EP=0x13 dir=< buf=B sha=160e5ffe nz=848 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355459.310560 > EP=0x13 TAG=0x17 TYPE=0x00 PARAM=0x14 DATA=0x00000120
+# ool 1794355459.310560 seq=535 EP=0x13 dir=> buf=A sha=7ac4ba15 nz=8182 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794355465.351570 < EP=0x13 TAG=0x18 TYPE=0x05 PARAM=0x10 DATA=0x00000000
+# ool 1794355465.351570 seq=602 EP=0x13 dir=< buf=B sha=734fda62 nz=848 changed=0x0+0x10 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000602_13_B.bin
+1794355465.358936 > EP=0x13 TAG=0x18 TYPE=0x00 PARAM=0xb2 DATA=0x00000000
+# ool 1794355465.358936 seq=603 EP=0x13 dir=> buf=A sha=1f141cf5 nz=8183 changed=0x0+0x1e,0x1f+0x37,0x57+0x29,0x81+0x1e,0xa0+0x12 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000603_13_A.bin
+1794355465.363185 < EP=0x13 TAG=0x19 TYPE=0x05 PARAM=0x10 DATA=0x00000000
+# ool 1794355465.363185 seq=604 EP=0x13 dir=< buf=B sha=734fda62 nz=848 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+1794355465.373710 > EP=0x13 TAG=0x19 TYPE=0x00 PARAM=0xb2 DATA=0x00000000
+# ool 1794355465.373710 seq=605 EP=0x13 dir=> buf=A sha=1f141cf5 nz=8183 changed=none len=0x8000 elapsed_ms=2.84 full=0 xlat=hit rm=1
+# ool_stats 1794355649.522489 n=59 mean_ms=2.89 max_ms=4.09 total_ms=170.8 bytes=1933312 xlat=2 dir=>:n=30,mean_ms=2.90,max_ms=4.09,bytes=983040,xlat=1 dir=<:n=29,mean_ms=2.89,max_ms=3.97,bytes=950272,xlat=1
+# end 1794355649.522494 seen=686 logged=60

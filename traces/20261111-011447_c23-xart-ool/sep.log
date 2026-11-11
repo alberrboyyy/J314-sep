@@ -1,0 +1,99 @@
+# trace_sep_filtered start 1794356097.726206 node=/arm-io/sep base=0x396400000 mode=SYNC(forcé par SEP_OOL_EPS) eps=0x13 shmem=off ool=on(eps=0x13,bytes=0x8000,full_types=0x5b,0x5f,0x65,0x6d,split_dir=1,revalidate_n=64,max_mb=64) ts=host_time_time
+# format: <ts> <dir> EP=0x.. TAG=0x.. TYPE=0x.. PARAM=0x.. DATA=0x.. [ool=...] ; '>' AP->SEP (INBOX), '<' SEP->AP (OUTBOX)
+# epname 1794356100.382213 EP=0x14 NAME='hibe'
+# epname 1794356100.383990 EP=0x18 NAME='stac'
+# epname 1794356100.385686 EP=0x00 NAME='cntl'
+# epname 1794356100.387411 EP=0x10 NAME='xars'
+# epname 1794356100.389114 EP=0x13 NAME='xarm'
+1794356100.390865 < EP=0x13 TAG=0x02 TYPE=0x0e PARAM=0x00 DATA=0x00000000
+# ool_error 1794356100.390865 seq=23 EP=0x13 buffers inconnus (pas encore de CNTL TYPE 2/3/4/5 PARAM=0x13) ; messages suivants de cet EP ignorés sans autre ligne jusqu'à apprentissage
+# epname 1794356100.391840 EP=0x15 NAME='pnon'
+# epname 1794356100.394584 EP=0x0e NAME='hdcp'
+# ool learn 1794356100.543076 seq=30 EP=0x13 buf=A size=0x8000 (CNTL TYPE=0x04 DATA=0x00008000)
+# ool learn 1794356100.550401 seq=32 EP=0x13 buf=A iova=0x4000 (CNTL TYPE=0x02 DATA=0x00000004)
+# ool learn 1794356100.552289 seq=34 EP=0x13 buf=B size=0x8000 (CNTL TYPE=0x05 DATA=0x00008000)
+# ool learn 1794356100.554086 seq=36 EP=0x13 buf=B iova=0x10000 (CNTL TYPE=0x03 DATA=0x00000010)
+1794356104.614598 > EP=0x13 TAG=0x02 TYPE=0x00 PARAM=0x00 DATA=0x00000100
+# ool 1794356104.614598 seq=90 EP=0x13 dir=> buf=A sha=c3502047 nz=0 changed=init len=0x8000 elapsed_ms=4.15 full=0 xlat=miss rm=1 file=000090_13_A.bin
+1794356104.620195 < EP=0x13 TAG=0x01 TYPE=0x13 PARAM=0x00 DATA=0x00000000
+# ool 1794356104.620195 seq=91 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=init len=0x8000 elapsed_ms=3.95 full=0 xlat=miss rm=1 file=000091_13_B.bin
+1794356104.624881 > EP=0x13 TAG=0x01 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+# ool 1794356104.624881 seq=92 EP=0x13 dir=> buf=A sha=101bbe62 nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000092_13_A.bin
+1794356104.630728 < EP=0x13 TAG=0x03 TYPE=0x00 PARAM=0x00 DATA=0x00000100
+# ool 1794356104.630728 seq=93 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+1794356104.634211 > EP=0x13 TAG=0x03 TYPE=0x00 PARAM=0x64 DATA=0x00000103
+# ool 1794356104.634211 seq=94 EP=0x13 dir=> buf=A sha=f62a3eeb nz=848 changed=0x0+0x10,0x11+0x5a,0x6c+0x144,0x1b1+0x10f,0x2c1+0xa3 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000094_13_A.bin
+1794356104.761112 < EP=0x13 TAG=0x04 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+# ool 1794356104.761112 seq=95 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356104.768082 > EP=0x13 TAG=0x04 TYPE=0x00 PARAM=0x14 DATA=0x00000008
+# ool 1794356104.768082 seq=96 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=0x11+0x6b,0x7d+0x2c1,0x33f+0xb9,0x3f9+0x8c,0x486+0x184,0x60b+0x158,0x764+0xb0 len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000096_13_A.bin
+1794356104.894398 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x6f DATA=0x00736269
+# ool 1794356104.894398 seq=97 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+# epname 1794356104.898221 EP=0x08 NAME='sbio'
+1794356104.902068 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736200
+# ool 1794356104.902068 seq=100 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794356104.908677 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x6c DATA=0x00736b64
+# ool 1794356104.908677 seq=101 EP=0x13 dir=< buf=B sha=c3502047 nz=0 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+# epname 1794356104.912465 EP=0x17 NAME='skdl'
+1794356104.914176 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x20 DATA=0x00737365
+# ool 1794356104.914176 seq=104 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000104_13_B.bin
+# epname 1794356104.918039 EP=0x0c NAME='sse '
+1794356104.919838 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x20 DATA=0x00736b73
+# ool 1794356104.919838 seq=107 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794356104.923598 < EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x64 DATA=0x00736372
+# ool 1794356104.923598 seq=108 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+# epname 1794356104.927345 EP=0x0a NAME='scrd'
+1794356104.929118 < EP=0x13 TAG=0x05 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356104.929118 seq=111 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356104.937802 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736b00
+# ool 1794356104.937802 seq=112 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356104.963831 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00737300
+# ool 1794356104.963831 seq=121 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794356104.973876 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736b00
+# ool 1794356104.973876 seq=122 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356104.990683 > EP=0x13 TAG=0x00 TYPE=0x16 PARAM=0x00 DATA=0x00736300
+# ool 1794356104.990683 seq=131 EP=0x13 dir=> buf=A sha=cccee08a nz=2043 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356105.002305 > EP=0x13 TAG=0x05 TYPE=0x00 PARAM=0x0c DATA=0x0000010c
+# ool 1794356105.002305 seq=133 EP=0x13 dir=> buf=A sha=fe5ca890 nz=3073 changed=0x0+0x51,0x52+0x4,0x57+0x198,0x1f0+0x34,0x225+0x31f,0x545+0x150,0x696+0x3a,0x6d1+0x1e4,0x8b6+0x33,0x8ea+0x1cb,0xab6+0x156 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000133_13_A.bin
+1794356105.007503 < EP=0x13 TAG=0x06 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.007503 seq=135 EP=0x13 dir=< buf=B sha=f5bddefd nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356105.018194 > EP=0x13 TAG=0x06 TYPE=0x00 PARAM=0x0c DATA=0x0000010c
+# ool 1794356105.018194 seq=136 EP=0x13 dir=> buf=A sha=fe5ca890 nz=3073 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356105.219814 < EP=0x13 TAG=0x07 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.219814 seq=137 EP=0x13 dir=< buf=B sha=abaea948 nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000137_13_B.bin
+1794356105.227006 > EP=0x13 TAG=0x07 TYPE=0x00 PARAM=0xb6 DATA=0x00000100
+# ool 1794356105.227006 seq=138 EP=0x13 dir=> buf=A sha=c2d5cc61 nz=3075 changed=0x0+0xb6 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000138_13_A.bin
+1794356105.231125 < EP=0x13 TAG=0x08 TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.231125 seq=139 EP=0x13 dir=< buf=B sha=abaea948 nz=16 changed=none len=0x8000 elapsed_ms=2.84 full=0 xlat=hit rm=1
+1794356105.241867 > EP=0x13 TAG=0x08 TYPE=0x00 PARAM=0xb6 DATA=0x00000100
+# ool 1794356105.241867 seq=140 EP=0x13 dir=> buf=A sha=c2d5cc61 nz=3075 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794356105.294003 < EP=0x13 TAG=0x09 TYPE=0x07 PARAM=0x10 DATA=0x00000000
+# ool 1794356105.294003 seq=141 EP=0x13 dir=< buf=B sha=40bffe4f nz=16 changed=0x0+0xe,0xf+0x1 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000141_13_B.bin
+1794356105.302490 > EP=0x13 TAG=0x09 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+# ool 1794356105.302490 seq=142 EP=0x13 dir=> buf=A sha=c2d5cc61 nz=3075 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356105.306537 < EP=0x13 TAG=0x0a TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.306537 seq=143 EP=0x13 dir=< buf=B sha=3593a0d3 nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000143_13_B.bin
+1794356105.317311 > EP=0x13 TAG=0x0a TYPE=0x00 PARAM=0x01 DATA=0x00000102
+# ool 1794356105.317311 seq=144 EP=0x13 dir=> buf=A sha=3c4ee0d9 nz=3072 changed=0x0+0x1c2,0x1c3+0x3e len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1 file=000144_13_A.bin
+1794356105.321548 < EP=0x13 TAG=0x0b TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.321548 seq=145 EP=0x13 dir=< buf=B sha=3593a0d3 nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356105.332159 > EP=0x13 TAG=0x0b TYPE=0x00 PARAM=0x01 DATA=0x00000102
+# ool 1794356105.332159 seq=146 EP=0x13 dir=> buf=A sha=3c4ee0d9 nz=3072 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+# epname 1794356105.336233 EP=0x12 NAME='sks '
+1794356105.351229 < EP=0x13 TAG=0x0c TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.351229 seq=160 EP=0x13 dir=< buf=B sha=46c689ee nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000160_13_B.bin
+1794356105.369523 > EP=0x13 TAG=0x0c TYPE=0x00 PARAM=0x28 DATA=0x00000100
+# ool 1794356105.369523 seq=165 EP=0x13 dir=> buf=A sha=da9324d1 nz=3072 changed=0x0+0x28 len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000165_13_A.bin
+1794356105.373728 < EP=0x13 TAG=0x0d TYPE=0x05 PARAM=0x10 DATA=0x00000100
+# ool 1794356105.373728 seq=166 EP=0x13 dir=< buf=B sha=46c689ee nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356105.385132 > EP=0x13 TAG=0x0d TYPE=0x00 PARAM=0x28 DATA=0x00000100
+# ool 1794356105.385132 seq=168 EP=0x13 dir=> buf=A sha=da9324d1 nz=3072 changed=none len=0x8000 elapsed_ms=2.86 full=0 xlat=hit rm=1
+1794356107.011395 < EP=0x13 TAG=0x0e TYPE=0x05 PARAM=0x10 DATA=0x00000000
+# ool 1794356107.011395 seq=181 EP=0x13 dir=< buf=B sha=7dfa3a7e nz=16 changed=0x0+0x10 len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1 file=000181_13_B.bin
+1794356107.018767 > EP=0x13 TAG=0x0e TYPE=0x00 PARAM=0x7c DATA=0x00000000
+# ool 1794356107.018767 seq=182 EP=0x13 dir=> buf=A sha=63e8087f nz=3074 changed=0x0+0x7c len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1 file=000182_13_A.bin
+1794356107.022956 < EP=0x13 TAG=0x0f TYPE=0x05 PARAM=0x10 DATA=0x00000000
+# ool 1794356107.022956 seq=183 EP=0x13 dir=< buf=B sha=7dfa3a7e nz=16 changed=none len=0x8000 elapsed_ms=2.85 full=0 xlat=hit rm=1
+1794356107.033790 > EP=0x13 TAG=0x0f TYPE=0x00 PARAM=0x7c DATA=0x00000000
+# ool 1794356107.033790 seq=184 EP=0x13 dir=> buf=A sha=63e8087f nz=3074 changed=none len=0x8000 elapsed_ms=2.87 full=0 xlat=hit rm=1
+1794356112.783685 < EP=0x13 TAG=0x10 TYPE=0x05 PARAM=0x10 DATA=0x00000100

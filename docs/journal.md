@@ -14,6 +14,19 @@ Format :
 
 ---
 
+## 2026-11-11 — Claude (Opus 4.8) — VOIE B faite : 1re capture du CONTENU du coffre xART (EP 0x13 OOL)
+- Trace : traces/20261111-010323_c21-xart-ool (SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000, boot macOS sous HV, lecture seule, reboot propre).
+  2e boot c22 raté (macOS non démarré, 0 message SEP = panne connue « chainload à chaud ») ; 3e tentative c23 en cours.
+- Fait : capturé pour la 1re fois le contenu OOL de l'échange xART au boot (avant : en-têtes seuls). 25 blobs OOL 0x13, buffers de 0x8000.
+- Vu (faits) : structure d'échange identique aux 19 boots (TAG 2/0x0e attente, fetch SEP-xART TAG3 PARAM 0x64, USER-xART TAG4, puis sbio
+  annoncé). Buffers A ('>', AP->SEP = coffre rendu) = lockers chiffrés, 2 à 8 Ko non nuls, **haute entropie dès le 1er octet (pas d'en-tête
+  en clair)**. Buffers B ('<', SEP->AP = à sauver) : certains n'ont que **16 octets non nuls = un UUID de locker** (l'un = d15bc8da…, le
+  locker USER-xART connu « not found »). Deux lockers partagent un suffixe de ~24 octets identiques (000144/000164).
+- Interprété : `vérifié` pour les faits ci-dessus. L'anti-rejeu n'est **pas** un champ en clair : il est cryptographique (dans le blob scellé),
+  donc invisible en lecture. La question « rejeu jouable ? » ne se tranche pas en lisant un blob ; il faut comparer deux boots (c21 vs un 2e bon
+  boot) ou, en dernier ressort, un test en écriture (voie C, pending/ + Albert). Les lockers sont adressés par UUID de 16 o (nouveau détail).
+- Incidents : c22 raté (boot à chaud), sans conséquence (reboot propre). Un démarrage à froid (Albert, appui long) fiabiliserait le 2e boot.
+
 ## 2026-11-10 — Claude (Opus 4.8) — xART : distinction rejeu vs forge (voie C réhabilitée, avec Albert)
 - Trace : — (mise à jour de doc, discussion avec Albert). Aucune action matérielle.
 - Fait : corrigé docs/xart_options.md. Albert a fait remarquer que le SEP n'a pas de disque et compte sur l'AP pour lui rendre ses blobs :

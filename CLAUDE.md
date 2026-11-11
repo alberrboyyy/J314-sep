@@ -79,3 +79,16 @@ passer aux tâches hors hardware (analyse, outillage).
 
 - Sur le Linux de test `root@10.0.200.4` (partition Asahi d'Albert, jetable) uniquement : l'agent peut y agir en root, via `tools/linux_ssh.sh` seulement, pour compiler et charger les modules de `driver/linux/`.
 - Interdit même là : partitionner, toucher à m1n1, à la boot policy ou à macOS, et envoyer quoi que ce soit au SEP (0x12, 0x13, 0x10, 0x15, gigalockers, IMG4).
+
+## Écriture dans docs/guide/
+- Lire docs/guide/STYLE.md avant toute modification du guide.
+- Le guide n'est pas le journal : aucun historique de travail, aucune
+  consigne pour l'agent, aucune mention d'Albert à la 3e personne.
+- Sources pour rédiger : verification_status.md, hypotheses.md,
+  messages.md, annexe-sources.md. Le journal sert à vérifier, pas à copier.
+- Jamais de fait inventé : un « pourquoi » manquant devient
+  <!-- QUESTION ALBERT : ... -->.
+- Après chaque modification d'un chapitre : lancer lecteur-naif puis
+  verificateur, et corriger jusqu'à ce qu'ils ne signalent plus rien.
+- Quand Albert corrige quelque chose, ajouter la règle correspondante
+  (avec exemple) dans STYLE.md.
