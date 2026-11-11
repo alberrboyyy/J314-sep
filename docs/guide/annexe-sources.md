@@ -125,6 +125,9 @@ de travail.
 | <a id="t-33"></a>T-33 | `20261110-002417_c18-spi-dma-boot` | 10/11/2026 | C18 | Démarrage avec lecture du contenu des échanges entre macOS et le capteur ; lecture incomplète |
 | <a id="t-34"></a>T-34 | `20261110-002829_c19-spi-dma-boot` | 10/11/2026 | C19 | Même chose, lecture complète : trames en clair et trames chiffrées |
 | <a id="t-35"></a>T-35 | `20261110-003201_c20-doigt-spi` | 10/11/2026 | C20 | Session avec doigt en écoutant à la fois le capteur et le SEP : 27 images lues sur le bus, 7 transmises au SEP, identiques octet pour octet |
+| <a id="t-45"></a>T-45 | `20261111-010323_c21-xart-ool` | 11/11/2026 | C21 | Premier démarrage où le contenu des buffers de l'endpoint `xarm` est lu : les lockers restitués et sauvés apparaissent en clair quant à leur taille et leur découpage, le contenu restant chiffré |
+| <a id="t-46"></a>T-46 | `20261111-011447_c23-xart-ool` | 11/11/2026 | C23 | Même lecture au démarrage suivant, sans intervention, pour comparer le coffre d'un démarrage à l'autre. Une tentative intermédiaire, dossier `20261111-010943_c22-xart-ool`, n'a pas démarré macOS et ne contient aucun message |
+| <a id="t-47"></a>T-47 | `20261111-013303_c24-xart-ool` | 11/11/2026 | C24 | Troisième lecture du contenu du coffre, sans intervention, pour confirmer sur trois démarrages quels lockers sont figés et lesquels changent |
 
 ### Setup S2 — m1n1 seul
 

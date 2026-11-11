@@ -14,6 +14,18 @@ Format :
 
 ---
 
+## 2026-11-11 — Claude (Opus 4.8) + analyste — xART : 3 boots, les 2 lockers variables identifiés, chaînage prouvé octet pour octet
+- Trace : traces/*c21-xart-ool [T-45], *c23-xart-ool [T-46], *c24-xart-ool [T-47] (lecture seule). Scripts : analysis/diff_xart_ool.py, scratchpad/diff3.py, scratchpad/lockers_variables.md (sous-agent analyste). Correspondance seq->fichier->TAG->nom noyau via le mot 64 bits des lignes « Replied to xART app ».
+- Vu (faits mesurés, 3 boots) :
+  - Buffers A (rendus au SEP) : 12 par boot ; sur le bloc de boot (seq 090..222), 10 lockers dont 8 identiques octet pour octet sur les 3 boots et 2 variables. Les 2 buffers A tardifs (TAG 0x16, 0x18) sont aussi stables.
+  - Les 2 variables sont : 000094 = TAG 0x03 = **SEP-xART** (blob nommé, pas d'UUID, ~0x363 o utiles) ; 000222 = TAG 0x10 = **locker du Credential Manager** adressé par UUID 8624497a8c2ff2582625a036fab3b8e3 (~0x307c o utiles, contexte AppleCredentialManager/ACMTRM). **USER-xART (TAG 0x04, 000096) NE change PAS** (CRC 0xfcf1 constant).
+  - UUID des lockers identiques sur les 3 boots (ex. USER_XART « not found » = d15bc8da...). Le locker 222 a le même UUID aux 3 boots : c'est le même locker dont le contenu change.
+  - Pas de compteur en clair : 000094 corps 0x11..0x363 entièrement renouvelé chaque boot ; 000222 tête 0x00..0x152 entièrement renouvelée, le reste (0x153..0x307c) identique sur les 3 boots. Aucun octet monotone.
+  - Buffers B (sauvés) : 5 par boot, 15/15 distincts. Structure d'un save SEP-xART : 16 octets variables à chaque save (aspect nonce/MAC) + corps chiffré constant au sein d'un boot.
+  - **Chaînage octet pour octet** : corps de A094(c23)==B231(c21), A094(c24)==B231(c23) ; A222(c23)==B229(c21) (après 16 o d'UUID), A222(c24)==B229(c23). Ce que le SEP sauve au boot N = ce que l'AP rend au boot N+1.
+- Interprété (hypothèse) : la fraîcheur anti-rejeu est portée par le préfixe de 16 octets des saves + le corps chiffré renouvelé ; pas de compteur lisible. Le rejeu reste plausible : rendre la dernière sauvegarde = exactement ce que le SEP attend au boot suivant (save N = fetch N+1, prouvé). Reste à savoir, par un test en écriture seul, si l'état interne du SEP accepte ce rejeu quand c'est Linux et non macOS qui boote le SEP. Statut : faits = vérifiés (octets) ; mécanisme anti-rejeu = hypothèse.
+- Incidents : c22 (entre c21 et c23) n'a pas démarré macOS, 0 message, ignoré.
+
 ## 2026-11-11 — Claude (Opus 4.8) — Coffre xART comparé sur 2 boots (c21 vs c23) : 80 % stable, fraîcheur isolée à 2 blobs
 - Trace : traces/*c21-xart-ool et traces/*c23-xart-ool (2 boots macOS sous HV, lecture seule ; c22 raté entre les deux, boot à chaud).
   Script : analysis/diff_xart_ool.py. Les deux boots vont jusqu'à l'écran de connexion, SANS login (pas de mot de passe tapé).

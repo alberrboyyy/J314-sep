@@ -74,6 +74,10 @@ xART.
 en adresses physiques. Le SEP a la sienne, nommée `dart-sep` dans l'ADT ; sur la machine étudiée
 elle est du modèle que le code public appelle `t6000`.
 
+**Coffre** — Nom donné dans ce guide à l'ensemble des lockers xART qu'un SEP confie à l'AP et
+se fait rendre au démarrage. Ce n'est pas un terme du protocole, seulement une image pour
+désigner ce stockage délégué. Voir **Locker** et **xART**.
+
 **Découverte** — Phase où le SEP annonce ses endpoints à l'AP, sur l'endpoint 0xFD : pour
 chacun, son numéro et un nom de quatre caractères.
 
@@ -281,6 +285,11 @@ sont décrits dans [annexe-sources.md](annexe-sources.md) et cités `S1`, `S2`�
 
 **SIO** — Coprocesseur de la puce qui prend en charge, sous macOS, les transferts DMA de
 certains bus, dont celui du capteur.
+
+**Somme de contrôle** — Nombre court calculé à partir d'un bloc de données pour en résumer le
+contenu. Deux blocs identiques ont la même somme de contrôle ; une même somme de contrôle rend
+très probable, sans le prouver, que les contenus soient identiques. Le journal du noyau de macOS
+en consigne une pour chaque locker xART.
 
 **SKS**, Secure Key Store — Service du SEP qui gère les clés et le keybag. Son endpoint est `sks`,
 numéro 0x12.

@@ -116,3 +116,9 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
   macOS : `vérifié` (2 essais identiques, 2e : traces/20261110-005318_mesa_hello2). Rend SPI-2 `vérifié` pour ces 4 trames seulement.
 - SPI-4 (2026-11-10, LINUX-HELLO) : sous Linux (Fedora Asahi de test), spi2 ajouté à chaud (driver/linux/mesa_ovl.c + mesa-spi2-overlay.dts)
   et mesa_probe enable=1 → même identité du capteur : `vérifié` (1 essai). Le pilote public spi-apple suffit pour le transport.
+
+- xART-CHAIN (2026-11-11, T-45/T-46/T-47, lecture seule) : le contenu OOL de l'EP 0x13 a été capturé et comparé sur 3 boots.
+  `vérifié (octet pour octet)` : sur 10 lockers rendus au SEP, 8 sont identiques sur les 3 boots ; les 2 variables sont SEP-xART (TAG 0x03)
+  et un locker Credential Manager (TAG 0x10, UUID 8624497a…) ; USER-xART (TAG 0x04) est stable. `save(N)=fetch(N+1)` confirmé sur le contenu
+  (A094(cN+1)=B231(cN), A222(cN+1)=B229(cN)). Pas de compteur en clair. Mécanisme anti-rejeu (préfixe 16 o = nonce/MAC) = `hypothèse`.
+  Que le SEP accepte un rejeu de la dernière sauvegarde quand Linux le boote = non testé (écriture SEP, pending/ + Albert).

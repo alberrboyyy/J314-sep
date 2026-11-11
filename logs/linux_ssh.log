@@ -72,3 +72,5 @@
 2026-11-10 15:50:47 put: driver/linux/mesa_transport.h -> /root/mesa/mesa_transport.h
 2026-11-10 15:50:48 put: driver/linux/mesa_probe.c -> /root/mesa/mesa_probe.c
 2026-11-10 15:50:49 run: cd /root/mesa && touch mesa_probe.c && make -C /lib/modules/$(uname -r)/build M=$PWD modules 2>&1 | grep -E 'LD.*mesa_probe|rror|arning: [^tp]'; rmmod mesa_irqwatch 2>/dev/null; rmmod mesa_probe 2>/dev/null; lsmod | grep -q mesa_ovl || insmod mesa_ovl.ko; insmod mesa_probe.ko enable=1; dmesg | grep 'mesa-probe' | grep -vE ' TX | RX ' | tail -12
+2026-11-11 01:25:33 run: echo JOIGNABLE; uptime
+2026-11-11 01:32:00 run: uname -r && uptime

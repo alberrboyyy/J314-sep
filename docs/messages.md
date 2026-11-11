@@ -708,3 +708,20 @@ les noms (5 annonces) ; `0x0d` puis `0x29` puis requête `0x14` (réponse 3) pui
 - **Toute réponse sur EP 0x13 est une écriture vers le SEP : ligne rouge.** Si jamais tenté : script dans `pending/`, lancé par Albert, après décision sur ses données (backup non existant).
 - Capture manquante, en lecture seule, qui fermerait le point (1)-(2) : OOL sur EP 0x13 (tampons xarm), en sachant que les blobs xART contiennent probablement du
   matériau sensible (jetons de keybag) : à décider avant de les écrire dans `traces/`. Non fait.
+
+### xART — contenu OOL et lockers variables (T-45 à T-47, 2026-11-11, lecture seule)
+
+Première lecture du contenu OOL de l'EP 0x13, sur 3 boots macOS sous hyperviseur (c21/c23/c24).
+Scripts : `analysis/diff_xart_ool.py`, `analysis/count_sensor_vs_sep_images.py` (non lié), scratchpad `diff3.py` / `lockers_variables.md`.
+
+- Buffers de 0x8000 ; contenu utile plus petit. Lockers adressés par UUID de 16 octets passé dans un buffer B quasi vide
+  juste avant le fetch ; UUID constants sur les 3 boots (ex. USER_XART « not found » = `d15bc8da05932ea3a9c2d0d0e924b264`).
+- Sur le bloc de boot (seq 090..222) : 10 lockers rendus (A), **8 identiques octet pour octet sur les 3 boots**, 2 variables.
+  Les 2 variables : `000094` = TAG 0x03 = **SEP-xART** (blob nommé, pas d'UUID, ~0x363 o utiles) ; `000222` = TAG 0x10 =
+  **locker Credential Manager** (UUID `8624497a…`, contexte ACMTRM, ~0x307c o utiles). **USER-xART (TAG 0x04, `000096`) est STABLE** (CRC 0xfcf1 constant).
+- Pas de compteur en clair : zones variables entièrement renouvelées (aspect chiffré), aucun octet monotone.
+- **Chaînage prouvé octet pour octet** : corps A094(c23)=B231(c21), A094(c24)=B231(c23) ; A222(c23)=B229(c21) (après 16 o d'UUID),
+  A222(c24)=B229(c23). Donc `save(N) = fetch(N+1)`, confirmé sur le contenu (avant : seulement sur le CRC du log noyau, 15/15 SEP-xART, 16/16 USER-xART).
+- Save SEP-xART = 16 octets variables par save (aspect nonce/MAC) + corps chiffré constant au sein d'un boot.
+- Interprétation (hypothèse) : fraîcheur anti-rejeu portée par le préfixe 16 o + corps renouvelé. Rejeu de la dernière sauvegarde = exactement
+  ce que le SEP attend au boot suivant ; reste à voir par écriture si l'état interne l'accepte quand Linux boote le SEP.
