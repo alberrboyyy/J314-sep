@@ -15,7 +15,7 @@ M1N1DEVICE_FIXED="${M1N1DEVICE:-}"   # surcharge explicite éventuelle
 HV_UART_FIXED="${HV_UART:-}"
 refresh_ports() {
   export M1N1DEVICE="${M1N1DEVICE_FIXED:-$(m1n1_port if00)}"
-  HV_UART="${HV_UART_FIXED:-$(m1n1_port if02)}"
+  HV_UART="${HV_UART_FIXED:-$(m1n1_port if02 || true)}"
 }
 refresh_ports
 
