@@ -72,8 +72,13 @@ printf '%s\n%s\n' "$OUT" "$$" > "$STATE_FILE"
 } > "$OUT/meta.txt"
 
 # 1. Chainload d'un m1n1 frais : obligatoire, l'ABI de l'hyperviseur est instable.
-"$M1N1_PYTHON" "$M1N1_DIR/proxyclient/tools/chainload.py" -r "$M1N1_DIR/build/m1n1.bin" 2>&1 | tee "$OUT/chainload.log"
-sleep 2
+#    SKIP_CHAINLOAD=1 : sauter cette étape quand un m1n1 frais (= build/m1n1.bin) tourne déjà au proxy.
+#    Utile quand le chainload est peu fiable (lien distant qui casse à la ré-énumération USB) : on
+#    chainloade une fois à part (sep_peek) puis on enchaîne les captures sans rechainloader.
+if [ "${SKIP_CHAINLOAD:-0}" != 1 ]; then
+  "$M1N1_PYTHON" "$M1N1_DIR/proxyclient/tools/chainload.py" -r "$M1N1_DIR/build/m1n1.bin" 2>&1 | tee "$OUT/chainload.log"
+  sleep 2
+fi
 require_mac
 
 echo "hv_uart_port: ${HV_UART:-absent}" >> "$OUT/meta.txt"
