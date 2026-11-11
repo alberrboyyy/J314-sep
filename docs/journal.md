@@ -17,18 +17,18 @@ Format :
 ## 2026-11-11 (fin journée) — Albert lance / Claude (Opus 4.8) — ESSAI VOIE C n°1 : sbio RÉVEILLÉ, mais le rejeu a DIVERGÉ (sbio ≠ rejeu accepté)
 - Trace : traces/20261111-120142_xart_replay/ (xart_replay.log, chainload.log) — PREMIÈRE écriture SEP du projet, lancée par Albert.
 - Fait : pending/sep_xart_replay.sh sur le S_new traces/20261111-113919_snew-reel. m1n1 démarre le SEP, met en place les tampons xART (A iova=0x2c000, B iova=0x38000, sid=0) via CNTL (SECMODE + 4 CNTL acquittés), puis tente le rejeu de l'échange EP 0x13.
-- Vu (FAITS) :
+- Vu (FAITS — corrigé après relecture de la trace ; voir CORRECTION ci-dessous) :
   - BOOT OK ; au démarrage, 7 endpoints seuls (cntl hdcp xars xarm hibe pnon stac) — comme sep_boot.sh.
-  - Au 1er pas du rejeu : le SEP envoie TAG=0x05 TYPE=0x01 (la capture macOS avait TYPE=0x05). Le script s'ARRÊTE immédiatement, **rien de plus envoyé au SEP** (0 locker rejoué, 0 réponse 'send' émise).
-  - MALGRÉ ça, à l'écoute de 10 s, le SEP annonce 11 endpoints dont **0x08 sbio (biométrie)**, 0x0a scrd, 0x0c sse, 0x17 skdl. Toujours ABSENT : sks (0x12, trousseau).
-- Interprété (HYPOTHÈSE, à trancher par le sceptique) :
-  - sbio est apparu SANS aucun rejeu de contenu → le réveil de la biométrie vient du **boot du SEP + mise en place des tampons xART (CNTL)**, PAS du contenu du coffre rendu. Le coffre n'est peut-être pas le verrou pour *annoncer* sbio.
-  - MAIS « sbio annoncé » ≠ « Touch ID fonctionne » (enrôlement/match peuvent exiger un état xART/keystore valide ; sks toujours absent).
-  - Le message « rejeu accepté » du script était trompeur (il ne testait que la présence de sbio). CORRIGÉ dans le script : il distingue maintenant rejeu complet vs divergé.
-  - Sens de TAG=0x05 TYPE=0x01 (vs 0x05) : inconnu. À creuser (désassemblage xarm / comparaison captures).
-- Différence clé vs sep_boot.sh (7/12, sans sbio) : ici on a EN PLUS fait le handshake CNTL des tampons xarm → à isoler : est-ce la mise en place des tampons, ou SECMODE, ou juste d'attendre plus ? = expérience sceptique.
-- Incidents : aucun. Aucune op disque. SEP laissé en état booté-avec-endpoints ; Mac à redémarrer (reboot matériel → m1n1, n'avance pas le compteur). macOS non rebooté.
-- Statut : FAITS = vérifiés (log). Cause de sbio = hypothèse. NE PAS conclure « voie C gagnée ».
+  - Les requêtes xART du SEP sont numérotées en série (macOS : TAG 0x02→0x01→0x03→0x04→0x05→0x06…). La divergence de l'essai 1 porte sur « attendu TAG=0x05 » : les 4 premières transactions (TAG 0x02/0x01/0x03/0x04) sont donc PASSÉES → **4 lockers RÉELLEMENT rejoués** (tampons A 090/092/094/096, dont 094=SEP-xART et 096=USER-xART, les 2 « frais »). Puis à la 5e requête le SEP envoie TAG=0x05 **TYPE=0x01** au lieu du TYPE=0x05 de macOS ; le script (rejeu rigide de la trace macOS) s'arrête là.
+  - `TAG=0x05 TYPE=0x01` n'existe NULLE PART dans la capture macOS (vérifié par grep du sep.log). TYPE=0x01 est un type de requête xART valide (macOS l'émet mais seulement à TAG=0x13). Donc le SEP sous m1n1 a sauté les transactions 5→18 de macOS et demandé directement une opération TYPE=0x01 : vrai chemin différent, pas un décalage de file.
+  - Pendant l'échange, entre TAG=0x04 et TAG=0x05 (comme sous macOS), le SEP annonce ses endpoints (TYPE=0x1d) : 11 au total dont **0x08 sbio (biométrie)**, 0x0a scrd, 0x0c sse, 0x17 skdl. Toujours ABSENT : sks (0x12, trousseau).
+- CORRECTION d'une erreur de lecture (le même jour) : j'avais d'abord écrit « 0 locker rejoué / sbio apparaît sans rejeu ». FAUX. La divergence à TAG=0x05 prouve que 4 transactions ont abouti avant. sbio apparaît DANS un échange xART partiel (au point normal, après 4 lockers), pas à partir des seuls tampons.
+- Interprété (HYPOTHÈSE) :
+  - Le SEP sous m1n1 a ENGAGÉ l'échange xART, repris 4 lockers (dont les 2 frais) sans les rejeter, et annoncé la biométrie — puis a divergé à la 5e requête. Encourageant : l'échange démarre. MAIS « sbio annoncé » reste ≠ « Touch ID fonctionne » (sks absent ; annonce des endpoints = étape normale, ne prouve pas la validation des lockers).
+  - Pourquoi TYPE=0x01 à TAG=0x05 (vs la longue suite de TYPE=0x05 de macOS) : inconnu. Piste : le SEP sous Linux n'a pas les mêmes lockers à réclamer, ou l'un des 4 premiers lui a fait changer de branche. À creuser : rendre le rejeu ADAPTATIF (répondre à ce que le SEP demande vraiment, pas rejouer la trace macOS à l'identique) ; désassemblage xarm = piste phase 2.
+  - Le message « rejeu accepté » du script était trompeur (il ne testait que la présence de sbio). CORRIGÉ dans le script : il distingue rejeu complet vs divergé et compte les réponses rejouées.
+- Incidents : aucun. Aucune op disque. SEP laissé en état booté-avec-endpoints ; Mac redémarré en m1n1 après coup (reboot matériel, n'avance pas le compteur). macOS non rebooté.
+- Statut : FAITS = vérifiés (log). Cause de la divergence TYPE=0x01 = ouvert. NE PAS conclure « voie C gagnée ». À trancher : rejeu adaptatif (pending/, Albert lance) + contrôles de reproductibilité.
 
 ## 2026-11-11 (fin journée) — Claude (Opus 4.8) — S_new réel capturé (tampons complets 0x8000), script voie C prêt à lancer
 - Trace : traces/20261111-113919_snew-reel (lecture seule, EP 0x13, SEP_OOL_BYTES=0x8000, END_ACTION=reboot).
