@@ -169,13 +169,28 @@ non appris », **sans aucune écriture SEP** (donc sûr), mais sans tester voie 
    - TYPE 0x03, DATA = iova_B >> 12         — « buf B iova »
 4. Puis le rejeu des lockers (déjà écrit) : écrire le locker dans A (par traduction DART + writemem) et renvoyer le message.
 
-**Inconnues à lever AVANT d'écrire ce correctif** (sinon on code au jugé) :
-- le **TAG** de ces 4 messages CNTL, et l'ordre/amorçage exact (le SEP réclame-t-il les tampons d'abord, ou l'AP les
-  pousse-t-il dès que `xarm` est annoncé ?). c24 est filtré sur EP 0x13 : il ne montre que les commentaires `# ool learn`,
-  pas les messages CNTL bruts avec leur TAG/direction.
-- Deux façons de lever ça : (a) une **capture non filtrée** (`SEP_EPS` vide, `SEP_OOL_EPS=0x13`) en **USB direct** (le boot
-  macOS sous hyperviseur n'est **pas fiable à travers le tunnel relais**, cf. journal 2026-11-11) ; (b) **désassembler
-  AppleSEPManager** (autorisé en phase 2, protocole uniquement) pour lire la mise en place des tampons OOL de `xarm`.
+**Protocole exact — déjà extrait du kext** (`docs/kext_sepmanager.md` §3, §5, §7, source: kext, phase 2). Plus besoin de
+capture pour ça :
+- **Mot CNTL** (EP 0) : octet0=0 (ep CNTL), octet1=tag, octet2=TYPE, octet3=param=ep cible (0x13), octets4-7=data.
+- **TAG** : `_cmsgSend` prend un slot dans un pool de 8 ; **tag = index_slot + 1** (1..8). La **réponse/acquittement** est
+  un message SEP→AP sur l'EP 0, **TYPE 0x01, même tag**, data = écho. Donc : après chaque CNTL, attendre un `< EP=0 TYPE=0x01`
+  de même tag avant d'envoyer le suivant.
+- **Ordre** (setSendOOLBuffer puis setReceiveOOLBuffer) : A d'abord — TYPE 0x04 (taille_A en octets) puis TYPE 0x02
+  (iova_A>>12) ; puis B — TYPE 0x05 (taille_B) puis TYPE 0x03 (iova_B>>12). param=0x13 pour les quatre.
+- **L'AP pousse** ces CNTL (allocateVisibleMemory + setSend/ReceiveOOLBuffer) au moment d'ouvrir l'endpoint, après que
+  `xarm` a été annoncé en 0xFD ; le SEP ne les réclame pas. Taille des tampons xarm = **0x8000** (c24 ; cohérent avec
+  l'annonce 0xFD, octets min/max pages, page SEP 0x4000).
+- **Amorçage AVANT l'ouverture** (§7-A) : « OS actif » (le SEP poste `< EP=0 TYPE=0x0d` ou `0x15`), puis l'AP répond au
+  `SECMODE_REQUEST` (CNTL TYPE 0x14, data=mode, c24/C11 : mode 3), puis découverte 0xFD. `sep_boot.sh` atteint déjà 7
+  endpoints dont `xarm` : à instrumenter pour voir ce que le SEP envoie sur l'EP 0 pendant ce boot et répondre comme l'AP.
+
+**Ce qui reste vraiment incertain** (à vérifier par l'essai, pas de capture possible avant) :
+- **Flux/sid DART des tampons OOL** : à quel IOVA mapper A et B pour que `xarm` du SEP les lise. macOS a utilisé
+  0x2c000 / 0x38000 ; `p.dart_map(handle, iova, phys, size)` (cf. `create_shmem`) mappe dans le DART du SEP, mais le
+  stream exact que `xarm` utilise n'est pas garanti identique sous m1n1. À confirmer en lisant, après mapping, que le SEP
+  va bien chercher dans A (sinon essayer l'IOVA/stream de la session macOS).
+- Est-ce que le SEP **démarré par m1n1** enchaîne spontanément l'échange xART une fois les tampons annoncés (comme sous
+  macOS), ou attend-il d'autres étapes (SKS 0x12, etc.) ? C'est précisément ce que l'essai tranche.
 
 **Points secondaires corrigés dans la v1** (sceptique) : échec FERMÉ sur divergence TAG/TYPE (ne plus pousser de réponses
 après désynchronisation) ; log du run réel toujours dans `traces/…_xart_replay/` même en `SKIP_CHAINLOAD` ; `chmod a-w` des
