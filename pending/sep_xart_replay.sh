@@ -53,8 +53,10 @@
 #   >>> le flux/IOVA DART : on mappe A/B à 0x2c000/0x38000 (valeurs macOS) ; pas garanti que
 #       xarm du SEP les lise là sous m1n1. Si le SEP n'acquitte pas les CNTL ou ne lit pas A :
 #       sortie propre (exit 2/3), AUCUN risque, et on ajuste l'IOVA/stream.
-#   >>> amorçage EP 0 : le script répond au NAP et ignore les notifications ; si le SEP exige
-#       en plus un SECMODE (CNTL 0x14) avant d'ouvrir xarm, il stagnera (timeout propre) -> à ajouter.
+#   >>> amorçage EP 0 : SECMODE (CNTL 0x14) AJOUTÉ et validé contre la capture cntl-study3
+#       (2026-11-11, non filtrée) ; le script répond aussi au NAP et ignore les notifications.
+#   >>> la capture montre que l'AP met aussi en place les tampons de 0x18 et 0x0e (autres EP)
+#       AVANT de répondre à xART. La v2 ne fait que 0x13. Si le SEP stagne, ajouter 0x18/0x0e.
 #   >>> si le SEP démarré par m1n1 enchaîne l'échange xART une fois les tampons annoncés : c'est
 #       justement la question de voie C.
 #   NON VÉRIFIÉ (échoue proprement si faux) : u.adt["/chosen"].dram_base/.dram_size existe en
@@ -309,6 +311,14 @@ if 0x13 not in sep.epnum2name:
     sys.exit(2)
 print("xarm (0x13) annoncé. Endpoints : "
       + ", ".join(f"0x{n:02x}:{nm}" for n, nm in sorted(sep.epnum2name.items())), flush=True)
+
+# Amorçage : SECMODE_REQUEST (CNTL TYPE 0x14, param=0). VALIDÉ sur la capture cntl-study3 :
+# le SEP poste OS-actif (0x0d), puis l'AP envoie > EP0 TYPE 0x14, le SEP répond < TYPE 0x01
+# DATA=mode (3). Le SEP fait ça AVANT d'accepter la mise en place des tampons.
+if not cntl_send(0x14, 0, 0x00, "SECMODE"):
+    print("ERREUR: pas d'acquittement SECMODE (CNTL 0x14) en 5 s. Abandon, rien de plus envoyé.", flush=True)
+    sys.exit(3)
+print("  SECMODE acquitté", flush=True)
 
 # Allouer A (envoi AP->SEP) et B (réception SEP->AP), 0x8000 chacun (c24), init à zéro,
 # et les mapper dans le DART du SEP. IOVA = celles de macOS (c24) ; à ajuster si xarm ne lit
