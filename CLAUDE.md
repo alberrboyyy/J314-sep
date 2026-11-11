@@ -34,15 +34,19 @@ objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le 
 - Doc publique Asahi (asahilinux.org/docs), code public de m1n1 et linux-asahi.
 - Code open source Apple publié (opensource.apple.com / apple-oss-distributions : xnu, IOKitUser…).
 
-Interdit en phase 1 : désassembler/décompiler **tout** binaire Apple (kexts compris).
+Désassemblage/décompilation de binaires Apple : **autorisé** (élargi par Albert le 2026-11-11 ;
+avant, interdit en phase 1). But : extraire le protocole (format des messages, séquences, constantes).
+Garde-fous conservés (côté légal) : **protocole uniquement**, aucune clé ni secret extrait, **aucune
+copie de code Apple** (même réécrit) dans `driver/`, info issue d'un binaire marquée `source: kext`.
 
 ## Phase 2 — règles (inactives tant que la ligne PHASE ne dit pas 2)
 
-- Désassemblage des kexts macOS autorisé **uniquement** pour extraire le protocole AP↔SEP
-  (format des messages, séquences, constantes). Kexts cibles : AppleSEPManager et drivers biométriques,
-  plus AppleSEPKeyStore (ajouté par Albert le 2026-11-08) pour le seul protocole de l'EP 0x12 (SKS), tel que
-  le dernier maillon entre un match biométrique et le déverrouillage. Mêmes règles : protocole uniquement,
-  aucune clé ni secret extrait, et toute écriture vers l'EP 0x12 reste un script dans `pending/` lancé par Albert.
+- Désassemblage des binaires macOS autorisé pour extraire le protocole AP↔SEP / Touch ID (format des
+  messages, séquences, constantes) : **tout binaire pertinent** (kexts SEP et biométrie — AppleSEPManager,
+  AppleSEPKeyStore pour l'EP 0x12/SKS, IOBiometricFamily, AppleMesaSEPDriver… — et au-delà si utile).
+  Élargi par Albert le 2026-11-11 (avant : seulement quelques kexts « uniquement pour le protocole »).
+  Garde-fous : protocole uniquement, aucune clé ni secret extrait ; toute **écriture** vers le SEP (dont
+  l'EP 0x12) reste un script dans `pending/` lancé par Albert.
 - Jamais de copie de code Apple (même réécrit ligne à ligne) dans `driver/`. On documente le protocole dans
   `docs/messages.md`, et le driver s'écrit à partir de cette doc.
 - Chaque information issue d'un kext est marquée `source: kext` dans la table.
@@ -74,6 +78,11 @@ passer aux tâches hors hardware (analyse, outillage).
 - Endpoints connus : voir `docs/messages.md`.
 - Hyperviseur : macOS **13.5** uniquement. Toujours chainloader un m1n1 frais avant `run_guest.py` (ABI instable) — `tools/boot_and_trace.sh` le fait.
 - Le tracer SEP actuel spamme la console au point de faire paniquer : filtrer par endpoint est la priorité n°1.
+- **RTFM d'abord** (erreur Claude, 2026-11-11) : avant de conclure qu'une opération « ne marche pas », lire les
+  options du proxyclient m1n1. Le `UartInterface` lit **`M1N1TIMEOUT`** (défaut **3 s**). Sur lien distant à
+  latence (tunnel relais, cf. mémoire tunnel-relais-mac), 3 s est trop court pour `run_guest` (boot hyperviseur) →
+  `UartTimeout` au bootstrap. Fix : **`export M1N1TIMEOUT=20`** (ou plus). Les lectures courtes (sep_peek) et le
+  chainload passent avec 3 s, pas le boot macOS. Autres vars utiles : `M1N1DEVICE`, `HV_UART`, `M1N1WAIT`, `M1N1HEAP`.
 
 ## Exception : 2e Linux de test (accord d'Albert)
 
