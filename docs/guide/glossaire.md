@@ -286,6 +286,10 @@ sont décrits dans [annexe-sources.md](annexe-sources.md) et cités `S1`, `S2`�
 **SIO** — Coprocesseur de la puce qui prend en charge, sous macOS, les transferts DMA de
 certains bus, dont celui du capteur.
 
+**SEP-xART, USER-xART** — Noms de deux lockers xART tels que le journal du noyau de macOS les
+désigne, dans ses lignes « Fetched SEP-xART » et « Fetched USER-xART ». Ce sont des noms observés,
+pas des rôles établis. Voir **Locker** et **xART**.
+
 **Somme de contrôle** — Nombre court calculé à partir d'un bloc de données pour en résumer le
 contenu. Deux blocs identiques ont la même somme de contrôle ; une même somme de contrôle rend
 très probable, sans le prouver, que les contenus soient identiques. Le journal du noyau de macOS
