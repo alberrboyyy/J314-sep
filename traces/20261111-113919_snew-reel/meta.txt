@@ -1,0 +1,17 @@
+date: 20261111-113919
+name: snew-reel
+mode: auto
+timeout_s: 900
+end_action: reboot
+m1n1_commit: 70757dc7
+trace_script: /home/albert/Desktop/sep-touchid/hv/trace_sep_filtered.py
+kernel: /home/albert/Desktop/sep-touchid/macos/kernel.macho
+bootargs: debug=0x14e serial=3 apcie=0xfffffffe -enable-kprintf-spam wdt=-1 clpc=0
+proxy_port: /tmp/m1n1
+hv_uart_port: /tmp/m1n1-console
+end_reason: timeout
+proxy_back_after_reboot: no
+lines: 836
+live_eps: 0x08
+sep_eps: 0x13
+sep_lines: 140

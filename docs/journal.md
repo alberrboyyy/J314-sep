@@ -14,6 +14,29 @@ Format :
 
 ---
 
+## 2026-11-11 (fin journée) — Albert lance / Claude (Opus 4.8) — ESSAI VOIE C n°1 : sbio RÉVEILLÉ, mais le rejeu a DIVERGÉ (sbio ≠ rejeu accepté)
+- Trace : traces/20261111-120142_xart_replay/ (xart_replay.log, chainload.log) — PREMIÈRE écriture SEP du projet, lancée par Albert.
+- Fait : pending/sep_xart_replay.sh sur le S_new traces/20261111-113919_snew-reel. m1n1 démarre le SEP, met en place les tampons xART (A iova=0x2c000, B iova=0x38000, sid=0) via CNTL (SECMODE + 4 CNTL acquittés), puis tente le rejeu de l'échange EP 0x13.
+- Vu (FAITS) :
+  - BOOT OK ; au démarrage, 7 endpoints seuls (cntl hdcp xars xarm hibe pnon stac) — comme sep_boot.sh.
+  - Au 1er pas du rejeu : le SEP envoie TAG=0x05 TYPE=0x01 (la capture macOS avait TYPE=0x05). Le script s'ARRÊTE immédiatement, **rien de plus envoyé au SEP** (0 locker rejoué, 0 réponse 'send' émise).
+  - MALGRÉ ça, à l'écoute de 10 s, le SEP annonce 11 endpoints dont **0x08 sbio (biométrie)**, 0x0a scrd, 0x0c sse, 0x17 skdl. Toujours ABSENT : sks (0x12, trousseau).
+- Interprété (HYPOTHÈSE, à trancher par le sceptique) :
+  - sbio est apparu SANS aucun rejeu de contenu → le réveil de la biométrie vient du **boot du SEP + mise en place des tampons xART (CNTL)**, PAS du contenu du coffre rendu. Le coffre n'est peut-être pas le verrou pour *annoncer* sbio.
+  - MAIS « sbio annoncé » ≠ « Touch ID fonctionne » (enrôlement/match peuvent exiger un état xART/keystore valide ; sks toujours absent).
+  - Le message « rejeu accepté » du script était trompeur (il ne testait que la présence de sbio). CORRIGÉ dans le script : il distingue maintenant rejeu complet vs divergé.
+  - Sens de TAG=0x05 TYPE=0x01 (vs 0x05) : inconnu. À creuser (désassemblage xarm / comparaison captures).
+- Différence clé vs sep_boot.sh (7/12, sans sbio) : ici on a EN PLUS fait le handshake CNTL des tampons xarm → à isoler : est-ce la mise en place des tampons, ou SECMODE, ou juste d'attendre plus ? = expérience sceptique.
+- Incidents : aucun. Aucune op disque. SEP laissé en état booté-avec-endpoints ; Mac à redémarrer (reboot matériel → m1n1, n'avance pas le compteur). macOS non rebooté.
+- Statut : FAITS = vérifiés (log). Cause de sbio = hypothèse. NE PAS conclure « voie C gagnée ».
+
+## 2026-11-11 (fin journée) — Claude (Opus 4.8) — S_new réel capturé (tampons complets 0x8000), script voie C prêt à lancer
+- Trace : traces/20261111-113919_snew-reel (lecture seule, EP 0x13, SEP_OOL_BYTES=0x8000, END_ACTION=reboot).
+- Fait : capturé un vrai S_new via boot_and_trace (M1N1TIMEOUT=20). Boot macOS OK sur tunnel, reboot auto en m1n1 à la fin.
+- Vu : 14 tampons A rendus au SEP, TOUS à 32768 octets (0x8000) — la troncature 0x400 de cntl-study3 est corrigée. 15 tampons B. SELFTEST du script sur cette capture : OK (60 étapes EP 0x13, 30 réponses AP, 14 écritures A, séquence xART complète, annonces endpoints sbio/sks/sse/scrd rejouées côté AP). sep_peek après reboot : SEP à l'arrêt (CPU_CONTROL RUN=0), mailbox lisible = m1n1 propre.
+- Interprété : S_new valide et frais pour l'essai voie C. Rien envoyé au SEP (tout lecture seule + selftest hors-ligne).
+- Suite : Albert lance pending/sep_xart_replay.sh sur ce dossier (écriture SEP ; agent n'exécute pas). Ne PAS booter macOS avant.
+
 ## 2026-11-11 (fin journée) — Claude (Opus 4.8) — voie C : v2 relue OK (sceptique), M1N1TIMEOUT trouvé, S_new à refaire
 - Fait : trouvé que run_guest échouait faute de M1N1TIMEOUT (défaut 3 s) → export M1N1TIMEOUT=20 → boot macOS OK sur tunnel. Capture cntl-study3 (non filtrée) VALIDE le protocole CNTL octet pour octet (SECMODE 0x14, tampons 0x04/0x02/0x05/0x03 PARAM=0x13, IOVA 0x2c/0x38, ack TYPE 0x01 même tag). v2 du script écrite (rôle AP) et relue par sceptique = « lançable, sûre, 0 disque ».
 - Vu / erreur : cntl-study3 capturé avec nbytes=0x400 → lockers .ool tronqués (1024 o au lieu de 32768) → INUTILISABLE comme S_new. Présenté à tort comme prêt (glissement de session longue). Procédure corrigée dans handoff.md : capturer S_new avec SEP_OOL_BYTES=0x8000.

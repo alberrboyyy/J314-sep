@@ -1,0 +1,29 @@
+S_new: 60 étapes EP 0x13, 30 réponses AP, 14 écritures tampon A
+TTY> Heap limit: 0x10010950000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+démarrage du SEP par m1n1 (séquence publique)...
+BOOT OK
+xarm (0x13) annoncé. Endpoints : 0x00:cntl, 0x0e:hdcp, 0x10:xars, 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x18:stac
+  SECMODE acquitté
+tampons mappés : A iova=0x2c000<-phys=0x10010994000 | B iova=0x38000<-phys=0x1001099c000
+  CNTL A taille : acquitté
+  CNTL A adresse : acquitté
+  CNTL B taille : acquitté
+  CNTL B adresse : acquitté
+tampons prêts : A sid=0 | B sid=0
+--- début du rejeu EP 0x13 ---
+[13] DIVERGENCE: reçu TAG=0x05 TYPE=0x01, attendu TAG=0x05 TYPE=0x05. Arrêt immédiat, rien de plus envoyé au SEP.
+--- rejeu terminé, écoute 10 s des endpoints ---
+Endpoints annoncés par le SEP :
+  0x00 cntl
+  0x08 sbio  <-- BIOMÉTRIE !
+  0x0a scrd
+  0x0c sse 
+  0x0e hdcp
+  0x10 xars
+  0x13 xarm
+  0x14 hibe
+  0x15 pnon
+  0x17 skdl
+  0x18 stac
+>>> sbio PRÉSENT : le rejeu est accepté, Touch ID atteignable sous Linux.

@@ -367,11 +367,15 @@ def next_sep_13(timeout_s=10):
 #    l'a fait à ce pas) puis on renvoie le message exact.
 # ---------------------------------------------------------------------------
 print("--- début du rejeu EP 0x13 ---", flush=True)
+replay_done = 0        # nb de réponses 'send' réellement renvoyées au SEP
+replay_total = sum(1 for s in steps if s[0] == 'send')
+diverged = False       # le SEP a-t-il divergé de la capture ?
 for idx, s in enumerate(steps):
     if s[0] == 'recv':
         m = next_sep_13()
         if m is None:
             print(f"[{idx}] timeout en attente d'une requête SEP (attendu TAG=0x{s[1]:02x}). Arrêt.", flush=True)
+            diverged = True
             break
         if m.TAG != s[1] or m.TYPE != s[2]:
             # Échec FERMÉ : si le SEP sous m1n1 diverge de la capture, on NE continue PAS à
@@ -379,14 +383,17 @@ for idx, s in enumerate(steps):
             print(f"[{idx}] DIVERGENCE: reçu TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x}, "
                   f"attendu TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x}. Arrêt immédiat, rien de plus "
                   f"envoyé au SEP.", flush=True)
+            diverged = True
             break
     else:
         tag, typ, param, data, a_path = s[1], s[2], s[3], s[4], s[5]
         if a_path:
             write_A(a_path)
         sep.send_msg(SEPMessage(EP=0x13, TAG=tag, TYPE=typ, PARAM=param, DATA=data))
+        replay_done += 1
 
-print("--- rejeu terminé, écoute 10 s des endpoints ---", flush=True)
+print(f"--- rejeu terminé ({replay_done}/{replay_total} réponses rejouées"
+      f"{', DIVERGENCE' if diverged else ''}), écoute 10 s des endpoints ---", flush=True)
 t0 = time.time()
 while time.time() - t0 < 10:
     pump_ep0(); time.sleep(0.03)
@@ -395,10 +402,19 @@ print("Endpoints annoncés par le SEP :", flush=True)
 for num, name in sorted(sep.epnum2name.items()):
     star = "  <-- BIOMÉTRIE !" if name == "sbio" else ""
     print(f"  0x{num:02x} {name}{star}", flush=True)
-if "sbio" in sep.epname2num:
-    print(">>> sbio PRÉSENT : le rejeu est accepté, Touch ID atteignable sous Linux.", flush=True)
+# ATTENTION : la présence de sbio NE prouve PAS à elle seule que le rejeu est accepté.
+# On ne peut parler de "rejeu accepté" que si le rejeu s'est déroulé SANS divergence.
+# (Essai 1, 2026-11-11 : sbio est apparu alors que le rejeu a divergé au 1er pas, donc
+#  rien n'avait été rejoué -> sbio vient du boot SEP + tampons, PAS du contenu du coffre.)
+sbio_la = "sbio" in sep.epname2num
+if sbio_la and not diverged and replay_done == replay_total:
+    print(">>> sbio PRÉSENT après un rejeu COMPLET sans divergence : rejeu plausiblement accepté.", flush=True)
+elif sbio_la and (diverged or replay_done < replay_total):
+    print(f">>> sbio PRÉSENT MAIS le rejeu a divergé/avorté ({replay_done}/{replay_total}). "
+          f"sbio ne vient donc PAS du contenu rejoué : réveil obtenu par le boot SEP + mise en "
+          f"place des tampons seuls. À interpréter avec le sceptique, NE PAS conclure 'voie C gagnée'.", flush=True)
 else:
-    print(">>> sbio ABSENT : le SEP a refusé le rejeu (ou vérifie plus). Voie C close.", flush=True)
+    print(">>> sbio ABSENT. Le réveil de la biométrie n'a pas eu lieu ici.", flush=True)
 PY
 
 # Logs d'une écriture SEP en lecture seule (policy « traces/ en lecture seule après capture »).
