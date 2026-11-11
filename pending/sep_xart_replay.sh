@@ -47,22 +47,21 @@
 #      n'avance pas le compteur ; seul un BOOT de macOS l'avancerait et périmerait S_new).
 #   3. Lancer CE script en lui passant le dossier de capture S_new.
 #
-# ÉTAT : v1, NON LANÇABLE EN L'ÉTAT — BLOCAGE identifié par le sceptique (2026-11-11) :
-#   >>> Le script croit APPRENDRE du SEP les adresses (IOVA) des tampons A/B. FAUX : dans la
-#       capture, ces IOVA sont annoncées AP->SEP (c'est macOS qui ALLOUE les tampons dans SA
-#       mémoire mappée DART et les DONNE au SEP via 4 messages CNTL). Donc en l'état,
-#       buffers_ready() reste faux -> sortie propre « tampons A/B non appris », SANS rien
-#       écrire au SEP (donc sûr), mais SANS tester voie C.
-#   >>> CORRECTIF À FAIRE (refonte, pas retouche) : ajouter le rôle AP = allouer A (0x8000) et
-#       B (0x8000) sur le heap m1n1, les dart_map à des IOVA qu'on choisit, puis ÉMETTRE les 4
-#       CNTL (EP 0, PARAM=0x13) : TYPE 0x04 DATA=taille_A ; TYPE 0x02 DATA=iova_A>>12 ;
-#       TYPE 0x05 DATA=taille_B ; TYPE 0x03 DATA=iova_B>>12. Puis seulement le rejeu des lockers.
-#   >>> INCONNU à lever d'abord (capture non filtrée sur USB, ou désassemblage AppleSEPManager
-#       en phase 2) : le TAG de ces CNTL et l'éventuel échange d'amorçage (le SEP demande-t-il
-#       les tampons, ou l'AP les pousse-t-il ?). Voir docs/voie_c_design.md « Correctif voie C ».
-#
-#   À faire AVANT lancement : (a) écrire le correctif ci-dessus ; (b) relecture sceptique + Albert ;
-#   (c) SELFTEST ; (d) Albert lance lui-même (jamais un agent).
+# ÉTAT : v2 — le rôle AP est implémenté (allocation + mapping + annonce des tampons OOL via CNTL,
+#   protocole du kext : docs/kext_sepmanager.md §3/§5). NON ENCORE LANCÉE.
+#   Ce qui reste INCERTAIN, tranché seulement par l'essai (Albert lance) :
+#   >>> le flux/IOVA DART : on mappe A/B à 0x2c000/0x38000 (valeurs macOS) ; pas garanti que
+#       xarm du SEP les lise là sous m1n1. Si le SEP n'acquitte pas les CNTL ou ne lit pas A :
+#       sortie propre (exit 2/3), AUCUN risque, et on ajuste l'IOVA/stream.
+#   >>> amorçage EP 0 : le script répond au NAP et ignore les notifications ; si le SEP exige
+#       en plus un SECMODE (CNTL 0x14) avant d'ouvrir xarm, il stagnera (timeout propre) -> à ajouter.
+#   >>> si le SEP démarré par m1n1 enchaîne l'échange xART une fois les tampons annoncés : c'est
+#       justement la question de voie C.
+#   NON VÉRIFIÉ (échoue proprement si faux) : u.adt["/chosen"].dram_base/.dram_size existe en
+#   contexte proxy ; p.dart_map mappe bien dans le stream que xarm utilise.
+#   À faire AVANT lancement : (a) relecture sceptique + Albert ; (b) SELFTEST (hors-ligne, ok) ;
+#   (c) capturer S_new juste avant (SEP_OOL_EPS=0x13, M1N1TIMEOUT=20) sans rebooter macOS ;
+#   (d) Albert lance lui-même (jamais un agent).
 #
 # PRÉCONDITION capture S_new : SEP_OOL_BYTES >= taille du tampon A (0x8000), sinon les .bin
 #   sont tronqués et A serait rejoué incomplet. (c24/c21 utilisaient bien 0x8000.)
@@ -262,42 +261,81 @@ sep.asc = ASCRegs(u, sep.sep_base)
 sep.dart_handle = p.request(p.P_DART_INIT, sep.dart_base, 0, 0, 2)  # T6000
 sep.epnum2name, sep.epname2num, sep.msgs = {}, {}, defaultdict(deque)
 
-bufs = {"A": {"iova": None, "size": None, "sid": None},
-        "B": {"iova": None, "size": None, "sid": None}}
+# --- rôle AP (v2) : amorçage EP 0 (CNTL) + ALLOCATION/ANNONCE des tampons OOL de l'EP 0x13 ---
+# Protocole : docs/kext_sepmanager.md §3/§5 (source: kext). tag = slot+1 (pool de 8) ;
+# acquittement = < EP0 TYPE 0x01 de même tag ; ordre A(taille 0x04, adresse 0x02) puis
+# B(taille 0x05, adresse 0x03), param = endpoint cible (0x13). C'est l'AP qui ALLOUE A et B
+# dans sa mémoire et les DONNE au SEP (le SEP ne les choisit pas).
+cntl_acks = set()
+cntl_tag = [0]
 
-def learn_cntl():
-    """Apprend les IOVA/tailles des tampons A/B de l'EP 0x13 depuis les messages CNTL
-    reçus (TYPE 2/3/4/5, PARAM=0x13). iova = DATA<<12 ; size = DATA. Comme le traceur."""
-    for msg in list(sep.msgs[CNTL_EP]):
-        if msg.TYPE in OOL_CNTL_TYPES and msg.PARAM == 0x13:
-            buf, field = OOL_CNTL_TYPES[msg.TYPE]
-            val = (msg.DATA << 12) if field == "iova" else msg.DATA
-            if bufs[buf][field] != val:
-                bufs[buf][field] = val; bufs[buf]["sid"] = None
-    sep.msgs[CNTL_EP].clear()
+def pump_ep0():
+    """Draine l'EP 0 sans bloquer : mémorise les acquittements (TYPE 0x01), répond au NAP
+    (0x11 -> NAP_OK 0x12), ignore les notifications (OS-actif 0x0d/0x15, 0x10...)."""
+    sep._try_recv_msgs()
+    while sep.msgs[CNTL_EP]:
+        m = sep.msgs[CNTL_EP].popleft()
+        if m.TYPE == 0x01:
+            cntl_acks.add(m.TAG)
+        elif m.TYPE == 0x11:
+            sep.send_msg(SEPMessage(EP=0, TAG=m.TAG, TYPE=0x12))
 
-def buffers_ready():
-    return all(bufs[b]["iova"] is not None and bufs[b]["size"] for b in ("A", "B"))
+def cntl_send(typ, data, param, label, timeout_s=5):
+    cntl_tag[0] = cntl_tag[0] % 8 + 1
+    tag = cntl_tag[0]
+    sep.send_msg(SEPMessage(EP=0, TAG=tag, TYPE=typ, PARAM=param, DATA=data))
+    t = time.time()
+    while time.time() - t < timeout_s:
+        pump_ep0()
+        if tag in cntl_acks:
+            cntl_acks.discard(tag); return True
+        time.sleep(0.01)
+    return False
 
 print("démarrage du SEP par m1n1 (séquence publique)...", flush=True)
 sep.boot()
 print("BOOT OK", flush=True)
 
-# laisser arriver les annonces d'endpoints + les CNTL d'init des tampons
+# attendre que le SEP annonce ses endpoints (0xFD) ; on veut xarm = 0x13
 t0 = time.time()
-while time.time() - t0 < 5:
-    sep._try_recv_msgs(); learn_cntl()
-    if buffers_ready():
+while time.time() - t0 < 8:
+    pump_ep0()
+    if 0x13 in sep.epnum2name:
         break
     time.sleep(0.02)
-if not buffers_ready():
-    print(f"ERREUR: tampons A/B non appris (A={bufs['A']}, B={bufs['B']}). "
-          f"Le SEP n'a pas annoncé l'EP 0x13 ? Abandon, rien de plus envoyé.", flush=True)
+if 0x13 not in sep.epnum2name:
+    print(f"ERREUR: le SEP n'a pas annoncé l'EP 0x13 (xarm). Endpoints={sep.epnum2name}. "
+          f"Abandon, rien de plus envoyé.", flush=True)
     sys.exit(2)
-for b in ("A", "B"):
-    bufs[b]["sid"] = find_sid(bufs[b]["iova"])
-print(f"tampons appris : A iova=0x{bufs['A']['iova']:x} size=0x{bufs['A']['size']:x} "
-      f"sid={bufs['A']['sid']} | B iova=0x{bufs['B']['iova']:x} sid={bufs['B']['sid']}", flush=True)
+print("xarm (0x13) annoncé. Endpoints : "
+      + ", ".join(f"0x{n:02x}:{nm}" for n, nm in sorted(sep.epnum2name.items())), flush=True)
+
+# Allouer A (envoi AP->SEP) et B (réception SEP->AP), 0x8000 chacun (c24), init à zéro,
+# et les mapper dans le DART du SEP. IOVA = celles de macOS (c24) ; à ajuster si xarm ne lit
+# pas A (inconnu de fond, cf. docs/voie_c_design.md « Correctif voie C »).
+SIZE = 0x8000
+IOVA_A, IOVA_B = 0x2c000, 0x38000
+phys_A = u.heap.memalign(0x4000, SIZE)
+phys_B = u.heap.memalign(0x4000, SIZE)
+iface.writemem(phys_A, b"\x00" * SIZE)
+iface.writemem(phys_B, b"\x00" * SIZE)
+p.dart_map(sep.dart_handle, IOVA_A, phys_A, SIZE)
+p.dart_map(sep.dart_handle, IOVA_B, phys_B, SIZE)
+print(f"tampons mappés : A iova=0x{IOVA_A:x}<-phys=0x{phys_A:x} | "
+      f"B iova=0x{IOVA_B:x}<-phys=0x{phys_B:x}", flush=True)
+
+# Annoncer au SEP : A taille puis adresse, B taille puis adresse — chacun acquitté.
+for label, typ, data in [("A taille", 0x04, SIZE), ("A adresse", 0x02, IOVA_A >> 12),
+                         ("B taille", 0x05, SIZE), ("B adresse", 0x03, IOVA_B >> 12)]:
+    if not cntl_send(typ, data, 0x13, label):
+        print(f"ERREUR: pas d'acquittement du CNTL {label} (TYPE 0x{typ:02x}) en 5 s. "
+              f"Le SEP n'a pas accepté la mise en place des tampons. Abandon.", flush=True)
+        sys.exit(3)
+    print(f"  CNTL {label} : acquitté", flush=True)
+
+bufs = {"A": {"iova": IOVA_A, "size": SIZE, "sid": find_sid(IOVA_A)},
+        "B": {"iova": IOVA_B, "size": SIZE, "sid": find_sid(IOVA_B)}}
+print(f"tampons prêts : A sid={bufs['A']['sid']} | B sid={bufs['B']['sid']}", flush=True)
 
 def write_A(path):
     data = open(path, "rb").read()
@@ -307,7 +345,7 @@ def write_A(path):
 def next_sep_13(timeout_s=10):
     t = time.time()
     while time.time() - t < timeout_s:
-        sep._try_recv_msgs(); learn_cntl()
+        pump_ep0()
         if sep.msgs[0x13]:
             return sep.msgs[0x13].popleft()
         time.sleep(0.01)
@@ -341,7 +379,7 @@ for idx, s in enumerate(steps):
 print("--- rejeu terminé, écoute 10 s des endpoints ---", flush=True)
 t0 = time.time()
 while time.time() - t0 < 10:
-    sep._try_recv_msgs(); learn_cntl(); time.sleep(0.03)
+    pump_ep0(); time.sleep(0.03)
 
 print("Endpoints annoncés par le SEP :", flush=True)
 for num, name in sorted(sep.epnum2name.items()):
