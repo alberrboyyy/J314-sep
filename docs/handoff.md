@@ -1,5 +1,32 @@
 Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 11).
 
+## POINT DE REPRISE 2026-11-11 (fin après-midi, Opus 4.8) — essai voie C REPRODUIT ; reprendre par l'observation
+
+**Acquis aujourd'hui (vérifié n=2, Albert a lancé) :** un SEP démarré par m1n1 accepte la pose des tampons
+xART, **rejoue 4 lockers** (dont SEP-xART+USER-xART), **annonce sbio/scrd/sse/skdl**, puis **diverge à la 5e
+transaction** (SEP demande TAG=0x05 TYPE=0x01=SAVE au lieu de TYPE=0x05=FETCH). Reproductible sur 2 runs.
+« sbio annoncé » ≠ « Touch ID marche » (sks 0x12 absent). Détail : journal + docs/hypotheses.md « Revue
+sceptique — ESSAI VOIE C n°1 » + docs/voie_c_design.md « Résultats ».
+
+**PROCHAIN PAS = essai A (observationnel), déjà prêt** (`OBSERVE` est le DÉFAUT de `pending/sep_xart_replay.sh`) :
+rejoue pareil puis **écoute le tampon B en lecture seule ~20 s sans répondre sur 0x13** (n'acquitte PAS le
+SAVE → compteur anti-rejeu préservé). But : voir ce que le SEP réclame à la divergence (B≈849 o = SAVE ?).
+
+**ÉTAT MATÉRIEL à la reprise :** Albert a débranché le Mac. Son m1n1 s'était **coincé** (« 0 octet ») après
+une capture S_new ratée (run_guest avorté sur lien instable — voir mémoire tunnel-relais-mac, erreur notée).
+**À faire pour reprendre :**
+1. Albert rebranche + **reboot physique en m1n1**.
+2. Relancer le tunnel si besoin : `./tools/restart_tunnel.sh` (le kill est bloqué par le mode auto → Albert
+   approuve, ou il lance `! ./tools/restart_tunnel.sh`). NE PAS relancer le tunnel si `sep_peek` dit déjà
+   « Running proxy... » (m1n1 vivant, octets périmés qui se purgent en réessayant).
+3. **1 seul `./tools/sep_peek.sh`** pour confirmer le lien (lecture seule) — rien d'autre.
+4. **Pas besoin de recapturer un S_new** : `traces/20261111-113919_snew-reel` est toujours valide (la capture
+   ratée n'a jamais démarré macOS). Si macOS a VRAIMENT rebooté entre-temps, alors recapturer.
+5. Albert lance (écriture SEP, jamais l'agent) :
+   `M1N1TIMEOUT=20 M1N1DEVICE=/tmp/m1n1 HV_UART=/tmp/m1n1-console ./pending/sep_xart_replay.sh traces/20261111-113919_snew-reel`
+   (OBSERVE par défaut → la lecture de B à la divergence s'affiche automatiquement.)
+6. Reproductibilité : relancer tunnel.py ENTRE chaque run (le lien désync après chaque run).
+
 ## Mise à jour 2026-11-11 (journée, Opus 4.8) — EXPÉRIENCE VOIE C PRÊTE À LANCER
 
 **Contexte matériel nouveau** : le MacBook n'est pas en USB local mais derrière un **relais TCP**
