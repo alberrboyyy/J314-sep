@@ -7,6 +7,7 @@ Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Lin
 - Autres résultats de la journée du 10-11 : capteur relayé octet pour octet au SEP (image 0x65, OOL EP 0x08, analysis/cmp_sensor_sep_image.py) ; 27 images lues / 7 transmises (count_sensor_vs_sep_images.py) ; transport capteur réactif (mesa_wait_ready, broche gpio0 195 caractérisée) ; piste hibernation écartée côté SEP (docs/power_sep_options.md, c'est du power management, pas le SEP).
 - GUIDE : docs/guide/05-xart.md réécrit au style (3 boots). En cours de dernier tour de relecture (lecteur-naif + verificateur). À faire ensuite : y intégrer l'identité précise des 2 lockers variables (SEP-xART + locker Credential Manager, USER-xART stable) une fois ces faits dans les notes — ils y sont depuis cette session. Chapitres encore périmés par la journée : 06-capteur (image relayée, broche, transport réactif) et 09-etat-et-suite.
 - PROCHAIN VRAI PAS = essai de rejeu (voie C), écriture SEP, donc script pending/ relu et lancé par Albert, avec garanties : aucun brick, aucune atteinte à la partition Linux. macOS sacrifiable (backup Linux seulement, voir mémoire priorites-risque).
+  Plan détaillé + analyse de sûreté écrits : docs/voie_c_design.md (idée : capturer les derniers lockers sauvés S_new, puis SANS reboot macOS démarrer le SEP par m1n1 et lui rendre S_new). Script pending/ PAS écrit : à faire après validation d'Albert. Étape 1 (capture de S_new) sans risque, faisable en mode câble.
 
 
 ## Albert et la façon de travailler
