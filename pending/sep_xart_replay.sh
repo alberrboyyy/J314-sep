@@ -47,10 +47,25 @@
 #      n'avance pas le compteur ; seul un BOOT de macOS l'avancerait et périmerait S_new).
 #   3. Lancer CE script en lui passant le dossier de capture S_new.
 #
-# ÉTAT : v1, NON VALIDÉE. À faire AVANT lancement :
-#   (a) relecture par l'agent sceptique + par Albert (garantie « aucune écriture disque ») ;
-#   (b) validation hors-ligne du répondeur contre une capture connue (SELFTEST ci-dessous) ;
-#   (c) Albert lance lui-même (jamais un agent).
+# ÉTAT : v1, NON LANÇABLE EN L'ÉTAT — BLOCAGE identifié par le sceptique (2026-11-11) :
+#   >>> Le script croit APPRENDRE du SEP les adresses (IOVA) des tampons A/B. FAUX : dans la
+#       capture, ces IOVA sont annoncées AP->SEP (c'est macOS qui ALLOUE les tampons dans SA
+#       mémoire mappée DART et les DONNE au SEP via 4 messages CNTL). Donc en l'état,
+#       buffers_ready() reste faux -> sortie propre « tampons A/B non appris », SANS rien
+#       écrire au SEP (donc sûr), mais SANS tester voie C.
+#   >>> CORRECTIF À FAIRE (refonte, pas retouche) : ajouter le rôle AP = allouer A (0x8000) et
+#       B (0x8000) sur le heap m1n1, les dart_map à des IOVA qu'on choisit, puis ÉMETTRE les 4
+#       CNTL (EP 0, PARAM=0x13) : TYPE 0x04 DATA=taille_A ; TYPE 0x02 DATA=iova_A>>12 ;
+#       TYPE 0x05 DATA=taille_B ; TYPE 0x03 DATA=iova_B>>12. Puis seulement le rejeu des lockers.
+#   >>> INCONNU à lever d'abord (capture non filtrée sur USB, ou désassemblage AppleSEPManager
+#       en phase 2) : le TAG de ces CNTL et l'éventuel échange d'amorçage (le SEP demande-t-il
+#       les tampons, ou l'AP les pousse-t-il ?). Voir docs/voie_c_design.md « Correctif voie C ».
+#
+#   À faire AVANT lancement : (a) écrire le correctif ci-dessus ; (b) relecture sceptique + Albert ;
+#   (c) SELFTEST ; (d) Albert lance lui-même (jamais un agent).
+#
+# PRÉCONDITION capture S_new : SEP_OOL_BYTES >= taille du tampon A (0x8000), sinon les .bin
+#   sont tronqués et A serait rejoué incomplet. (c24/c21 utilisaient bien 0x8000.)
 #
 # Usage :
 #   ./pending/sep_xart_replay.sh <dossier_capture_S_new>      # lancement réel (Albert)
@@ -72,12 +87,13 @@ export SELFTEST="${SELFTEST:-0}"
 if [ "$SELFTEST" != 1 ]; then
   require_mac
   [ -f "$M1N1_DIR/build/m1n1.bin" ] || die "m1n1 non compilé : ./tools/build_m1n1.sh"
+  # Toujours créer le dossier de sortie, même en SKIP_CHAINLOAD : une écriture SEP doit
+  # laisser une trace dans traces/ (et pas dans /tmp qu'on perd).
+  STAMP="$(date +%Y%m%d-%H%M%S)"; OUT="$TRACES_DIR/${STAMP}_xart_replay"; mkdir -p "$OUT"; export OUT
   if [ "${SKIP_CHAINLOAD:-0}" != 1 ]; then
-    STAMP="$(date +%Y%m%d-%H%M%S)"; OUT="$TRACES_DIR/${STAMP}_xart_replay"; mkdir -p "$OUT"
     "$M1N1_PYTHON" "$M1N1_DIR/proxyclient/tools/chainload.py" -r "$M1N1_DIR/build/m1n1.bin" \
       2>&1 | tee "$OUT/chainload.log" >/dev/null
     sleep 2; require_mac
-    export OUT
   fi
 fi
 
@@ -310,8 +326,12 @@ for idx, s in enumerate(steps):
             print(f"[{idx}] timeout en attente d'une requête SEP (attendu TAG=0x{s[1]:02x}). Arrêt.", flush=True)
             break
         if m.TAG != s[1] or m.TYPE != s[2]:
-            print(f"[{idx}] ATTENTION: reçu TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x}, "
-                  f"attendu TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x} (le SEP diverge de la capture)", flush=True)
+            # Échec FERMÉ : si le SEP sous m1n1 diverge de la capture, on NE continue PAS à
+            # pousser des réponses enregistrées (ça mettrait le SEP dans un état non maîtrisé).
+            print(f"[{idx}] DIVERGENCE: reçu TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x}, "
+                  f"attendu TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x}. Arrêt immédiat, rien de plus "
+                  f"envoyé au SEP.", flush=True)
+            break
     else:
         tag, typ, param, data, a_path = s[1], s[2], s[3], s[4], s[5]
         if a_path:
@@ -333,4 +353,8 @@ else:
     print(">>> sbio ABSENT : le SEP a refusé le rejeu (ou vérifie plus). Voie C close.", flush=True)
 PY
 
+# Logs d'une écriture SEP en lecture seule (policy « traces/ en lecture seule après capture »).
+if [ "$SELFTEST" != 1 ] && [ -n "${OUT:-}" ]; then
+  chmod a-w "$OUT"/*.log 2>/dev/null || true
+fi
 echo "Terminé. Quel que soit le résultat : ne rien renvoyer, couper, redémarrer le Mac."

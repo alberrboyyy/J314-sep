@@ -146,3 +146,39 @@ pour cela qu'il est une écriture vers le SEP, à mettre dans `pending/` et à l
 
 Il ne reste donc, avant un essai, que : écrire ce script avec soin et le faire relire ; capturer l'état `S_new` juste avant
 sans redémarrer macOS entre-temps. La seule inconnue de fond demeure : l'anti-rejeu du SEP accepte-t-il ce rejeu fidèle.
+
+## Correctif voie C — qui alloue les tampons OOL (relecture sceptique, 2026-11-11)
+
+**Erreur corrigée dans le plan ci-dessus.** Le plan disait « le SEP refait ses propres CNTL ; le script apprend les IOVA
+à la volée ». C'est **faux**, et la capture le prouve : dans `hv/trace_sep_filtered.py`, les lignes `# ool learn` ne sont
+émises que pour la direction **AP→SEP** (`tx=True`). Donc les 4 messages CNTL qui portent les adresses/tailles des tampons
+A et B (seq 43/45/47/49 de c24) **vont de l'AP vers le SEP** : c'est **macOS qui ALLOUE** A et B dans sa propre mémoire
+mappée par le DART, et qui en **donne** les IOVA au SEP. Le SEP ne choisit pas ces adresses (il n'a pas la main sur le DART
+de l'AP). Un script qui *attend de recevoir* ces IOVA du SEP ne les recevra jamais.
+
+**Conséquence sur le script** `pending/sep_xart_replay.sh` (v1) : `buffers_ready()` reste faux → sortie propre « tampons A/B
+non appris », **sans aucune écriture SEP** (donc sûr), mais sans tester voie C. La v1 n'est pas lançable utilement.
+
+**Ce que le script doit faire en plus (rôle AP), avant le rejeu des lockers** :
+1. Allouer A (0x8000) et B (0x8000) sur le heap m1n1 (`u.heap.memalign`, cf. `SEP.create_shmem` dans `m1n1/hw/sep.py`).
+2. Les mapper dans le DART du SEP (`p.dart_map(dart_handle, iova, phys, size)`) à des IOVA qu'**on** choisit.
+3. Émettre les 4 messages CNTL (EP 0, PARAM=0x13), d'après c24 :
+   - TYPE 0x04, DATA = taille_A (0x8000)   — « buf A size »
+   - TYPE 0x02, DATA = iova_A >> 12         — « buf A iova »
+   - TYPE 0x05, DATA = taille_B (0x8000)   — « buf B size »
+   - TYPE 0x03, DATA = iova_B >> 12         — « buf B iova »
+4. Puis le rejeu des lockers (déjà écrit) : écrire le locker dans A (par traduction DART + writemem) et renvoyer le message.
+
+**Inconnues à lever AVANT d'écrire ce correctif** (sinon on code au jugé) :
+- le **TAG** de ces 4 messages CNTL, et l'ordre/amorçage exact (le SEP réclame-t-il les tampons d'abord, ou l'AP les
+  pousse-t-il dès que `xarm` est annoncé ?). c24 est filtré sur EP 0x13 : il ne montre que les commentaires `# ool learn`,
+  pas les messages CNTL bruts avec leur TAG/direction.
+- Deux façons de lever ça : (a) une **capture non filtrée** (`SEP_EPS` vide, `SEP_OOL_EPS=0x13`) en **USB direct** (le boot
+  macOS sous hyperviseur n'est **pas fiable à travers le tunnel relais**, cf. journal 2026-11-11) ; (b) **désassembler
+  AppleSEPManager** (autorisé en phase 2, protocole uniquement) pour lire la mise en place des tampons OOL de `xarm`.
+
+**Points secondaires corrigés dans la v1** (sceptique) : échec FERMÉ sur divergence TAG/TYPE (ne plus pousser de réponses
+après désynchronisation) ; log du run réel toujours dans `traces/…_xart_replay/` même en `SKIP_CHAINLOAD` ; `chmod a-w` des
+logs ; précondition `SEP_OOL_BYTES >= 0x8000` sur la capture S_new. Non vérifié (faute de pouvoir disséquer m1n1 sans risque) :
+`u.adt["/chosen"].dram_base/.dram_size` existe-t-il en contexte proxy (le traceur, en hyperviseur, utilise `hv.ram_base`) ?
+Si l'attribut manque → `AttributeError` **avant** toute écriture (échec propre). À confirmer par Albert hors IA.

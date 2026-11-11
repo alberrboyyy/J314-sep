@@ -14,6 +14,19 @@ Format :
 
 ---
 
+## 2026-11-11 (journée, autonome) — Claude (Opus 4.8) — Mac à distance via tunnel relais ; script de rejeu v1 + blocage trouvé par le sceptique
+- Trace : nombreuses captures de test (premier_contact, chainN, clN, reset…, en lecture seule). Config d'accès : Mac non en USB local mais derrière un relais TCP `10.0.200.5` (ports 4000 proxy / 4001 console), via `tunnel.py` (voir mémoire tunnel-relais-mac).
+- Fait :
+  - Fiabilisé le lien distant : `tunnel.sh` socat nu recréait le PTY à chaque coupure → cassait la session proxy ; écrit `tunnel.py` (PTY stable + contre-pression) → **chainload 6/6**, PTY ne change plus, coupures (ré-énum USB) rattrapées. Côté relais : ajouter `fork` au socat (évite le trou de reconnexion). Ajout `SKIP_CHAINLOAD=1` à `boot_and_trace.sh`. Correctif `env.sh` (HV_UART `|| true` sous set -e sans appareil).
+  - Écrit `pending/sep_xart_replay.sh` (v1) : rejeu fidèle de l'échange EP 0x13 d'une capture S_new (sep.log + .ool), apprentissage prévu des tampons, écriture DART+writemem. Validé hors-ligne (SELFTEST sur c24 : 60 étapes, 12 écritures tampon A, ordre correct).
+  - Relecture critique (agent sceptique).
+- Vu :
+  - **BLOCAGE sceptique** : les IOVA des tampons OOL A/B de l'EP 0x13 sont annoncées **AP→SEP** (les lignes `# ool learn` du traceur ne sortent que pour `tx=True`), pas SEP→AP. C'est macOS qui ALLOUE A/B dans sa mémoire DART et les DONNE au SEP. La v1 attend donc des IOVA qui n'arriveront jamais → sortie propre « tampons non appris », **aucune écriture SEP** (sûr), mais ne teste rien. Correctif détaillé : docs/voie_c_design.md « Correctif voie C ».
+  - **run_guest (boot macOS sous hyperviseur) PAS fiable à travers le tunnel** : échoue quasi systématiquement au bootstrap (UartTimeout / UartCMDError de désync), même avec `SKIP_CHAINLOAD`. Le succès d'un boot complet plus tôt dans la journée (macOS 13.5 affiché, batterie 80 %) était un coup de chance. chainload et lectures SEP, eux, passent bien (6/6).
+- Interprété : voie C reste ouverte mais la v1 doit être refondue (ajouter le rôle AP : allouer + mapper + annoncer les tampons). Le TAG/amorçage exact des CNTL manque → à lever par une capture non filtrée **en USB direct**, ou par désassemblage d'AppleSEPManager (phase 2). Hypothèses, pas vérifié.
+- Incidents : un `run_guest` avorté laisse le m1n1 en état mi-hyperviseur / proxy désynchronisé ; récupération = redémarrer `tunnel.py` (vide les octets périmés) puis chainload (remet m1n1 propre). Pas besoin de reboot physique.
+- Décision Albert (2026-11-11) : je peux éditer le repo y compris `m1n1/` (rien ne sort = seule contrainte) ; macOS sacrifiable mais à ménager ; pleine autonomie pour tout sauf le lancement de l'écriture SEP.
+
 ## 2026-11-11 — Claude (Opus 4.8) + analyste — xART : 3 boots, les 2 lockers variables identifiés, chaînage prouvé octet pour octet
 - Trace : traces/*c21-xart-ool [T-45], *c23-xart-ool [T-46], *c24-xart-ool [T-47] (lecture seule). Scripts : analysis/diff_xart_ool.py, scratchpad/diff3.py, scratchpad/lockers_variables.md (sous-agent analyste). Correspondance seq->fichier->TAG->nom noyau via le mot 64 bits des lignes « Replied to xART app ».
 - Vu (faits mesurés, 3 boots) :
