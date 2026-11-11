@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-11 (soir) — Albert + Claude (Opus 4.8) — INCIDENT : le Mac ne démarre plus (menu Apple cassé) après voie C
+- Fait : après l'essai voie C reproduit (rejeu xART au SEP), le Mac ne charge plus le menu de démarrage ni la récupération 1TR (bootloop) ; macOS boucle ; seul m1n1 démarre (« Running proxy… »). DFU Revive fait (firmware rafraîchi) → n'a PAS réparé (Revive ne reset pas l'état scellé du SEP). Double-appui maintenu + maintien 15 s (1TR) testés : rien.
+- Interprété : les écritures SEP de la voie C ont bousculé l'état scellé de la puce → le boot sécurisé Apple (menu/1TR/macOS) échoue ; seul le boot permissif m1n1 passe. Le risque « brick faible mais non nul / macOS perturbé » de l'en-tête du script s'est matérialisé, et a débordé sur le menu (donc sur l'accès à ALARM).
+- SÛR : ALARM (Linux quotidien) + données = intactes (aucune écriture disque jamais faite) ; backup Linux OK ; Mac non brické. Albert avait mis m1n1 en défaut volontairement.
+- Décision : STOP voie C. Récupération = tethered boot (non destructif, sans 2e Mac) ou, en dernier recours, DFU Restore + réinstall depuis backup. Procédure complète : docs/RECUPERATION_MAC.md ; bandeau en tête de handoff.md ; mémoire mac-boot-casse-recuperation. Albert fera la récupération en session fraîche.
+
 ## 2026-11-11 (fin journée) — Albert lance / Claude (Opus 4.8) — essai 1 REPRODUIT (n=2) ; m1n1 coincé ; observation pas encore capturée
 - Trace : traces/20261111-124327_… (échec chainload), 20261111-12xx (run 2 OK, même sortie que l'essai 1), 20261111-125023/125142 (chainload desync/0 octet).
 - Fait : après rallumage des 2 Macs, lien proxy désynchronisé → relancé tunnel.py (2×, via Albert qui approuve le kill ; script tools/restart_tunnel.sh ajouté). Sur lien propre, 1 run complet = REPRODUCTION exacte de l'essai 1.

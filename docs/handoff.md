@@ -1,3 +1,11 @@
+> # 🔴 STOP — LE MAC EST EN PANNE DE DÉMARRAGE (2026-11-11)
+> Les essais voie C (rejeu SEP) ont bousculé l'état de la puce : le Mac ne charge plus le menu de
+> démarrage ni la récupération Apple (bootloop) ; seul m1n1 démarre. macOS est HS, le menu pour
+> rebasculer sur Asahi ALARM (le Linux d'Albert) est cassé. **Données + ALARM intactes, backup OK,
+> Mac non brické.** AVANT TOUT AUTRE TRAVAIL, lis **`docs/RECUPERATION_MAC.md`** et aide Albert à
+> récupérer son Linux (tethered boot, non destructif). **AUCUN nouvel essai SEP tant que le Mac
+> n'est pas récupéré.**
+
 Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 11).
 
 ## POINT DE REPRISE 2026-11-11 (fin après-midi, Opus 4.8) — essai voie C REPRODUIT ; reprendre par l'observation
