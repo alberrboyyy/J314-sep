@@ -83,10 +83,13 @@ Classées de la plus sûre (rien vers le SEP) à la plus risquée (écriture, Al
   SEP) : il suffirait que **Linux les stocke et les rende** comme macOS. On ne **forge** rien (ça, c'est impossible, voie D) ; on
   **relaie** l'état que le SEP a lui-même fait sauver. Si le SEP valide, il annonce `sbio` → et c'est **lui** qui fait ensuite la
   comparaison d'empreinte (on n'a jamais besoin de sa clé). Donc le Touch ID n'est **pas** mort par conception : il est derrière cette question.
-- **La vraie inconnue (à trancher par la voie B, sans écrire)** : l'anti-rejeu accepte-t-il un **rejeu fidèle de l'état courant** ?
-  - Rendre **exactement** le dernier état sauvé (inchangé depuis) = ce que fait un boot normal → devrait passer.
-  - Mais s'il existe un **compteur/nonce par boot** que le SEP incrémente et vérifie, un rejeu passif serait refusé. Inconnu ; la
-    voie B doit chercher ce compteur dans l'échange.
+- **Mesuré par la voie B (c21 vs c23, 2 boots, lecture seule, 2026-11-11, analysis/diff_xart_ool.py)** :
+  - Le coffre rendu au SEP = 10 blobs ; **8/10 identiques octet pour octet** d'un boot à l'autre (statiques, rejouables trivialement) ;
+    seuls **2 blobs** changent (un de ~848 o, un de ~3 Ko ; hypothèse : SEP-xART + USER-xART). Ce que le SEP **sauve** change à 100 %.
+  - Donc la fraîcheur anti-rejeu est **isolée à 2 petits blobs** (et au contenu chiffré, invisible). Pas de nonce en clair dans l'échange.
+- **La vraie inconnue qui reste (seulement tranchable par un test en ÉCRITURE)** : quand Linux rendra la **dernière** version sauvée de
+  ces 2 blobs, le **compteur scellé** interne au SEP l'acceptera-t-il ? Impossible à lire (chiffré dans le blob). Contrainte : ces 2 blobs
+  **périment dès que macOS reboote** (il réécrit) → un essai doit utiliser des blobs capturés juste avant, sans boot macOS entre-temps.
 - **Ce qu'il faut, concrètement** : (1) les **vrais fichiers de lockers** (gigalockers `/System/Volumes/xarts/<UUID>.gl` + le
   contenu shmem non tracé), pas seulement les en-têtes ; les lire sur le disque macOS (lecture seule). (2) Un composant Linux qui
   réponde sur l'EP 0x13 avec ces blobs. (3) Un SEP démarré par m1n1 (on sait le faire : SEP-BOOT).

@@ -2287,3 +2287,499 @@ container_unload:1888: vnode_close() invoked in the container unload path
 DK: IOUserBluetoothSerialDriver-0x100000b37::start(IOBluetoothDevice-0x100000b36) ok
 _dlil_get_flowswitch_buffer_size: en0 1436 1500
   IOTimeSyncTimeSyncTimePort(0xbcd074208c470008): Created general notifier <ptr> for local clock port <ptr>
+Couldn't build index for com.apple.nvram: Not eligible for acceleration
+[System Event] [2440351449] [INFO] [Subsystem: nvram] [Event: write] LocationServicesEnabled with data size 0
+[System Event] [2440467072] [INFO] [Subsystem: nvram] [Event: delete] LocationServicesEnabled
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+AppleCredentialManagerUserClient: start: session_uid = ffffffff.
+ACMFirstResponderKernelService: _onGetCapabilities: T208: NO.
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+_aks_unwrap_media_class:148: AKS unwrap_media_key_from_class succeeded for tag = 7
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:111: operation failed (sel: 75 ret: e00002ce, -1, 100001)
+AppleBiometricSensor: loaded patch vers=22
+AppleBiometricSensor: loaded patch vers=22
+AppleSEPKeyStore:12143:258: operation failed (sel: 23 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:111: operation failed (sel: 75 ret: e00002ce, -1, 100001)
+dev_init:296: disk3 device accelerated crypto: 3 (compiled @ Jul 10 2023 22:11:39)
+dev_init:299: disk3 device_handle block size 4096 block count 610304 features 22 internal solidstate
+nx_mount:1224: disk3 initializing cache w/hash_size 8192 and cache size 32768
+nx_mount:1553: disk3 checkpoint search: largest xid 864, best xid 864 @ 19
+nx_mount:1555: disk3 reloading after unclean unmount, checkpoint xid 864, superblock xid 861
+nx_mount:1580: disk3 stable checkpoint indices: desc 18 data 1078
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+_aks_unwrap_media_class:148: AKS unwrap_media_key_from_class succeeded for tag = 7
+container_unload:1888: vnode_close() invoked in the container unload path
+Couldn't build index for com.apple.UserSelector: Not eligible for acceleration
+AppleSEPKeyStore:8084:271: unexpected session: 100004 uid: -1 requested by: ctkd (271)
+AppleSEPKeyStore:12143:271: operation failed (sel: 17 ret: e00002c2, -1, 100004)
+[System Event] [2563585974] [INFO] [Subsystem: nvram] [Event: write] SystemAudioVolumeExtension with data size 0x2
+skip attaching fsw to bridge0 using legacy TX modelskip attaching fsw to bridge0 using legacy TX modelvoid AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Fetched SEP-xART Locker with CRC: 0x6fb7
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Replied to xART app: 0x0000012014001613
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Fetched SEP-xART Locker with CRC: 0x6fb7
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Replied to xART app: 0x0000012014001713
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+ACMTRM: _onBioDropReceived: [BIO DROPPED] forcedBioRestrictionReason=2, unlockTokenDroppedReason=0.
+IOConsoleUsers: time(0) 0->0, lin 0, llk 0, 
+IOConsoleUsers: gIOScreenLockState 3, hs 0, bs 0, now 0, sm 0x0
+Couldn't alloc class "AppleKeyStoreTest"
+Couldn't build index for com.apple.activateSettings: Not eligible for acceleration
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:256: operation failed (sel: 17 ret: e00002f0, -1, 100001)
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+[System Event] [2631242167] [INFO] [Subsystem: nvram] [Event: write] IASInstallPhaseList with data size 0
+[System Event] [2631346241] [INFO] [Subsystem: nvram] [Event: delete] IASInstallPhaseList
+[System Event] [2631610439] [INFO] [Subsystem: nvram] [Event: write] IASCurrentInstallPhase with data size 0
+[System Event] [2631692915] [INFO] [Subsystem: nvram] [Event: delete] IASCurrentInstallPhase
+AppleSEPKeyStore:12143:287: operation failed (sel: 17 ret: e00002f0, 262, 100015)
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+AppleSEPKeyStore:12143:312: operation failed (sel: 17 ret: e00002f0, 205, 100011)
+dev_init:296: disk2 device accelerated crypto: 3 (compiled @ Jul 10 2023 22:11:39)
+dev_init:299: disk2 device_handle block size 4096 block count 610304 features 22 internal solidstate
+nx_mount:1224: disk2 initializing cache w/hash_size 8192 and cache size 32768
+nx_mount:1553: disk2 checkpoint search: largest xid 316, best xid 316 @ 15
+nx_mount:1555: disk2 reloading after unclean unmount, checkpoint xid 316, superblock xid 304
+nx_mount:1580: disk2 stable checkpoint indices: desc 14 data 1258
+spaceman_metazone_init:110: disk2 no metazone for device 0, of size 2499805184 bytes, block_size 4096
+spaceman_scan_free_blocks:3374: disk2 scan took 0.000885 s (no trims)
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+dev_init:296: disk3 device accelerated crypto: 3 (compiled @ Jul 10 2023 22:11:39)
+dev_init:299: disk3 device_handle block size 4096 block count 610304 features 22 internal solidstate
+nx_mount:1224: disk3 initializing cache w/hash_size 8192 and cache size 32768
+_aks_unwrap_media_class:148: AKS unwrap_media_key_from_class succeeded for tag = 7
+nx_mount:1553: disk3 checkpoint search: largest xid 864, best xid 864 @ 19
+nx_mount:1555: disk3 reloading after unclean unmount, checkpoint xid 864, superblock xid 861
+nx_mount:1580: disk3 stable checkpoint indices: desc 18 data 1078
+spaceman_metazone_init:110: disk3 no metazone for device 0, of size 2499805184 bytes, block_size 4096
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+spaceman_scan_free_blocks:3374: disk3 scan took 0.000807 s (no trims)
+spaceman_scan_free_blocks:3356: disk3 scan took 0.000809 s, trims took 0.000224 s
+spaceman_scan_free_blocks:3358: disk3 354528 blocks free in 79 extents
+spaceman_scan_free_blocks:3366: disk3 354528 blocks trimmed in 79 extents (2 us/trim, 352678 trims/s)
+spaceman_scan_free_blocks:3369: disk3 trim distribution 1:15 2+:20 4+:26 16+:16 64+:1 256+:1
+nx_get_volume_group:8053: disk2 volume groups tree is not setup yet
+apfs_get_paired_volume:2074: disk2s1 nx_get_volume_group failed with error 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+AppleSEPKeyStore:2769:333: Mapping volume without a valid persona.
+AppleSEPKeyStore:2836:333: mapped uuid 46F325BF-5A81-4E72-9A8F-66B6FBB7DA19 to bag -5, persona none, compressed uuid: -786063610
+AppleSEPKeyStore:5225:333: cmd: 18, result: 0
+spaceman_scan_free_blocks:3356: disk2 scan took 0.002589 s, trims took 0.000264 s
+spaceman_scan_free_blocks:3358: disk2 354482 blocks free in 108 extents
+spaceman_scan_free_blocks:3366: disk2 354482 blocks trimmed in 108 extents (2 us/trim, 409090 trims/s)
+spaceman_scan_free_blocks:3369: disk2 trim distribution 1:42 2+:37 4+:13 16+:13 64+:2 256+:1
+AppleSEPKeyStore:826:0: Unlock notification for volume (uuid: 46F325BF-5A81-4E72-9A8F-66B6FBB7DA19, handle -786063610)
+AppleSEPKeyStore:946:0: Sending lock change 0 for handle -786063610 value 0
+AppleSEPKeyStore:4009:0: Sent notification for volume 46F325BF-5A81-4E72-9A8F-66B6FBB7DA19 (action 1)
+apfs_keybag_load_class_keys:3217: successfully loaded volume class keys
+_aks_unwrap_media_class:148: AKS unwrap_media_key_from_class succeeded for tag = 7
+er_state_obj_get_for_recovery:7551: disk2s1 No ER state object for volume Fedora Linux Minimal - Data - rolling is not happening, nothing to recover.
+nx_get_volume_group:8053: disk3 volume groups tree is not setup yet
+apfs_log_mount_unmount:2039: disk2s1 mounting volume Fedora Linux Minimal - Data, requested by: mount_apfs (pid 333); parent: mount (pid 330)
+handle_mount:765: disk2s1 vol-uuid: 46F325BF-5A81-4E72-9A8F-66B6FBB7DA19 block size: 4096 block count: 610304 (encrypted; flags: 0x100; features: 41.0.12)
+handle_mount:778: disk2s1 setting dev block size to 4096 from 512
+nx_volume_group_update:7978: disk2s1 Set volume (role 0x40) to 402 xid 0
+ioqueue_depth = 253,   ioscale = 8
+apfs_get_paired_volume:2074: disk3s1 nx_get_volume_group failed with error 2
+AppleSEPKeyStore:2769:335: Mapping volume without a valid persona.
+AppleSEPKeyStore:2836:335: mapped uuid 3538A686-7470-4A1C-AD4F-605B547E152C to bag -5, persona none, compressed uuid: -1160916929
+AppleSEPKeyStore:5225:335: cmd: 18, result: 0
+AppleSEPKeyStore:826:0: Unlock notification for volume (uuid: 3538A686-7470-4A1C-AD4F-605B547E152C, handle -1160916929)
+AppleSEPKeyStore:946:0: Sending lock change 0 for handle -1160916929 value 0
+apfs_keybag_load_class_keys:3217: successfully loaded volume class keys
+AppleSEPKeyStore:4009:0: Sent notification for volume 3538A686-7470-4A1C-AD4F-605B547E152C (action 1)
+er_state_obj_get_for_recovery:7551: disk3s1 No ER state object for volume alarm - Data - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk3s1 mounting volume alarm - Data, requested by: mount_apfs (pid 335); parent: mount (pid 332)
+handle_mount:765: disk3s1 vol-uuid: 3538A686-7470-4A1C-AD4F-605B547E152C block size: 4096 block count: 610304 (encrypted; flags: 0x100; features: 41.0.12)
+handle_mount:778: disk3s1 setting dev block size to 4096 from 512
+nx_volume_group_update:7978: disk3s1 Set volume (role 0x40) to 402 xid 0
+ioqueue_depth = 253,   ioscale = 8
+bufattr_get_apfs:8188: Only accept buf I/O, no raw disk access
+disk5s7s1: device is not readable.
+er_state_obj_get_for_recovery:7551: disk2s3 No ER state object for volume Preboot - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk2s3 mounting volume Preboot, requested by: mount_apfs (pid 340); parent: mount (pid 339)
+handle_mount:765: disk2s3 vol-uuid: 56D9527A-14CC-4EEC-8D97-437C50B111BE block size: 4096 block count: 610304 (unencrypted; flags: 0x1; features: 1.0.2)
+handle_mount:778: disk2s3 setting dev block size to 4096 from 512
+nx_volume_group_update:7897: disk2s3 Volume Preboot role 10 Not a System or data volume
+ioqueue_depth = 253,   ioscale = 8
+dev_init:296: disk4 device accelerated crypto: 3 (compiled @ Jul 10 2023 22:11:39)
+dev_init:299: disk4 device_handle block size 4096 block count 1310709 features 22 internal solidstate
+nx_mount:1224: disk4 initializing cache w/hash_size 8192 and cache size 32768
+nx_mount:1553: disk4 checkpoint search: largest xid 272, best xid 272 @ 23
+nx_mount:1580: disk4 stable checkpoint indices: desc 22 data 1316
+container_unload:1888: vnode_close() invoked in the container unload path
+bufattr_get_apfs:8188: Only accept buf I/O, no raw disk access
+disk2s3: device is not readable.
+er_state_obj_get_for_recovery:7551: disk5s1 No ER state object for volume Macintosh HD - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk5s1 mounting volume Macintosh HD, requested by: mount_apfs (pid 344); parent: mount (pid 341)
+er_state_obj_get_for_recovery:7551: disk3s2 No ER state object for volume alarm - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk3s2 mounting volume alarm, requested by: mount_apfs (pid 345); parent: mount (pid 342)
+handle_mount:765: disk3s2 vol-uuid: AC38F18F-9886-4400-A755-713857839C72 block size: 4096 block count: 610304 (unencrypted; flags: 0x201; features: 1.0.12)
+handle_mount:778: disk3s2 setting dev block size to 4096 from 512
+nx_volume_group_update:7978: disk3s2 Set volume (role 0x1) to 410 xid 0
+ioqueue_depth = 253,   ioscale = 8
+handle_mount:765: disk5s1 vol-uuid: 81F4D5C4-19E0-4E78-980A-185316ED99CA block size: 4096 block count: 48828125 (unencrypted; flags: 0x201; features: 21.0.12)
+handle_mount:778: disk5s1 setting dev block size to 4096 from 512
+nx_volume_group_update:7978: disk5s1 Set volume (role 0x1) to 402 xid 0
+ioqueue_depth = 253,   ioscale = 8
+er_state_obj_get_for_recovery:7551: disk2s2 No ER state object for volume Fedora Linux Minimal - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk2s2 mounting volume Fedora Linux Minimal, requested by: mount_apfs (pid 346); parent: mount (pid 343)
+handle_mount:765: disk2s2 vol-uuid: C115DA48-1010-41D4-9EC8-949D0D8ED2A1 block size: 4096 block count: 610304 (unencrypted; flags: 0x201; features: 1.0.12)
+handle_mount:778: disk2s2 setting dev block size to 4096 from 512
+nx_volume_group_update:7978: disk2s2 Set volume (role 0x1) to 413 xid 0
+ioqueue_depth = 253,   ioscale = 8
+AppleSPU(42): Clearing historical queue for endpoint
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+IO80211APIUserClient init failed in checkEntitlement
+apfs_keybag_unlock_record_tag:3318: failed to unwrap volume key, err = 0xe00002e2 (tag = 2)
+apfs_keybag_unlock_record:3399: failed to unwrap volume key, err = 1
+apfs_mount:28971: disk5s5 Failed to unwrap metadata crypto state: 1
+AppleSEPKeyStore:2769:353: Mapping volume without a valid persona.
+AppleSEPKeyStore:5225:353: cmd: 19, result: -536870160
+AppleSEPKeyStore:5258:353: failed to map 19
+apfs_keybag_unload_class_keys:3109: failed to unload volume class keys, error = e00002f0
+apfs_vfsop_mount:2396: disk5 apfs_mount failed, err: 1
+apfs_vfsop_mount:2684: apfs_vfsop_mount failed, err: 1
+er_state_obj_get_for_recovery:7551: disk3s3 No ER state object for volume Preboot - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk3s3 mounting volume Preboot, requested by: mount_apfs (pid 357); parent: mount (pid 356)
+handle_mount:765: disk3s3 vol-uuid: D764FF60-C529-41B7-88E5-86B3C32C5257 block size: 4096 block count: 610304 (unencrypted; flags: 0x1; features: 1.0.2)
+handle_mount:778: disk3s3 setting dev block size to 4096 from 512
+nx_volume_group_update:7897: disk3s3 Volume Preboot role 10 Not a System or data volume
+ioqueue_depth = 253,   ioscale = 8
+bufattr_get_apfs:8188: Only accept buf I/O, no raw disk access
+disk3s3: device is not readable.
+dev_init:296: disk4 device accelerated crypto: 3 (compiled @ Jul 10 2023 22:11:39)
+dev_init:299: disk4 device_handle block size 4096 block count 1310709 features 22 internal solidstate
+nx_mount:1224: disk4 initializing cache w/hash_size 8192 and cache size 32768
+nx_mount:1553: disk4 checkpoint search: largest xid 272, best xid 272 @ 23
+nx_mount:1580: disk4 stable checkpoint indices: desc 22 data 1316
+container_unload:1888: vnode_close() invoked in the container unload path
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+effaceable_is_disabled:10907: ================ no-effaceable-storage is ON ================
+_aks_unwrap_media_class:148: AKS unwrap_media_key_from_class succeeded for tag = 7
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Fetched USER-xART Locker with CRC: 0x83f2
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Replied to xART app: 0x00000000b2001813
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Fetched USER-xART Locker with CRC: 0x83f2
+void AppleSEPXART::_handle_sep_driven_msg(AppleSEPXART::XARTMessage *): Replied to xART app: 0x00000000b2001913
+dev_init:296: disk4 device accelerated crypto: 3 (compiled @ Jul 10 2023 22:11:39)
+dev_init:299: disk4 device_handle block size 4096 block count 1310709 features 22 internal solidstate
+nx_mount:1224: disk4 initializing cache w/hash_size 8192 and cache size 32768
+nx_mount:1553: disk4 checkpoint search: largest xid 272, best xid 272 @ 23
+nx_mount:1580: disk4 stable checkpoint indices: desc 22 data 1316
+container_unload:1888: vnode_close() invoked in the container unload path
+_dlil_get_flowswitch_buffer_size: ap1 1500 1500
+1
+setInterfaceEnable:1113 interface ap1 enable
+AirPort: Link Up on ap1. Reason Unspecified (1)
+IO80211VirtualInterface::init getController() is 0x3fa5f8ae1604, provider is 0x57c10cabac role is 6 
+IO80211VirtualInterface::init SUCCESS getController() is 0x3fa5f8ae1604, provider is 0x57c10cabac
+IO80211AWDLPeerManager::initInterfaceConfigPeerReporters(5917) fPeerManagerReporters == NULL , skipping init
+Couldn't alloc class "AppleKeyStoreTest"
+IO80211AWDLPeerManager::addPeerOperation(5983) fInterfacePeerCounters not yet present, storing operation for later 
+Finding ivars->_faultReporter
+IO80211AWDLPeerManager::createDefaultReportersAndLegend(6799) Created OSSet <ptr> for role 6 
+IO80211AWDLPeerManager::createDefaultReportersAndLegend(6802) Adding PeerList <ptr> for role 6 
+IO80211AWDLPeerManager::createDefaultReportersAndLegend(6811) Adding _multicastPeer <ptr> for role 6 
+IO80211PeerMonitor::createReportersAndLegend getBSDName bad, using presumed mapCouldn't alloc class "AppleKeyStoreTest"
+ Creating all peerManager reporters
+IO80211AWDLPeerManager::createDefaultReportersAndLegend(6781) createDefaultReportersAndLegend() already complete
+AppleBCMWLANProximityInterface::peerToPeerAttachToBpf name <awdl0> role 6 successful attach to bpf type 147
+ifnet_attach: Waiting for all kernel threads created for interface awdl0 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface awdl0 have been scheduled at least once. Proceeding.
+0
+IOUC IO80211APIUserClient failed MACF in process pid 132, bluetoothd
+IO80211APIUserClient init failed in checkEntitlement
+AppleBCMWLANSkywalkInterface::init start
+Interface Init complete
+start: error getting PHY_MODE;  using MODE_UNKNOWN
+[WiFiTimeSync]: postMessage APPLE80211_M_MAC_ADDRESS_CHANGED, got new MAC 0x32 db bd 26 2d 43, calling super::setSelfMacAddr()
+Couldn't alloc class "AppleKeyStoreTest"
+ifnet_attach: Waiting for all kernel threads created for interface llw0 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface llw0 have been scheduled at least once. Proceeding.
+AppleSEPKeyStore:8084:76: unexpected session: 100001 uid: -1 requested by: UserEventAgent (76)
+AppleSEPKeyStore:12143:76: operation failed (sel: 17 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:8084:76: unexpected session: 100001 uid: -1 requested by: UserEventAgent (76)
+AppleSEPKeyStore:12143:76: operation failed (sel: 17 ret: e00002c2, -1, 100001)
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+AppleSEPKeyStore:12143:258: operation failed (sel: 23 ret: e00002f0, -1, 100001)
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:258: operation failed (sel: 23 ret: e00002f0, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+AppleSEPKeyStore:8084:271: unexpected session: 100004 uid: -1 requested by: ctkd (271)
+AppleSEPKeyStore:12143:271: operation failed (sel: 17 ret: e00002c2, -1, 100004)
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_keybag_init:2649: failed to initialize volume keybag, err = 2
+apfs_stop_bg_work:831: disk2s3 Volume Preboot is unmounting, stop any bg work
+apfs_stop_bg_work:831: disk3s3 Volume Preboot is unmounting, stop any bg work
+apfs_log_mount_unmount:2039: disk3s3 unmounting volume Preboot, requested by: diskarbitrationd (pid 103); parent: launchd (pid 1)
+apfs_vfsop_unmount:2989: disk3s3 waiting for purgatory cleaner to finish
+nx_volume_group_update:7897: disk3s3 Volume Preboot role 10 Not a System or data volume
+apfs_vfsop_unmount:3318: disk3 nx_num_vols_mounted is 2
+apfs: total mem allocated: 52341104 (50 mb);
+apfs_vfsop_unmount:3331: all done.  going home.  (numMountedAPFSVolumes 14)
+apfs_log_mount_unmount:2039: disk2s3 unmounting volume Preboot, requested by: diskarbitrationd (pid 103); parent: launchd (pid 1)
+apfs_vfsop_unmount:2989: disk2s3 waiting for purgatory cleaner to finish
+nx_volume_group_update:7897: disk2s3 Volume Preboot role 10 Not a System or data volume
+apfs_vfsop_unmount:3318: disk2 nx_num_vols_mounted is 2
+apfs: total mem allocated: 52341264 (50 mb);
+apfs_vfsop_unmount:3331: all done.  going home.  (numMountedAPFSVolumes 13)
+AppleSEPKeyStore:8084:202: unexpected session: 100001 uid: -1 requested by: containermanagerd (202)
+AppleSEPKeyStore:12143:202: operation failed (sel: 17 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:8084:271: unexpected session: 100004 uid: -1 requested by: ctkd (271)
+AppleSEPKeyStore:12143:271: operation failed (sel: 17 ret: e00002c2, -1, 100004)
+AppleSEPKeyStore:8084:202: unexpected session: 100001 uid: -1 requested by: containermanagerd (202)
+AppleSEPKeyStore:12143:202: operation failed (sel: 17 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:312: operation failed (sel: 17 ret: e00002f0, 205, 100011)
+AppleSEPKeyStore:12143:287: operation failed (sel: 17 ret: e00002f0, 262, 100015)
+AppleSEPKeyStore:12143:287: operation failed (sel: 17 ret: e00002f0, 262, 100015)
+print_unknown_ioctl:18502: disk3s1 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+print_unknown_ioctl:18502: disk2s1 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+print_unknown_ioctl:18502: disk5s2 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+print_unknown_ioctl:18502: disk3s2 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+print_unknown_ioctl:18502: disk2s2 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+print_unknown_ioctl:18502: disk5s7 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+[DCP:PPipeDCP_H13P.cpp:11379] virtual IOMFBStatus IOMFB::UPPipeDCP_H13P::apt_normal_mode_changed(IOMFB::AppleRegisterStream *): requesting transtition to aut...
+[DCP:PPipeDCP_H13P.cpp:10490] set_run_mode_safe: deferring: 4 -> 2
+
+[DCP:PPipeDCP_H13P.cpp:10395] virtual IOMFBStatus IOMFB::UPPipeDCP_H13P::ready_for_run_mode_change(IOMFB::AppleRegisterStream *): initiating deferred run mod...
+[DCP:UPTSQManager.cpp:150] IOMFBStatus IOMFB::UPTSQManager::power_down_M3(IOMFB::AppleRegisterStream *, UPTSQManager::ModeChangeWaiter *): request mode ch...
+[DCP:UPTSQManager.cpp:162] IOMFBStatus IOMFB::UPTSQManager::power_down_M3(IOMFB::AppleRegisterStream *, UPTSQManager::ModeChangeWaiter *): disabling M3
+
+AppleSEPKeyStore:12143:312: operation failed (sel: 17 ret: e00002f0, 205, 100011)
+[DCP:PPipeDCP_H13P.cpp:12902] prc_set_tab_config: temperatures - [ 
+[DCP:PPipeDCP_H13P.cpp:12904] 200 
+[DCP:PPipeDCP_H13P.cpp:12904] 250 
+[DCP:PPipeDCP_H13P.cpp:12904] 260 
+[DCP:PPipeDCP_H13P.cpp:12904] 280 
+[DCP:PPipeDCP_H13P.cpp:12904] 300 
+[DCP:PPipeDCP_H13P.cpp:12904] 320 
+[DCP:PPipeDCP_H13P.cpp:12904] 350 
+[DCP:PPipeDCP_H13P.cpp:12904] 400 
+[DCP:PPipeDCP_H13P.cpp:12905] ]
+
+[DCP:PPipeDCP_H13P.cpp:12902] prc_set_tab_config: backlight levels - [ 
+[DCP:PPipeDCP_H13P.cpp:12904] 100 
+[DCP:PPipeDCP_H13P.cpp:12905] ]
+
+[DCP:PPipeDCP_H13P.cpp:12902] prc_set_tab_config: durations - [ 
+[DCP:PPipeDCP_H13P.cpp:12904] 2 
+[DCP:PPipeDCP_H13P.cpp:12904] 3 
+[DCP:PPipeDCP_H13P.cpp:12904] 4 
+[DCP:PPipeDCP_H13P.cpp:12904] 5 
+[DCP:PPipeDCP_H13P.cpp:12904] 6 
+[DCP:PPipeDCP_H13P.cpp:12904] 7 
+[DCP:PPipeDCP_H13P.cpp:12904] 8 
+[DCP:PPipeDCP_H13P.cpp:12904] 9 
+[DCP:PPipeDCP_H13P.cpp:12904] 10 
+[DCP:PPipeDCP_H13P.cpp:12905] ]
+
+[DCP:PPipeDCP_H13P.cpp:12955] prc_set_tab_config: polarities count: 1
+
+AppleNVMe Assert failed: ( isKeyUsed == true ) Exit file: /AppleInternal/Library/BuildRoots/8ca92091-1d5a-11ee-a938-46d450270006/Library/Caches/com.apple.xbs/Sources/IONVMeFamily/Embedded/AppleNVMeEAN.cpp line: 505 
+[DCP:PPipeDCP_H13P.cpp:11379] virtual IOMFBStatus IOMFB::UPPipeDCP_H13P::apt_normal_mode_changed(IOMFB::AppleRegisterStream *): requesting transtition to nor...
+[DCP:PPipeDCP_H13P.cpp:10490] set_run_mode_safe: deferring: 2 -> 4
+
+[DCP:PPipeDCP_H13P.cpp:10395] virtual IOMFBStatus IOMFB::UPPipeDCP_H13P::ready_for_run_mode_change(IOMFB::AppleRegisterStream *): initiating deferred run mod...
+[DCP:M3Hal_v1.cpp:197] IOMFB: load APT M3 IMem : size 0x7960
+
+[DCP:M3Hal_v1.cpp:197] IOMFB: load APT M3 DMem : size 0x70ac
+
+[DCP:PPipeDCP_H13P.cpp:14085] IOMFB Int RTBandwidth: program_M3_rt_config: Using Dashboard 28e3d0988
+
+[DCP:UPTSQManager.cpp:133] IOMFB: clearing M3 reset
+
+[DCP:UPTSQ_Hal_v1.cpp:349] IOMFB: timebase_offset = 4
+
+[DCP:UPTSQManager.cpp:105] IOMFB: switch to normal mode succeeded
+
+print_unknown_ioctl:18502: disk5s8 unknown ioctl _IOW('X', 2, 48) (0x80305802), pid = 100
+AppleSPU(42): Clearing historical queue for endpoint
+IO80211APIUserClient init failed in checkEntitlement
+ IOCTL (from pid 181) not recognized: 10 out of 424 line 2756
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+telemetry: ustackshot every 12000000000 cycles
+AirPort: Link Up on awdl0. Reason Unspecified (1)
+1
+en0: setting diversity to: -1
+en0: setting tx antenna: -1
+en0: channel changed to 1
+en0: Extended channel change info: channel[1] band['2.4 GHz'] freq[2412 MHz] bw['20'] flags[0x0000000a]
+_dlil_get_flowswitch_buffer_size: awdl0 1428 1500
+1
+setInterfaceEnable:1113 interface awdl0 enable
+_dlil_attach_flowswitch_nexus: not attaching flowswitch to llw0
+_dlil_attach_flowswitch_nexus: not attaching flowswitch to llw0
+_dlil_attach_flowswitch_nexus: not attaching flowswitch to llw0
+AppleBCMWLANPCIeTransmitFlowRing::enable 0xffff99586b6cfc31
+IO80211APIUserClient init failed in checkEntitlement
+IO80211APIUserClient init failed in checkEntitlement
+SEP EP 12 enabled
+er_state_obj_get_for_recovery:7551: disk5s3 No ER state object for volume Recovery - rolling is not happening, nothing to recover.
+apfs_log_mount_unmount:2039: disk5s3 mounting volume Recovery, requested by: mount_apfs (pid 417); parent: mount (pid 416)
+handle_mount:765: disk5s3 vol-uuid: 8360ACE7-93BC-42FF-828D-E222C9723366 block size: 4096 block count: 48828125 (unencrypted; flags: 0x1; features: 1.0.2)
+handle_mount:778: disk5s3 setting dev block size to 4096 from 512
+nx_volume_group_update:7897: disk5s3 Volume Recovery role 4 Not a System or data volume
+ioqueue_depth = 253,   ioscale = 8
+bufattr_get_apfs:8188: Only accept buf I/O, no raw disk access
+disk5s3: device is not readable.
+Exit-setAssociateRequest:188 ret:0
+apfs_stop_bg_work:831: disk5s3 Volume Recovery is unmounting, stop any bg work
+apfs_log_mount_unmount:2039: disk5s3 unmounting volume Recovery, requested by: diskarbitrationd (pid 103); parent: launchd (pid 1)
+apfs_vfsop_unmount:2989: disk5s3 waiting for purgatory cleaner to finish
+nx_volume_group_update:7897: disk5s3 Volume Recovery role 4 Not a System or data volume
+apfs_vfsop_unmount:3318: disk5 nx_num_vols_mounted is 6
+apfs: total mem allocated: 54829069 (52 mb);
+apfs_vfsop_unmount:3331: all done.  going home.  (numMountedAPFSVolumes 13)
+Posting link state changed to up with IEEE reason code 1 
+en0: BSSID changed to 00:03:7f:12:86:f3
+Adding setInterfaceAverageCCA with cca 30
+en0: channel changed to 40,80
+en0: Extended channel change info: channel[40] band['5 GHz'] freq[5200 MHz] bw['80'] flags[0x00000410]
+en0: BSSID changed to 00:03:7f:12:86:f3
+en0: channel changed to 40,80
+en0: Extended channel change info: channel[40] band['5 GHz'] freq[5200 MHz] bw['80'] flags[0x00000410]
+Unexpected payload found for message 4, dataLen 164
+en0: BSSID changed to 00:03:7f:12:86:f3
+en0: channel changed to 40,80
+en0: Extended channel change info: channel[40] band['5 GHz'] freq[5200 MHz] bw['80'] flags[0x00000410]
+en0: BSSID changed to 00:03:7f:12:86:f3
+en0: channel changed to 40,80
+en0: Extended channel change info: channel[40] band['5 GHz'] freq[5200 MHz] bw['80'] flags[0x00000410]
+IO80211PeerMonitor::createLinkQualityMonitor(3331) failed
+IO80211Family: ERROR: IO80211QueueCall::handleEntry - called type 3, error 0xe00002c9
+AppleBCMWLANPCIeTransmitFlowRing::enable 0xffffb076da86e58b
+IO80211PeerMonitor::createLinkQualityMonitor(3331) failed
+IO80211Family: ERROR: IO80211QueueCall::handleEntry - called type 3, error 0xe00002c9
+IO80211PeerMonitor::createLinkQualityMonitor(3331) failed
+IO80211Family: ERROR: IO80211QueueCall::handleEntry - called type 3, error 0xe00002c9
+IO80211PeerMonitor::createLinkQualityMonitor(3331) failed
+IO80211Family: ERROR: IO80211QueueCall::handleEntry - called type 3, error 0xe00002c9
+[System Event] [3091564950] [INFO] [Subsystem: nvram] [Event: write] current-network with data size 0xc0
+AppleBCMWLANPCIeTransmitFlowRing::enable 0x2baeec96b786
+AppleBCMWLANPCIeTransmitFlowRing::enable 0xffffc18fc22f0e86
+scanControl: AWDL is controlling scan, ePNOScan ON, roamScan ON, limitedRoam OFF, abortScan 0
+scanControlCommand: Sending scan control command, ePNOScan ON (0x0), roamScan ON (0x0), limitedRoam OFF (0x0), abortScan 0
+scanControl: AWDL is controlling scan, ePNOScan ON, roamScan ON, limitedRoam OFF, abortScan 0
+scanControlCommand: Sending scan control command, ePNOScan ON (0x0), roamScan ON (0x0), limitedRoam OFF (0x0), abortScan 0
+IO80211APIUserClient init failed in checkEntitlement
+IOMFB: User Power Assertion Request 1
+IOMFB: User Power Assertion Request 0
+en0: 802.11d country code set to 'CH'.
+en0: Band ( 2 GHz) Supported channels: 1 2 3 4 5 6 7 8 9 10 11 12 13 
+en0: Band ( 5 GHz) Supported channels: 36 40 44 48 52 56 60 64 100 104 108 112 116 120 124 128 132 136 140 149 153 157 161 165 
+Couldn't build index for com.apple.sysmond: Not eligible for acceleration
+apfs_mount:28769: disk5s7 EALREADY; rooted from snap, apfs <ptr>
+apfs_log_mount_unmount:2039: disk5s7 mounting volume macos13.5, requested by: mount_apfs (pid 434); parent: com.apple.Mobile (pid 431)
+authapfs_seal_break:501: disk5s7 integrity protection will be disabled (from xid: 4798906)
+apfs_mount_livefs:28468: disk5 mount no firmlinks
+handle_mount:765: disk5s7 vol-uuid: 9F3E7019-833A-4413-89F2-E5D7B339534F block size: 4096 block count: 48828125 (unencrypted; flags: 0x201; features: 21.0.12)
+handle_mount:778: disk5s7 setting dev block size to 4096 from 512
+ioqueue_depth = 253,   ioscale = 8
+nx_global_extent_manipulation_lock:5457: disk5 nx_global_extent_manipulation_lock(0, 1), (0, 0, 0, 0)
+nx_global_extent_manipulation_lock:5527: disk5 Shared global_extent_manipulation lock taken after 0 attempts
+handle_revert_to_snapshot:6165: disk5s7 On next mount, volume will revert to snapshot 'com.apple.os.update-D7BD339F115F8FC71C367287B6E5E586574E146CDBB9F324EE3F6F29C93FA922' w/snap xid 4787376
+nx_global_extent_manipulation_unlock:5552: disk5 nx_global_extent_manipulation_unlock(0, 1), (0, 0, 1, 1)
+IO80211APIUserClient init failed in checkEntitlement
+apfs_stop_bg_work:831: disk5s7 Volume macos13.5 is unmounting, stop any bg work
+apfs_log_mount_unmount:2039: disk5s7 unmounting volume macos13.5, requested by: com.apple.MobileSoftwareUpdate. (pid 431); parent: launchd (pid 1)
+apfs_vfsop_unmount:2989: disk5s7 waiting for purgatory cleaner to finish
+authapfs_seal_restore:597: disk5s7 integrity protection will be re-enabled
+apfs_vfsop_unmount:3318: disk5 nx_num_vols_mounted is 6
+apfs: total mem allocated: 55884167 (53 mb);
+apfs_vfsop_unmount:3331: all done.  going home.  (numMountedAPFSVolumes 13)
+apfs_mount:28769: disk5s7 EALREADY; rooted from snap, apfs <ptr>
+apfs_log_mount_unmount:2039: disk5s7 mounting volume macos13.5, requested by: mount_apfs (pid 436); parent: com.apple.Mobile (pid 431)
+authapfs_seal_break:501: disk5s7 integrity protection will be disabled (from xid: 4798912)
+tx_flush:1241: disk5 xid 4798912 tx stats: # 20 finish 20 enter 426 wait 1 2578us close 0us flush 4118us
+apfs_mount_livefs:28468: disk5 mount no firmlinks
+revert_to_snapshot:1618: disk5s7 Reverting to snapshot w/xid 4787376 and old sblock oid 652663.
+revert_extents_to_snapshot:1435: disk5s7 free'ing extents in main extentref tree 532030
+free_allocated_snapshot_extents:1350: disk5s7 processed 0 extents and free'd 0 blocks
+supplemental_tree_revert:305: disk5s7 reverted supplemental tree (type 5): 531545 -> 531717
+omap_cleanup:1464: disk5s7 started cleaning snapshots 4798913-4798913
+omap_cleanup:1685: disk5s7 completed cleaning snapshot 4798913, om_snap_count 1 om_most_recent_snap 4798913
+obj_cache_remove_reverted_fs_objects:1596: disk5s7 removing reverted fs objects for fs 8677324: 4787377 - 4798913
+revert_to_snapshot:1713: disk5s7 DONE reverting to snapshot w/xid 4787376
+authapfs_seal_break:501: disk5s7 integrity protection will be disabled (from xid: 4798914)
+handle_mount:765: disk5s7 vol-uuid: 9F3E7019-833A-4413-89F2-E5D7B339534F block size: 4096 block count: 48828125 (unencrypted; flags: 0x201; features: 21.0.12)
+handle_mount:778: disk5s7 setting dev block size to 4096 from 512
+ioqueue_depth = 253,   ioscale = 8
+apfs_log_mount_unmount:2039: disk5s7 unmounting volume macos13.5, requested by: com.apple.MobileSoftwareUpdate. (pid 431); parent: launchd (pid 1)
+apfs_vfsop_unmount:2989: disk5s7 waiting for purgatory cleaner to finish
+authapfs_seal_restore:597: disk5s7 integrity protection will be re-enabled
+apfs_vfsop_unmount:3318: disk5 nx_num_vols_mounted is 6
+apfs: total mem allocated: 70312727 (67 mb);
+apfs_vfsop_unmount:3331: all done.  going home.  (numMountedAPFSVolumes 13)
+open by IOHIDLibUserClient 0x100000c3f (0x0)
+close by IOHIDLibUserClient 0x100000c3f (0x0)
+[System Event] [3423764621] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+IO80211APIUserClient init failed in checkEntitlement
+IO80211APIUserClient init failed in checkEntitlement
+IO80211APIUserClient init failed in checkEntitlement
+Adding setInterfaceAverageCCA with cca 54
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [3908979461] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+Couldn't build index for com.apple.mdbulkimport: Not eligible for acceleration
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+tx_flush:1241: disk5 xid 4798932 tx stats: # 40 finish 39 enter 236 wait 2 6077us close 1405us flush 3750us
+[System Event] [5349803240] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:12143:489: operation failed (sel: 7 ret: e00002bc, 501, 100027)
+AppleSEPKeyStore:12143:489: operation failed (sel: 7 ret: e00002bc, 501, 100027)
+AppleSEPKeyStore:12143:489: operation failed (sel: 7 ret: e00002bc, 501, 100027)
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+tx_flush:1241: disk5 xid 4798952 tx stats: # 60 finish 59 enter 173 wait 2 6077us close 937us flush 3136us
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)
+[System Event] [6789574225] [INFO] [Subsystem: nvram] [Event: write] battery-health with data size 0x174
+AppleSEPKeyStore:8084:132: unexpected session: 100001 uid: -1 requested by: bluetoothd (132)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002c2, -1, 100001)
+AppleSEPKeyStore:12143:132: operation failed (sel: 7 ret: e00002bc, -1, 100001)

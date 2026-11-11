@@ -14,6 +14,19 @@ Format :
 
 ---
 
+## 2026-11-11 — Claude (Opus 4.8) — Coffre xART comparé sur 2 boots (c21 vs c23) : 80 % stable, fraîcheur isolée à 2 blobs
+- Trace : traces/*c21-xart-ool et traces/*c23-xart-ool (2 boots macOS sous HV, lecture seule ; c22 raté entre les deux, boot à chaud).
+  Script : analysis/diff_xart_ool.py. Les deux boots vont jusqu'à l'écran de connexion, SANS login (pas de mot de passe tapé).
+- Vu (faits) : le coffre rendu au SEP (buffers A, fetch) = 10 blobs ; **8/10 identiques octet pour octet** entre les 2 boots ; 2 diffèrent
+  (un de ~848 o = 000094, un de ~3 Ko = 000222). Ce que le SEP fait sauver (buffers B) = 5 blobs, **5/5 différents** à chaque boot.
+  Les 8 A stables font 2043/3072/3072/3073/3074/3075/8182/8183 o.
+- Interprété : `vérifié` pour les comptes. Lecture : la grande partie du coffre est **statique** (l'AP la stocke et la rend telle quelle →
+  rejouable trivialement, confirme « le SEP n'a pas de disque »). La **fraîcheur anti-rejeu** est isolée à 2 petits blobs rendus (hypothèse :
+  SEP-xART + USER-xART) et à tout ce que le SEP sauve (régénéré chaque session). Donc le rejeu (voie C) n'est ni mort ni gagné : il faudrait
+  rendre la **dernière** version sauvée de ces 2 blobs, et seul un test en écriture (pending/ + Albert) dira si le compteur scellé du SEP l'accepte.
+  Le compteur est chiffré dans le blob, invisible en lecture. Contrainte : ces 2 blobs périment dès que macOS reboote (il réécrit).
+- Incidents : c23 fini en `client_exited` (Albert a débranché l'USB pour récupérer son câble) ; échange xART déjà complet, sans conséquence.
+
 ## 2026-11-11 — Claude (Opus 4.8) — VOIE B faite : 1re capture du CONTENU du coffre xART (EP 0x13 OOL)
 - Trace : traces/20261111-010323_c21-xart-ool (SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000, boot macOS sous HV, lecture seule, reboot propre).
   2e boot c22 raté (macOS non démarré, 0 message SEP = panne connue « chainload à chaud ») ; 3e tentative c23 en cours.

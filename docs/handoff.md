@@ -36,7 +36,7 @@ Légende : [ ] à faire, [x] fait, [!] bloqué (dire pourquoi).
 - [x] Étude du « coffre » (xART) : docs/xart_options.md écrit le 2026-11-10 (Opus 4.8, filtre non déclenché). 5 voies, reco = voie B.
 - [x] Comparaison fine image puce ↔ bus ↔ SEP : faite le 2026-11-10 (analysis/cmp_sensor_sep_image.py). Image relayée octet pour octet au SEP (OOL 0x08, entête 0x1c, type 0x65), chiffrée bout en bout. verification_status.md SPI-1.
 - [x] Voie B outillage : l'OOL de l'EP 0x13 est déjà traçable (SEP_OOL_EPS=0x13), commande prête dans docs/xart_options.md. Rien à coder.
-- [ ] Voie B capture : Mac en mode câble, Albert devant la machine, backup macOS confirmé. `SEP_EPS=0x13 SEP_OOL_EPS=0x13 SEP_OOL_BYTES=0x8000 LIVE_EPS=0x13 ./tools/boot_and_trace.sh c21-xart-ool`. Pas faisable à distance (câble débranché).
+- [x] Voie B capture : FAITE 2026-11-11 (c21 + c23, lecture seule). Coffre xART : 8/10 blobs stables entre 2 boots, 2 changent, saves 100 % frais. Verdict rejeu : ni mort ni gagné, tranchable seulement par un test en écriture. docs/xart_options.md voie C, analysis/diff_xart_ool.py.
 
 - [x] Caractérisé la broche gpio0 195 (2026-11-10, mesa_irqwatch hello=1) : ligne « donnée prête », remonte à chaque réponse en attente (y compris après 0x70), retombe à la lecture d'état. Pilotage par interruption possible.
 - [x] Transport réactif : mesa_wait_ready() attend la broche « donnée prête » (scrutation sûre) avant chaque lecture d'état ; identité toujours identique (2026-11-10).

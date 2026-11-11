@@ -828,3 +828,32 @@ TTY> HV: Entering guest secondary 9 at 0x1001c0f0000
 [cpu9] Pass: mrs x13, HID1_EL1 = 1440000002000000 (HID1_EL1)
 [cpu9] Pass: msr HID1_EL1, x13 = 1440000002000000 (OK) (HID1_EL1)
 [cpu9] Pass: mrs x13, HID18_EL1 = 2000040004000 (HID18_EL1)
+[cpu9] Pass: msr HID18_EL1, x13 = 2000040004000 (OK) (HID18_EL1)
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/run_guest.py", line 180, in <module>
+    hv.start()
+    ~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 2362, in start
+    self.p.hv_start(self.entry, self.guest_base + self.bootargs_off)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 1134, in hv_start
+    return self.request(self.P_HV_START, entry, *args)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 758, in request
+    return self._request(opcode, *args2, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 722, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 401, in proxyreq
+    return self.reply(self.REQ_PROXY)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 204, in readfull
+    block = self.dev.read(size - len(d))
+  File "/usr/lib/python3.14/site-packages/serial/serialposix.py", line 595, in read
+    raise SerialException(
+        'device reports readiness to read but returned no data '
+        '(device disconnected or multiple access on port?)')
+serial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
