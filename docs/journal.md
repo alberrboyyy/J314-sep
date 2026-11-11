@@ -14,6 +14,11 @@ Format :
 
 ---
 
+## 2026-11-11 (fin journée) — Claude (Opus 4.8) — voie C : v2 relue OK (sceptique), M1N1TIMEOUT trouvé, S_new à refaire
+- Fait : trouvé que run_guest échouait faute de M1N1TIMEOUT (défaut 3 s) → export M1N1TIMEOUT=20 → boot macOS OK sur tunnel. Capture cntl-study3 (non filtrée) VALIDE le protocole CNTL octet pour octet (SECMODE 0x14, tampons 0x04/0x02/0x05/0x03 PARAM=0x13, IOVA 0x2c/0x38, ack TYPE 0x01 même tag). v2 du script écrite (rôle AP) et relue par sceptique = « lançable, sûre, 0 disque ».
+- Vu / erreur : cntl-study3 capturé avec nbytes=0x400 → lockers .ool tronqués (1024 o au lieu de 32768) → INUTILISABLE comme S_new. Présenté à tort comme prêt (glissement de session longue). Procédure corrigée dans handoff.md : capturer S_new avec SEP_OOL_BYTES=0x8000.
+- Incertitudes voie C (tranchées par l'essai) : stream DART lu par xarm ; tampons 0x18/0x0e ; enchaînement xART sous m1n1.
+
 ## 2026-11-11 (journée, autonome) — Claude (Opus 4.8) — Mac à distance via tunnel relais ; script de rejeu v1 + blocage trouvé par le sceptique
 - Trace : nombreuses captures de test (premier_contact, chainN, clN, reset…, en lecture seule). Config d'accès : Mac non en USB local mais derrière un relais TCP `10.0.200.5` (ports 4000 proxy / 4001 console), via `tunnel.py` (voir mémoire tunnel-relais-mac).
 - Fait :

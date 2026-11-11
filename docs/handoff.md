@@ -18,20 +18,32 @@ pas le tunnel). Détails + récup : mémoire `tunnel-relais-mac`. (Côté relais
 - `CLAUDE.md` : décompilation élargie (tout binaire Apple pertinent) ; leçon RTFM M1N1TIMEOUT.
 - Docs : `voie_c_design.md` « Correctif voie C » (protocole complet), journal, mémoires à jour.
 
-**ÉTAT : expérience prête.** S_new = `traces/20261111-111740_cntl-study3` (capturé aujourd'hui, valide tant
-qu'aucun boot macOS n'a lieu — reboots m1n1 OK car m1n1 = startup disk). Mac au m1n1 propre.
+**ÉTAT : script v2 PRÊT et relu (sceptique : « lançable tel quel », sûr, 0 opération disque). Mac au m1n1
+propre. MAIS il MANQUE un vrai S_new.** `traces/20261111-111740_cntl-study3` a servi à VALIDER le protocole
+CNTL (octet pour octet), mais ses lockers .ool sont **tronqués à 0x400** (capturé avec le défaut `nbytes=0x400`)
+→ **INUTILISABLE comme S_new** (le tampon A serait rejoué incomplet). Erreur de la session précédente, corrigée ici.
 
-**LANCEMENT (Albert uniquement, écriture SEP)** — après relecture de l'en-tête du script :
-```
-M1N1TIMEOUT=20 M1N1DEVICE=/tmp/m1n1 HV_UART=/tmp/m1n1-console ./pending/sep_xart_replay.sh traces/20261111-111740_cntl-study3
-```
-Succès = `>>> sbio PRÉSENT`. Modes d'échec = sorties propres (exit 2/3) AVANT toute écriture risquée.
+**PROCÉDURE pour lancer l'essai voie C :**
+1. **Capturer un vrai S_new** (lecture seule, ~15 min ; `SEP_OOL_BYTES=0x8000` = tampon COMPLET, et reboot auto
+   en m1n1 à la fin) :
+   ```
+   M1N1TIMEOUT=20 M1N1DEVICE=/tmp/m1n1 HV_UART=/tmp/m1n1-console \
+   SEP_OOL_EPS=0x13 SEP_EPS=0x13 SEP_OOL_BYTES=0x8000 END_ACTION=reboot \
+   ./tools/boot_and_trace.sh snew-reel
+   ```
+   Vérifier ensuite que `traces/..._snew-reel/sep.log.ool/*_A.bin` font bien **32768** octets.
+2. **NE PAS booter macOS entre la capture et le lancement** (reboots m1n1 OK — m1n1 = startup disk).
+3. **Albert lance** (écriture SEP), après relecture de l'en-tête de `pending/sep_xart_replay.sh` :
+   ```
+   M1N1TIMEOUT=20 M1N1DEVICE=/tmp/m1n1 HV_UART=/tmp/m1n1-console ./pending/sep_xart_replay.sh traces/<le_snew-reel>
+   ```
+   Succès = `>>> sbio PRÉSENT`. Échecs = sorties propres (exit 2/3) AVANT toute écriture risquée.
 
-**À VÉRIFIER AVANT DE LANCER (si session neuve)** : une relecture sceptique FINALE de la v2 était en cours
-au moment du clear (focus : SECMODE/provisioning, tampons 0x18/0x0e aussi posés par macOS avant xART, flux
-DART). **Si ses conclusions ne sont pas dans le journal, relancer le sceptique sur `pending/sep_xart_replay.sh`
-avant lancement.** Incertitudes de fond (tranchées par l'essai) : IOVA/stream DART que xarm lit vraiment ;
-faut-il aussi poser les tampons de 0x18/0x0e ; le SEP sous m1n1 enchaîne-t-il l'échange xART.
+**Sceptique (fait, 2026-11-11)** : v2 conforme à la capture réelle, sûre. Incertitudes de fond, tranchées
+seulement par l'essai (non bloquantes pour la sûreté — échec propre si manqué) : le stream/IOVA DART que xarm
+lit vraiment ; faut-il aussi poser les tampons de 0x18(stac)/0x0e(hdcp) avant que le SEP enchaîne xART ;
+le SEP démarré par m1n1 enchaîne-t-il l'échange. Amélioration v3 notée : écrire A via `phys_A` direct plutôt
+que re-dériver par `find_sid` (évite une mappe résiduelle d'un stream inférieur).
 
 ## Mise à jour nuit du 2026-11-11 (session autonome, Opus 4.8)
 - VOIE B FAITE. Contenu du coffre xART capturé en lecture seule sur 3 boots macOS : c21/c23/c24 = traces T-45/T-46/T-47. Outils déjà en place (SEP_OOL_EPS=0x13). c22 a raté (boot à chaud), ignoré.
