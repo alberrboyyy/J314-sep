@@ -130,3 +130,19 @@ les sept autres sont figés (voir le chapitre « Le coffre xART » du guide).
 capturé correspondant, écrire ses octets dans le buffer A, renvoyer le mot de réponse de la colonne PARAM/DATA. Pour les
 lockers 1 et 2, sans étiquette, se repérer par l'ordre et le TAG. Les IOVA des buffers A et B sont relus à la volée au
 démarrage du SEP par m1n1, jamais codés en dur. Reste la seule inconnue de fond : l'anti-rejeu accepte-t-il ce rejeu fidèle.
+
+## Faisabilité technique confirmée (lecture de code public, rien lancé)
+
+Les primitives nécessaires au script de rejeu existent déjà dans l'outillage, donc le script est implémentable :
+
+- Écrire un locker dans le buffer A du SEP : on traduit l'IOVA du buffer en adresse physique par le DART, exactement
+  comme le traceur le fait en lecture, puis on écrit les octets avec la commande d'écriture mémoire du proxy m1n1. La
+  traduction lecture seule est déjà codée et vérifiée dans le traceur ; l'écriture mémoire est une primitive du proxy.
+- Démarrer le SEP et lui envoyer des messages sur la mailbox : `pending/sep_boot.sh` le fait déjà pour la séquence de boot.
+- Lire l'étiquette dans le buffer B avant chaque fetch : même traduction lecture seule que ci-dessus.
+
+Le traceur, lui, s'interdit toute écriture mémoire par principe ; le script de rejeu fait l'inverse, et c'est précisément
+pour cela qu'il est une écriture vers le SEP, à mettre dans `pending/` et à lancer par Albert, jamais par un agent.
+
+Il ne reste donc, avant un essai, que : écrire ce script avec soin et le faire relire ; capturer l'état `S_new` juste avant
+sans redémarrer macOS entre-temps. La seule inconnue de fond demeure : l'anti-rejeu du SEP accepte-t-il ce rejeu fidèle.
