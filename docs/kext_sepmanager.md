@@ -557,3 +557,16 @@ possible (champs `offset`/`total`/`fragment`), état `kGTIdle`→occupé.
 SEP, (2) envoyer un message EP 0x08 `type=0xfc`, `data`=descripteur OOL, `tag`=compteur++, (3) attendre le `0xfc` de réponse (même
 tag), (4) lire l'OOL de sortie. **Reste** : champs exacts de `gt_packet_t` (`0x9937570`), et le type `0x70` (vu en trace, probable
 transfert d'image en vrac, distinct du `0xfc`) — à finir.
+
+### 13b. VÉRIFICATION du format `gt_packet_t` contre capture (trace c12) — VÉRIFIÉ
+
+Les buffers OOL **EP 0x08** capturés (`traces/20261108-032454_c12-boot-ho/sep.log.ool/*_08_A.bin`) collent **exactement** au
+`gt_packet_t` décodé du kext — confirmation par trace (14 buffers A examinés) :
+- `+0x00 = 0x01` (kind) sur **14/14** ; `+0x04` (total) == `+0x18` (longueur fragment) ; payload à `+0x1c` de la bonne longueur.
+- `+0x14` = opcode, valeurs lues et recoupées avec §4 et la table §12c :
+  `0x73` (len 4), **`0x17`** (len 0x10 = **n° de série**, §4), **`0x15`/`0x16`** (len 4 / 0x28 = **clé de session**, `performKeyExchange`),
+  **`0x42`/`0x18`** (**compteur**, §4), **`0x5f`** (buffer **16 Ko** = **patch**, §4), `0x5d` (`applySensorParams`), `0x5c`, `0x6a`, `0x31`,
+  `0x32`, `0x01`, **`0x1f`** (`cacheMatchPolicy`).
+- **Conséquence** : le **format fil sbio est VÉRIFIÉ** (le reste — noms d'opérations — reste `source: kext`). On peut désormais
+  **parser l'opcode de n'importe quelle transaction EP 0x08** (= `gt_packet_t.+0x14` du buffer A), et donc nommer toutes les
+  transactions `0xfc` d'une capture. Outil d'analyse à ajouter : lecture `gt_packet_t` dans `analysis/`.
