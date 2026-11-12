@@ -615,3 +615,14 @@ séparé pour certaines notifications (« Unexpected sks notification via TDM »
 fil** (0x2f/0x41/0x18…) — à extraire du dispatch `AppleKeyStoreUserClient::externalMethod` + la méthode endpoint `+0x1e8` ;
 (2) le **format exact** de la requête SKS sur le fil (OOL) ; (3) la question décisive **D2** : le SEP **refuse-t-il** un `0x09`
 (match) tant que le keybag est verrouillé, ou macOS s'abstient-il ? — tranchable seulement par écriture (Albert, EP 0x12 = ligne rouge).
+
+### 14b. SKS = RPC à params DER, PAS un protocole à opcodes (précision, source: kext)
+
+Vérification du modèle : les `aks_ref_key_encrypt/decrypt/sign/wrap/unwrap/transcrypt/compute_key/attest` appellent tous
+`__aks_operation`/dispatcher avec `x0` = le **ref_key / contexte** (pas un petit opcode), et construisent la commande via
+`aks_params_*` **sérialisés en DER** (`aks_params_get_der`). Donc, contrairement à sbio (EP 0x08 = opcode 1 octet dans un
+`gt_packet_t`), **SKS (EP 0x12) est un RPC dont l'opération et les arguments sont dans une structure DER** portée par l'OOL ;
+le mot mailbox 0x12 ne porte qu'un compteur de transaction + la longueur (cohérent avec `messages.md` : `> t n 0 0xLLLL0000`,
+TYPE=compteur). Conséquence pratique : **un driver Linux devrait produire le même DER** (schéma à extraire), pas juste un opcode.
+Les `aks_system_key_get_public/sign/collection` passent `x0 = -1` (sentinelle « pas de ref_key »). Mapping fin op↔DER↔TAG fil
+(0x2f/0x41/0x18) = gros travail restant, et de toute façon tout envoi 0x12 reste **ligne rouge** (Albert).
