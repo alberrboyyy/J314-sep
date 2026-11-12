@@ -246,3 +246,84 @@ sceptique ne sont couvertes qu'à 29.) Statut : lecture kext **non contredite**,
 si le drapeau n'est pas prêt). Utilisé sur ce capteur : oui (présent à chaque boot : `5b 63`, `63 63`, + 2 dans la queue
 user-client). `setCalibrationData` exige que la taille retournée soit `sizeof(calDataInfo)` (assert) avant
 `sendDeviceSerialNumberToSbio`. 0x61 n'est **pas** GetCalibrationDataInfo : c'est le ratio de modulation (voir K6-3), non envoyé.
+
+## 8. xART (EP 0x13) — `AppleSEPXART::_handle_sep_driven_msg` : table des opérations (2026-11-11, Claude — source: kext, macOS 13.5)
+
+Méthode : `com.apple.driver.AppleSEPManager` du fileset `macos/kernel.macho` ; symbole
+`__ZN12AppleSEPXART22_handle_sep_driven_msgEPNS_11XARTMessageE` (vm `0xfffffe0009986588`), désassemblé avec
+`analysis/kext/kdis.py func` (listing non commité). Aucun code copié ; on décrit le dispatch et le format. **Statut : `hypothèse`
+(source: kext).** But : interpréter la bifurcation de l'essai voie C n°1 (le SEP a demandé `TYPE=0x01` à `TAG=0x05` au lieu du
+`TYPE=0x05` de macOS — cf. journal 2026-11-11).
+
+**Structure `XARTMessage` (offsets lus dans le handler).** Le message SEP→AP (`<` sur EP 0x13) est vu octet par octet :
+octet 1 = TAG, **octet 2 = opération (ce que la trace appelle TYPE)**, octets 3-4 = longueur (halfword, `[x19,#3]`),
+**octet 5 bit 0 = sélecteur SEP(0) / USER(1)** (`tst w22,#1` → chaîne `"SEP"` ou `"USER"`). Deux tampons OOL portés par l'objet :
+`this+0xc8` = tampon **A** (AP→SEP, ce que l'AP *écrit* pour le SEP) et `this+0xd0` = tampon **B** (SEP→AP, ce que le SEP a
+*déposé* : UUID réclamé ou blob à sauver). Concorde avec notre convention de trace (A = AP→SEP, B = SEP→AP).
+
+**Dispatch (switch sur l'opération, table à `0xfffffe0009986db8`, opérations 0x00–0x0e ; 0x13 traité à part ; autre = inconnu).**
+
+| op (TYPE) | handler | rôle (chaîne de log du kext) | tampon lu / écrit |
+|---|---|---|---|
+| 0x00 | 0x6e8 | **FETCH xART maître** — `"Fetched %s-xART with CRC: 0x%x"` (`%s` = SEP ou USER) | écrit le blob dans **A** |
+| 0x01 | 0x838 | **SAVE xART maître** — `"Saving %s-xART with CRC: 0x%x"` | lit le blob depuis **B** (CRC16) |
+| 0x05 | 0x874 | **FETCH gigalocker par UUID** — attend longueur = 0x10 (16 o d'UUID dans **B**), rend le locker | lit UUID en **B**, écrit locker en **A** |
+| 0x06 | 0x99c | **SAVE gigalocker** — `"Saving %s-xART Locker with CRC"` / `"Fetched %s-xART Locker with CRC"` | B/A |
+| 0x07 | 0x9d8 | locker **supprimé / introuvable** — `"%s_XART_LOCKER with uuid %s %s"` (`being deleted` / `not found`) | — |
+| 0x0e | 0xac8 | état de chargement fw — chaînes `protected-data-access`, `sepfw-load-at-boot`, `sepfw-loaded` | — |
+| 0x13 | (hors table) | `AppleSEPXART::_determineOsUuidGated` (vm `0x9986290`) : rend **16 o d'UUID de l'OS** | écrit l'UUID en **A** |
+| autre | 0x814 | `"AppleSEP:WARNING: AppleSEPXART (EP: %u) received unknown SEP request op %u"` → acquitte (op 0x16) | — |
+
+Toutes les branches réécrivent l'octet 2 (op) par le code de réponse et renvoient le message au SEP (`"Replied to xART app: 0x%016llx"`).
+
+**Fraîcheur / anti-rejeu (symboles, non désassemblés en détail).** La classe `AppleSEPXART` expose un sous-système de nonce et de
+graines de session : `nonce_generate`, `nonce_read`, `nonce_invalidate`, `_nonce_action`, `commit_hash`, `setup_OS_UUID`,
+`_determineOsUuidGated`, `fetch_xart_known_sessions`, `erase_session_seeds_for_UUID`, `erase_all_xART_seeds`. Lecture (hypothèse) :
+l'état xART est **lié à un UUID d'OS + un nonce/graine de session** (op 0x13 fournit l'UUID ; le nonce vient a priori de l'EP
+`pnon` 0x15). Ce n'est donc **pas** un simple « rends-moi le dernier blob » : le SEP valide le blob rendu contre ce contexte.
+
+**Application à l'essai voie C n°1 (interprétation, `hypothèse`).** Les « 4 lockers » rejoués = TAG 0x02 **op 0x0e** (état fw-boot),
+TAG 0x01 **op 0x13** (UUID d'OS), TAG 0x03 **op 0x00** (FETCH SEP-xART) et TAG 0x04 **op 0x00** (FETCH USER-xART) — soit **2 blobs
+xART maîtres + l'UUID + le drapeau fw**, pas 4 gigalockers. Puis, là où macOS enchaîne des **op 0x05 (FETCH gigalocker)**, le SEP
+sous m1n1 a émis **op 0x01 (SAVE xART maître)**. Donc le SEP ne réclame pas le gigalocker suivant : il veut **ré-écrire** son xART
+maître. Cohérent avec « l'état restauré n'a pas été jugé valide/courant → le SEP re-scelle » (hypothèse B de `hypotheses.md` HV1) —
+et un SAVE acquitté ferait vraisemblablement **avancer le compteur scellé** du SEP (ce qui collerait avec la casse du boot Apple
+constatée après l'essai). À **ne pas** acquitter sans décision d'Albert **et** sans image disque préalable.
+
+## 9. xART — fraîcheur / nonce : d'où vient l'anti-rejeu ? (2026-11-12, Claude — source: kext, macOS 13.5)
+
+Suite du §8. But : dire si le **re-scellement** observé à l'essai voie C (le SEP émet op 0x01 SAVE au lieu de continuer les FETCH)
+est **inévitable par conception**. Fonctions désassemblées (kext AppleSEPManager, `kdis.py func`, listings non commités) ;
+**statut : `hypothèse` (source: kext)**. Le *pourquoi* final est interne à SEPOS/ROM, non observable depuis le kext — on décrit
+ce que l'AP fait et ce à quoi l'état est lié.
+
+**À quoi l'état xART est lié (2 ancrages).**
+1. **UUID d'OS** — `_determineOsUuidGated` (op 0x13) lit `/chosen` → propriété **`apfs-preboot-uuid`** (`0x74a71a8`) et la rend au
+   SEP en tampon A. C'est l'UUID du volume macOS amorcé : **constant** pour une même install → **rejouable**, donc ce n'est **pas**
+   lui le verrou de fraîcheur.
+2. **Nonce SEP** — un sous-système de nonce, porté **par l'EP xART 0x13 lui-même** : `nonce_generate` / `nonce_read` /
+   `nonce_invalidate` → `_nonce_action` → `_runOperation(block)` → **`AppleSEPXART::_xmsgSend(XARTMessage*, xart_buffer_config*)`**
+   (`0x99939e8`). L'AP **demande** au SEP de générer/lire/invalider un nonce ; il n'en **choisit pas** la valeur.
+   - `AppleSEPUserClient::getOrGenerateNonce` (`0x9999aac`) appelle generate puis read et journalise
+     `"AppleSEP: %s SEP Nonce (%u bytes): 0x…"` avec `%s` ∈ {`Current`, `New`} — déclenché **à la demande** (user-client), pas
+     prouvé « à chaque boot ».
+   - `nonce_invalidate` journalise `"SEP Nonce invalidated"` (via `DispatchUserClientInvalidate…`).
+
+**Nonce ROM du SEP (booter).** `AppleSEPBooter::generateROMNonce(uint8_t*, uint32_t*)` (`0x9989684`) dialogue avec la **ROM du SEP**
+et attend l'opcode de boot **`BootOpcode::ReportNonceWord`** (« le SEP rapporte un mot de nonce »). **Appelé uniquement** depuis
+`AppleSEPUserClient::DispatchUserClientGenerateROMNonce` (user-client, à la demande) — **pas** dans la séquence de boot automatique
+que reproduit `pending/sep_boot.sh` (qui ne fait que GET_STATUS / BOOT_TZ0 / BOOT_IMG4 / SET_SHMEM). La valeur est **produite par
+la ROM**, l'AP ne la fixe pas.
+
+**Lecture (HYPOTHÈSE, source: kext) — pourquoi le SAVE à TAG=0x05 est le comportement attendu.** Les blobs xART que le SEP fait
+sauvegarder sont liés à un **nonce que le SEP produit lui-même** (xART et/ou ROM), pas à une valeur fournie par l'AP. Au boot m1n1
+(sep_boot), le SEP a un **contexte de nonce courant** qui n'est pas celui sous lequel les lockers rejoués ont été scellés (capture
+macOS = un autre boot SEP). Après avoir chargé les 2 blobs maîtres (op 0x00) + l'UUID (op 0x13), le SEP **ne reconnaît pas l'état
+comme courant** et **re-scelle** (op 0x01) au lieu d'aller chercher les gigalockers (op 0x05). C'est exactement la bifurcation
+observée, et un SAVE acquitté ferait avancer l'état scellé (cohérent avec la casse du boot Apple).
+
+**Ce qui reste ouvert (non tranché par le kext) — la seule porte de sortie éventuelle pour la voie C.** La valeur du nonce de boot
+est-elle **dérivée d'une graine réglable** (style « boot nonce » iOS en NVRAM : on pose la graine, le SEP régénère le **même**
+nonce → rejeu possible), ou purement **interne/aléatoire par boot** (→ rejeu impossible par conception) ? Le kext montre `nonce_*`
+et un nonce ROM, mais pas d'où vient l'aléa. → recherche sources publiques (NVRAM boot-nonce / ap-nonce / sep-nonce) en cours.
+Tant que ce point n'est pas tranché : **voie C = re-scellement attendu**, et l'essai qui écrirait reste **Albert + image disque**.

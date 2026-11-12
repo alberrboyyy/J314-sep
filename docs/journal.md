@@ -14,6 +14,107 @@ Format :
 
 ---
 
+## 2026-11-12 ~08:40 — Claude (Opus 4.8) + Albert — Récupération ALARM après gel PMU ; handoff
+- Trace : — (opérations matérielles de récupération, aucune capture SEP)
+- Fait : relance du tethered boot ALARM. 1er essai (`linux.py`) planté au `PMU.reset_panic_counter` →
+  `UartTimeout` SPMI. Rechargé un m1n1 frais (`CHAIN=1`) : **même plantage au PMU**. Albert a fait une
+  **coupure complète du courant** du Mac. Au redémarrage, m1n1 « running proxy » à l'écran mais **aucun
+  périphérique USB côté PC** (ni ttyACM ni lsusb). Après **changement de câble/port USB-C**, le proxy est
+  revenu (`serial/by-id …WHFWP7FYXF`). Relancé `tools/tethered_boot.sh alarm` → PMU OK, noyau chargé (35 Mo),
+  « Preparing to boot kernel ». Albert confirme : « j'ai le mac » (ALARM repris).
+- Vu : le gel PMU/SPMI survit à un m1n1 frais ; seule la coupure d'alim le lève. Le proxy USB ne réénumère
+  pas tout seul après coupure → câble/port à reprendre. `linux.py` en tâche de fond finit par
+  `termios.error: Inappropriate ioctl for device` (ttymode sans terminal) = bénin, noyau déjà parti.
+- Interprété : les manips SEP du jour (sep_peek / voie C) laissent le bus PMU dans un état qui ne se
+  réinitialise qu'à froid. (hypothèse)
+- Incidents : 2 × UartTimeout PMU ; 1 power-cycle physique ; ré-énumération USB manuelle. Aucun SEP write.
+- Suite : handoff mis à jour (docs/handoff.md, section 2026-11-12). Prochain pas SEP = essai observationnel
+  (relais du **dernier SAVE**, suit le SEP) — script `pending/` à écrire, lancé par Albert. En attente :
+  décision image disque + moment. Mémoire [[mac-boot-casse-recuperation]] complétée (piège PMU + USB).
+
+## 2026-11-12 — analyste — xART : la fraîcheur du FETCH est variable par boot (4 boots, lecture seule)
+- Trace : `traces/20261111-010323_c21-xart-ool`, `…011447_c23…`, `…013303_c24…`, `…113919_snew-reel` (OOL EP 0x13 0x8000).
+  `c22` (`…010943`) inexploitable (0 fichier OOL, boot avorté). Aucun hardware, aucune écriture SEP.
+- Fait : apparié les tampons OOL 0x13 par rôle (TAG/TYPE/PARAM) sur les 4 boots, SHA-256 + byte-diff
+  (`analysis/diff_xart_ool.py` + scratchpad `xart5.py`/`bmap.py`/`bdiff.py`).
+- Vu : (1) UUID d'OS (tampon A `000092`, 16 o) = `EFF3C698-A740-4F41-AB86-99C85C0EB880` CONSTANT 4/4 (= apfs-preboot-uuid).
+  (2) Coffre FETCH = 10 blobs : 8 CONSTANTS octet pour octet, 2 VARIABLES à chaque boot = **SEP-xART maître** (`000094`, fetché
+  AVANT sbio ; ~846/867 o changent ; 17 premiers octets = 0, pas de nonce en clair) et **locker Credential Manager** (`000222`).
+  **USER-xART** (`000096`) STABLE 4/4. (3) Les 16 o des `< TYPE=0x05` (B) = UUID d'adressage CONSTANTS, pas des nonces ; les SAVE
+  (B, ~849 o) 100 % variables. (4) Chaînage octet pour octet : dernier SAVE SEP-xART c21 = FETCH SEP-xART c23 → `fetch(N)=save(N-1)`.
+  (5) pnon 0x15 non tracé ; le `nonce-seeds 0x203` du hv_uart est une écriture NVRAM macOS, pas une valeur du FETCH 0x13.
+- Interprété (→ hypotheses.md) : la fraîcheur validée avant l'acceptation (sbio) est portée par des octets **variables par boot**
+  (SEP-xART maître), pas constants → rejeu statique impossible ; mais ce blob = le dernier SAVE du boot d'avant → voie C = relais du
+  dernier SAVE. Indécidable en lecture si l'état scellé interne a un compteur/graine en plus de la clé → seul un essai écriture tranche.
+  Renforce HV1(B)/HV2 (re-scellement observé = attendu d'un rejeu sans le bon contexte de fraîcheur). Statut `hypothèse` (pas d'écrit).
+- Incidents : aucun.
+
+## 2026-11-12 — Claude (Opus 4.8) — Phase 2 : d'où vient la fraîcheur xART (nonce) → le re-scellement de la voie C est l'attendu
+- Trace : — (analyse pure `macos/kernel.macho`, aucun hardware ; 2 sous-agents lancés en //: documentaliste=sources publiques nonce,
+  analyste=nonce constant/variable dans les traces de boot).
+- Fait : désassemblé la chaîne nonce du kext AppleSEPManager : `nonce_generate/read/invalidate` → `_nonce_action` →
+  `_runOperation` → **`AppleSEPXART::_xmsgSend`** (le nonce passe par l'EP xART 0x13) ; `AppleSEPUserClient::getOrGenerateNonce`
+  (logs « Current/New SEP Nonce ») ; **`AppleSEPBooter::generateROMNonce`** (opcode `BootOpcode::ReportNonceWord`, nonce produit
+  par la ROM du SEP), appelé seulement via user-client `DispatchUserClientGenerateROMNonce`. Et `_determineOsUuidGated` (op 0x13)
+  lit `/chosen` → `apfs-preboot-uuid`. Consigné `kext_sepmanager.md` §9.
+- Vu (FAITS kext) : l'état xART est ancré à (1) l'UUID d'OS = apfs-preboot-uuid (CONSTANT par install → rejouable) et (2) un
+  **nonce produit par le SEP** (xART et/ou ROM), l'AP ne choisit pas sa valeur.
+- Interprété (HYPOTHÈSE, source: kext) : comme la fraîcheur vient d'un nonce SEP (pas d'une valeur AP), un rejeu de lockers scellés
+  à un autre boot est lié à un **ancien** nonce → au boot m1n1, le SEP charge les 2 blobs maîtres + l'UUID puis **re-scelle (op 0x01)**
+  au lieu d'aller aux gigalockers (op 0x05). = EXACTEMENT la bifurcation de l'essai voie C. Donc le re-scellement est le comportement
+  **attendu**. SEULE porte de sortie possible, non tranchée par le kext : le nonce de boot est-il dérivé d'une **graine réglable**
+  (NVRAM « boot nonce ») — rejeu possible — ou interne/aléatoire par boot — rejeu impossible ? → sous-agent documentaliste.
+- Décision/limite : rien envoyé au Mac. Aucune relance voie C. L'étape qui écrirait reste Albert + image disque d'abord.
+- Incidents : aucun.
+
+## 2026-11-12 — documentaliste — xART anti-rejeu / nonce : ce que le PUBLIC établit (réponse à la question ouverte ci-dessus)
+- Trace : — (sources publiques seules : doc Asahi sep/ + platform/security/, clone m1n1, rappel linux-asahi).
+- Vu (FAITS publics) : (1) Asahi affirme la finalité anti-rejeu — « The xART prevents replay attacks from capturing the VEK »
+  (platform/security/) — mais **ne décrit aucun mécanisme** (ni compteur monotone, ni nonce, ni ancre de fraîcheur). (2) EP 0x10
+  `xars`, 0x13 `xart manager` (gigalockers/keybags, needed for SKS), 0x15 `pnon` = « boot policy related / Machine owner credentials
+  handoff » — `pnon` n'est **pas** décrit comme un nonce anti-rejeu. (3) m1n1 lit déjà le gigalocker du disque :
+  `rust_read_gigalocker` / `get_gigalocker` (commit 07c2c3af, S. Finkelstein, 2026-07-16 ; volume APFS rôle xART 0x100) → le
+  **stockage AP est trivialement rejouable**. (4) `nonce` dans m1n1 ne concerne que l'aléa de boot Linux (rng-seed), jamais xART.
+  Aucune notion ap-nonce/sep-nonce/BootNonce liée à la fraîcheur xART dans le public.
+- Interprété : le public donne l'**intention** (anti-rejeu) + prouve que le blob AP est rejouable, mais **ne tranche pas** entre
+  « nonce régénéré par boot » (rejeu du dernier état impossible) et « simple monotonie de version » (dernier état toujours acceptable).
+  → Conclusion publique = **(c) indéterminé**. La question ne se tranche que par l'expérience (voie B : chercher un nonce/compteur par
+  boot dans l'échange 0x13), pas par la doc. Complète, sans contredire, l'hypothèse kext ci-dessus (nonce SEP) : le kext suggère
+  « nonce SEP », mais aucune source PUBLIQUE ne le confirme ni ne dit s'il est réglable.
+- Détail et citations : docs/public_linux_state.md, section « 2026-11-12 — xART anti-rejeu / nonce (sources publiques) ».
+- Incidents : aucun (aucune action hardware).
+
+## 2026-11-11 (23:56) — Claude (Opus 4.8) — Mac revenu en USB local ; sep_peek tenté, m1n1 coincé au chainload
+- Trace : traces/20261111-235625_etat_retour (chainload.log ; pas de lecture MMIO — échec avant).
+- Fait : lien proxy de retour en **USB local** (ttyACM0/1, m1n1 v2.0.0-92-g7075). Lancé `tools/sep_peek.sh` (lecture seule).
+- Vu : le chainload du m1n1 frais va jusqu'à « Preparing to run next stage », puis **reconnexion USB timeout** ; ensuite
+  **plus aucun /dev/serial/by-id** (vérifié 5×). Le nouveau m1n1 ne réénumère pas → m1n1 **coincé**.
+- Interprété : flakiness connue du chainload (cf. récup ALARM). Aucune donnée touchée, aucune écriture SEP (échec avant toute
+  lecture MMIO). Récup = **power-cycle physique** du Mac par Albert (présent) pour relancer m1n1 en mode proxy.
+- Incidents : m1n1 coincé après chainload ; pas insisté (règle « Mac ne répond plus → ne pas insister »).
+
+## 2026-11-11 — Claude (Opus 4.8) — Phase 2 : désassemblage du dispatch xART (EP 0x13) — pourquoi le SEP a demandé SAVE à TAG=0x05
+- Trace : — (aucun hardware ; lien proxy hors ligne depuis le PC — ni USB ni tunnel. Analyse pure sur `macos/kernel.macho`.)
+- Fait : désassemblé `AppleSEPXART::_handle_sep_driven_msg` (vm 0xfffffe0009986588, kext AppleSEPManager) avec
+  `analysis/kext/kdis.py` (capstone, venv scratchpad ; listing non commité). Décodé la table de saut des opérations xART.
+  Résultat consigné en `docs/kext_sepmanager.md` §8 (source: kext).
+- Vu (FAITS kext, certains) : l'octet 2 du message = l'opération. **op 0x00 = FETCH xART maître** (« Fetched %s-xART with CRC »),
+  **op 0x01 = SAVE xART maître** (« Saving %s-xART with CRC »), **op 0x05 = FETCH gigalocker par UUID** (16 o d'UUID dans le
+  tampon B → locker rendu dans A), op 0x06 = save/fetch gigalocker, op 0x07 = locker supprimé/introuvable, op 0x0e = état
+  fw-boot (sepfw-loaded…), **op 0x13 = `_determineOsUuidGated` (rend 16 o d'UUID d'OS)**. Tampons : `this+0xc8` = A (AP→SEP),
+  `this+0xd0` = B (SEP→AP) — concorde avec la convention de trace. La classe expose un sous-système de nonce/graines de session
+  (`nonce_generate/read/invalidate`, `commit_hash`, `erase_session_seeds_for_UUID`, `setup_OS_UUID`).
+- Interprété (HYPOTHÈSE) : l'essai voie C n°1 a rejoué TAG 0x02=op0x0e (fw), 0x01=op0x13 (UUID), 0x03=op0x00 (SEP-xART),
+  0x04=op0x00 (USER-xART) — donc **2 blobs maîtres + UUID + drapeau fw**, pas « 4 gigalockers ». Là où macOS fait ensuite des
+  **op 0x05 (FETCH gigalocker)**, le SEP sous m1n1 a émis **op 0x01 (SAVE xART maître)** : il veut **ré-écrire** son xART, pas
+  restaurer la suite. Cela renforce l'hypothèse B de HV1 (état jugé non valide/courant → re-scellement), et un SAVE acquitté
+  ferait a priori avancer le compteur scellé → cohérent avec la casse du boot Apple après l'essai. Reste `hypothèse` (le *pourquoi*
+  interne est dans SEPOS, pas dans ce kext).
+- Décision/limite : **ne relance PAS la voie C.** L'étape hardware suivante (Essai A, rejeu observationnel) est une **écriture SEP**
+  → interdite à l'agent, et bloquée par la règle « pas de réécriture SEP sans image disque d'abord » (voie C a cassé le boot
+  Apple, 2026-11-11 nuit). Rien envoyé au Mac dans cette session.
+- Incidents : aucun (aucune action hardware).
+
 ## 2026-11-11 (nuit) — Albert + Claude (Opus 4.8) — RÉCUPÉRATION : ALARM bootable par tethered boot (Mac usable malgré le côté Apple cassé)
 - Trace : — (aucune capture SEP ; récupération système).
 - Fait :

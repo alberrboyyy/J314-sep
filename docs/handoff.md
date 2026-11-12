@@ -1,14 +1,63 @@
-> # 🔴 STOP — LE MAC EST EN PANNE DE DÉMARRAGE (2026-11-11)
-> Les essais voie C (rejeu SEP) ont bousculé l'état de la puce : le Mac ne charge plus le menu de
-> démarrage ni la récupération Apple (bootloop) ; seul m1n1 démarre. macOS est HS, le menu pour
-> rebasculer sur Asahi ALARM (le Linux d'Albert) est cassé. **Données + ALARM intactes, backup OK,
-> Mac non brické.** AVANT TOUT AUTRE TRAVAIL, lis **`docs/RECUPERATION_MAC.md`** et aide Albert à
-> récupérer son Linux (tethered boot, non destructif). **AUCUN nouvel essai SEP tant que le Mac
-> n'est pas récupéré.**
+> # 🟠 MAC RÉCUPÉRÉ (ALARM) — CÔTÉ APPLE TOUJOURS CASSÉ (2026-11-12)
+> Les essais voie C (rejeu SEP) ont bousculé l'état de la puce : côté Apple tout bootloope (macOS,
+> recovery, menu Startup Options) ; seul m1n1 démarre. **Mais ALARM (le Linux d'Albert) est RÉCUPÉRÉ
+> et bootable** par tethered boot depuis le PC (`tools/tethered_boot.sh alarm`). Données + ALARM
+> intactes, backup OK, **Mac non brické**. Réparer le côté Apple = DFU Restore (plus tard, 2e Mac).
+> Mémoire : [[mac-boot-casse-recuperation]]. **Aucune réécriture SEP sans l'accord d'Albert** (il lance).
 
-Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 11).
+Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 12).
+
+## POINT DE REPRISE 2026-11-12 (Opus 4.8) — Mac récupéré en ALARM ; prochain pas SEP = essai observationnel (relais du dernier SAVE)
+
+**ÉTAT MATÉRIEL à la reprise (différent des sections plus bas : plus de tunnel relais) :**
+- Mac en **USB LOCAL direct** (Albert est devant, pas de relais TCP). Proxy m1n1 v2.0.0-92-g7075,
+  `/dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00` → ttyACM0 (console if02→ttyACM1).
+- **Le Mac tourne ALARM (tethered boot)** à la fin de cette session. Pour faire du SEP il faut le remettre
+  en **m1n1 proxy** (ALARM ≠ proxy : le noyau a pris la main).
+- **Piège PMU/SPMI (vu aujourd'hui, aussi en mémoire)** : après des manips SEP (sep_peek / voie C), `linux.py`
+  plante au `PMU.reset_panic_counter` (UartTimeout SPMI, bus PMU figé). **Un m1n1 frais ne suffit pas** →
+  **coupure complète du courant** (bouton alim ~10 s). Ensuite le **proxy USB ne réénumère pas seul**
+  (rien sur ttyACM / lsusb alors que l'écran dit « running proxy ») → **changer câble/port** jusqu'à ce que
+  `serial/by-id` revienne. Une fois coupé proprement, le PMU répond et le boot passe.
+- `tools/tethered_boot.sh alarm` lancé **sans terminal** finit par `termios.error: Inappropriate ioctl for device`
+  (ouverture du ttymode) — **pas un échec**, le noyau est déjà parti. ALARM se rejoint par SSH (`tools/linux_ssh.sh`, root@10.0.200.4).
+
+**CE QUI A CHANGÉ CÔTÉ ANALYSE (corrige les sections plus bas) :** voir [[voie-c-xart-fraicheur]], docs/messages.md
++ docs/hypotheses.md (section xART, 2026-11-12), docs/kext_sepmanager.md §8/§9.
+- Le blob xART variable rejoué **= exactement le DERNIER SAVE du boot précédent** (chaînage prouvé octet pour octet,
+  `fetch(N)=save(N-1)`). Donc un rejeu doit resservir **le dernier SAVE, PAS le FETCH initial** d'un boot.
+- Les 2 blobs qui changent par boot = **SEP-xART maître** (TAG 0x03, avant sbio) + locker **Credential Manager**.
+  **USER-xART est STABLE** (corrige une hypothèse antérieure). UUID d'OS constant `EFF3C698-…` (rejouable, pas le verrou).
+- La divergence de l'essai n°1 (SEP envoie TAG=0x05 **TYPE=0x01 SAVE** au lieu de FETCH) = re-scellement **attendu**.
+  Le verrou de fond (clé relayable OU compteur scellé) **ne se tranche QUE par une écriture**.
+
+**PROCHAIN PAS = essai observationnel (écriture SEP → script `pending/`, Albert lance).** Pas encore écrit.
+Il doit **suivre le SEP** au lieu de s'arrêter à la divergence : laisser le SEP re-sceller (op 0x01), **l'acquitter**,
+et regarder s'il finit par annoncer **`sks` (0x12, le trousseau)** et atteindre un état fonctionnel (≠ juste `sbio`).
+
+**PROCÉDURE :**
+1. *(Optionnel — décision Albert)* **image disque** depuis ALARM (qui tourne). Discuté : ce n'est **pas** un vrai
+   filet pour le SEP (une image disque ne répare pas le SEP ; seul DFU Restore le fait), juste du confort. Les vrais
+   filets existent déjà : ALARM boote indépendamment + DFU Restore plus tard. Albert tranche : image ou on saute.
+2. **Remettre le Mac en m1n1 proxy** : power-cycle, **ne PAS** tethered-booter ALARM ; vérifier `/dev/ttyACM`
+   (re-câble/port si besoin, cf. piège ci-dessus).
+3. **J'écris le script** dans `pending/` (en-tête but / risque / résultat attendu ; relais du **dernier SAVE** ;
+   OBSERVE = suit le SEP, acquitte le SAVE, écoute l'annonce d'endpoints).
+4. **Albert relit.**
+5. **Albert lance.** Je lis la trace : SEP accepte et avance (sks annoncé → rejeu suffisant) OU re-scelle et bloque
+   (compteur scellé). S_new à relayer : repartir de `traces/20261111-113919_snew-reel` (ou recapturer un S_new en
+   lecture seule avant, sans booter macOS entre-temps).
+
+**EN ATTENTE D'ALBERT :** (a) image disque oui/non ; (b) quand lancer (reboot m1n1 maintenant, ou plus tard).
+
+**Sûreté (mémoire voie-c-xart-fraicheur) :** lectures seules et **boot SEP permissif nu** (sep_boot, sep_peek) OK en
+autonomie (le SEP-BOOT du 2026-11-09 n'a pas cassé le menu, auto-récupéré). Ce qui casse = **engagement xART +
+re-scellement**. Toute écriture xART = Albert + (si choisie) image disque.
 
 ## POINT DE REPRISE 2026-11-11 (fin après-midi, Opus 4.8) — essai voie C REPRODUIT ; reprendre par l'observation
+<!-- ⚠️ SECTION HISTORIQUE — l'état matériel ci-dessous (tunnel relais 10.0.200.5, « Mac débranché », S_new à
+     recapturer) est PÉRIMÉ. État courant et procédure à jour = section 2026-11-12 en tête. Garder pour l'historique
+     des idées (OBSERVE, divergence) mais NE PAS suivre les commandes tunnel/relais : le Mac est en USB local direct. -->
 
 **Acquis aujourd'hui (vérifié n=2, Albert a lancé) :** un SEP démarré par m1n1 accepte la pose des tampons
 xART, **rejoue 4 lockers** (dont SEP-xART+USER-xART), **annonce sbio/scrd/sse/skdl**, puis **diverge à la 5e

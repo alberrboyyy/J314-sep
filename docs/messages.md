@@ -725,3 +725,47 @@ Scripts : `analysis/diff_xart_ool.py`, `analysis/count_sensor_vs_sep_images.py` 
 - Save SEP-xART = 16 octets variables par save (aspect nonce/MAC) + corps chiffré constant au sein d'un boot.
 - Interprétation (hypothèse) : fraîcheur anti-rejeu portée par le préfixe 16 o + corps renouvelé. Rejeu de la dernière sauvegarde = exactement
   ce que le SEP attend au boot suivant ; reste à voir par écriture si l'état interne l'accepte quand Linux boote le SEP.
+
+### xART — fraîcheur FETCH : constant vs variable par boot (analyste, 2026-11-12, lecture seule, 4 boots)
+
+Question tranchée **côté traces** pour la voie C : les octets que le SEP valide au FETCH (avant d'accepter) sont-ils **constants**
+(rejouables à l'identique) ou **variables par boot** (non rejouables à l'identique) ? Boots comparés = **4 captures macOS complètes**
+avec OOL EP 0x13 (`SEP_OOL_EPS=0x13`, buffers 0x8000) : `c21` (`traces/20261111-010323_c21-xart-ool`), `c23` (`…011447_c23…`),
+`c24` (`…013303_c24…`), `snew-reel` (`…113919_snew-reel`). **`c22` inexploitable** (0 fichier OOL, boot avorté). Scripts :
+`analysis/diff_xart_ool.py` + scratchpad `xart5.py`/`bmap.py`/`bdiff.py` (appariement par rôle TAG/TYPE/PARAM, hash SHA-256, byte-diff).
+
+- **Réponse AP à l'op 0x13 = UUID d'OS (tampon A, fichier `000092_13_A.bin`, 16 o) : CONSTANT 4/4.** Valeur lue identique sur les
+  4 boots : `eff3c698 a7404f41 ab8699c8 5c0eb880` = **EFF3C698-A740-4F41-AB86-99C85C0EB880** = le groupe de volumes macOS (`OS UUID is …`
+  dans hv_uart ; = `apfs-preboot-uuid`). **VU** : confirme la prédiction « constant pour une même install ».
+- **Coffre rendu au SEP (tampons A, FETCH) = 10 blobs ; 8 CONSTANTS octet pour octet sur les 4 boots, 2 VARIABLES à chaque boot.**
+  - VARIABLE 1 — **SEP-xART maître** (`000094_13_A.bin`, réponse op 0x00 à `< TAG=0x03`, PARAM 0x64, ~0x363 = 867 o utiles) :
+    **4 SHA distincts** (c21 `24e824f0`, c23 `f62a3eeb`, c24 `83948264`, snew `adf83d7b`). Byte-diff : **~846 o/867 diffèrent** entre
+    deux boots ; les **17 premiers octets (0x00..0x10) = 0x00** (pas un nonce en clair) ; le corps (0x11→0x363) entièrement renouvelé (aspect chiffré).
+    **Fetché AVANT l'annonce sbio** (c21 : seq 94 vs sbio `< TYPE=0x1d PARAM=0x6f` à seq 97).
+  - VARIABLE 2 — **locker Credential Manager** (`000222_13_A.bin` / snew `000214`, UUID `8624497a…`, ctx ACMTRM, ~0x307c o utiles) :
+    **4 SHA distincts** (`16bfaf55`, `18b8691a`, `e60b7b2c`, `97dcd7ee`). Fetché **après** sbio.
+  - CONSTANTS (8, mêmes SHA 4/4) : **USER-xART** (`000096`, `cccee08a`) ; lockers `000133` (`fe5ca890`), `000138` (`c2d5cc61`),
+    `000144` (`3c4ee0d9`), `000164` (`da9324d1`), `000182` (`63e8087f`) ; 2 gros lockers de session `000533` (`7ac4ba15`, 8182 o nz) et
+    `000603` (`1f141cf5`, 8183 o nz). **Précision vs T-47** : sur ces 4 boots **USER-xART est bien STABLE** ; les 2 seuls variables sont
+    SEP-xART maître + Credential Manager.
+- **Tampons B (SEP→AP).** Les 16 o non nuls des `< TYPE=0x05` (seq 104/137/141/143/160/181/221) sont des **UUID d'adressage** de locker,
+  **CONSTANTS** 4/4 (ex. `8624497a…` = Credential Manager ; `d15bc8da…` = USER_XART « not found ») — des identifiants, **pas** des nonces.
+  Les **SAVE** `< TYPE=0x01/0x06` (seq 227/229/231, ~849 o) sont **variables à 100 %**, haute entropie dès l'octet 0.
+- **Chaînage prouvé octet pour octet (boots traçés consécutifs)** : dernier SAVE SEP-xART de c21 (`000231_13_B.bin`, tête `78147638 176cd341
+  357725cb c5f976…`) = FETCH SEP-xART de c23 (`000094_13_A.bin`, corps à 0x11 après 17 o de zéro : `78147638 176cd341 357725cb c5f976…`).
+  Donc **`fetch(N) = save(N-1)`** sur le contenu (pas seulement le CRC du log noyau). Idem c21→c23→c24 (déjà en T-47).
+- **pnon EP 0x15** : non capturé en OOL (trace filtrée sur 0x13) et **aucun message 0x15 dans la fenêtre 0x13**. Le `nonce-seeds (size 0x203)`
+  vu dans `hv_uart.log` est une **écriture NVRAM** de macOS (nonce de boot), **pas** une valeur échangée sur le FETCH 0x13.
+
+**Conclusion factuelle (VU, 4 boots) — statut `hypothèse`** (aucune expérience d'écriture ne l'a confirmée) :
+- La fraîcheur que le SEP valide **avant d'accepter** (avant d'annoncer sbio) est portée par des octets **VARIABLES à chaque boot** : le
+  blob **SEP-xART maître** (fetché en seq 94, 867 o dont ~846 changent). Elle n'est **pas** portée par des octets constants. Donc un rejeu
+  **statique** (resservir toujours le même blob capturé) présenterait un SEP-xART **périmé** → **non rejouable à l'identique**.
+- Mais ce blob variable **est exactement le dernier SAVE du boot précédent** (chaînage prouvé). La voie C n'est donc pas un rejeu statique
+  mais un **relais du dernier SAVE** : resservir ces octets-là, c'est resservir ce que le boot suivant attend.
+- **INTERPRÉTÉ / indécidable en lecture** : savoir si l'état scellé interne du SEP est **seulement** la clé qui déchiffre/authentifie ces
+  blobs (alors relayer le dernier SAVE suffit) **ou** aussi un **compteur monotone / graine de session** interne que le SEP incrémente au
+  SAVE et vérifie au FETCH (invisible, chiffré). L'absence de compteur **en clair** ne prouve pas l'absence de compteur **scellé**. Recoupe
+  `kext_sepmanager.md` §8 (symboles `nonce_*`, `setup_OS_UUID`, `erase_session_seeds_for_UUID`) : seul un test en **écriture** tranche.
+- **Support** : 4 boots comparables pour constant/variable ; chaînage sur paires consécutives (c21→c23→c24). Suffisant pour les faits
+  d'octets (VU) ; insuffisant pour conclure que le relais sera accepté (reste `hypothèse`, dépend d'un essai en écriture — voie C).

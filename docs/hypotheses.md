@@ -53,6 +53,22 @@ Deux **types d'opération** distincts, lisibles aux tampons OOL :
   s'est arrêté **avant d'y répondre**. Puis écoute : **11 endpoints, sbio présent, sks (0x12) ABSENT**.
 - Précondition : S_new macOS tournait **juste avant** (reboot matériel → m1n1 → script).
 
+### Fraîcheur FETCH : constante ou variable par boot ? (analyste, 2026-11-12, [LS], 4 boots) — VU
+Question décisive voie C, tranchée **côté traces** sur 4 boots macOS avec OOL 0x13 (`c21`, `c23`, `c24`, `snew-reel` ; `c22` avorté).
+Détail chiffré + fichiers/SHA dans `docs/messages.md` (section « fraîcheur FETCH : constant vs variable par boot »). Essentiel :
+- **UUID d'OS** (réponse op 0x13, tampon A `000092_13_A.bin`, 16 o) = `EFF3C698-A740-4F41-AB86-99C85C0EB880` : **CONSTANT 4/4** (= `apfs-preboot-uuid`).
+- **Coffre FETCH = 10 blobs : 8 CONSTANTS octet pour octet, 2 VARIABLES à chaque boot.** Les 2 variables = **SEP-xART maître**
+  (`000094`, fetché **avant** l'annonce sbio ; ~846 o/867 changent ; 17 premiers octets (0x00..0x10) = 0 ; **pas de nonce en clair**) et **locker
+  Credential Manager** (`000222`, après sbio). **USER-xART est STABLE** sur ces 4 boots (précision vs T-47).
+- **Chaînage octet pour octet** : dernier SAVE SEP-xART de c21 = FETCH SEP-xART de c23 → `fetch(N)=save(N-1)` sur le **contenu**.
+- **pnon 0x15** non capturé (filtre 0x13) ; aucun 0x15 dans la fenêtre ; le `nonce-seeds 0x203` du hv_uart = écriture NVRAM macOS, pas une valeur du FETCH.
+- **Conclusion (VU → statut hypothèse, aucun écrit ne l'a confirmée)** : la fraîcheur que le SEP valide **avant d'accepter** est portée
+  par des octets **VARIABLES par boot** (SEP-xART maître), **pas** par des octets constants → **rejeu statique impossible**. Mais ce blob
+  variable **est** le dernier SAVE du boot d'avant → la voie C = **relais du dernier SAVE**, pas rejeu figé. **Indécidable en lecture** :
+  l'état scellé interne (clé seule, ou **compteur/graine** interne vérifié au FETCH — cf. §8 `nonce_*`/`erase_session_seeds_for_UUID`,
+  penche vers B) ; seul un essai **en écriture** tranche. **Renforce HV1(B) et HV2** : un rejeu fidèle sans le bon contexte de fraîcheur
+  (variable par boot, invisible) expliquerait le re-scellement (SAVE op 0x01) observé à l'essai 1.
+
 ## Ce que ces faits changent (par rapport à l'ancienne lecture « tampons seuls »)
 - **sbio n'est PAS apparu grâce aux seuls tampons** : il est apparu **à l'intérieur d'un vrai échange xART partiel**, après
   l'acceptation apparente de 4 lockers, **au point exact** où macOS l'annonce. C'est un signe **encourageant** (le rejeu n'a pas
@@ -72,6 +88,14 @@ Deux **types d'opération** distincts, lisibles aux tampons OOL :
     « Transaction passée » = « reçue », pas « acceptée ». Si vrai, le rejeu est **refusé au niveau crypto** malgré l'apparence.
   - **(C) divergence d'environnement** : le SEP sous m1n1 ne lit pas correctement A (stream/IOVA DART), obtient des blobs
     inutilisables et abandonne le FETCH. (Mais sbio annoncé au point normal plaide **contre** un abandon précoce.)
+- **Apport désassemblage (2026-11-11, `source: kext`, cf. `kext_sepmanager.md` §8)** : le handler `_handle_sep_driven_msg`
+  confirme la sémantique des opérations xART — **op 0x00 = FETCH xART maître**, **op 0x01 = SAVE xART maître**,
+  **op 0x05 = FETCH gigalocker (UUID en B)**. Donc la bifurcation = le SEP passe de « restaurer » à « **ré-écrire son xART
+  maître** » exactement là où macOS irait chercher les gigalockers. Les 4 transactions rejouées avant la bifurcation étaient
+  op 0x0e (fw) / op 0x13 (UUID d'OS) / op 0x00 (SEP-xART) / op 0x00 (USER-xART) : **2 blobs maîtres + UUID + drapeau**, pas 4
+  gigalockers. Comme la classe lie l'état à un **UUID d'OS + nonce/graine de session** (symboles `nonce_*`, `setup_OS_UUID`,
+  `erase_session_seeds_for_UUID`), un rejeu fidèle des blobs **sans** le bon contexte de fraîcheur explique naturellement un
+  **re-scellement (op 0x01)** → **penche vers B**, sans encore le prouver (le choix est interne à SEPOS). Reste `hypothèse`.
 - **Ce qui distingue A de B sans rien envoyer de risqué** : le SAVE TYPE=0x01 écrit un blob dans **B** (que l'AP peut **lire**,
   c'est passif). Si ce blob **ressemble** à un re-scellement d'état restauré (et si le SEP a demandé en B, aux TAG 0x02/01/03/04,
   **les mêmes UUID** que macOS) → (A). S'il part d'un état vide/différent → (B). Les blobs sont chiffrés (contenu opaque), mais

@@ -276,3 +276,90 @@ Documentaliste. Sources : linux-asahi branche `asahi`, fichiers bruts
 ### D. Contradictions avec nos traces
 - Aucune : la doc publique est seulement incomplète (pas de spi2/spi4 dans le DT, pas de mesa). Les 4 contrôleurs vus
   dans la trace macOS ne sont pas tous décrits par Linux.
+
+---
+
+## 2026-11-12 — xART anti-rejeu / nonce (sources publiques)
+
+Documentaliste. Question posée : l'anti-rejeu xART du SEP est-il **inévitable par conception** (compteur/nonce
+monotone matériel interne au SEP qui refuse un rejeu), ou un rejeu fidèle des derniers lockers capturés peut-il
+être accepté par un SEP redémarré par m1n1 ? Sources lues le 2026-11-12 : doc Asahi `hw/soc/sep/` et
+`platform/security/` ; clone m1n1 local (commit de travail habituel) ; rappel des limites de linux-asahi (§1.2).
+Aucun firmware ni dump. Légende : **[public]**, **[déduit]**, **[trace]** comme ci-dessus ; **[kext]** = issu du
+désassemblage du kext (phase 2), cité ici seulement pour contraste, PAS comme source publique.
+
+### A. Ce que xART garantit, d'après la doc publique
+- [public] Asahi, https://asahilinux.org/docs/platform/security/ : « the SEP generates a Volume Encryption Key
+  (VEK) and eXtended Anti-Replay Token (xART) for each APFS volume » ; « The xART prevents replay attacks from
+  capturing the VEK » ; le VEK « is stored in the SEP's own airgapped memory » et « can never be read by the
+  application cores ». Avec FileVault : « the VEK and xART are wrapped with a Key Encryption Key (KEK) ».
+  « All encryption keys are destroyed by the SEP when the Machine Owner requests the machine to be wiped. »
+- [public] Même page, intégrité de boot (lié mais distinct de la fraîcheur xART) : pour chaque kernelcache,
+  « its hash is recorded in the SEP's Boot Policy ».
+- [public] Donc la **finalité** anti-rejeu est affirmée noir sur blanc (« prevents replay attacks »), mais la
+  page **ne décrit pas le mécanisme** : ni compteur monotone, ni nonce, ni où vit l'ancre de fraîcheur
+  (interne SEP vs NVRAM vs disque). « Non trouvé » côté doc pour le *comment*.
+
+### B. Les endpoints xART/pnon selon Asahi (table des endpoints, `hw/soc/sep/`)
+- [public] 0x10 = « xars (according to tracer) », « xART setup? involved in startup/shutdown ».
+- [public] 0x12 = « Secure/SEP Key Store », « SEP encrypt/decrypt operations and key management ».
+- [public] 0x13 = « xART manager », « manages xARTs, gigalockers and keybags (needed for SKS to start) ».
+- [public] 0x15 = « pnon (tracer name) », « Boot policy related. We will eventually need it for Machine owner
+  credentials handoff, but can be ignored for now ».
+- [public] Structure d'un locker décrite sur la même page : identifiant/UUID de clé à 0x01–0x12, longueur de clé
+  0x12–0x16, CRC de la clé wrappée 0x16–0x1a, payload/keybag wrappé de 0x22 à la fin. Fetch = message type 0 ;
+  réponse de fetch d'un locker = type 0x5 (succès), 0x7 = erreur, param 0x10. Les tags « seem to be increasing in
+  the order of the lockers within the gigalocker ». La trace gigalocker init (EP 0x13) est marquée **non vérifiée**
+  par Asahi.
+- [public] **La doc ne contient aucun nonce, compteur monotone, anti-rollback, ni « boot nonce » dans ces
+  endpoints.** Le nom `pnon` est seulement « boot policy related » (handoff Machine owner), pas décrit comme un
+  nonce anti-rejeu xART.
+
+### C. Nonce / BootNonce côté boot : ce que les sources publiques consultées contiennent
+- [public] Dans tout le clone m1n1, `nonce` n'apparaît que pour l'**aléa de boot Linux** (rng-seed / kaslr-seed
+  via GETRAND sur l'EP 0xff, cf. §1.1), **jamais** pour xART, le SEP scellé, un ap-nonce/sep-nonce ou un BootNonce.
+  Grep `xart|xarm|xars|pnon|anti-replay|nonce` sur m1n1 : aucune occurrence xART/pnon/nonce-anti-rejeu.
+- [public] linux-asahi (§1.2) : le stub `drivers/soc/apple/sep.rs` ne gère que TZ0/IMG4/shmem/découverte et
+  **ignore** tous les autres endpoints ; aucun code xART, nonce ou boot-policy. Rien non plus dans la doc bindings.
+- [déduit] La notion « ap-nonce / sep-nonce / BootNonce → fraîcheur de l'état scellé » n'est **pas documentée
+  dans les sources publiques autorisées ici** (Asahi + m1n1 + linux-asahi + open source Apple publié). Non trouvé.
+
+### D. Peut-on rejouer l'état xART d'un boot précédent ? — ce que le public établit
+- [public] **Le stockage opaque (gigalocker sur disque) est publiquement lisible.** m1n1 contient
+  `rust_read_gigalocker` (`rust/src/apfs.rs`, commit `07c2c3af` « proxyclient: Add get_gigalocker », Sasha
+  Finkelstein, 2026-07-16) : il scanne le GPT, trouve le volume APFS de rôle xART (`VOL_ROLE_XART = 0x100`,
+  `apfs.rs:162,330`), remonte au fichier gigalocker et renvoie son contenu brut (`apfs.rs:378-392`,
+  `proxyclient/m1n1/proxyutils.py:428-434` `get_gigalocker`, proxy op `P_READ_GIGALOCKER = 0x1400`).
+  → Côté AP, le blob xART n'est qu'un fichier chiffré que n'importe quel code peut relire : **rien côté AP
+  n'empêche de le rejouer.** C'est cohérent avec Asahi : le SEP « is the only one that seems to have dedicated
+  storage » et confie le reste à l'AP.
+- [public] **Ce que le public ne dit PAS** : où le SEP ancre la fraîcheur (compteur monotone matériel interne ?),
+  ni s'il refuse un gigalocker rejoué, ni s'il lie l'acceptation à un nonce régénéré à chaque boot. Asahi affirme
+  seulement l'objectif (« prevents replay attacks ») sans le mécanisme. L'open source Apple publié
+  (apple-oss-distributions) ne publie pas le firmware SEP ni les kexts SEP ; ces internes n'y figurent pas
+  (non trouvé).
+- [déduit] Nuance importante pour notre question précise : « anti-replay » protège classiquement contre un
+  **rollback** (rejouer un état *ancien*). Rejouer à l'identique l'état *le plus récent* sauvé n'est pas un
+  rollback. La question « un rejeu fidèle du dernier gigalocker passe-t-il ? » dépend donc de savoir si le SEP lie
+  l'acceptation à un **nonce régénéré à chaque boot** (alors le dernier état devient périmé au boot suivant) ou à
+  une **simple monotonie de version** (alors le dernier état reste toujours acceptable). **Aucune source publique
+  ne tranche entre ces deux cas.**
+- [kext, pour contraste — PAS une source publique] La classe `AppleSEPXART` expose `nonce_generate`/`nonce_read`/
+  `nonce_invalidate` (cf. `docs/kext_sepmanager.md`) : l'existence d'un nonce xART côté protocole est plausible,
+  mais son rôle (par-boot vs par-session) et son ancrage matériel ne sont **pas** établis publiquement. À traiter
+  comme hypothèse, à confirmer par l'expérience (voie B/C), pas par la doc.
+
+### E. Conclusion (sources publiques uniquement)
+**(c) Indéterminé publiquement.** Les sources publiques établissent l'**intention** anti-rejeu de xART
+(« The xART prevents replay attacks ») et montrent que le **stockage AP est trivialement rejouable** (m1n1
+`get_gigalocker`). Mais elles **ne documentent pas le mécanisme de fraîcheur** (compteur monotone interne au SEP,
+nonce par boot, ou simple monotonie de version) : impossible de conclure, à partir du seul public, que le
+re-scellement est (a) inévitable par conception, ni (b) contournable par rejeu du dernier état. Trancher exige une
+**expérience** (voie B pour chercher un nonce/compteur par boot dans l'échange 0x13, cf. `docs/xart_options.md`,
+`docs/verification_status.md` xART-CHAIN) ou l'étude du protocole en phase 2 — pas une source publique.
+
+### F. Contradictions doc publique ↔ nos traces (pour le sceptique)
+- Aucune contradiction : le public est seulement **muet** sur le mécanisme de fraîcheur. Nos traces (xART-CHAIN,
+  `verification_status.md` L120-123) vont plus loin que tout public : `save(N)=fetch(N+1)`, 2 lockers variables
+  sur 10 (SEP-xART TAG 0x03 + un locker Credential Manager), préfixe 16 o = nonce/MAC **hypothèse**, pas de
+  compteur en clair. À confronter à la voie B, pas à la doc.
