@@ -534,7 +534,26 @@ ce mot** : ils sont dans le **buffer OOL** pointé par l'objet.
 observée = **une suite de transactions `0xfc`, une par opcode** (0x23, 0x06, 0x65, 0x07, 0x09=match, 0x1f, 0x22, …). Le tag qui
 s'incrémente explique le compteur de TAG vu sur EP 0x08.
 
-**Pour le driver Linux (phase 2+)** : pour piloter sbio, (1) écrire opcode+payload dans un buffer OOL mappé au SEP, (2) envoyer un
-message EP 0x08 `type=0xfc`, `data`=descripteur OOL, `tag`=compteur++, (3) attendre le `0xfc` de réponse (même tag), (4) lire l'OOL
-de sortie. **Reste** : le format interne de l'OOL (où exactement l'opcode + le payload), et le type `0x70` (vu en trace, probable
+**Format OOL = `gt_packet_t`.** `0x993741c` (prépare le transfert) exige `oolBufferSize > sizeof(gt_packet_t)` (`cmp x2,#0x1c` →
+buffer > **0x1c = 28 o**), vérifie `context->transfer.state == kGTIdle` et met l'état à 2 (kGTBusy ?). Donc l'OOL commence par un
+en-tête **`gt_packet_t`** (**0x1c = 28 o**) écrit par `0x9937570`, puis le payload. Champs décodés (le writer construit l'en-tête
+puis `memcpy` le payload à `+0x1c`) :
+
+| offset | champ |
+|---|---|
+| +0x00 | `kind` = 1 |
+| +0x04 | longueur **totale** du transfert |
+| +0x08 | `offset` du fragment courant |
+| +0x0c | flags (endpoint `+0xac`) |
+| +0x10 | 0 (réservé) |
+| +0x14 | **opcode** (endpoint `+0xa4` → 0x09 match, 0x42 compteur…) |
+| +0x18 | longueur du fragment |
+| +0x1c | payload (données de la commande) |
+
+→ **l'opcode sbio est à l'offset `+0x14` du `gt_packet_t`**, dans le buffer OOL (pas dans le mot mailbox). Transfert fragmenté
+possible (champs `offset`/`total`/`fragment`), état `kGTIdle`→occupé.
+
+**Pour le driver Linux (phase 2+)** : pour piloter sbio, (1) écrire un `gt_packet_t` (opcode + payload) dans un buffer OOL mappé au
+SEP, (2) envoyer un message EP 0x08 `type=0xfc`, `data`=descripteur OOL, `tag`=compteur++, (3) attendre le `0xfc` de réponse (même
+tag), (4) lire l'OOL de sortie. **Reste** : champs exacts de `gt_packet_t` (`0x9937570`), et le type `0x70` (vu en trace, probable
 transfert d'image en vrac, distinct du `0xfc`) — à finir.
