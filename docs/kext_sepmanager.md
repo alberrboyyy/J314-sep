@@ -435,3 +435,15 @@ provient de structures de commande `bm_cmd_t` (cf. `performSpecificCommandGated(
 vraiment au SEP sont soit des mutations, soit des lectures de données biométriques (interdites). **Prochain pas pour une sonde** :
 suivre une sous-commande de `diagnostics` (sélecteur 1 → `0x978df34`) ou `getSepTimeMeasurements` pour trouver **une** lecture qui
 fait un `sepTransact` propre (opcode fixe, sortie bornée, aucune écriture) — ce serait le message à mettre dans `pending/`.
+
+### 12b. Format de commande `bm_cmd_t` (performSpecificCommandGated, source: kext)
+
+`performSpecificCommandGated(bm_cmd_t* cmd, payload, payloadSize, outData, outSize)` (slot 277) lit l'en-tête de `cmd` :
+- **Magic « BM »** (`0x4d42` = 'B','M', `getBiometricCommandMagic`) en u16 à l'offset **+0**. Format « BM » : champ u16 à **+2**
+  (sélecteur/opcode présumé, → `w25`) et u16 à **+6** (→ `w27`).
+- **Magic v2 « CMCM »** (`0x4d434d43`) en u32 à +0 : octet de **type** à **+4** mappé vers une taille (type `0x01`→`0x02`,
+  `0x1b`→`0x10`, `0x36`→`0x22`), octet à **+5** (→ `w27`) ; le driver reconstruit un en-tête « BM » (`0x4d42` + taille) en interne.
+Ensuite la commande est exécutée et, pour les opérations qui parlent au SEP, relayée par `sepTransact(opcode, …)`. L'`opcode`
+**fil** (EP 0x08) n'est donc pas le champ `bm_cmd_t` directement : il est posé au moment du `sepTransact` (appel virtuel).
+**Prochain pas table opcode↔fil** : tracer, pour quelques opérations nommées (§12), la valeur d'`opcode` passée à `sepTransact`,
+puis la croiser avec les TAGs EP 0x08 de `docs/messages.md` (0xfc/0x09/0x70…). **Statut : hypothèse (source: kext).**
