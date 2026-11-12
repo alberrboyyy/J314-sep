@@ -83,6 +83,12 @@ passer aux tâches hors hardware (analyse, outillage).
   latence (tunnel relais, cf. mémoire tunnel-relais-mac), 3 s est trop court pour `run_guest` (boot hyperviseur) →
   `UartTimeout` au bootstrap. Fix : **`export M1N1TIMEOUT=20`** (ou plus). Les lectures courtes (sep_peek) et le
   chainload passent avec 3 s, pas le boot macOS. Autres vars utiles : `M1N1DEVICE`, `HV_UART`, `M1N1WAIT`, `M1N1HEAP`.
+- **Protocole AVANT de coder la réponse** (erreur Claude, 2026-11-12) : avant d'écrire un script qui **répond** au SEP,
+  lister TOUS les messages qu'il pilote et **comment macOS répond à chacun**, depuis la capture complète + `kext_sepmanager.md`
+  §8 — pas depuis le seul sous-ensemble nommé dans la consigne. Erreur concrète : le mode FOLLOW n'acquittait que les SAVE
+  (0x01/0x06) et traitait tout le reste en « inconnu → stop » ; or l'op **0x07 (locker-absent)** était déjà dans la capture
+  (macOS l'acquitte, snew-reel TAG=0x0b) et documentée — l'arrêt « prudent » s'est déclenché sur un message connu et bénin,
+  coûtant un run. La règle « inconnu → stop » reste bonne ; c'est la liste des « connus » qu'il faut bâtir exhaustivement.
 
 ## Exception : 2e Linux de test (accord d'Albert)
 

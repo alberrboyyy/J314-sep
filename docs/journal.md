@@ -14,6 +14,56 @@ Format :
 
 ---
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Analyse des 13 blobs B re-scellés : l'op 0x07 ne change QUE 16 octets de tête, corps identique
+- Trace : `traces/20261112-215313_xart_replay/follow_B/` (13 blobs de 32768 o, lecture seule). Aucun matériel.
+  Script : `scratchpad/analyze_blobs.py` (régions non nulles, diff consécutif, octets stables, recherche de compteur, entropie).
+- Fait : diff octet par octet des 13 tampons B que la puce a re-scellés pendant l'ESSAI B, pour répondre à
+  « que re-scelle-t-elle ? un nonce/compteur bouge-t-il ? ».
+- Vu (FAITS) :
+  - Données concentrées **au début** du tampon (0x0000 → au plus 0x0264 = 612 o) ; tout le reste des 32 Ko = 0.
+  - Zone non nulle **croissante** à mesure que les lockers s'accumulent : 127 → 225 → 323 → 420 o
+    (pic à **613 o** au blob 008 = un SAVE-locker 0x06, puis retombe à 322).
+  - Diff consécutif : entre deux SAVE de **contenu différent**, **toute** la zone non nulle change (ré-écrite).
+  - **EXCEPTION nette — blob 009 → blob 010 (l'op `0x07` locker-absent)** : **seuls les 16 premiers octets (0x00–0x0f)
+    changent** ; le corps `0x10`→`0x142` (**307 o**) est **byte-à-byte identique**. Vérifié à part : corps identique = `True`,
+    tête `009`=`b460a57e…4542e8`, `010`=`d15bc8da…24b264`.
+  - Les 16 octets de tête sont à **entropie quasi-maximale** (≈4 bits/oct, 15–16 valeurs distinctes sur 16) sur les 13 blobs.
+  - **Aucun** octet non nul **stable** commun aux 13 ; **aucun compteur en clair monotone** (largeurs 1/2/4 oct, LE) dans les 0x400 premiers octets.
+- Interprété (HYPOTHÈSE, lecture de tampon, n=1) :
+  - Structure probable du B re-scellé : **[16 o d'enveloppe de fraîcheur (nonce ou MAC/tag, haute entropie)] + [corps scellé]**.
+  - L'op `0x07` re-scelle **sans nouveau contenu** → le corps ne bouge pas, **seule l'enveloppe 16 o est rafraîchie**. C'est la
+    signature d'un **anti-rejeu** : la fraîcheur avance à **chaque** scellement, même à contenu constant. Et le corps **identique**
+    montre qu'il n'est **pas** re-chiffré sur un 0x07 (ciphertext stocké tel quel ; seule la tête 16 o est recalculée).
+  - **Pas de compteur en clair** = cohérent avec un **compteur scellé interne** ([[voie-c-xart-fraicheur]]) : s'il existe, il est
+    sous le MAC/chiffrement, invisible en clair. Renforce HV1(B)/HV2 : rejouer un **vieux** B figé serait rejeté car sa tête 16 o
+    est liée à l'état de fraîcheur interne, qui a avancé.
+  - RÉSERVE : on ne connaît ni la clé ni l'algo ; « enveloppe = nonce/MAC » est une **déduction de structure**, pas une preuve.
+    On a montré « 16 o de tête changent à contenu égal », pas « c'est un GMAC » ni « c'est un IV ». Seul un essai en écriture (Albert) tranche.
+- Incidents : aucun (hors ligne).
+
+## 2026-11-12 (soir, 21:53) — Claude (Opus 4.8) + Albert — ESSAI B v3.1 : en acquittant le 0x07, la puce annonce `sks` (0x12) pour la 1re fois
+- Trace : `traces/20261112-215313_xart_replay` (+ 13 blobs B dumpés dans `follow_B/`). Albert a lancé après
+  reboot + **changement de port USB** (Bus 008→001) : plusieurs gels de lien avant (voir Incidents).
+- Fait : `FOLLOW=1` (v3.1, lanceur `pending/follow_go.sh`). Correctif v3.1 en action : 0x07 désormais acquitté.
+- Vu (FAITS) : boot SEP OK, tampons OK. Après les 4 lockers maîtres, la puce a enchaîné **13 ops acquittées** :
+  9 SAVE (0x01/0x06, TAG 0x05→0x0d, blobs B 125→613 o) **puis un 0x07 (locker-absent, TAG=0x0e) — acquitté
+  cette fois** — **puis 3 SAVE de plus** (TAG 0x0f/0x10/0x11, B 322→418 o), puis **timeout** (la puce n'a plus
+  rien demandé). **Endpoints finaux : incluent `0x12 sks`** (ABSENT au run 21:28 ; sbio/scrd/sse/skdl aussi présents).
+  (La ligne auto « sks ABSENT » du script était un FAUX NÉGATIF : le nom d'endpoint = `"\x00sks"` (octet nul de tête)
+  → le test par chaîne ratait. La LISTE des endpoints, elle, montre bien 0x12. Corrigé : test par numéro d'EP.)
+- Interprété (HYPOTHÈSE) : acquitter le 0x07 (correctif v3.1) a laissé la puce **avancer** jusqu'à annoncer le
+  trousseau `sks` (0x12) — 1re apparition sous m1n1. L'annonce de sks semble **conditionnée à la progression xART**
+  (au run précédent, arrêt au 0x07 → pas de sks). RÉSERVES : (1) « annoncé ≠ fonctionnel » (même réserve que sbio) —
+  ce n'est PAS « Touch ID marche » ; (2) **n=1** ; (3) la puce n'a PAS suivi la séquence FETCH de macOS : elle a fait
+  sa propre chaîne de 13 re-scellements puis s'est tue → état atteint par re-scellement, pas par restauration des
+  gigalockers ; (4) les 13 SAVE = **vraies écritures SEP** (état scellé avancé), aucune persistance disque.
+- Fait (suite) : bug d'affichage sks/sbio corrigé dans `pending/sep_xart_replay.sh` (test par numéro d'EP). Revalidé
+  (bash -n + py_compile). Dumps B à analyser (que re-scelle la puce ? croissance 125→613 o).
+- Incidents : plusieurs `UartTimeout` (gel du proxy m1n1 PENDANT le boot SEP, point variable = flakiness de lien,
+  pas le script) ; power-cycles + **changement de port USB** (Bus 008→001) pour obtenir un run propre. Aucun côté disque.
+- RAPPEL m1n1 : en vérifiant un détail j'ai rouvert `m1n1/.../sep.py` → avis mainteneurs « pas d'IA sur m1n1 » (journal
+  session 1). Lecture du code m1n1 stoppée ; info tirée de la sortie + nos docs. Contrainte = ne rien contribuer à Asahi (respecté).
+
 ## 2026-11-12 (soir, ~21:30) — Claude (Opus 4.8) + Albert — ESSAI B (FOLLOW) LANCÉ : 9 re-scellements puis op 0x07 ; sks absent mais arrêt prématuré
 - Trace : `traces/20261112-212820_xart_replay` (run réussi ; Albert a lancé). Deux runs avortés avant :
   `…211716` (UartTimeout au DÉBUT du rejeu, 0 écrit) et `…212238` (chainload NOP timeout, m1n1 coincé) →

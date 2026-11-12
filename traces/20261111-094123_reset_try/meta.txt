@@ -1,0 +1,6 @@
+date: 20261111-094123
+name: reset_try
+m1n1_commit: 70757dc7
+proxy_port: /tmp/m1n1
+chainload: oui
+mmio_reads: CPU_CONTROL(+0x44) A2I_CONTROL(+0x8110) I2A_CONTROL(+0x8114)

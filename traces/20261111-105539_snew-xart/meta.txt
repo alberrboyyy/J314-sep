@@ -1,0 +1,15 @@
+date: 20261111-105539
+name: snew-xart
+mode: auto
+timeout_s: 1800
+end_action: reboot
+m1n1_commit: 70757dc7
+trace_script: /home/albert/Desktop/sep-touchid/hv/trace_sep_filtered.py
+kernel: /home/albert/Desktop/sep-touchid/macos/kernel.macho
+bootargs: debug=0x14e serial=3 apcie=0xfffffffe -enable-kprintf-spam wdt=-1 clpc=0
+proxy_port: /tmp/m1n1
+hv_uart_port: /tmp/m1n1-console
+end_reason: client_exited
+lines: 89
+live_eps: 0x13
+sep_eps: 0x13

@@ -69,6 +69,20 @@ Détail chiffré + fichiers/SHA dans `docs/messages.md` (section « fraîcheur F
   penche vers B) ; seul un essai **en écriture** tranche. **Renforce HV1(B) et HV2** : un rejeu fidèle sans le bon contexte de fraîcheur
   (variable par boot, invisible) expliquerait le re-scellement (SAVE op 0x01) observé à l'essai 1.
 
+### Fraîcheur SAVE : où vit-elle dans le blob re-scellé ? (Claude Opus 4.8, 2026-11-12, hors ligne, n=1) — VU
+Complément **côté SAVE** du point précédent (qui, lui, était côté FETCH). Analyse des 13 tampons B re-scellés par la puce pendant
+l'ESSAI B (`traces/20261112-215313_xart_replay/follow_B/`, diff octet par octet). Essentiel :
+- Le B re-scellé = **petite structure en tête** (0x00 → au plus 0x264) ; reste des 32 Ko = 0 ; taille croît avec les lockers.
+- Entre deux SAVE de **contenu différent**, **toute** la zone non nulle est ré-écrite (re-chiffrée).
+- **Fait net : l'op `0x07` (locker-absent) re-scelle sans nouveau contenu et ne change QUE les 16 premiers octets** (0x00–0x0f) ;
+  le corps (0x10→0x142, 307 o) est **byte-à-byte identique** au blob d'avant. Ces 16 o sont à **entropie quasi-max** sur les 13 blobs.
+- **Interprété (hypothèse)** : le blob porte une **enveloppe de fraîcheur de 16 o en tête** (nonce ou MAC/tag), **distincte** du corps
+  scellé, **recalculée à chaque seal même à contenu constant** → signature d'un **anti-rejeu** (la fraîcheur avance à chaque SAVE).
+  Côté FETCH on voyait « pas de nonce en clair » (17 o de tête = 0) ; côté SAVE la fraîcheur **est** ces 16 o de tête variables.
+  **Aucun compteur en clair** ailleurs → cohérent avec un **compteur scellé interne** ([[voie-c-xart-fraicheur]]), invisible.
+- **Réserve** : lecture de tampon, n=1, clé/algo inconnus. On a prouvé « 16 o de tête changent à contenu égal », **pas** « c'est un
+  GMAC/IV ». Ne tranche **pas** entre « clé seule » et « compteur scellé » ; **renforce** HV1(B)/HV2 (rejeu figé d'un vieux B = rejeté).
+
 ## Ce que ces faits changent (par rapport à l'ancienne lecture « tampons seuls »)
 - **sbio n'est PAS apparu grâce aux seuls tampons** : il est apparu **à l'intérieur d'un vrai échange xART partiel**, après
   l'acceptation apparente de 4 lockers, **au point exact** où macOS l'annonce. C'est un signe **encourageant** (le rejeu n'a pas
@@ -122,6 +136,10 @@ Détail chiffré + fichiers/SHA dans `docs/messages.md` (section « fraîcheur F
   conclure « sks absent prouve l'échec du rejeu ».
 - **Renfort (2026-11-12, Essai C / FOLLOW, voir plus bas)** : en suivant le SEP (9 SAVE acquittés), sks reste absent — MAIS le
   suivi s'est arrêté prématurément sur une op 0x07 que macOS acquitte. Donc « sks absent » reste **non concluant** ; HV3 ouverte.
+- **MAJ (2026-11-12 21:53, Essai C bis v3.1, n=1)** : 0x07 acquitté → la puce avance et **annonce `sks` (0x12)** pour la 1re fois
+  sous m1n1 (trace `…215313`). Donc « sks s'annonce bien » quand on suit assez loin. **Mais** « annoncé ≠ fonctionnel » (même
+  réserve que sbio) : reste à prouver qu'on peut ouvrir/utiliser le trousseau. HV3 **toujours ouverte**, basculée côté « sks
+  atteignable à l'annonce », pas « fonctionnel ».
 - Expérience « annoncé vs fonctionnel » SANS doigt (point 4), du moins au plus intrusif :
   - **[LS — tout de suite, dès qu'un log imprime tous les messages]** après l'annonce de sbio, le SEP émet-il un **trafic sbio
     spontané** (init type C1 L320-449 : 0x17/0x15/0x16…) ou **seulement son nom** puis silence ? (L'essai 1 n'imprimait pas ces
@@ -186,6 +204,22 @@ Détail chiffré + fichiers/SHA dans `docs/messages.md` (section « fraîcheur F
   → signal recherché ; (b) il bute sur un **FETCH-locker (0x05)** → verrou = « le SEP réclame un gigalocker qu'on ne fournit
   pas » → étape suivante = servir ce locker depuis la capture (par UUID lu en B) ; (c) il se tait sans FETCH → autre blocage.
   Écriture SEP → Albert lance. Reproductibilité toujours à faire (n≥3, reboot m1n1 entre chaque, pas de boot macOS).
+
+### RÉSULTAT Essai C bis = v3.1, 0x07 acquitté (2026-11-12 21:53, Albert ; trace `20261112-215313_xart_replay`) — n=1
+- VU : mêmes 9 SAVE, **puis le 0x07 acquitté** (correctif v3.1), **puis 3 SAVE de plus** (TAG 0x0f/0x10/0x11), puis la puce
+  se tait (timeout, plus de requête). **La liste finale des endpoints inclut `0x12 sks`** — ABSENT au run précédent (21:28).
+  13 blobs B re-scellés dumpés dans `follow_B/` (croissance 125→613 o). (La ligne auto « sks ABSENT » était un faux négatif :
+  nom d'EP = `"\x00sks"`, test par chaîne cassé → corrigé par test par numéro d'EP.)
+- INTERPRÉTÉ (HYPOTHÈSE) : acquitter le 0x07 a laissé la puce avancer jusqu'à **annoncer le trousseau `sks`** — 1re fois
+  sous m1n1. C'est le **cas (c) → non**, re-situé : ce n'est ni (a) « il annonce sks puis continue vers un match », ni (b)
+  « mur sur FETCH 0x05 » ; la puce **ne redemande rien** après 13 ops et a annoncé tous les endpoints applicatifs par sa
+  propre chaîne de re-scellements (pas par la séquence FETCH de macOS).
+- RÉSERVES (fortes) : (1) **« sks annoncé » ≠ « trousseau fonctionnel »** — même piège que sbio (HV3) ; aucune preuve qu'on
+  puisse l'ouvrir ou faire un match. (2) **n=1**. (3) 13 SAVE = vraies écritures SEP (état scellé avancé), aucune persistance
+  disque → la puce « croit » avoir sauvé ; comportement sur un vrai boot suivant inconnu.
+- PROCHAIN PAS : (i) **analyser les 13 blobs B** (`follow_B/`) — que re-scelle la puce, y a-t-il un nonce/compteur qui bouge ?
+  (ii) une fois sks annoncé, tester **une lecture** côté sks (0x12) ou sbio (0x08) pour « annoncé vs vivant » (script `pending/`,
+  Albert) ; (iii) reproductibilité n≥3. Ne PAS écrire « voie C gagnée » : on a franchi « sks annoncé », pas « trousseau ouvert ».
 
 ## Reproductibilité — pour dire « le SEP bifurque à TAG=0x05 » = vérifié (point 3)
 - Essai 1 = **n=1** → `hypothèse`.

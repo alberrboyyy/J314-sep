@@ -1,0 +1,37 @@
+TTY> Heap limit: 0x1000f764000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+Disable iodev 5
+Disable iodev 6
+Disable iodev 7
+Disable iodev 8
+Disable iodev 9
+Disable iodev 10
+Disable iodev 11
+Initializing hypervisor over iodev 4
+TTY> HV: SPTM mode 0
+TTY> Starting secondary CPUs...
+TTY> Starting CPU 1 (0:0:1)... Failed!
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/run_guest.py", line 97, in <module>
+    hv.init()
+    ~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 1439, in init
+    self.p.hv_init()
+    ~~~~~~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 1130, in hv_init
+    return self.request(self.P_HV_INIT)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 758, in request
+    return self._request(opcode, *args2, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 722, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 401, in proxyreq
+    return self.reply(self.REQ_PROXY)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 206, in readfull
+    raise UartTimeout("Expected %d bytes, got %d bytes"%(size,len(d)))
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes

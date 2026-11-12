@@ -1,0 +1,47 @@
+S_new: 60 étapes EP 0x13, 30 réponses AP, 14 écritures tampon A
+TTY> Heap limit: 0x10010fa4000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+démarrage du SEP par m1n1 (séquence publique)...
+BOOT OK
+xarm (0x13) annoncé. Endpoints : 0x00:cntl, 0x0e:hdcp, 0x10:xars, 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x18:stac
+  SECMODE acquitté
+tampons mappés : A iova=0x2c000<-phys=0x10010fe8000 | B iova=0x38000<-phys=0x10010ff0000
+  CNTL A taille : acquitté
+  CNTL A adresse : acquitté
+  CNTL B taille : acquitté
+  CNTL B adresse : acquitté
+tampons prêts : A sid=0 | B sid=0
+--- début du rejeu EP 0x13 ---
+[13] FOLLOW: SAVE-xART (TAG=0x05 TYPE=0x01 DATA=0xa2670100) -> ACK DATA=0xa2670100 [op acquittée #1]  B: nz=125 sha=d4f741b5 head=034ce3eca785ecd6a9313735cd20cb444dd6064f1e72ad988e2afa33eae1a640. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-locker (TAG=0x06 TYPE=0x06 DATA=0xec2d0100) -> ACK DATA=0xec2d0100 [op acquittée #2]  B: nz=127 sha=79f24d0d head=407e94c4f60495b3f2fbf5a8a31ae71989a1bd02b0c86e620aafa63731cc800f. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x07 TYPE=0x01 DATA=0x91be0100) -> ACK DATA=0x91be0100 [op acquittée #3]  B: nz=126 sha=3c80178d head=087ca50e1a7c4503bae601687ded82c5039cc60ee40a0a33003583cbbc12c1fa. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x08 TYPE=0x01 DATA=0x228a0100) -> ACK DATA=0x228a0100 [op acquittée #4]  B: nz=224 sha=0df94a83 head=6d869b95226bd2b5473dc9634084de0775ff06415f89197fc7d9e1751dc2f27a. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-locker (TAG=0x09 TYPE=0x06 DATA=0x42d80100) -> ACK DATA=0x42d80100 [op acquittée #5]  B: nz=224 sha=47fb304d head=9133c5d52d8f276460f2ff4851d260654948625db5c258cd34fa395b441020c8. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x0a TYPE=0x01 DATA=0x7f160100) -> ACK DATA=0x7f160100 [op acquittée #6]  B: nz=225 sha=6f4f022b head=077e1c9fd5f8948b3c1195cc6d295cc458245464298b8a4ccfaa154546f607fc. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x0b TYPE=0x01 DATA=0xc1860101) -> ACK DATA=0xc1860100 [op acquittée #7]  B: nz=323 sha=a2f566d5 head=87b80620b6a768b2cb82be14b8469c8f8f807593988316f101cf5598a8ca67b2. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-locker (TAG=0x0c TYPE=0x06 DATA=0xf19b0102) -> ACK DATA=0xf19b0100 [op acquittée #8]  B: nz=613 sha=389f3b25 head=e01e3b5e2c38f5960968a4d52ae2b22bd85c61ec531049f541a14915b50bd968. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x0d TYPE=0x01 DATA=0xe05c0101) -> ACK DATA=0xe05c0100 [op acquittée #9]  B: nz=322 sha=602c1d5a head=b460a57eabea4af6ed3cb4fe0a4542e80e5074e3ce040a35768e5913586bd562. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: locker-absent (TAG=0x0e TYPE=0x07 DATA=0x00000000) -> ACK DATA=0x00000000 [op acquittée #10]  B: nz=322 sha=892f76be head=d15bc8da05932ea3a9c2d0d0e924b2640e5074e3ce040a35768e5913586bd562. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x0f TYPE=0x01 DATA=0x5b4b0101) -> ACK DATA=0x5b4b0100 [op acquittée #11]  B: nz=418 sha=b608c405 head=ead100dcb23da554e4645c882638e48995a3cdc49e41b635d1ff67ce00e3c505. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-locker (TAG=0x10 TYPE=0x06 DATA=0x1ee60101) -> ACK DATA=0x1ee60100 [op acquittée #12]  B: nz=417 sha=e5d6e019 head=2438821b3dc0faf876d7aad6ca4dc668361b8dc576603f3dfff521c00f557e59. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE-xART (TAG=0x11 TYPE=0x01 DATA=0x93460101) -> ACK DATA=0x93460100 [op acquittée #13]  B: nz=418 sha=48408c31 head=189ceab25132d7b0d070b9bc598691cc2bb92b4e9470fce9a0ac2dc97df49196. ré-attente de TAG=0x05 TYPE=0x05
+[13] timeout en attente d'une requête SEP (attendu TAG=0x05). Arrêt.
+--- rejeu terminé (4/30 réponses rejouées, DIVERGENCE) ---
+--- FOLLOW 30s : on acquitte SAVE/locker-absent et on écoute les annonces (sks ?) ---
+--- fin FOLLOW : 0 ops acquittées (SAVE/0x07), 0 FETCH-locker non servis, 0 autres ---
+Endpoints annoncés par le SEP :
+  0x00 cntl
+  0x08 sbio  <-- BIOMÉTRIE !
+  0x0a scrd
+  0x0c sse 
+  0x0e hdcp
+  0x10 xars
+  0x12 sks 
+  0x13 xarm
+  0x14 hibe
+  0x15 pnon
+  0x17 skdl
+  0x18 stac
+>>> sbio PRÉSENT après 4 lockers rejoués, puis divergence (4/30). sbio est annoncé pendant un échange xART PARTIEL (au point normal, comme macOS) : ce n'est PAS une preuve que le rejeu est accepté. 'annoncé' != 'fonctionnel'. NE PAS conclure 'voie C gagnée' ; voir l'observation de B ci-dessus pour ce que le SEP réclame à la divergence.
+>>> ESSAI B : 13 ops acquittées (SAVE/locker-absent) pendant le rejeu. sks (0x12) ABSENT.
+>>> sks ABSENT. Regarder OÙ le suivi s'est arrêté (log ci-dessus) : s'il a buté sur un FETCH-locker (0x05) non servi, le verrou est 'le SEP réclame un gigalocker qu'on ne lui fournit pas' (étape suivante = servir ce locker depuis la capture). S'il s'est tu sans FETCH, c'est autre chose. -> docs/hypotheses.md.

@@ -1,0 +1,89 @@
+TTY> Heap limit: 0x1000f764000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+Disable iodev 5
+Disable iodev 6
+Disable iodev 7
+Disable iodev 8
+Disable iodev 9
+Disable iodev 10
+Disable iodev 11
+Initializing hypervisor over iodev 4
+TTY> HV: SPTM mode 0
+TTY> Starting secondary CPUs...
+TTY> Starting CPU 1 (0:0:1)...   Started.
+TTY> Starting CPU 2 (0:1:0)...   Started.
+TTY> Starting CPU 3 (0:1:1)...   Started.
+TTY> Starting CPU 4 (0:1:2)...   Started.
+TTY> Starting CPU 5 (0:1:3)...   Started.
+TTY> Starting CPU 6 (0:2:0)...   Started.
+TTY> Starting CPU 7 (0:2:1)...   Started.
+TTY> Starting CPU 8 (0:2:2)...   Started.
+TTY> Starting CPU 9 (0:2:3)...   Started.
+TTY> Error getting cpu-uttdbg-reg property
+TTY> HV: Initializing for 42-bit PA range
+TTY> HV: No ECV supported
+Mapping MMIO range: 0x200000000 .. 0x600000000
+Mapping MMIO range: 0x580000000 .. 0x700000000
+Mapping MMIO range: 0x700000000 .. 0x1680000000
+Removing ADT node /arm-io/dart-usb0
+Removing ADT node /arm-io/atc-phy0
+Removing ADT node /arm-io/usb-drd0
+Removing ADT node /arm-io/acio0
+Removing ADT node /arm-io/acio-cpu0
+Removing ADT node /arm-io/dart-acio0
+Removing ADT node /arm-io/apciec0
+Removing ADT node /arm-io/dart-apciec0
+Removing ADT node /arm-io/apciec0-piodma
+Removing ADT node /arm-io/i2c0/hpmBusManager/hpm0
+Removing ADT node /arm-io/i2c0/hpmBusManager1/hpm0
+Removing ADT node /arm-io/i2c3/hpmBusManager0/hpm0
+Removing ADT node /arm-io/nub-spmi-a0/hpm0
+Removing ADT node /arm-io/atc0-dpxbar
+Removing ADT node /arm-io/atc0-dpphy
+Removing ADT node /arm-io/atc0-dpin0
+Removing ADT node /arm-io/atc0-dpin1
+Removing ADT node /arm-io/atc-phy0
+Removing display endpoint atc0 from /device-tree/arm-io/display-crossbar0
+Setting boot arguments to 'debug=0x14e serial=3 apcie=0xfffffffe -enable-kprintf-spam wdt=-1 clpc=0'
+LOAD: __TEXT 32768 bytes from 0 to 0
+LOAD: __PRELINK_TEXT 9879552 bytes from 8000 to 8000
+LOAD: __DATA_CONST 10928128 bytes from 974000 to 974000
+LOAD: __TEXT_EXEC 50233344 bytes from 13e0000 to 13e0000
+LOAD: __PRELINK_INFO 3276800 bytes from 43c8000 to 43c8000
+LOAD: __DATA 3178496 bytes from 46e8000 to 46e8000
+LOAD: __LINKEDIT 19234816 bytes from 49f0000 to 49f0000
+Total region size: 0x6204000 bytes
+Mapping guest physical memory...
+Unmapping TZ carveouts...
+  Unmap [0x107d95d8000..0x107db1dffff]
+  Unmap [0x107d95d0000..0x107d95d7fff]
+  Unmap [0x107e6e28000..0x107ffe27fff]
+Physical memory: 0x10017764000 .. 0x107d95d0000
+Guest region start: 0x10019838000
+Loading kernel image (0x5c48000 bytes)...
+[0%....10%....20%....30%....40%....50%....60%....70%....80%....90%....100%]
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/run_guest.py", line 159, in <module>
+    hv.load_macho(payload, symfile=symfile)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 1996, in load_macho
+    self.load_raw(image, entryoffset=(macho.entry - macho.vmin), use_xnu_symbols=self.xnu_mode and symfile is not None, vmin=macho.vmin)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 1885, in load_raw
+    self._load_executable_raw(image, self.guest_base, "kernel")
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hv/__init__.py", line 1800, in _load_executable_raw
+    self.u.compressed_writemem(base, image, True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxyutils.py", line 250, in compressed_writemem
+    self.iface.writemem(compressed_addr, payload, progress)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 424, in writemem
+    self.reply(self.REQ_MEMWRITE)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 206, in readfull
+    raise UartTimeout("Expected %d bytes, got %d bytes"%(size,len(d)))
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes

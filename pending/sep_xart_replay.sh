@@ -590,21 +590,24 @@ else:
     while time.time() - t0 < 10:
         pump_ep0(); time.sleep(0.03)
 
+# NB : les noms d'endpoints portent un octet NUL en tête (octet haut du DATA d'annonce),
+# ex. sks -> "\x00sks". On teste donc par NUMÉRO (sbio=0x08, sks=0x12), jamais par nom.
 print("Endpoints annoncés par le SEP :", flush=True)
 for num, name in sorted(sep.epnum2name.items()):
+    clean = name.replace("\x00", "").strip()
     star = ""
-    if name == "sbio":
-        star = "  <-- BIOMÉTRIE !"
-    elif name == "sks":
-        star = "  <-- TROUSSEAU (sks 0x12) !"
-    print(f"  0x{num:02x} {name}{star}", flush=True)
+    if num == 0x08:
+        star = "  <-- BIOMÉTRIE (sbio) !"
+    elif num == 0x12:
+        star = "  <-- TROUSSEAU (sks) !"
+    print(f"  0x{num:02x} {clean}{star}", flush=True)
 # ATTENTION : la présence de sbio NE prouve PAS à elle seule que le rejeu est accepté.
 # On ne peut parler de "rejeu accepté" que si le rejeu s'est déroulé SANS divergence.
 # (Essai 1, 2026-11-11 : 4 lockers rejoués — dont SEP-xART et USER-xART — puis le SEP a
 #  divergé à la 5e transaction (TAG=0x05 TYPE=0x01=SAVE au lieu de TYPE=0x05=FETCH). sbio
 #  a été annoncé pendant cet échange partiel, au point normal, PAS depuis les seuls tampons.
 #  "annoncé" != "fonctionnel" ; sks (0x12) restait absent.)
-sbio_la = "sbio" in sep.epname2num
+sbio_la = 0x08 in sep.epnum2name   # par numéro : les noms ont un NUL en tête (cf. plus haut)
 if sbio_la and not diverged and replay_done == replay_total:
     print(">>> sbio PRÉSENT après un rejeu COMPLET sans divergence : rejeu plausiblement accepté.", flush=True)
 elif sbio_la and (diverged or replay_done < replay_total):
@@ -619,7 +622,7 @@ else:
 # annoncé à l'essai 1 pendant un échange partiel. La question est : après avoir acquitté le(s)
 # re-scellement(s), le SEP atteint-il un état fonctionnel qui expose sks ?
 if FOLLOW:
-    sks_la = "sks" in sep.epname2num
+    sks_la = 0x12 in sep.epnum2name   # par numéro (nom = "\x00sks")
     print(f">>> ESSAI B : {saves_acked} ops acquittées (SAVE/locker-absent) pendant le rejeu. "
           f"sks (0x12) {'PRÉSENT' if sks_la else 'ABSENT'}.", flush=True)
     if sks_la:

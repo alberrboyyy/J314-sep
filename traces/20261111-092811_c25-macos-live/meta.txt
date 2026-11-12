@@ -1,0 +1,10 @@
+date: 20261111-092811
+name: c25-macos-live
+mode: auto
+timeout_s: 1200
+end_action: none
+m1n1_commit: 70757dc7
+trace_script: /home/albert/Desktop/sep-touchid/hv/trace_sep_filtered.py
+kernel: /home/albert/Desktop/sep-touchid/macos/kernel.macho
+bootargs: debug=0x14e serial=3 apcie=0xfffffffe -enable-kprintf-spam wdt=-1 clpc=0
+proxy_port: /tmp/m1n1

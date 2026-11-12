@@ -1,0 +1,33 @@
+TTY> Heap limit: 0x10010750000 (128 MiB)
+m1n1 base: 0x10005448000
+Fetching ADT (0x0007C000 bytes)...
+Total region size: 0xae8000 bytes
+Copying SEPFW                         : 0x1000591c000..0x10005e94000 -> 0x10010d34240 (0x578000 bytes)
+Copying preoslog                      : 0x10005e94000..0x10005ed4000 -> 0x100112ac240 (0x40000 bytes)
+Copying TrustCache                    : 0x10005ed4000..0x10005f2c000 -> 0x100112ec240 (0x58000 bytes)
+Loading kernel image (0x4d0004 bytes)...
+[0%....10%....20%....30%....40%....50%....60%....70%....80%....90%....100%]
+Adjusting addresses in ADT...
+Pushing ADT (492260 bytes)...
+Setting up bootargs...
+Copying stub...
+Entry point: 0x10005448800
+Reloading into stub at 0x10011348240
+TTY> Preparing to run next stage at 0x10011348240...
+Waiting for reconnection... ....... Connected
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/chainload.py", line 165, in <module>
+    iface.nop()
+    ~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 381, in nop
+    result = self.reply(self.REQ_NOP)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 204, in readfull
+    block = self.dev.read(size - len(d))
+  File "/usr/lib/python3.14/site-packages/serial/serialposix.py", line 595, in read
+    raise SerialException(
+        'device reports readiness to read but returned no data '
+        '(device disconnected or multiple access on port?)')
+serial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)

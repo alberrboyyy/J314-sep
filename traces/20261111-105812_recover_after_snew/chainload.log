@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/chainload.py", line 19, in <module>
+    from m1n1.setup import *
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/setup.py", line 18, in <module>
+    bootstrap_port(iface, p)
+    ~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxyutils.py", line 588, in bootstrap_port
+    iface.nop()
+    ~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 381, in nop
+    result = self.reply(self.REQ_NOP)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 317, in reply
+    raise UartCMDError("Reply command mismatch: Expected 0x%08x, got 0x%08x"%(cmd, cmdin))
+m1n1.proxy.UartCMDError: Reply command mismatch: Expected 0x00aa55ff, got 0x01aa55ff

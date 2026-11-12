@@ -1,0 +1,88 @@
+=== /arm-io/sep
+sep {
+    compatible = [iop-sep,ascwrap-v4]
+    iommu-parent = 172
+    interrupt-parent = 126
+    aarch64 = None
+    interrupts = [546, 545, 548, 547]
+    clock-gates = [298]
+    clock-ids = [365]
+    reg = [Container: 
+    addr = 0x0000000196400000
+    size = 0x000000000006C000, Container: 
+    addr = 0x0000000196050000
+    size = 0x0000000000004000]
+    iop-version = 1
+    device_type = sep
+    self-power-gate = None
+    sika-support = 1
+    cpu-ctrl-filtered = None
+    AAPL,phandle = 166
+    power-gates = [298]
+    role = SEP
+    sepfw-loaded = 1
+
+    iop-sep-nub {
+        rom-panic-bytes = 392
+        function-wait_for_power_gate = 149:Wait(0x12a, 0x0, 0x0)
+        compatible = [iop-nub,sep]
+        AAPL,phandle = 167
+        tz0-size-set = 1
+        tz0-size = 29392896
+        tz1-size-set = 0
+        tz1-size = 32768
+
+        Ocelot {
+            AAPL,phandle = 168
+
+        }
+        xART {
+            AAPL,phandle = 169
+
+        }
+        InvalidateHmac {
+            config = 0
+            outbox-ctrl-empty-mask = 131072
+            inbox-ctrl-offset = 33040
+            inbox-offset = 34816
+            inbox-ctrl-enable-mask = 1
+            outbox-offset = 34864
+            outbox-ctrl-offset = 33044
+            reg-block = [0x0000000396400000, 0x000000000006C000]
+            AAPL,phandle = 170
+
+        }
+    }
+}
+
+=== /arm-io/dart-sep
+dart-sep {
+    bypass-address = 0000000000000000000000000000000000000000000000000000000000000200
+    bypass = 32768
+    compatible = [dart,t6000]
+    page-size = 16384
+    interrupt-parent = 126
+    interrupts = [551]
+    reg = [Container: 
+    addr = 0x00000001952C0000
+    size = 0x0000000000004000]
+    AAPL,phandle = 171
+    error-reflector = 11040047104
+    device_type = dart
+    dart-options = 37
+    diag-config = 2147492096
+    instance = 545241444441525400000000
+    retention = None
+    sids = 32769
+    dart-tunables-instance-0 = 6000000004000000006100ff00000000006100ec0000000068000000040000000f0f0f00000000000f0f0f00000000006c00000004000000ffffff00000000000808080000000000
+    dart-id = 9
+
+    mapper-sep {
+        AAPL,phandle = 172
+        reg = 0
+        compatible = [iommu-mapper]
+        device_type = dart-mapper
+
+    }
+}
+

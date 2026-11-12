@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/tools/run_guest.py", line 69, in <module>
+    bootstrap_port(iface, p)
+    ~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxyutils.py", line 588, in bootstrap_port
+    iface.nop()
+    ~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 381, in nop
+    result = self.reply(self.REQ_NOP)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 206, in readfull
+    raise UartTimeout("Expected %d bytes, got %d bytes"%(size,len(d)))
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes
