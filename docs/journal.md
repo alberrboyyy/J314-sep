@@ -14,6 +14,17 @@ Format :
 
 ---
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Reconnaissance sbio (EP 0x08) : pas de lecture-statut fil triviale ; dispatch par vtable
+- Trace : — (désassemblage AppleMesaSEPDriver, `kdis.py func`, venv capstone ; listings non commités). Aucun matériel.
+- Fait : cherché un message sbio de lecture pure pour une sonde « vivant ». Désassemblé `getProvisioningStateInt`, `provisionSensor`.
+  Écrit `docs/kext_sepmanager.md §11`.
+- Vu (FAITS, source: kext) : (1) `getProvisioningStateInt` lit des champs **cachés côté AP** (`_provisionStatus` +0x1f0…), aucun
+  aller-retour SEP → « statut provision » ne prouve pas le lien vivant *maintenant*. (2) Les opérations sbio passent par **méthodes
+  virtuelles** du driver Mesa (`provisionSensor` → `this+0xa48`/`+0xa58`) ; opcodes fil dans la vtable, stack **stateful**.
+- Interprété : la sonde « vivant » sbio n'est **pas** un one-shot simple → cohérent avec la prudence « annoncé ≠ vivant ». Prochain pas
+  utile (surtout pour le driver) : **marcher la vtable Mesa** pour nommer les opcodes EP 0x08, croisés avec les TAGs fil de `messages.md`.
+- Incidents : aucun (hors ligne).
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Décompilation du nonce xART/ROM : aucun levier AP pour fixer la fraîcheur (verrou maître voie C)
 - Trace : — (désassemblage `macos/kernel.macho`, bundle AppleSEPManager, `analysis/kext/kdis.py func`, venv capstone du scratchpad ;
   listings non commités). Aucun matériel. Cible choisie car c'est le **verrou maître de la voie C**.

@@ -376,3 +376,26 @@ notifications TAG 0x01, déjà documenté §6). Ces noms sont majoritairement de
 3. **`sbio` (EP 0x08) n'est PAS sur la liste rouge d'écriture** : une sonde de lecture est bien moins contrainte côté sbio que
    côté sks. Si l'on veut tester « vivant », sbio est la porte la plus sûre (reste à bâtir la liste exhaustive de ses messages de
    lecture — règle « protocole complet avant de coder la réponse »).
+
+## 11. sbio (EP 0x08) — reconnaissance pour une sonde « vivant » et pour le driver (2026-11-12, Claude — source: kext)
+
+But : trouver un message sbio de **lecture pure** (prouver « sbio annoncé = vivant » sans déclencher match/enroll/capture) et,
+plus largement, préparer le driver. Désassemblage `com.apple.driver.AppleMesaSEPDriver`. **Statut : hypothèse / reconnaissance.**
+
+**Vu (FAITS, source: kext).**
+- Le statut de provision côté AP est **caché** : `getProvisioningStateInt` (`0x978e16c`) lit seulement des champs de l'objet
+  (`_provisionStatus` à `+0x1f0`, `_provisionStatusExt` `+0x1f4`, drapeaux `+0x1f8`/`+0x1fa`) et les mappe vers un enum public
+  (ex. statut interne 0x1d/0x20/0x35/0x36/0x6e → 0..10). **Aucun aller-retour SEP** : lire « provision status » ne prouve pas que
+  le lien SEP est vivant *maintenant*.
+- Les opérations sbio sont dispatchées par **méthodes virtuelles** du driver Mesa : `provisionSensor` (`0x978e3ec`) appelle
+  `this+0xa48` (provType 1) ou `this+0xa58` (provType 2-4) — les opcodes fil sont **dans ces méthodes virtuelles**, pas en
+  immédiat. Le stack est **stateful** (handlers `checkAutoMatchConditions`, `accessoryStateHandler`, `_commandMode`, `_fingerOn`,
+  `autoMatchConditionsHandler`, `bgOpsResultReadyHandler`…).
+
+**Interprété / conséquence.**
+- Pas de « lecture de statut » fil **triviale et sans effet de bord** repérée côté sbio : une sonde « vivant » n'est **pas** un
+  one-shot simple, c'est un sous-système à cartographier opcode par opcode. Cohérent avec la prudence déjà retenue (« annoncé ≠
+  vivant » ne se tranche pas d'un seul message injecté).
+- **Prochain pas (décompilation, pour le driver surtout)** : marcher la **vtable du driver Mesa** (slots `+0xa48`, `+0xa58`, et
+  ceux de match/enroll/cancel) pour nommer les opcodes EP 0x08, en les croisant avec les **TAGs fil déjà dans `messages.md`**
+  (séquences `0xfc`/`0x09`/`0x70`, notifs TAG 0x01, TAG 0x02/0x03/0x04 — cf. §6). Objectif : table opcode↔nom↔effet (lecture/mutation).
