@@ -447,3 +447,32 @@ Ensuite la commande est exécutée et, pour les opérations qui parlent au SEP, 
 **fil** (EP 0x08) n'est donc pas le champ `bm_cmd_t` directement : il est posé au moment du `sepTransact` (appel virtuel).
 **Prochain pas table opcode↔fil** : tracer, pour quelques opérations nommées (§12), la valeur d'`opcode` passée à `sepTransact`,
 puis la croiser avec les TAGs EP 0x08 de `docs/messages.md` (0xfc/0x09/0x70…). **Statut : hypothèse (source: kext).**
+
+### 12c. Table opcode `sepTransact` ↔ opération ↔ TAG fil (2026-11-12, Claude — source: kext + traces)
+
+Opcodes **fil EP 0x08** extraits du `mov w1,#imm` **juste avant** l'appel virtuel `sepTransact` (slot +0x9e0), par fonction
+appelante (scan `scratchpad/scan_opcodes.py` + lecture du contexte exact ; quelques hits du scan étaient du bruit, écartés).
+`sepTransact(w1=opcode, …)` relaie vers le transfert SEP interne (`AppleSEPManager`, `[this+0x170]`). **Statut : hypothèse
+(source: kext), partiellement recoupée par les TAGs de `docs/messages.md`.**
+
+| opcode | opération (nom kext) | recoupement trace (messages.md) |
+|---|---|---|
+| 0x03 | `commandStartEnroll` | présent dans la séquence de match `…70 03 21` |
+| 0x06 | `forceNoMatch` | présent (`23 06 65…`) |
+| 0x07 | `asyncCaptureHandler` (capture) | présent (`…65 07 09…`) |
+| 0x08 | `handleEnrollment` | capture d'enrôlement (sortie lue) |
+| **0x09** | **`handleMatch` (match)** | **`<09` = le match, 240-356 ms (C3/C8)** ✓ |
+| 0x0c | `handleMatch` (1er transact, sans payload = armement ?) | — |
+| 0x15 | `performKeyExchange` | **clé de session capteur 0x15/0x16** (§4) ✓ |
+| 0x1f | `cacheMatchPolicy` | présent dans la séquence de match (`…09 1f 22…`) ✓ |
+| 0x22 | `asyncCaptureHandler` | présent (`…1f 22 70…`) ✓ |
+| 0x42 | `initializeSequenceCounter` | **compteur 0x42** (§4, InitializeSequenceCounter) ✓ |
+| 0x4a | `seaCookieHandleMessage` (provisioning usine) | — |
+| 0x5d | `applySensorParams` | proche du patch 0x5f (§4) |
+| 0x63 | `setCalibrationData` | — |
+
+Lecture : **les octets de la sous-séquence de match `23 06 65 07 09 1f 22 70 03 21`** (relayée dans la transaction `0xfc`) sont,
+pour une bonne part, ces **opcodes `sepTransact`** (0x06, 0x07, 0x09, 0x1f, 0x22, 0x03) — c.-à-d. les sous-commandes capteur
+émises pendant un match. Le driver Linux (phase 2+) devra émettre cette séquence ; `0x09` = l'ordre de match proprement dit.
+**Non encore résolus** (opcode chargé via registre, pas immédiat) : `HandleReset` (0x19 ?), `LoadPatch`, `establishDiffieHellmanSession`,
+`lockRootKeyInSensor`, `prepareNotPairedSession`, `setCalibrationData`-variantes. À finir en suivant le flot de données.

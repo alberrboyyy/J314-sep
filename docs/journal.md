@@ -30,6 +30,19 @@ Format :
   RÉSERVE : n=2, lecture de tampon ; « empreinte » vs « MAC tronqué » non tranché ; ne change pas la conclusion voie C (rejeu impossible côté AP).
 - Incidents : 13 re-scellements (SEP, vraies écritures) ; côté macOS déjà cassé, Linux/données intacts. Power-cycle demandé après le run.
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Table opcode sbio ↔ opération ↔ TAG fil (pont kext↔traces, socle driver)
+- Trace : — (scan `scratchpad/scan_opcodes.py` + lecture de contexte sur `macos/kernel.macho` ; non commité). Aucun matériel.
+- Fait : repéré les appels virtuels à `sepTransact` (slot +0x9e0) dans tout le `__text` Mesa et lu l'opcode (`mov w1,#imm`) par opération.
+  Écrit `docs/kext_sepmanager.md §12c`.
+- Vu (FAITS, source: kext) : opcodes EP 0x08 par opération — `handleMatch`=**0x09** (puis 0x0c), `handleEnrollment`=0x08,
+  `commandStartEnroll`=0x03, `forceNoMatch`=0x06, `asyncCaptureHandler`=0x07/0x22, `performKeyExchange`=0x15,
+  `cacheMatchPolicy`=0x1f, `initializeSequenceCounter`=0x42, `applySensorParams`=0x5d, `setCalibrationData`=0x63, `seaCookieHandleMessage`=0x4a.
+- Interprété / RECOUPEMENT : plusieurs opcodes (0x03/0x06/0x07/0x09/0x1f/0x22) sont **exactement** les octets de la sous-séquence de
+  match `23 06 65 07 09 1f 22 70 03 21` déjà vue en trace → ce sont les **sous-commandes capteur d'un match** ; `0x09` = l'ordre de match
+  (= le `<09` ~240 ms de C3/C8). Et 0x42=compteur, 0x15=clé de session recoupent §4. **Pont kext↔traces établi** = socle du driver (phase 2+).
+  Statut `hypothèse` (source: kext), partiellement cross-validé. Reste des opcodes chargés via registre (HandleReset/LoadPatch…) à finir.
+- Incidents : aucun (hors ligne).
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Carte des opérations sbio : vtable AppleMesaSEPDriver résolue (noms de méthodes)
 - Trace : — (désassemblage + résolution de vtable `macos/kernel.macho` ; outil `scratchpad/vtable_dump.py`, non commité). Aucun matériel.
 - Fait : résolu la vtable `__ZTV18AppleMesaSEPDriver` (chained-fixup arm64e auth-rebase, base `0xfffffe0007004000`) → 344 slots nommés ;
