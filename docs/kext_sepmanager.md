@@ -508,3 +508,33 @@ Ces opcodes **complètent** la table §12c (ajouts : `0x0b 0x0d 0x0e 0x0f 0x10 0
 = lectures de sous-résultats ; `0x8001` = opcode à bit haut, probablement « relais capteur »). **Statut : hypothèse (source: kext).**
 Pour le driver (phase 2+), le **cœur du match** = armer (`0x0c`) → capturer (`0x8001`) → lire les sous-résultats (`0x0b`–`0x12`) →
 demander le verdict (`0x09`) → finaliser (`0x1b/0x1c/0x22`). Payloads exacts et ordre strict = à finir (suivi du flot de données).
+
+## 13. sbio (EP 0x08) — cadre fil : le message `0xfc` et le buffer OOL (2026-11-12, Claude — source: kext)
+
+Comment un opcode `sepTransact` devient un message EP 0x08. Chaîne : `AppleMesaSEPDriver::sepTransact(opcode,…)` →
+`AppleSEPGenericTransfer::transact(opcode,…)` (`0x9939900`) → construction du message (`0x9937348`) → doorbell (`0x993a480`).
+**Statut : hypothèse (source: kext), recoupé par les traces.**
+
+**`transact` (`0x9939900`)** range, dans l'objet endpoint : l'**opcode** à `+0xa4`, le **pointeur inData** à `+0x80`, l'**inLen**
+(32 bits) à `+0x88`, un flag à `+0xac` ; mappe le buffer OOL (`+0x50`) ; puis envoie un message de **type `0xfc`** (`mov w1,#0xfc ;
+bl 0x9937348`) et attend la réponse (vérifie que l'opcode renvoyé `+0xa4` == opcode envoyé).
+
+**Construction du mot de message (`0x9937348`, le « 0xfc »)** :
+```
+tag16   = *(u16*)(obj+0x20); (*(u16*)(obj+0x20))++   // compteur de séquence, +1 par message
+data32  = *(u32*)(obj+0x24)
+message = (tag16 << 48) | (data32 << 16) | (0xfc << 8) | endpoint
+```
+→ **bits 8-15 = `0xfc` (type du message GenericTransfer)**, bits 16-47 = DATA (config/longueur OOL), **bits 48-63 = tag (compteur
+incrémenté)**, bits 0-7 = endpoint (0x08, posé par la couche doorbell). **L'opcode sbio (0x09, 0x42…) et le payload ne sont PAS dans
+ce mot** : ils sont dans le **buffer OOL** pointé par l'objet.
+
+**Recoupement trace (décisif).** C'est exactement le `<fc`/`>fc` des captures (EP 0x08), avec son buffer B hors-ligne. Chaque
+`sepTransact(opcode)` = **une transaction `0xfc`** portant un opcode dans l'OOL. La sous-séquence `23 06 65 07 09 1f 22 70 03 21`
+observée = **une suite de transactions `0xfc`, une par opcode** (0x23, 0x06, 0x65, 0x07, 0x09=match, 0x1f, 0x22, …). Le tag qui
+s'incrémente explique le compteur de TAG vu sur EP 0x08.
+
+**Pour le driver Linux (phase 2+)** : pour piloter sbio, (1) écrire opcode+payload dans un buffer OOL mappé au SEP, (2) envoyer un
+message EP 0x08 `type=0xfc`, `data`=descripteur OOL, `tag`=compteur++, (3) attendre le `0xfc` de réponse (même tag), (4) lire l'OOL
+de sortie. **Reste** : le format interne de l'OOL (où exactement l'opcode + le payload), et le type `0x70` (vu en trace, probable
+transfert d'image en vrac, distinct du `0xfc`) — à finir.
