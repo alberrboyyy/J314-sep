@@ -1,0 +1,42 @@
+S_new: 60 étapes EP 0x13, 30 réponses AP, 14 écritures tampon A
+TTY> Heap limit: 0x10010610000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+démarrage du SEP par m1n1 (séquence publique)...
+BOOT OK
+xarm (0x13) annoncé. Endpoints : 0x00:cntl, 0x0e:hdcp, 0x10:xars, 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x18:stac
+  SECMODE acquitté
+tampons mappés : A iova=0x2c000<-phys=0x10010654000 | B iova=0x38000<-phys=0x1001065c000
+  CNTL A taille : acquitté
+  CNTL A adresse : acquitté
+  CNTL B taille : acquitté
+  CNTL B adresse : acquitté
+tampons prêts : A sid=0 | B sid=0
+--- début du rejeu EP 0x13 ---
+[13] FOLLOW: SAVE (TAG=0x05 TYPE=0x01 DATA=0x43f10100) -> ACK DATA=0x43f10100 [re-scellement #1]  B: nz=126 sha=14d69459 head=b837da5ba475ab925d9fef5fa1a24a5085232d6804877a02cd2400ffec932dd6. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x06 TYPE=0x06 DATA=0x40000100) -> ACK DATA=0x40000100 [re-scellement #2]  B: nz=127 sha=59fb7559 head=407e94c4f60495b3f2fbf5a8a31ae719248cf664d40fd4177388fcef66d10771. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x07 TYPE=0x01 DATA=0xe9880100) -> ACK DATA=0xe9880100 [re-scellement #3]  B: nz=127 sha=e6405013 head=09f934f286ef4440921268c7821e0df42e221213ea8fad7de896f55030f74b88. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x08 TYPE=0x01 DATA=0x48420100) -> ACK DATA=0x48420100 [re-scellement #4]  B: nz=225 sha=3ea1e88d head=b7d42f8c89ce38a934de50ffbfc3ac1260c1c5d4018fdd76840e43861833c957. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x09 TYPE=0x06 DATA=0x1ba30100) -> ACK DATA=0x1ba30100 [re-scellement #5]  B: nz=225 sha=36e849b9 head=9133c5d52d8f276460f2ff4851d260658bd3c67b9e27e8fa7f1e1964784b7ad0. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x0a TYPE=0x01 DATA=0xaa630100) -> ACK DATA=0xaa630100 [re-scellement #6]  B: nz=225 sha=5655f852 head=017479380476e1f954dd5fdb7e28128876876f389cab0bcf765e57bd819ae50c. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x0b TYPE=0x01 DATA=0xfc430101) -> ACK DATA=0xfc430100 [re-scellement #7]  B: nz=321 sha=f1d7ce4f head=f677daef2790a4c367cdb622acc8d389fdda5b594c762e935ca23acdb456878b. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x0c TYPE=0x06 DATA=0xcbbb0102) -> ACK DATA=0xcbbb0100 [re-scellement #8]  B: nz=611 sha=03df556b head=e01e3b5e2c38f5960968a4d52ae2b22bfa0d9d91c13550e325baf3881f7e5fd1. ré-attente de TAG=0x05 TYPE=0x05
+[13] FOLLOW: SAVE (TAG=0x0d TYPE=0x01 DATA=0x58370101) -> ACK DATA=0x58370100 [re-scellement #9]  B: nz=321 sha=d3399e1e head=373625f4a1fe8d2c853f62ee423398c74e76099340101333932254f78d4448d3. ré-attente de TAG=0x05 TYPE=0x05
+[13] DIVERGENCE après 4 lockers rejoués (9 SAVE acquittés) : reçu TAG=0x0e TYPE=0x07, attendu TAG=0x05 TYPE=0x05. Rien de plus envoyé au SEP.  [message complet : PARAM=0x10 DATA=0x00000000 ; B: nz=321 sha=e1894cd3 head=d15bc8da05932ea3a9c2d0d0e924b2644e76099340101333932254f78d4448d3]
+--- rejeu terminé (4/30 réponses rejouées, DIVERGENCE) ---
+--- FOLLOW 30s : on acquitte les SAVE et on écoute les annonces (sks ?) ---
+--- fin FOLLOW : 0 SAVE acquittés, 0 FETCH non servis, 0 autres ---
+Endpoints annoncés par le SEP :
+  0x00 cntl
+  0x08 sbio  <-- BIOMÉTRIE !
+  0x0a scrd
+  0x0c sse 
+  0x0e hdcp
+  0x10 xars
+  0x13 xarm
+  0x14 hibe
+  0x15 pnon
+  0x17 skdl
+  0x18 stac
+>>> sbio PRÉSENT après 4 lockers rejoués, puis divergence (4/30). sbio est annoncé pendant un échange xART PARTIEL (au point normal, comme macOS) : ce n'est PAS une preuve que le rejeu est accepté. 'annoncé' != 'fonctionnel'. NE PAS conclure 'voie C gagnée' ; voir l'observation de B ci-dessus pour ce que le SEP réclame à la divergence.
+>>> ESSAI B : 9 SAVE acquittés pendant le rejeu. sks (0x12) ABSENT.
+>>> sks ABSENT malgré les SAVE acquittés : re-sceller ne suffit pas à ramener le trousseau. Noter ce que le SEP a demandé après (FETCH non servis ? blocage ?) dans le log ci-dessus -> docs/hypotheses.md. La voie 'rejeu' seule est alors insuffisante.

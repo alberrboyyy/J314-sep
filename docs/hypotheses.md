@@ -120,6 +120,8 @@ Détail chiffré + fichiers/SHA dans `docs/messages.md` (section « fraîcheur F
   pas complet » (il manque la boucle de FETCH qui, chez macOS, précède sks). HYPOTHÈSE.
 - **Autre explication** (sks absent) : sks pourrait exiger ses **propres** tampons CNTL (0x12) non posés par l'essai 1 → ne pas
   conclure « sks absent prouve l'échec du rejeu ».
+- **Renfort (2026-11-12, Essai C / FOLLOW, voir plus bas)** : en suivant le SEP (9 SAVE acquittés), sks reste absent — MAIS le
+  suivi s'est arrêté prématurément sur une op 0x07 que macOS acquitte. Donc « sks absent » reste **non concluant** ; HV3 ouverte.
 - Expérience « annoncé vs fonctionnel » SANS doigt (point 4), du moins au plus intrusif :
   - **[LS — tout de suite, dès qu'un log imprime tous les messages]** après l'annonce de sbio, le SEP émet-il un **trafic sbio
     spontané** (init type C1 L320-449 : 0x17/0x15/0x16…) ou **seulement son nom** puis silence ? (L'essai 1 n'imprimait pas ces
@@ -165,6 +167,25 @@ Détail chiffré + fichiers/SHA dans `docs/messages.md` (section « fraîcheur F
 - **Ne pas faire avant A/B.** Acquitter le SAVE TYPE=0x01 (gabarit macOS TAG=0x13 : lire B, renvoyer `TYPE=0x00 PARAM=0x00` avec
   l'octet bas remis à 0) **ferait avancer** l'état interne du SEP → **risque de périmer le S_new** et de re-sceller. À ne tenter
   qu'après avoir compris le SAVE (A) et **re-capturé un S_new frais** si macOS a rebooté entre-temps. Décision d'Albert.
+
+### RÉSULTAT Essai C = mode FOLLOW (2026-11-12 21:28, Albert a lancé ; trace `20261112-212820_xart_replay`) — n=1
+- VU : après les 4 lockers maîtres, le SEP a enchaîné **9 SAVE** (TAG 0x05→0x0d, alternance TYPE 0x01 xART / 0x06 locker ;
+  blobs B croissants : nz 126→127→225→321→611), **tous acquittés** (gabarit macOS confirmé). Puis **TAG=0x0e TYPE=0x07**
+  (op « locker-absent », PARAM=0x10 DATA=0). Le script (v3) ne gérait que 0x01/0x06 → **s'est arrêté sur ce 0x07**. Ensuite
+  **silence** (0 message 0x13 pendant 30 s). Endpoints finaux : **sbio présent, sks (0x12) ABSENT**.
+- INTERPRÉTÉ (HYPOTHÈSE) :
+  1. **« sks absent » NON concluant ici.** La capture macOS `snew-reel` montre que l'op 0x07 (TAG=0x0b) est **acquittée** par
+     macOS (`> TYPE=0x00 PARAM=0x00 DATA=0`, L78→80) et le boot continue. Le suivi s'est donc arrêté **un cran trop tôt**.
+  2. Le SEP, après les 4 maîtres, **ne FETCH pas les gigalockers comme macOS** : il **re-scelle 9 fois** puis annonce un
+     locker-absent. Cohérent avec « l'état rejoué est jugé non courant → re-scellement » ([[voie-c-xart-fraicheur]], HV1-B).
+  3. Les 9 SAVE acquittés = **vraies écritures SEP** (état scellé interne avancé) ; **aucune persistance disque** (l'AP n'a
+     pas réécrit le gigalocker) → le SEP « croit » avoir sauvé. Côté Apple déjà cassé ; Linux/données intacts.
+- CORRECTIF (v3.1, 2026-11-12) : 0x07 ajouté à `ACKABLE` → on le suit comme macOS ; arrêt seulement sur un **FETCH-locker
+  (0x05)** non servi ou une op inconnue ; dump des blobs B re-scellés dans `OUT/follow_B/`.
+- PROCHAIN PAS (Essai C bis) : relancer v3.1 (`pending/follow_go.sh`) et regarder **où** le suivi bute : (a) il annonce `sks`
+  → signal recherché ; (b) il bute sur un **FETCH-locker (0x05)** → verrou = « le SEP réclame un gigalocker qu'on ne fournit
+  pas » → étape suivante = servir ce locker depuis la capture (par UUID lu en B) ; (c) il se tait sans FETCH → autre blocage.
+  Écriture SEP → Albert lance. Reproductibilité toujours à faire (n≥3, reboot m1n1 entre chaque, pas de boot macOS).
 
 ## Reproductibilité — pour dire « le SEP bifurque à TAG=0x05 » = vérifié (point 3)
 - Essai 1 = **n=1** → `hypothèse`.

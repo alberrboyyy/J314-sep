@@ -31,9 +31,26 @@ Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Lin
 - La divergence de l'essai n°1 (SEP envoie TAG=0x05 **TYPE=0x01 SAVE** au lieu de FETCH) = re-scellement **attendu**.
   Le verrou de fond (clé relayable OU compteur scellé) **ne se tranche QUE par une écriture**.
 
-**PROCHAIN PAS = essai observationnel (écriture SEP → script `pending/`, Albert lance).** Pas encore écrit.
+**PROCHAIN PAS = essai observationnel (écriture SEP → script `pending/`, Albert lance).**
 Il doit **suivre le SEP** au lieu de s'arrêter à la divergence : laisser le SEP re-sceller (op 0x01), **l'acquitter**,
 et regarder s'il finit par annoncer **`sks` (0x12, le trousseau)** et atteindre un état fonctionnel (≠ juste `sbio`).
+
+> **✅ LANCÉ 1× (2026-11-12 21:28, Albert) — mode FOLLOW de `pending/sep_xart_replay.sh`.** Trace
+> `20261112-212820_xart_replay`. Résultat : après les 4 lockers maîtres, le SEP a enchaîné **9 SAVE**
+> (re-scellements, acquittés) puis une op **0x07 (locker-absent)**. La v3 s'arrêtait sur 0x07 → **sks
+> jamais atteint, résultat NON concluant** (macOS, lui, acquitte 0x07 et continue : snew-reel TAG=0x0b).
+> Détail : journal + hypotheses.md « RÉSULTAT Essai C ». Les 9 SAVE = vraies écritures SEP (état scellé
+> avancé) ; aucune persistance disque ; Linux/données intacts ; côté Apple déjà cassé.
+>
+> **➡️ CORRIGÉ en v3.1 (2026-11-12) :** 0x07 ajouté à ACKABLE (on le suit comme macOS), arrêt seulement
+> sur un FETCH-locker 0x05 non servi ou op inconnue ; dump des blobs B re-scellés dans `OUT/follow_B/`.
+> SELFTEST + py_compile OK. **NON relancé** (choix d'Albert).
+>
+> **Albert relance (écriture SEP, lui seul) — depuis le tél en RC :** `! ./pending/follow_go.sh`
+> (lanceur court = `M1N1TIMEOUT=20 FOLLOW=1 ./pending/sep_xart_replay.sh traces/20261111-113919_snew-reel`).
+> Regarder où le suivi bute : annonce `sks` (gagné) / FETCH-locker 0x05 non servi (→ servir le locker par
+> UUID depuis la capture) / silence. ⚠️ si le lien fige : seule récup = power-cycle PHYSIQUE (pas depuis le tél) ;
+> ~1 bon chainload par power-cycle.
 
 **PROCÉDURE :**
 1. *(Optionnel — décision Albert)* **image disque** depuis ALARM (qui tourne). Discuté : ce n'est **pas** un vrai

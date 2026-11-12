@@ -33,6 +33,22 @@
 #   - macOS : effet de bord possible (FileVault / trousseau / reconnexion compte Apple).
 #     macOS sacrifiable (accord Albert). Ne déborde ni sur Linux ni sur le démarrage.
 #
+# MODE FOLLOW (nouveau, 2026-11-12) — « suivre le SEP » au lieu de s'arrêter à la divergence
+#   FOLLOW=1 : rejoue comme d'habitude, mais quand le SEP DIVERGE en demandant un SAVE
+#   (TYPE=0x01 xART maître / TYPE=0x06 gigalocker) là où macOS faisait un FETCH, le script
+#   ACQUITTE le SAVE au lieu de s'arrêter (réponse > TYPE=0x00 PARAM=0x00 DATA=(DATA&0xffffff00),
+#   protocole observé octet pour octet dans la capture macOS : tags 0x13/0x14/0x15 de snew-reel,
+#   0x..0103->0x..0100 / 0x..0101->0x..0100), puis ré-attend la suite. Ensuite il écoute ~30 s en
+#   continuant d'acquitter les SAVE. BUT : voir si, une fois son xART re-scellé, le SEP finit par
+#   annoncer `sks` (0x12, le trousseau) et atteindre un état fonctionnel (pas seulement `sbio`).
+#   >>> FOLLOW est STRICTEMENT PLUS INVASIF qu'OBSERVE : acquitter un SAVE fait AVANCER le
+#       re-scellement xART du SEP (c'est l'écriture que la voie C évitait). Le côté Apple est
+#       DÉJÀ cassé (bootloop) donc l'enjeu « casser le boot Apple » est caduc ; Linux + données
+#       = AUCUN risque ; au pire gel PMU -> coupure d'alim (Albert présent). Il N'INJECTE PAS de
+#       locker en réponse à un FETCH post-divergence (on observe si le SEP bloque, on ne le pousse
+#       pas dans un état non maîtrisé). Budget de SAVE borné (16) pour éviter toute boucle infinie.
+#       Reste une ÉCRITURE SEP -> Albert relit et lance lui-même.
+#
 # RÉSULTAT ATTENDU
 #   À la fin, liste des endpoints annoncés par le SEP. Si `sbio` (et skdl/sse/sks/scrd)
 #   apparaissent -> le rejeu est accepté, Touch ID atteignable : TRÈS bonne nouvelle.
@@ -47,6 +63,14 @@
 #      n'avance pas le compteur ; seul un BOOT de macOS l'avancerait et périmerait S_new).
 #   3. Lancer CE script en lui passant le dossier de capture S_new.
 #
+# ÉTAT : v3.1 — mode FOLLOW (2026-11-12, Claude Opus 4.8). LANCÉ 1× (Albert, 2026-11-12 21:28,
+#   trace 20261112-212820_xart_replay) : après les 4 lockers maîtres, le SEP a enchaîné 9 SAVE
+#   (re-scellements, acquittés) puis une op 0x07 (locker-absent). v3 s'ARRÊTAIT sur 0x07 -> sks
+#   jamais atteint, résultat NON concluant. CORRECTIF v3.1 : 0x07 est ACKABLE (macOS l'acquitte,
+#   snew-reel TAG=0x0b) -> on le suit désormais. On s'arrête seulement sur un FETCH-locker (0x05)
+#   non servi ou une op inconnue. Les blobs B re-scellés sont dumpés dans OUT/follow_B/. À relancer :
+#     FOLLOW=1 ./pending/sep_xart_replay.sh traces/20261111-113919_snew-reel
+#   (ou le lanceur court pending/follow_go.sh). SELFTEST OK hors-ligne ; snew-reel = S_new désigné.
 # ÉTAT : v2.1 — ESSAI 1 LANCÉ (2026-11-11, Albert) : 4 lockers rejoués (dont SEP-xART+USER-xART),
 #   sbio/scrd/sse/skdl annoncés, puis divergence à la 5e transaction (SEP demande TAG=0x05
 #   TYPE=0x01=SAVE au lieu de TYPE=0x05=FETCH). PROCHAIN PAS recommandé (sceptique) : OBSERVE=1
@@ -81,6 +105,9 @@
 #                 sans JAMAIS répondre sur 0x13 (donc n'acquitte PAS le SAVE -> n'avance pas le
 #                 compteur anti-rejeu, S_new préservé). But : voir ce que le SEP demande après
 #                 les 4 lockers (SAVE ? FETCH ? quel UUID / quelle taille de blob en B ?).
+#   FOLLOW=1 ./pending/sep_xart_replay.sh <dossier_capture>   # ESSAI B (suivi) : rejoue puis
+#                 ACQUITTE les SAVE du SEP (ÉCRITURE : avance le re-scellement) et écoute si
+#                 `sks` (0x12) finit par être annoncé. Plus invasif qu'OBSERVE. Voir « MODE FOLLOW ».
 #   SELFTEST=1 ./pending/sep_xart_replay.sh <dossier_capture> # test hors-ligne, NE TOUCHE PAS le Mac
 #   SKIP_CHAINLOAD=1 ...                                       # si un m1n1 frais tourne déjà
 #
@@ -96,6 +123,7 @@ SNEW="${1:?usage: $0 <dossier_capture_S_new (contenant sep.log et sep.log.ool/)>
 export SNEW M1N1_PROXYCLIENT="$M1N1_DIR/proxyclient"
 export SELFTEST="${SELFTEST:-0}"
 export OBSERVE="${OBSERVE:-1}"   # observation (lecture seule de B) activée par défaut ; OBSERVE=0 pour l'ancien comportement
+export FOLLOW="${FOLLOW:-0}"     # ESSAI B : acquitte les SAVE et suit le SEP (ÉCRITURE). Défaut 0. Prend le pas sur OBSERVE.
 
 if [ "$SELFTEST" != 1 ]; then
   require_mac
@@ -114,6 +142,7 @@ timeout 400 "$M1N1_PYTHON" - <<'PY' 2>&1 | tee "${OUT:-/tmp}/xart_replay.log"
 import os, sys, re, time, struct, glob
 SELFTEST = os.environ["SELFTEST"] == "1"
 OBSERVE = os.environ["OBSERVE"] == "1"
+FOLLOW = os.environ.get("FOLLOW", "0") == "1"
 SNEW = os.environ["SNEW"]
 sys.path.insert(0, os.environ["M1N1_PROXYCLIENT"])
 
@@ -375,17 +404,86 @@ def next_sep_13(timeout_s=10):
     return None
 
 import hashlib
-def read_B(n=0x400):
+# Ops pilotées par le SEP (octet TYPE du message = opération, cf. docs/kext_sepmanager.md §8).
+OPNAME = {0x00: "FETCH-xART", 0x01: "SAVE-xART", 0x05: "FETCH-locker", 0x06: "SAVE-locker",
+          0x07: "locker-absent", 0x0e: "fw-boot", 0x13: "OS-UUID"}
+# Ops que macOS acquitte par un ACK GÉNÉRIQUE (TYPE=0x00 PARAM=0x00 DATA=DATA&0xffffff00), sans
+# fournir de locker : SAVE xART (0x01), SAVE locker (0x06) ET locker-absent (0x07, vu TAG=0x0b dans
+# snew-reel : macOS répond > TYPE=0x00 PARAM=0x00 DATA=0). On NE met PAS 0x05 (FETCH) ici : un FETCH
+# exige qu'on remplisse le tampon A avec le bon locker -> on s'arrête dessus (mur réel).
+ACKABLE = {0x01, 0x06, 0x07}
+
+_bseq = [0]
+B_DUMP = (os.path.join(os.environ["OUT"], "follow_B")
+          if os.environ.get("OUT") and not SELFTEST else None)
+if B_DUMP:
+    os.makedirs(B_DUMP, exist_ok=True)
+
+def read_B(n=0x400, dump=False, tag=0, typ=0):
     """LECTURE SEULE du tampon B (SEP->AP). On lit directement phys_B (qu'on a alloué et mappé
     en IOVA_B) : aucun message envoyé, strictement équivalent au readmem du traceur. Renvoie
-    (nbytes_non_nuls_sur_n, sha8, 32_premiers_octets_hex)."""
+    (nbytes_non_nuls_sur_n, sha8, 32_premiers_octets_hex). Si dump : écrit le tampon complet
+    (0x8000) dans OUT/follow_B/ pour analyse (écriture d'un FICHIER LOCAL, rien vers le Mac)."""
     try:
         data = iface.readmem(phys_B, n)
     except Exception as e:
         return (-1, "????????", f"<lecture B impossible: {e}>")
     nz = sum(1 for b in data if b)
     sha = hashlib.sha256(data).hexdigest()[:8]
+    if dump and B_DUMP:
+        _bseq[0] += 1
+        try:
+            full = iface.readmem(phys_B, SIZE)
+            with open(os.path.join(B_DUMP, f"{_bseq[0]:03d}_tag{tag:02x}_op{typ:02x}.bin"), "wb") as f:
+                f.write(full)
+        except Exception:
+            pass
     return (nz, sha, data[:32].hex())
+
+def ack_save(m):
+    """ESSAI B (FOLLOW) : ACQUITTE une op pilotée par le SEP que macOS acquitte sans locker
+    (SAVE xART 0x01, SAVE locker 0x06, locker-absent 0x07). Protocole observé octet pour octet
+    dans la capture macOS snew-reel (tags 0x13/0x14/0x15 pour les SAVE, 0x0b pour 0x07) :
+      < EP0x13 TAG TYPE=0x01/0x06/0x07 ... DATA=0xWWWWWWxx  ->  > EP0x13 TAG TYPE=0x00 PARAM=0x00 DATA=0xWWWWWW00
+    (l'octet de poids faible du DATA, qui code la variante, est remis à 0 = « fait »).
+    Pour un SAVE c'est une ÉCRITURE qui fait avancer le re-scellement xART ; pour 0x07 c'est un
+    simple accusé. Renvoie le DATA acquitté."""
+    ack_data = m.DATA & 0xffffff00
+    sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=ack_data))
+    return ack_data
+
+def follow_loop(seconds=30):
+    """ESSAI B : après le rejeu, on CONTINUE de suivre le SEP ~30 s. On ACQUITTE les ops ACKABLE
+    (SAVE xART 0x01, SAVE locker 0x06, locker-absent 0x07) pour le laisser avancer, et on LIT B
+    (read-only, dumpé dans OUT/follow_B/) à chaque message. On N'INJECTE PAS de locker en réponse
+    à un FETCH (0x05) : on s'ARRÊTE de suivre là (mur réel) mais on continue d'écouter les annonces.
+    But : voir si le SEP finit par annoncer `sks` (0x12) et un état fonctionnel."""
+    print(f"--- FOLLOW {seconds}s : on acquitte SAVE/locker-absent et on écoute les annonces (sks ?) ---", flush=True)
+    n_ack = n_fetch = n_other = 0
+    hit_fetch = False
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        pump_ep0()
+        while sep.msgs[0x13]:
+            m = sep.msgs[0x13].popleft()
+            op = OPNAME.get(m.TYPE, "?")
+            nz, sha, head = read_B(dump=True, tag=m.TAG, typ=m.TYPE)
+            if m.TYPE in ACKABLE:
+                ack = ack_save(m); n_ack += 1
+                print(f"  SEP> {op} TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x} DATA=0x{m.DATA:08x} "
+                      f"-> ACK DATA=0x{ack:08x}  B: nz={nz} sha={sha} head={head}", flush=True)
+            elif m.TYPE == 0x05:
+                n_fetch += 1; hit_fetch = True
+                print(f"  SEP> FETCH-locker TAG=0x{m.TAG:02x} PARAM=0x{m.PARAM:02x} DATA=0x{m.DATA:08x} "
+                      f"NON SERVI (on n'injecte pas de locker = MUR)  B: nz={nz} sha={sha} head={head}", flush=True)
+            else:
+                n_other += 1
+                print(f"  SEP> {op} TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x} PARAM=0x{m.PARAM:02x} "
+                      f"DATA=0x{m.DATA:08x} NON TRAITÉ (op inconnue)  B: nz={nz} sha={sha} head={head}", flush=True)
+        time.sleep(0.02)
+    mur = " ; le SEP a buté sur un FETCH-locker qu'on ne sert pas" if hit_fetch else ""
+    print(f"--- fin FOLLOW : {n_ack} ops acquittées (SAVE/0x07), {n_fetch} FETCH-locker non servis, "
+          f"{n_other} autres{mur} ---", flush=True)
 
 def observe_loop(seconds=20):
     """ESSAI A : après la divergence, on N'ENVOIE RIEN sur 0x13 (surtout pas d'acquittement de
@@ -427,24 +525,46 @@ print("--- début du rejeu EP 0x13 ---", flush=True)
 replay_done = 0        # nb de réponses 'send' réellement renvoyées au SEP
 replay_total = sum(1 for s in steps if s[0] == 'send')
 diverged = False       # le SEP a-t-il divergé de la capture ?
+saves_acked = 0        # ESSAI B : nb d'ops ACKABLE acquittées pendant le rejeu (borné)
+SAVE_BUDGET = 40       # garde-fou anti-boucle : au-delà, on s'arrête même en FOLLOW
 for idx, s in enumerate(steps):
     if s[0] == 'recv':
-        m = next_sep_13()
-        if m is None:
-            print(f"[{idx}] timeout en attente d'une requête SEP (attendu TAG=0x{s[1]:02x}). Arrêt.", flush=True)
+        matched = False
+        while not matched:
+            m = next_sep_13()
+            if m is None:
+                print(f"[{idx}] timeout en attente d'une requête SEP (attendu TAG=0x{s[1]:02x}). Arrêt.", flush=True)
+                diverged = True
+                break
+            if m.TAG == s[1] and m.TYPE == s[2]:
+                matched = True
+                break
+            # --- DIVERGENCE : le SEP ne demande pas ce que la capture attendait ---
+            # ESSAI B (FOLLOW) : si c'est une op ACKABLE (SAVE 0x01/0x06 ou locker-absent 0x07),
+            # on l'acquitte comme macOS et on RÉ-ATTEND — le SEP enchaîne peut-être la suite.
+            # Un FETCH-locker (0x05) ou une op inconnue = MUR : on NE sert PAS de locker, on s'arrête.
+            if FOLLOW and m.TYPE in ACKABLE and saves_acked < SAVE_BUDGET:
+                op = OPNAME.get(m.TYPE, "?")
+                nz, sha, head = read_B(dump=True, tag=m.TAG, typ=m.TYPE)
+                ack = ack_save(m); saves_acked += 1
+                print(f"[{idx}] FOLLOW: {op} (TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x} DATA=0x{m.DATA:08x}) "
+                      f"-> ACK DATA=0x{ack:08x} [op acquittée #{saves_acked}]  B: nz={nz} sha={sha} head={head}. "
+                      f"ré-attente de TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x}", flush=True)
+                continue
+            # Sinon (OBSERVE, ou budget épuisé, ou FETCH/op inconnue) : échec FERMÉ, on NE pousse
+            # PAS de réponse enregistrée (état non maîtrisé).
+            extra = ""
+            if OBSERVE or FOLLOW:
+                nz, sha, head = read_B(dump=True, tag=m.TAG, typ=m.TYPE)
+                extra = (f"  [op={OPNAME.get(m.TYPE,'?')} PARAM=0x{m.PARAM:02x} DATA=0x{m.DATA:08x} ; "
+                         f"B: nz={nz} sha={sha} head={head}]")
+            budget = " (budget d'acquittements épuisé)" if FOLLOW and m.TYPE in ACKABLE else ""
+            print(f"[{idx}] DIVERGENCE après {replay_done} lockers rejoués ({saves_acked} ops acquittées)"
+                  f"{budget} : reçu TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x}, attendu TAG=0x{s[1]:02x} "
+                  f"TYPE=0x{s[2]:02x}. Rien de plus envoyé au SEP.{extra}", flush=True)
             diverged = True
             break
-        if m.TAG != s[1] or m.TYPE != s[2]:
-            # Échec FERMÉ : si le SEP sous m1n1 diverge de la capture, on NE continue PAS à
-            # pousser des réponses enregistrées (ça mettrait le SEP dans un état non maîtrisé).
-            extra = ""
-            if OBSERVE:
-                nz, sha, head = read_B()
-                extra = f"  [message complet : PARAM=0x{m.PARAM:02x} DATA=0x{m.DATA:08x} ; B: nz={nz} sha={sha} head={head}]"
-            print(f"[{idx}] DIVERGENCE après {replay_done} lockers rejoués : reçu TAG=0x{m.TAG:02x} "
-                  f"TYPE=0x{m.TYPE:02x}, attendu TAG=0x{s[1]:02x} TYPE=0x{s[2]:02x}. "
-                  f"Rien de plus envoyé au SEP.{extra}", flush=True)
-            diverged = True
+        if diverged:
             break
     else:
         tag, typ, param, data, a_path = s[1], s[2], s[3], s[4], s[5]
@@ -456,9 +576,13 @@ for idx, s in enumerate(steps):
 print(f"--- rejeu terminé ({replay_done}/{replay_total} réponses rejouées"
       f"{', DIVERGENCE' if diverged else ''}) ---", flush=True)
 
-# ESSAI A : après le rejeu (divergé ou complet), on observe passivement ce que le SEP demande,
-# SANS rien lui renvoyer sur 0x13. Sinon, simple écoute des annonces d'endpoints (EP 0).
-if OBSERVE:
+# Après le rejeu (divergé ou complet) :
+#   FOLLOW  -> on suit le SEP en acquittant les SAVE (écriture), pour voir s'il annonce sks.
+#   OBSERVE -> on écoute B en lecture seule sans rien renvoyer (n'acquitte pas le SAVE).
+#   sinon   -> simple écoute des annonces d'endpoints (EP 0).
+if FOLLOW:
+    follow_loop(30)
+elif OBSERVE:
     observe_loop(20)
 else:
     print("--- écoute 10 s des endpoints ---", flush=True)
@@ -468,7 +592,11 @@ else:
 
 print("Endpoints annoncés par le SEP :", flush=True)
 for num, name in sorted(sep.epnum2name.items()):
-    star = "  <-- BIOMÉTRIE !" if name == "sbio" else ""
+    star = ""
+    if name == "sbio":
+        star = "  <-- BIOMÉTRIE !"
+    elif name == "sks":
+        star = "  <-- TROUSSEAU (sks 0x12) !"
     print(f"  0x{num:02x} {name}{star}", flush=True)
 # ATTENTION : la présence de sbio NE prouve PAS à elle seule que le rejeu est accepté.
 # On ne peut parler de "rejeu accepté" que si le rejeu s'est déroulé SANS divergence.
@@ -486,6 +614,23 @@ elif sbio_la and (diverged or replay_done < replay_total):
           f"voir l'observation de B ci-dessus pour ce que le SEP réclame à la divergence.", flush=True)
 else:
     print(">>> sbio ABSENT. Le réveil de la biométrie n'a pas eu lieu ici.", flush=True)
+
+# ESSAI B (FOLLOW) : le critère n'est PAS sbio mais sks (0x12, le trousseau). sbio était déjà
+# annoncé à l'essai 1 pendant un échange partiel. La question est : après avoir acquitté le(s)
+# re-scellement(s), le SEP atteint-il un état fonctionnel qui expose sks ?
+if FOLLOW:
+    sks_la = "sks" in sep.epname2num
+    print(f">>> ESSAI B : {saves_acked} ops acquittées (SAVE/locker-absent) pendant le rejeu. "
+          f"sks (0x12) {'PRÉSENT' if sks_la else 'ABSENT'}.", flush=True)
+    if sks_la:
+        print(">>> sks PRÉSENT après suivi du SEP : le SEP atteint un état trousseau sous m1n1 "
+              "-> à creuser (c'est le signal recherché). NE PAS en conclure 'Touch ID marche' : "
+              "il reste à ouvrir le trousseau (code/mot de passe) et à tester un match.", flush=True)
+    else:
+        print(">>> sks ABSENT. Regarder OÙ le suivi s'est arrêté (log ci-dessus) : s'il a buté sur "
+              "un FETCH-locker (0x05) non servi, le verrou est 'le SEP réclame un gigalocker qu'on "
+              "ne lui fournit pas' (étape suivante = servir ce locker depuis la capture). S'il s'est "
+              "tu sans FETCH, c'est autre chose. -> docs/hypotheses.md.", flush=True)
 PY
 
 # Logs d'une écriture SEP en lecture seule (policy « traces/ en lecture seule après capture »).

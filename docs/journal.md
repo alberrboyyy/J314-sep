@@ -14,6 +14,48 @@ Format :
 
 ---
 
+## 2026-11-12 (soir, ~21:30) — Claude (Opus 4.8) + Albert — ESSAI B (FOLLOW) LANCÉ : 9 re-scellements puis op 0x07 ; sks absent mais arrêt prématuré
+- Trace : `traces/20261112-212820_xart_replay` (run réussi ; Albert a lancé). Deux runs avortés avant :
+  `…211716` (UartTimeout au DÉBUT du rejeu, 0 écrit) et `…212238` (chainload NOP timeout, m1n1 coincé) →
+  power-cycle. Flakiness de lien connue (~1 bon chainload par power-cycle).
+- Fait : Albert a lancé `FOLLOW=1 ./pending/sep_xart_replay.sh traces/20261111-113919_snew-reel`. Nouveau
+  mode FOLLOW : à la divergence, acquitte les SAVE au lieu de s'arrêter. (Écriture SEP, lancée par Albert.)
+- Vu (FAITS) : boot SEP OK ; endpoints de base annoncés (cntl/hdcp/xars/xarm/hibe/pnon/stac) ; SECMODE +
+  tampons A/B OK. Rejeu des 4 lockers maîtres OK, puis divergence (comme essai 1, n≥3). **Le SEP a alors
+  enchaîné 9 SAVE** (TAG 0x05→0x0d, alternance TYPE 0x01 xART / 0x06 locker ; blobs B croissants :
+  nz 126→127→225→321→611), tous acquittés. **Puis TAG=0x0e TYPE=0x07** (op « locker-absent », PARAM=0x10
+  DATA=0) — le script v3 ne gérait QUE 0x01/0x06 → **arrêt sur ce 0x07**. Ensuite silence (0 msg 0x13 en 30 s).
+  Endpoints finaux : cntl, **sbio(0x08)**, scrd, sse, hdcp, xars, xarm, hibe, pnon, skdl, stac. **sks (0x12) ABSENT.**
+- Interprété (HYPOTHÈSE) : (1) sbio annoncé mais sks absent = comme essai 1. (2) **Le « sks absent » n'est PAS
+  concluant** : la capture macOS snew-reel montre qu'un op 0x07 (TAG=0x0b) est acquitté par macOS (> TYPE=0x00
+  PARAM=0x00 DATA=0) et le boot continue. Le script s'est donc arrêté UN CRAN TROP TÔT. (3) Les 9 SAVE acquittés
+  SONT de vraies écritures SEP (état scellé interne avancé) ; aucune persistance disque (l'AP n'a pas réécrit le
+  gigalocker) → le SEP « croit » avoir sauvé. Côté Apple déjà cassé ; Linux/données intacts.
+- Fait (suite) : corrigé en **v3.1** — 0x07 ajouté à ACKABLE (on le suit comme macOS), arrêt seulement sur un
+  FETCH-locker (0x05) non servi ou op inconnue ; dump des blobs B re-scellés dans `OUT/follow_B/`. Lanceur court
+  `pending/follow_go.sh` (pour lancer depuis le tél en RC). SELFTEST + py_compile OK. NON relancé (choix d'Albert).
+- Incidents : 2 gels de lien (UartTimeout), power-cycles par Albert. Aucun côté disque.
+
+## 2026-11-12 (soir) — Claude (Opus 4.8) — Mac rebranché (USB local) ; script ESSAI B (FOLLOW) écrit, prêt pour Albert
+- Trace : — (aucune action hardware ; le script n'est PAS lancé. Travail hors ligne + lecture capture.)
+- Fait : (1) Vérifié le lien : Mac en **USB local direct** (ttyACM0/1, m1n1 uartproxy v2.0.0-92-g7075,
+  `WHFWP7FYXF`, énuméré 20:59), pas de tunnel. Pas de `sep_peek` lancé (le chainload peut se coincer, cf.
+  incident 2026-11-11 23:56 ; device clairement vivant, on garde le proxy propre pour le run d'Albert).
+  (2) Lu la séquence EP 0x13 de `traces/20261111-113919_snew-reel` : identifié le protocole d'**acquittement
+  d'un SAVE** piloté par le SEP (tags 0x13/0x14/0x15) → `> TYPE=0x00 PARAM=0x00 DATA=(DATA_reçu & 0xffffff00)`.
+  (3) Ajouté le **mode FOLLOW** à `pending/sep_xart_replay.sh` (v3) : à la divergence, acquitte les SAVE
+  (0x01/0x06) au lieu de s'arrêter, ré-attend, puis écoute ~30 s en continuant d'acquitter, pour voir si
+  `sks` (0x12) finit par être annoncé. N'injecte PAS de locker sur un FETCH post-divergence (observation).
+  Budget SAVE borné à 16 (anti-boucle). Boot/CNTL/DART/rejeu inchangés (déjà validés octet pour octet).
+- Vu : SELFTEST OK (séquence relue, ACK SAVE = 0x89290100/0x551e0100/0xcad30100, identiques à la capture) ;
+  `bash -n` OK ; bloc Python `py_compile` OK.
+- Interprété : FOLLOW est l'ESSAI observationnel du handoff 2026-11-12. C'est une **écriture SEP** (acquitter
+  un SAVE fait avancer le re-scellement xART) → lancée par **Albert** seulement. Côté Apple déjà cassé
+  (bootloop) : l'enjeu « casser le boot Apple » est caduc ; Linux + données = aucun risque.
+- Décision/limite : rien envoyé au Mac. En attente d'Albert : (a) image disque oui/non (confort, pas un vrai
+  filet) ; (b) lancer `FOLLOW=1 ./pending/sep_xart_replay.sh traces/20261111-113919_snew-reel`.
+- Incidents : aucun.
+
 ## 2026-11-12 ~08:40 — Claude (Opus 4.8) + Albert — Récupération ALARM après gel PMU ; handoff
 - Trace : — (opérations matérielles de récupération, aucune capture SEP)
 - Fait : relance du tethered boot ALARM. 1er essai (`linux.py`) planté au `PMU.reset_panic_counter` →
