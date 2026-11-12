@@ -455,24 +455,41 @@ appelante (scan `scratchpad/scan_opcodes.py` + lecture du contexte exact ; quelq
 `sepTransact(w1=opcode, …)` relaie vers le transfert SEP interne (`AppleSEPManager`, `[this+0x170]`). **Statut : hypothèse
 (source: kext), partiellement recoupée par les TAGs de `docs/messages.md`.**
 
-| opcode | opération (nom kext) | recoupement trace (messages.md) |
-|---|---|---|
-| 0x03 | `commandStartEnroll` | présent dans la séquence de match `…70 03 21` |
-| 0x06 | `forceNoMatch` | présent (`23 06 65…`) |
-| 0x07 | `asyncCaptureHandler` (capture) | présent (`…65 07 09…`) |
-| 0x08 | `handleEnrollment` | capture d'enrôlement (sortie lue) |
-| **0x09** | **`handleMatch` (match)** | **`<09` = le match, 240-356 ms (C3/C8)** ✓ |
-| 0x0c | `handleMatch` (1er transact, sans payload = armement ?) | — |
-| 0x15 | `performKeyExchange` | **clé de session capteur 0x15/0x16** (§4) ✓ |
-| 0x1f | `cacheMatchPolicy` | présent dans la séquence de match (`…09 1f 22…`) ✓ |
-| 0x22 | `asyncCaptureHandler` | présent (`…1f 22 70…`) ✓ |
-| 0x42 | `initializeSequenceCounter` | **compteur 0x42** (§4, InitializeSequenceCounter) ✓ |
-| 0x4a | `seaCookieHandleMessage` (provisioning usine) | — |
-| 0x5d | `applySensorParams` | proche du patch 0x5f (§4) |
-| 0x63 | `setCalibrationData` | — |
+Table **complète** (tous les sites `sepTransact` du Mesa, opcode = `mov w1,#imm` remonté jusqu'à 22 instr avant l'appel ;
+`scratchpad/scan_opcodes2.py`). ✓ = octet vu dans la sous-séquence de match fil `23 06 65 07 09 1f 22 70 03 21` (messages.md).
 
-Lecture : **les octets de la sous-séquence de match `23 06 65 07 09 1f 22 70 03 21`** (relayée dans la transaction `0xfc`) sont,
-pour une bonne part, ces **opcodes `sepTransact`** (0x06, 0x07, 0x09, 0x1f, 0x22, 0x03) — c.-à-d. les sous-commandes capteur
-émises pendant un match. Le driver Linux (phase 2+) devra émettre cette séquence ; `0x09` = l'ordre de match proprement dit.
-**Non encore résolus** (opcode chargé via registre, pas immédiat) : `HandleReset` (0x19 ?), `LoadPatch`, `establishDiffieHellmanSession`,
-`lockRootKeyInSensor`, `prepareNotPairedSession`, `setCalibrationData`-variantes. À finir en suivant le flot de données.
+| opcode | opération (nom kext) | note / recoupement |
+|---|---|---|
+| 0x03 | `commandStartEnroll` | ✓ (`…70 03 21`) |
+| 0x06 | `forceNoMatch` | ✓ (`23 06 65…`) ; aussi dans `retryMatchAfterHomeButtonPress` |
+| 0x07 | `asyncCaptureHandler` / retryMatch (capture) | ✓ (`…07 09…`) |
+| 0x08 | `handleEnrollment` | capture d'enrôlement (sortie lue) |
+| **0x09** | **`handleMatch` — le match** | ✓ **`<09` = match, 240-356 ms (C3/C8)** |
+| 0x0a | `applyPostponedMatch` | match différé |
+| 0x0c | `handleMatch` (×2, 1er transact = armement) | — |
+| 0x15 | `performKeyExchange` | **clé de session 0x15/0x16 (§4)** |
+| 0x19 | `HandleReset` | reset capteur |
+| 0x1b | `prepareNotPairedSession` | session (non appairée) |
+| 0x1f | `cacheMatchPolicy` | ✓ (`…09 1f 22…`) |
+| 0x22 | `asyncCaptureHandler` | ✓ (`…1f 22 70…`) |
+| 0x23 | `asyncCaptureHandler` | ✓ (`23 06…` = début de la séquence) |
+| 0x24 / 0x30 | `lockRootKeyInSensor` | verrouillage clé racine (2 étapes) |
+| 0x28 | `performSpecificCommandGated` / `cacheCaptureData` | — |
+| 0x2b | `cacheProtectedConfigurationSpecific` | config protégée |
+| 0x36 | `performSpecificCommandGated` | — |
+| 0x39 | `cacheSysProtectedConfigurationSpecific` | config système protégée |
+| 0x3d | `forceBioLockoutSpecific` | verrouillage biométrique |
+| 0x42 | `initializeSequenceCounter` | **compteur 0x42 (§4)** |
+| 0x43 | `establishDiffieHellmanSession` | négociation de clé SEP↔capteur |
+| 0x49-0x4f, 0x53, 0x76, 0x77 | `seaCookieHandleMessage` | provisioning **usine** (nombreux sous-opcodes) |
+| 0x58 / 0x5a | `cacheCaptureData` | — |
+| 0x5d | `applySensorParams` | proche patch 0x5f (§4) |
+| 0x63 | `setCalibrationData` | — |
+| 0x65 / 0x74 | `asyncCaptureHandler` / retryMatch | ✓ (`…65 07…`, et `0x74`) |
+| 0x7e | `provisionNavajo` | provisioning capteur Navajo |
+
+**Lecture.** La sous-séquence de match `23 06 65 07 09 1f 22 70 03 21` (relayée dans la transaction `0xfc`) est **nommée à 8/10** :
+`0x23`/`0x06`/`0x65`/`0x07`/`0x09`/`0x1f`/`0x22`/`0x03` = opérations `asyncCaptureHandler`/`forceNoMatch`/capture/`handleMatch`/
+`cacheMatchPolicy`/`commandStartEnroll`. `0x09` = l'ordre de match. **Restent `0x70` et `0x21`** (non émis par un `sepTransact` Mesa →
+sans doute une autre couche : trame mailbox `0x70` = transfert d'image de capture ?, à confirmer). Le driver Linux (phase 2+) devra
+émettre cette séquence. **Statut : hypothèse (source: kext), cross-validé par les TAGs fil.**
