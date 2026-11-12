@@ -399,3 +399,39 @@ plus largement, préparer le driver. Désassemblage `com.apple.driver.AppleMesaS
 - **Prochain pas (décompilation, pour le driver surtout)** : marcher la **vtable du driver Mesa** (slots `+0xa48`, `+0xa58`, et
   ceux de match/enroll/cancel) pour nommer les opcodes EP 0x08, en les croisant avec les **TAGs fil déjà dans `messages.md`**
   (séquences `0xfc`/`0x09`/`0x70`, notifs TAG 0x01, TAG 0x02/0x03/0x04 — cf. §6). Objectif : table opcode↔nom↔effet (lecture/mutation).
+
+## 12. sbio (EP 0x08) — carte des opérations du driver (vtable AppleMesaSEPDriver, 2026-11-12, Claude — source: kext)
+
+Suite du §11. Vtable `__ZTV18AppleMesaSEPDriver` résolue (chained-fixup arm64e auth-rebase, base `0xfffffe0007004000`,
+VA = base + 32 bits bas ; outil `scratchpad/vtable_dump.py`, non commité). Les méthodes **propres** au driver (au-delà de
+l'IOService hérité) donnent la surface d'opérations sbio. **Statut : hypothèse (noms de méthodes, source: kext).**
+
+**Primitive d'envoi au SEP.** `sepTransact(uint opcode, const void* in, ulong inLen, void** out, ulong* outLen, bool, uint)`
+(slot 316) et `sepTransactToIOMD(uint, const void*, ulong, IOMemoryDescriptor*, uint*, uint)` (slot 315). C'est le point de
+passage AP→SEP sbio. Appelées **en virtuel** (pas de `bl` direct → la recherche d'appelants ne les voit pas) ; l'`opcode` (w1)
+provient de structures de commande `bm_cmd_t` (cf. `performSpecificCommandGated(const bm_cmd_t*, …)` slot 277,
+`checkBiometricCommand(const bm_cmd_t*)` slot 294, `getBiometricCommandMagic()` slot 293).
+
+**Opérations nommées (sélection), nature présumée d'après le nom :**
+
+| slot | méthode | nature |
+|---|---|---|
+| 324 | `getProvisioningState(IOMemoryDescriptor*, uint*)` | **lecture — mais CACHÉE côté AP** : empaquette `getProvisioningStateInt` (champs `_provisionStatus` +0x1f0), **aucun aller-retour SEP** (désassemblé) |
+| 341 | `diagnostics(const void* in, ulong, IOMemoryDescriptor* out, uint*)` | **lecture structurée** : `in[0]` = sous-sélecteur 1..5 (table de saut) ; candidat sonde mais pas un opcode unique |
+| 313 | `getSepTimeMeasurements(time_struct_t*)` | lecture (mesures de temps SEP) — à vérifier si transact réel |
+| 322/323 | `prepareSession` / `prepareNotPairedSession(bool*)` | session (établit l'état) |
+| 325/326/327 | `provisionSensor(uint)` / `unpairSensor()` / `unprovisionSensor(bool)` | **mutation** (provisioning) |
+| 329/331 | `provisionNavajo(uint)` / `provisionSandDollar(uint, bool)` | **mutation** par génération de capteur (Navajo, SandDollar = noms Apple du capteur Touch ID) |
+| 333/335 | `lockRootKeyInSensor(bool*)` / `provisionSensorWithRootKey(…)` | **mutation sensible** (clés) |
+| 334 | `establishDiffieHellmanSession()` | **mutation** (négociation de clé SEP↔capteur) |
+| 305/306/319/320 | `LoadPatch` / `ClearPatchOverride` / `loadCustomPatch` / `cachePatch` | **mutation** (firmware capteur) |
+| 290/291/292 | `forceBioLockout(int)` / `dropUnlockToken(uint)` / `dropBiometricTokens(uint)` | **mutation** (verrouillage/tokens) |
+| 338/339/340 | `getPreImage` / `prepareSerialisedTemplates` / `getSerialisedTemplates` | **lecture de données biométriques — NE PAS sonder** (empreintes/templates) |
+| 300 | `sendLockStateToClients(lock_state_data_v1_t)` | propage l'état de verrou (côté AP) |
+| 297/310 | `handleSEPMessage(ulong)` / `ProcessMessage(asd_message_t)` | réception SEP→AP |
+
+**Conclusion pour une sonde « vivant » (honnête).** À cette couche, pas de « ping statut » fil **trivial et sans effet de bord** :
+`getProvisioningState` est caché AP (ne prouve rien) ; `diagnostics` est multi-sous-commandes ; les opérations qui parlent
+vraiment au SEP sont soit des mutations, soit des lectures de données biométriques (interdites). **Prochain pas pour une sonde** :
+suivre une sous-commande de `diagnostics` (sélecteur 1 → `0x978df34`) ou `getSepTimeMeasurements` pour trouver **une** lecture qui
+fait un `sepTransact` propre (opcode fixe, sortie bornée, aucune écriture) — ce serait le message à mettre dans `pending/`.

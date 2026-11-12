@@ -30,6 +30,20 @@ Format :
   RÉSERVE : n=2, lecture de tampon ; « empreinte » vs « MAC tronqué » non tranché ; ne change pas la conclusion voie C (rejeu impossible côté AP).
 - Incidents : 13 re-scellements (SEP, vraies écritures) ; côté macOS déjà cassé, Linux/données intacts. Power-cycle demandé après le run.
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Carte des opérations sbio : vtable AppleMesaSEPDriver résolue (noms de méthodes)
+- Trace : — (désassemblage + résolution de vtable `macos/kernel.macho` ; outil `scratchpad/vtable_dump.py`, non commité). Aucun matériel.
+- Fait : résolu la vtable `__ZTV18AppleMesaSEPDriver` (chained-fixup arm64e auth-rebase, base `0xfffffe0007004000`) → 344 slots nommés ;
+  isolé les méthodes propres au driver = surface d'opérations sbio. Désassemblé `getProvisioningState`, `diagnostics`. Écrit `kext_sepmanager.md §12`.
+- Vu (FAITS, source: kext) : primitive d'envoi = `sepTransact(uint opcode, in, inLen, out, outLen, …)` (slot 316, appelée **en virtuel**).
+  Opérations nommées : provision/unpair/unprovision/`provisionNavajo`/`provisionSandDollar`/`lockRootKeyInSensor`/`establishDiffieHellmanSession`/
+  `LoadPatch` = **mutations** ; `getPreImage`/`getSerialisedTemplates` = **données biométriques (interdit de sonder)** ;
+  `getProvisioningState` = **caché côté AP** (désassemblé : empaquette `getProvisioningStateInt`, aucun aller-retour SEP) ;
+  `diagnostics` = interface à sous-commandes (sélecteur `in[0]`=1..5). (Navajo, SandDollar = noms Apple du capteur Touch ID.)
+- Interprété : pas de « ping statut » fil **trivial et sans effet de bord** à cette couche → la sonde « vivant » n'est pas un one-shot.
+  Prochain pas sonde : suivre une sous-commande de `diagnostics` ou `getSepTimeMeasurements` pour isoler une lecture `sepTransact` propre.
+  La carte reste surtout utile pour le **driver** (phase 2+). Statut `hypothèse` (noms de méthodes).
+- Incidents : aucun (hors ligne).
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Reconnaissance sbio (EP 0x08) : pas de lecture-statut fil triviale ; dispatch par vtable
 - Trace : — (désassemblage AppleMesaSEPDriver, `kdis.py func`, venv capstone ; listings non commités). Aucun matériel.
 - Fait : cherché un message sbio de lecture pure pour une sonde « vivant ». Désassemblé `getProvisioningStateInt`, `provisionSensor`.
