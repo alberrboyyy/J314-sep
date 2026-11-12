@@ -570,3 +570,18 @@ Les buffers OOL **EP 0x08** capturés (`traces/20261108-032454_c12-boot-ho/sep.l
 - **Conséquence** : le **format fil sbio est VÉRIFIÉ** (le reste — noms d'opérations — reste `source: kext`). On peut désormais
   **parser l'opcode de n'importe quelle transaction EP 0x08** (= `gt_packet_t.+0x14` du buffer A), et donc nommer toutes les
   transactions `0xfc` d'une capture. Outil d'analyse à ajouter : lecture `gt_packet_t` dans `analysis/`.
+
+### 13c. Verdict de match (opcode 0x09) — `match_info_t` — VÉRIFIÉ (c6/c8/c11)
+
+La commande de **match** = transaction `0xfc`, `gt_packet_t` opcode **0x09**, **payload vide** (total=0). La **réponse** (buffer B) =
+`gt_packet_t` opcode 0x09, payload **`match_info_t`** (longueur `0xca2`), dont le **verdict** est en tête :
+
+| payload +off | succès | échec |
+|---|---|---|
+| +0x00 (u32) | **`0x1f5`** (= 501, user) | **`0xffffffff`** |
+| +0x04 (16 o) | **identifiant du gabarit** `fe6003d8cea5414fb48a0338dc7c371b` | zéros |
+
+**VÉRIFIÉ** : reproductible sur **3 captures doigt** (c6, c8, c11), ~35 réponses 0x09 ; tous les succès portent `0x1f5` + le **même**
+identifiant (le doigt enrôlé), tous les échecs `0xffffffff` + zéros. Rattache le kext (`handleMatch`→`match_info_t`) au marqueur de
+succès `0x1f5`/`fe6003d8…` déjà noté en trace (messages.md §SBIO). **C'est le signal « doigt reconnu » que le driver Linux lira.**
+(Les ~3200 octets restants du `match_info_t` = métadonnées d'image/score, non décodés.)

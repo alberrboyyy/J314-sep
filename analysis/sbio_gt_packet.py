@@ -51,5 +51,23 @@ def main():
         warn = "" if kind == 1 else "  <-- kind != 1 (pas un gt_packet ?)"
         print(f"{idx:>7} {kind:>4} {tot:>#6x} {off:>#5x} {flen:>#5x}  {op:>#5x}  {OPS.get(op,'?')}{warn}")
 
+    # réponses B des matches (opcode 0x09) : verdict match_info_t (VÉRIFIÉ, §13c)
+    bresp = sorted(glob.glob(os.path.join(d, "*_08_B.bin")))
+    shown = False
+    for f in bresp:
+        b = open(f, "rb").read()
+        if len(b) < 0x20:
+            continue
+        kind, tot, off, flg, r10, op, flen = struct.unpack_from("<IIIIIII", b, 0)
+        if op != 0x09:
+            continue
+        verdict = struct.unpack_from("<I", b, 0x1c)[0]
+        tag = "SUCCES" if verdict == 0x1f5 else ("ECHEC" if verdict == 0xffffffff else "?")
+        if not shown:
+            print("\n-- réponses de match (opcode 0x09, buffer B) : verdict match_info_t --")
+            shown = True
+        idx = os.path.basename(f).split("_")[0]
+        print(f"{idx:>7}  verdict={verdict:#010x} {tag}  ident={b[0x20:0x30].hex()}")
+
 if __name__ == "__main__":
     main()

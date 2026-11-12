@@ -30,6 +30,16 @@ Format :
   RÉSERVE : n=2, lecture de tampon ; « empreinte » vs « MAC tronqué » non tranché ; ne change pas la conclusion voie C (rejeu impossible côté AP).
 - Incidents : 13 re-scellements (SEP, vraies écritures) ; côté macOS déjà cassé, Linux/données intacts. Power-cycle demandé après le run.
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — VÉRIFIÉ : verdict de match Touch ID (opcode 0x09 → match_info_t) sur 3 captures
+- Trace : `c6-doigt-ool`, `c8-doigt-ool`, `c11-doigt-tranchant` (buffers OOL EP 0x08 déjà capturés, doigt sur capteur). Outil `analysis/sbio_gt_packet.py`.
+- Fait : parsé les transactions de match (opcode 0x09) et leurs réponses (buffer B = `gt_packet_t`), extrait le verdict en tête du `match_info_t`.
+- Vu (FAIT **VÉRIFIÉ**, reproductible, ~35 réponses sur 3 captures) : commande match = `gt_packet_t` op 0x09 payload vide ; réponse = `gt_packet_t`
+  op 0x09, payload `match_info_t` (0xca2 o). **Verdict en tête : `+0x00 = 0x1f5` (succès, user 501) + identifiant 16 o `fe6003d8cea5414fb48a0338dc7c371b`
+  (le doigt enrôlé) ; `0xffffffff` + zéros = échec.** Tous les succès = même identifiant ; tous les échecs = zéros. 0 faux positif.
+- Interprété : c'est le **signal « doigt reconnu »** que le driver Linux lira (rattache `handleMatch`→`match_info_t` du kext au marqueur
+  `0x1f5`/`fe6003d8…` déjà noté par l'analyste, messages.md §SBIO). Les ~3200 o restants = métadonnées image/score (non décodés).
+- Incidents : aucun (hors ligne, captures existantes).
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — VÉRIFIÉ : format fil sbio (gt_packet_t) confirmé par capture + outil d'analyse
 - Trace : `traces/20261108-032454_c12-boot-ho/sep.log.ool/*_08_A.bin` (dumps OOL EP 0x08 déjà capturés). Désassemblage AppleSEPGenericTransfer.
 - Fait : décodé la chaîne `sepTransact → AppleSEPGenericTransfer::transact (0x9939900) → message 0xfc (0x9937348) → gt_packet_t (0x9937570)` ;
