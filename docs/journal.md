@@ -30,6 +30,19 @@ Format :
   RÉSERVE : n=2, lecture de tampon ; « empreinte » vs « MAC tronqué » non tranché ; ne change pas la conclusion voie C (rejeu impossible côté AP).
 - Incidents : 13 re-scellements (SEP, vraies écritures) ; côté macOS déjà cassé, Linux/données intacts. Power-cycle demandé après le run.
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — VÉRIFIÉ : format fil sbio (gt_packet_t) confirmé par capture + outil d'analyse
+- Trace : `traces/20261108-032454_c12-boot-ho/sep.log.ool/*_08_A.bin` (dumps OOL EP 0x08 déjà capturés). Désassemblage AppleSEPGenericTransfer.
+- Fait : décodé la chaîne `sepTransact → AppleSEPGenericTransfer::transact (0x9939900) → message 0xfc (0x9937348) → gt_packet_t (0x9937570)` ;
+  **vérifié** le format contre les buffers capturés ; écrit l'outil `analysis/sbio_gt_packet.py`. Docs : `kext_sepmanager.md §13/§13b`.
+- Vu (FAIT **VÉRIFIÉ** par trace, 14 buffers A + fragmentation) : un message EP 0x08 `type=0xfc` (tag = compteur++) porte un buffer OOL
+  = **`gt_packet_t`** : `+0x00 kind=1`, `+0x04 total`, `+0x08 offset`, `+0x0c flags`, `+0x14 OPCODE`, `+0x18 longueur fragment`,
+  `+0x1c payload`. Confirmé sur c12 : `+0x00=1` 14/14 ; opcodes lus = 0x17 (n° série), 0x15/0x16 (clé session), 0x42/0x18 (compteur),
+  0x5f (patch, 16 Ko), 0x1f (match policy)… ; **fragmentation vérifiée** (opcode 0x5b, total 0xfc99, offset 0→0x3fe4→0x7fc8→0xbfac).
+- Interprété (noms = `source: kext`) : séquence d'init capteur c12 = série → clé(0x15/0x16) → compteur(0x42/0x18) → patch(0x5f) →
+  params(0x5d) → switchToProd(0x32) → matchPolicy(0x1f) → calib(0x63) → reset(0x19). Le **format fil sbio est maintenant VÉRIFIÉ**
+  (les noms d'opérations restent hypothèse kext). On peut parser l'opcode de toute transaction EP 0x08 (`analysis/sbio_gt_packet.py`).
+- Incidents : aucun (hors ligne).
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Table opcode sbio ↔ opération ↔ TAG fil (pont kext↔traces, socle driver)
 - Trace : — (scan `scratchpad/scan_opcodes.py` + lecture de contexte sur `macos/kernel.macho` ; non commité). Aucun matériel.
 - Fait : repéré les appels virtuels à `sepTransact` (slot +0x9e0) dans tout le `__text` Mesa et lu l'opcode (`mov w1,#imm`) par opération.
