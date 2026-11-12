@@ -14,6 +14,22 @@ Format :
 
 ---
 
+## 2026-11-12 (22:38) — Claude (Opus 4.8) + Albert — ESSAI B reproduit (n=2) : sks/sbio ré-annoncés + l'enveloppe 16 o se sépare en digest déterministe (locker) vs variable par boot (xART)
+- Trace : `traces/20261112-223837_xart_replay` (+ `follow_B/`, 13 blobs). Albert a lancé `follow_go.sh`. Comparé à `…215313` (n=1).
+- Fait : rejeu de la même capture (`…113919_snew-reel`) une 2e fois ; diff croisé des deux jeux de 13 blobs B.
+- Vu (FAITS) :
+  - **Reproduit** : 13 ops acquittées, **sks (0x12) ET sbio (0x08) ré-annoncés** (n=2).
+  - **Intra-run reproduit** : l'op `0x07` (locker-absent, blob 010) ne change **que les 16 premiers octets** (`009→010 : 16 o diff @ 0x0000-0x000f`), corps identique — identique au run 1.
+  - **Croisé entre les 2 runs (fait neuf)** : les **16 premiers octets** sont **IDENTIQUES d'un run à l'autre** pour tous les SAVE-**locker** (TYPE 0x06 : blobs 002/005/008/012) **et** pour le 0x07 (010) ; ils **DIFFÈRENT** pour tous les SAVE-**xART** (TYPE 0x01). Les octets **16+** et le corps diffèrent entre runs **partout**.
+  - Les 16 o de tête des lockers sont **distincts entre lockers** (407e94c4… / 9133c5d5… / e01e3b5e… / 2438821b… / 0x07=d15bc8da…) → pas une constante globale.
+- Interprété (HYPOTHÈSE, raffine l'entrée « Fraîcheur SAVE » et [[voie-c-xart-fraicheur]]) : l'« enveloppe 16 o » n'est pas monolithique.
+  Pour un **locker**, les 16 premiers octets = **empreinte déterministe du contenu** (le locker est rejoué à l'identique → même empreinte
+  aux 2 runs), **pas** un nonce. La matière **variable par boot** (la fraîcheur) vit dans les **blobs xART maîtres** (TYPE 0x01, dont les
+  16 premiers octets changent par boot) et dans les octets **16+** de tout blob (chiffrés/MAC avec la matière de session). Cohérent avec le
+  §9 : le SEP mêle une matière de session par boot que l'AP ne contrôle pas → un vieux blob xART rejoué ne colle pas au nonce du boot courant.
+  RÉSERVE : n=2, lecture de tampon ; « empreinte » vs « MAC tronqué » non tranché ; ne change pas la conclusion voie C (rejeu impossible côté AP).
+- Incidents : 13 re-scellements (SEP, vraies écritures) ; côté macOS déjà cassé, Linux/données intacts. Power-cycle demandé après le run.
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Reconnaissance sbio (EP 0x08) : pas de lecture-statut fil triviale ; dispatch par vtable
 - Trace : — (désassemblage AppleMesaSEPDriver, `kdis.py func`, venv capstone ; listings non commités). Aucun matériel.
 - Fait : cherché un message sbio de lecture pure pour une sonde « vivant ». Désassemblé `getProvisioningStateInt`, `provisionSensor`.

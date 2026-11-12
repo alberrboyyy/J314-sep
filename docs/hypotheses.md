@@ -82,6 +82,14 @@ l'ESSAI B (`traces/20261112-215313_xart_replay/follow_B/`, diff octet par octet)
   **Aucun compteur en clair** ailleurs → cohérent avec un **compteur scellé interne** ([[voie-c-xart-fraicheur]]), invisible.
 - **Réserve** : lecture de tampon, n=1, clé/algo inconnus. On a prouvé « 16 o de tête changent à contenu égal », **pas** « c'est un
   GMAC/IV ». Ne tranche **pas** entre « clé seule » et « compteur scellé » ; **renforce** HV1(B)/HV2 (rejeu figé d'un vieux B = rejeté).
+- **MAJ n=2 (2026-11-12 22:38, 2e run `…223837` vs `…215313`, diff croisé) — l'enveloppe 16 o se décompose.** Intra-run : le 0x07 ne
+  change **que** les 16 premiers octets (reproduit). **Croisé entre runs** (même capture rejouée) : les 16 premiers octets sont
+  **IDENTIQUES d'un run à l'autre** pour les SAVE-**locker** (TYPE 0x06) **et** le 0x07, mais **DIFFÈRENT** pour les SAVE-**xART** (TYPE
+  0x01) ; les octets 16+ diffèrent **partout**. Et les 16 o de tête sont **distincts entre lockers** → ce sont des **empreintes
+  déterministes de contenu** (locker rejoué à l'identique → même empreinte), **pas** un nonce aléatoire. **Conclusion raffinée** : la
+  **fraîcheur variable par boot** vit dans les **blobs xART maîtres** (TYPE 0x01, 16 o de tête variables par boot) + les octets 16+ de
+  tout blob ; les lockers portent, eux, une empreinte déterministe en tête. Cohérent avec §9 (matière de session par boot non
+  contrôlable par l'AP) et avec « rejeu d'un vieux xART = ne colle pas au nonce du boot courant ». Reste `hypothèse` (n=2, lecture).
 
 ## Ce que ces faits changent (par rapport à l'ancienne lecture « tampons seuls »)
 - **sbio n'est PAS apparu grâce aux seuls tampons** : il est apparu **à l'intérieur d'un vrai échange xART partiel**, après
