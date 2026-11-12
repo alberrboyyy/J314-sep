@@ -493,3 +493,18 @@ Table **complète** (tous les sites `sepTransact` du Mesa, opcode = `mov w1,#imm
 `cacheMatchPolicy`/`commandStartEnroll`. `0x09` = l'ordre de match. **Restent `0x70` et `0x21`** (non émis par un `sepTransact` Mesa →
 sans doute une autre couche : trame mailbox `0x70` = transfert d'image de capture ?, à confirmer). Le driver Linux (phase 2+) devra
 émettre cette séquence. **Statut : hypothèse (source: kext), cross-validé par les TAGs fil.**
+
+### 12d. Flot `handleMatch` / `handleEnrollment` — répertoire d'opcodes (2026-11-12, Claude — source: kext)
+
+Désassemblage de `handleMatch` (`0x9794da4`) et `handleEnrollment` (`0x9794468`). **Opcodes `sepTransact` émis** (répertoire sûr ;
+**ordre approximatif**, toutes les branches ne sont pas reversées) :
+- **`handleMatch`** : `0x0c` (armement) → `0x8001` (récurrent, bit haut = passthrough capteur / capture d'image ?) → `0x1e` →
+  `0x14` → une rafale **`0x11 0x12 0x0f 0x10 0x0b 0x0c 0x0d 0x0e`** chacune chronométrée (`mach_absolute_time`) = **lectures de
+  sous-résultats / télémétrie** → **`0x09` = le verdict de match** → `0x1b 0x1c 0x22` (finalisation). Résultat dans une structure
+  **`match_info_t`** ; logs `"%s: Image matched: %d"`, `"Dirt on sensor detected …"` ; assert `getCommandMode() == kCommandModeMatch`.
+- **`handleEnrollment`** : `0x8001` (×3, capture) → `0x1e` → **`0x08` = capture d'enrôlement** → `0x1f` (`cacheMatchPolicy`) → `0x8001`.
+
+Ces opcodes **complètent** la table §12c (ajouts : `0x0b 0x0d 0x0e 0x0f 0x10 0x11 0x12 0x14 0x1c 0x1e`, tous dans le flot de match,
+= lectures de sous-résultats ; `0x8001` = opcode à bit haut, probablement « relais capteur »). **Statut : hypothèse (source: kext).**
+Pour le driver (phase 2+), le **cœur du match** = armer (`0x0c`) → capturer (`0x8001`) → lire les sous-résultats (`0x0b`–`0x12`) →
+demander le verdict (`0x09`) → finaliser (`0x1b/0x1c/0x22`). Payloads exacts et ordre strict = à finir (suivi du flot de données).
