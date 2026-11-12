@@ -7,6 +7,52 @@
 
 Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 12).
 
+## POINT DE REPRISE 2026-11-13 (Opus 4.8) — session « décompilation » : voie C quasi-morte, protocole sbio vérifié, archi SKS
+
+> **TL;DR** : grosse session **hors ligne** (désassemblage kernel + 2 reruns ESSAI B lancés par Albert). Deux acquis majeurs :
+> (1) **la voie C (rejeu xART) penche fortement vers impossible côté AP** — le nonce de fraîcheur est généré par le SEP, l'AP
+> n'a **aucun levier** pour le fixer ; (2) **le protocole sbio (EP 0x08) est désormais vérifié de bout en bout** (format fil
+> `gt_packet_t` + verdict de match). La stratégie bascule : **Touch ID sous Linux = driver natif + état SEP valide**, pas un rejeu.
+
+**ÉTAT MATÉRIEL :** inchangé (voir bandeau en tête : Mac en ALARM, côté Apple cassé, non brické). **Rien ne tourne côté SEP**
+à la fin de cette session. Albert a lancé **2× l'ESSAI B** (follow_go.sh) → **13 re-scellements chacun** ; **power-cycler le Mac**
+avant toute reprise SEP. Tout le travail de cette session était hors ligne (aucune nouvelle capture risquée).
+
+**CE QUE CETTE SESSION A ÉTABLI (tout commité, voir docs/journal.md 2026-11-12/13 + docs/kext_sepmanager.md §9–§14) :**
+
+1. **Voie C / nonce — quasi-morte côté AP** (`kext_sepmanager.md §9`, [[voie-c-xart-fraicheur]]). Désassemblage : nonce = 20 o
+   généré par le SEP (ROM), sélecteurs AP = generate/read/invalidate, **aucune API « set/seed »**, et aucune graine `boot-nonce`
+   NVRAM qui alimente l'xART. → un rejeu d'un état scellé sous un ancien nonce ne peut **pas** être rendu « frais » par l'AP.
+   RÉSERVE : prouve l'absence de levier **AP**, pas que la ROM SEP n'a pas une graine interne (non observable d'ici). Hypothèse
+   (source: kext), non tranchée par écriture — mais appuyée aussi par l'observation n=2 (ci-dessous).
+2. **ESSAI B reproduit n=2** (`20261112-215313` et `…223837`). `sks`+`sbio` ré-annoncés les 2 fois ; op 0x07 ne change que
+   16 o ; **croisé** : 16 o de tête = empreinte déterministe pour les lockers, **variable par boot** pour les blobs xART maîtres
+   (= là où vit la fraîcheur). Recoupe le §9.
+3. **sbio (EP 0x08) — protocole VÉRIFIÉ** (`kext_sepmanager.md §11–§13c`). Carte des opérations (vtable AppleMesaSEPDriver),
+   table opcode↔opération (0x09=match, 0x08=enroll, 0x42=compteur, 0x15=clé, …), cadre fil = message **`0xfc`** + buffer OOL
+   **`gt_packet_t`** (opcode à +0x14) **vérifié contre la capture c12**, et **verdict de match vérifié** sur c6/c8/c11 :
+   réponse op 0x09 = `match_info_t`, `+0x00 = 0x1f5` (succès, user 501) + identifiant `fe6003d8…`, `0xffffffff` = échec.
+   Outil : `analysis/sbio_gt_packet.py`. ⚠️ Une bonne part **recoupait du déjà-`vérifié`** de `verification_status.md`/`messages.md`
+   (en-tête GT, séquence d'init, verdict) : lire ces deux docs **avant** de re-décompiler sbio.
+4. **SKS / keystore (EP 0x12) — architecture** (`kext_sepmanager.md §14/§14b`, nouveau). L'AP passe par l'API **AKS**
+   (`aks_ref_key_*`) → `__aks_operation` → endpoint SKS. **SKS n'est PAS à opcodes** comme sbio : c'est un **RPC à params
+   sérialisés DER** dans l'OOL (explique le mot 0x12 « TYPE=compteur, DATA=longueur » des traces). Mapping fin + schéma DER =
+   gros reste, et **EP 0x12 = ligne rouge** (non testable sans écriture).
+
+**PROCHAINS PAS (par ordre d'utilité réelle) :**
+- **[Albert, matériel, sans urgence] Le vrai déblocage** : Touch ID sous Linux a besoin d'un **état SEP valide et courant**
+  (keybag + empreintes enrôlées) qui vit dans macOS — or macOS est cassé. Donc à un moment : **DFU Restore + ré-enrôler Touch ID**,
+  et **backup disque** avant toute écriture risquée. Jusque-là, aucun essai SEP en écriture ne peut être *validé*.
+- **[offline] Consolidation** : si on veut du driver, intégrer les opcodes nommés (noms kext) dans `messages.md`/`driver_plan.md`.
+  Décompil SKS plus loin = possible mais **long et non testable** (EP 0x12 rouge) → faible priorité.
+- **NE PAS** relancer l'ESSAI B (n=2 suffit ; chaque run re-scelle le SEP pour rien de neuf).
+- **Lire `verification_status.md` + `messages.md` AVANT** toute nouvelle décompilation sbio (éviter de re-labourer le connu).
+
+**Lignes rouges inchangées** (CLAUDE.md) : aucune écriture SEP par l'agent (0x12/0x13/0x10/0x15, IMG4) ; hardware via `tools/*.sh`
+uniquement ; écriture = script `pending/` relu et lancé par Albert.
+
+---
+
 ## POINT DE REPRISE 2026-11-12 (Opus 4.8) — Mac récupéré en ALARM ; prochain pas SEP = essai observationnel (relais du dernier SAVE)
 
 **ÉTAT MATÉRIEL à la reprise (différent des sections plus bas : plus de tunnel relais) :**
