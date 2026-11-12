@@ -585,3 +585,33 @@ La commande de **match** = transaction `0xfc`, `gt_packet_t` opcode **0x09**, **
 identifiant (le doigt enrôlé), tous les échecs `0xffffffff` + zéros. Rattache le kext (`handleMatch`→`match_info_t`) au marqueur de
 succès `0x1f5`/`fe6003d8…` déjà noté en trace (messages.md §SBIO). **C'est le signal « doigt reconnu » que le driver Linux lira.**
 (Les ~3200 octets restants du `match_info_t` = métadonnées d'image/score, non décodés.)
+
+## 14. SKS / keystore (EP 0x12) — architecture AKS côté AP (2026-11-13, Claude — source: kext)
+
+Complète `messages.md` (qui a les TAGs fil 0x12 par rôle : 0x2f verrou différé, 0x41/0x18 mot de passe, notifs lock-change
+**vérifiées**) avec l'**architecture logicielle** côté AP, non encore documentée. Bundle `com.apple.driver.AppleSEPKeyStore`.
+**Statut : hypothèse (source: kext).**
+
+**Couches.** L'AP n'émet pas un opcode SKS « brut » : il passe par l'API **AKS** (Apple KeyStore) :
+- `aks_ref_key_*` : `create`, `encrypt`/`decrypt`, `wrap`/`unwrap`, `sign`/`verify_sig`, `transcrypt`, `compute_key`, `attest`,
+  `get_public_key`, `set_key_class`, `delete`, `get_blob`/`get_uuid`/`get_handle`… (opérations sur une clé scellée par le SEP) ;
+- `aks_params_*` (`create`/`set_number`/`set_data`/`get_der`…) : construit les paramètres (sérialisés **DER**) ;
+- `aks_system_key_*`, `aks_sik_attest` : clés système / SIK.
+- Tout converge vers **`__aks_operation`** (`0x9941a64`) → dispatcher **`0x9955030`** : bâtit une requête sur la pile
+  `{ptr, op=w23, 3, arg1, arg2, out1, out2}` et la soumet à l'objet **endpoint SKS** (singleton `globals+0x81b8`, méthode
+  virtuelle `+0x1e8`). Le `3` = version/type de requête présumé ; `op` = le code d'opération AKS (famille `kAppleKeyStore*`,
+  ex. `kAppleKeyStoreUnlockWithSyncBag`, `kAppleKeyStoreBackupKeyForVolume` vus en clair).
+
+**Transport.** Log `sep-endpoint,sks` + `sep_endpoint() failed to initialize` + validations « Received response has invalid
+size », « Received payload is too big (%llx) », « sks request timeout (%d strikes) » → requête/réponse avec OOL et bornes de
+taille (≠ encodage EP 0x08 : rappel, en trace le mot 0x12 a TYPE=compteur, DATA=longueur, pas TYPE=commande). Chemin **TDM**
+séparé pour certaines notifications (« Unexpected sks notification via TDM », « tdm sks request timeout »).
+
+**Entitlements** (déclencheurs des opérations, vus en clair) : `com.apple.keystore.lockunlock`, `.lockassertion[.*]`,
+`.access-keychain-keys`, `.device[.verify/.remote-session/.smart-card/.uuid]`, `.stash.access/.persist`, `.config.set[.*]`,
+`.auth-token`, `.obliterate-d-key`, `.devicebackup`, `.fdr-access`…
+
+**Ce qui manque (open, = D2 du driver_plan)** : (1) l'énum **numérique** complet `kAppleKeyStore*` et son mapping vers le **TAG
+fil** (0x2f/0x41/0x18…) — à extraire du dispatch `AppleKeyStoreUserClient::externalMethod` + la méthode endpoint `+0x1e8` ;
+(2) le **format exact** de la requête SKS sur le fil (OOL) ; (3) la question décisive **D2** : le SEP **refuse-t-il** un `0x09`
+(match) tant que le keybag est verrouillé, ou macOS s'abstient-il ? — tranchable seulement par écriture (Albert, EP 0x12 = ligne rouge).
