@@ -14,6 +14,32 @@ Format :
 
 ---
 
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Décompilation du nonce xART/ROM : aucun levier AP pour fixer la fraîcheur (verrou maître voie C)
+- Trace : — (désassemblage `macos/kernel.macho`, bundle AppleSEPManager, `analysis/kext/kdis.py func`, venv capstone du scratchpad ;
+  listings non commités). Aucun matériel. Cible choisie car c'est le **verrou maître de la voie C**.
+- Fait : désassemblé `generateROMNonce`, `_nonce_action` + son block_invoke, `nonce_generate`/`nonce_read` ; cherché toute API set/seed-nonce
+  et les usages NVRAM d'AppleSEPManager. Complété `docs/kext_sepmanager.md §9`.
+- Vu (FAITS, source: kext) : (1) sélecteurs `nonce_generate`=0x0f, `nonce_read`=0x10 ; nonce = **20 o / 160 bits**. (2) `generateROMNonce`
+  envoie une requête **constante** `0x00030100` (aucune graine), le SEP répond **opcode 0x67 + data 0xa0** (NONCE_BIT_LEN=160), l'AP **lit**
+  mot par mot. (3) **Aucun symbole** set/seed/write-nonce côté SEP/XART/Booter (recherche vide). (4) NVRAM vue par AppleSEPManager =
+  `oblit-inprogress`, `auto-boot`, `sep-debug-args` seulement — **pas** de `boot-nonce`/graine xART.
+- Interprété (HYPOTHÈSE renforcée) : **côté AP, aucun levier pour fixer/semer/reproduire le nonce de fraîcheur** → un rejeu (statique ou
+  relais) d'un état scellé sous un ancien nonce ne peut pas être rendu « frais » sous Linux → le re-scellement (op 0x01 à TAG=0x05) est le
+  comportement **attendu** ; la voie C « faire accepter un rejeu » penche **fortement vers impossible côté AP**. RÉSERVE : prouve l'absence
+  d'API AP, pas que la ROM SEP n'a pas sa propre graine interne (non observable d'ici). Détaille/raffine HV1(B)/HV2 et [[voie-c-xart-fraicheur]].
+- Incidents : aucun (hors ligne).
+
+## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Étude SKS (EP 0x12) démarrée : inventaire pour une sonde « annoncé vs vivant »
+- Trace : — (lecture du kernel `macos/kernel.macho` via `analysis/kext/ksyms.py` ; aucun matériel). Filtre cyber : **n'a pas coupé** sous Opus 4.8.
+- Fait : relié les symboles keystore aux messages EP 0x12 de `docs/messages.md`, pour trier lecture pure vs mutation. Écrit `docs/kext_sepmanager.md §10`.
+- Vu (FAITS, source: kext) : transport du keybag = `com.apple.driver.AppleSEPKeyStore` (EP 0x12, bundle présent). Classes `AppleKeyStore`
+  (`unload_keybag`, `set_volume_keybag`, `tdm_*`) et `AppleFDEKeyStore` (`setPassphrase`, `deleteKey`…) = méthodes majoritairement mutantes.
+- Interprété / conclusion (hypothèse) : commandes on-wire 0x2f (verrouille), 0x41/0x18 (déverrouillent) = **mutations** ; **0x04/0x06
+  (→0x84/0x86) = seul candidat LECTURE** (reflète l'état login, jamais vu muter), **non vérifié**. (1) EP 0x12 = **ligne rouge écriture** →
+  toute sonde va dans `pending/`, lancée par Albert. (2) Le TYPE = compteur de transaction → une requête hors-séquence peut désync.
+  (3) **`sbio` (EP 0x08) n'est PAS sur la liste rouge** → porte de sonde plus sûre que sks pour tester « vivant ».
+- Incidents : aucun (hors ligne).
+
 ## 2026-11-12 (soir, hors ligne) — Claude (Opus 4.8) — Analyse des 13 blobs B re-scellés : l'op 0x07 ne change QUE 16 octets de tête, corps identique
 - Trace : `traces/20261112-215313_xart_replay/follow_B/` (13 blobs de 32768 o, lecture seule). Aucun matériel.
   Script : `scratchpad/analyze_blobs.py` (régions non nulles, diff consécutif, octets stables, recherche de compteur, entropie).

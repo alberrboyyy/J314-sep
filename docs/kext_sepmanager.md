@@ -322,8 +322,57 @@ macOS = un autre boot SEP). Après avoir chargé les 2 blobs maîtres (op 0x00) 
 comme courant** et **re-scelle** (op 0x01) au lieu d'aller chercher les gigalockers (op 0x05). C'est exactement la bifurcation
 observée, et un SAVE acquitté ferait avancer l'état scellé (cohérent avec la casse du boot Apple).
 
-**Ce qui reste ouvert (non tranché par le kext) — la seule porte de sortie éventuelle pour la voie C.** La valeur du nonce de boot
-est-elle **dérivée d'une graine réglable** (style « boot nonce » iOS en NVRAM : on pose la graine, le SEP régénère le **même**
-nonce → rejeu possible), ou purement **interne/aléatoire par boot** (→ rejeu impossible par conception) ? Le kext montre `nonce_*`
-et un nonce ROM, mais pas d'où vient l'aléa. → recherche sources publiques (NVRAM boot-nonce / ap-nonce / sep-nonce) en cours.
-Tant que ce point n'est pas tranché : **voie C = re-scellement attendu**, et l'essai qui écrirait reste **Albert + image disque**.
+**Détail du protocole nonce (2026-11-12, Claude — désassemblé, source: kext).**
+- **Sélecteurs** passés à `_nonce_action(void*, uint*, uchar)` via les closures : `nonce_generate` = **0x0f**, `nonce_read` = **0x10**
+  (`nonce_invalidate` sans buffer). Le block_invoke (`0x99879a0`) exige **`*len ≥ 0x14` (20 o)** sinon `0xe00002c2`, puis délègue à
+  `_xmsgSend` (`0x99939e8`) avec le sélecteur. La **taille du nonce = 20 o = 160 bits**, la même des deux côtés (xART et ROM).
+- **`generateROMNonce` (protocole bootstrap ROM).** L'AP construit un message **constant** `0x00030100` (aucune graine chargée),
+  l'envoie (vtable +0x1e8), attend (timeout `0xc350` = 50 s), le SEP répond **opcode `0x67`** avec **data `0xa0` (= `NONCE_BIT_LEN` 160)**,
+  puis l'AP **lit** le nonce mot par mot (opcode suivant `0x00040100`). Les seules entrées de `generateROMNonce` sont le **buffer de
+  sortie** et sa **longueur** : l'AP **ne fournit aucune graine**, il reçoit un nonce **produit par la ROM**.
+- **Aucune API « poser / semer » un nonce côté SEP.** Recherche de symboles `set_nonce`/`writeNonce`/`SeedNonce`/`nonce_seed`/
+  `bootNonce` dans les classes SEP/XART/Booter : **vide**. L'AP n'expose que generate (0x0f) / read (0x10) / invalidate — **jamais set**.
+- **NVRAM vue par AppleSEPManager** (`_loadFlagData`, `getReadableNvram`) : uniquement `oblit-inprogress`, `auto-boot`,
+  `sep-debug-args`. **Aucune** variable `boot-nonce`/graine qui alimenterait l'xART. Donc le nonce de fraîcheur n'est **pas** dérivé
+  d'une graine NVRAM réglable par l'AP (≠ modèle « boot-nonce » iOS, qui, lui, est du côté img4 `__img4_nonce_manager_persistence_nvram`,
+  pour la **personnalisation de l'image de boot**, pas pour la fraîcheur des lockers xART).
+
+**Conséquence pour la voie C (HYPOTHÈSE renforcée, source: kext).** Du **côté AP**, il n'existe **aucun levier** pour fixer, semer ou
+reproduire le nonce xART : il est généré par le SEP (ROM, 20 o), l'AP ne peut que le déclencher/lire/invalider. Un rejeu (statique ou
+relais) d'un état scellé sous un **ancien** nonce ne peut donc **pas** être rendu « frais » par l'AP sous Linux → le re-scellement
+observé (op 0x01 à TAG=0x05) est bien le comportement **attendu**, et la voie C « faire accepter un rejeu » penche **fortement vers
+impossible côté AP**. **Réserve honnête** : ceci prouve l'**absence d'API côté AP** ; ça n'exclut pas formellement que la ROM du SEP
+lise une graine dans son **propre** stockage effaçable interne (non observable d'ici). Mais tout ce que l'AP contrôle est désormais
+cartographié : pas de levier nonce. L'essai qui écrirait reste **Albert + image disque**, mais sa probabilité de succès baisse.
+
+## 10. SKS (EP 0x12) — inventaire pour une sonde « annoncé vs vivant » (2026-11-12, Claude — source: kext + traces)
+
+But : savoir quels messages SKS seraient **de pure lecture** (ne changent pas l'état du keybag), en vue d'une sonde
+`pending/` testant « sks annoncé ≠ sks fonctionnel ». **Statut : hypothèse.**
+
+**Transport confirmé (source: kext).** Le driver du keybag côté AP est `com.apple.driver.AppleSEPKeyStore` (bundle présent
+dans `macos/kernel.macho`) ; il parle à l'EP 0x12. Classes/méthodes liées vues dans les symboles : `AppleKeyStore`
+(`unload_keybag`, `unload_session_keybags`, `set_volume_keybag`, `tdm_new_entry`/`tdm_remove_entry`), `AppleFDEKeyStore`
+(`setPassphraseWithUserID`, `deletePassphrase`, `setKeyWithUserID`, `deleteKey`), et côté biométrie
+`IOSEPBiometricService::sksQueueInit/Enqueue/Dequeue/Process/ProcessAsync` + `sksLockStateChangeHandler` (chemin des
+notifications TAG 0x01, déjà documenté §6). Ces noms sont majoritairement des **mutations** (load/unload/set/delete).
+
+**Commandes SKS on-wire observées en trace (`> EP=0x12`), nature :**
+
+| TAG | rôle observé (messages.md C8/C3/C1) | nature |
+|---|---|---|
+| 0x2f | verrouiller keybag/volume si délai écoulé (bit 0 réponse = verrouillé) | **MUTE** (verrouille) |
+| 0x41 | déverrouillage par mot de passe, 1re étape (volume, -6) | **MUTE** (déverrouille) |
+| 0x18 | déverrouillage -501 par mot de passe (2e étape) / op au verrouillage | **MUTE** |
+| 0x04/0x06 (→ réponse 0x84/0x86) | réponse PARAM=0xfd **avant** 1er login, 0x00 **après** (3 captures) ; reflète l'état login | **candidat LECTURE** (reflète un état, pas vu muter) |
+| 0x98 (→ réponse d'une requête) | réponse SKS `TYPE=0x67` 1 ms avant 0x0228 (code validé) | à classer |
+| TYPE = compteur de transaction | +1 à chaque requête (3 écarts sur 579) | le SEP suit une **séquence** → une requête hors-séquence peut désync |
+
+**Conclusion pour une sonde (honnête).**
+1. **EP 0x12 est une ligne rouge « écriture interdite à l'agent »** (CLAUDE.md). *Envoyer* un message SKS — même le poll
+   0x04/0x06 — reste un envoi vers le SEP : la sonde va **dans `pending/`**, lancée par Albert, jamais par l'agent.
+2. On n'a **aucune** commande SKS **vérifiée** comme pure lecture : 0x04/0x06 est seulement un *candidat* (reflète l'état login
+   sans mutation observée) ; le compteur de transaction fait qu'une requête injectée hors-séquence pourrait être rejetée/désync.
+3. **`sbio` (EP 0x08) n'est PAS sur la liste rouge d'écriture** : une sonde de lecture est bien moins contrainte côté sbio que
+   côté sks. Si l'on veut tester « vivant », sbio est la porte la plus sûre (reste à bâtir la liste exhaustive de ses messages de
+   lecture — règle « protocole complet avant de coder la réponse »).
