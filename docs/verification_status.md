@@ -122,3 +122,33 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
   et un locker Credential Manager (TAG 0x10, UUID 8624497a…) ; USER-xART (TAG 0x04) est stable. `save(N)=fetch(N+1)` confirmé sur le contenu
   (A094(cN+1)=B231(cN), A222(cN+1)=B229(cN)). Pas de compteur en clair. Mécanisme anti-rejeu (préfixe 16 o = nonce/MAC) = `hypothèse`.
   Que le SEP accepte un rejeu de la dernière sauvegarde quand Linux le boote = non testé (écriture SEP, pending/ + Albert).
+
+## Mise à jour 2026-11-12/13 (Claude, Opus 4.8) — session décompilation (sources : journal 12-13/11, kext_sepmanager.md §9/§13/§14)
+
+- **Format fil sbio `gt_packet_t` — VÉRIFIÉ contre capture** (kext §13b, outil `analysis/sbio_gt_packet.py`). Le buffer OOL d'un
+  message EP 0x08 `type=0xfc` est un `gt_packet_t` : `+0x00 kind=1`, `+0x04 total`, `+0x08 offset`, `+0x0c flags`, `+0x14 OPCODE`,
+  `+0x18 longueur fragment`, `+0x1c charge`. Confirmé sur c12 : `+0x00=1` 14/14 ; **fragmentation vérifiée** (opcode 0x5b, total
+  0xfc99, offsets 0→0x3fe4→0x7fc8→0xbfac) ; les opcodes lus à `+0x14` (0x17, 0x15/0x16, 0x42/0x18, 0x5f, 0x1f…) **correspondent**
+  à la séquence d'init déjà `vérifiée` (ligne « Init 57 commandes »). → **affermit la ligne « En-tête OOL 0x1c o »** : le sens de
+  `+0x14` = opcode est maintenant croisé octet-à-octet, plus seulement une lecture de kext. Noms d'opérations : restent `hypothèse (kext)`.
+- **Verdict de match 0x09 — reconfirmé** (kext §13c) : ~35 réponses sur c6/c8/c11 reparsées avec le même outil, `+0x00=0x1f5` +
+  identifiant `fe6003d8…` aux succès, `0xffffffff`+zéros aux échecs, 0 faux positif. Recoupe la ligne 0x09 déjà `vérifié (HE)`.
+- **Table opcode↔opération `sepTransact`** (kext §12c, `hypothèse (kext)`, partiellement croisée) : `handleMatch`=0x09, `handleEnrollment`=0x08,
+  `commandStartEnroll`=0x03, `forceNoMatch`=0x06, `asyncCaptureHandler`=0x07/0x22, `performKeyExchange`=0x15, `cacheMatchPolicy`=0x1f,
+  `initializeSequenceCounter`=0x42, `applySensorParams`=0x5d, `setCalibrationData`=0x63, `seaCookieHandleMessage`=0x4a. Les opcodes
+  0x03/0x06/0x07/0x09/0x1f/0x22 = exactement la sous-séquence de match `23 06 65 07 09 1f 22 70 03 21` déjà `vérifiée` en trace.
+- **Voie C / nonce xART — `hypothèse (kext)`, renforcée** (kext §9). Le nonce de fraîcheur (20 o = 160 bits) est **généré par le SEP**
+  (xART sélecteurs generate=0x0f/read=0x10/invalidate, et ROM `generateROMNonce` opcode 0x67/data 0xa0) ; **aucune API AP « set/seed »**
+  (recherche de symboles vide) ; **aucune** variable NVRAM graine (`_loadFlagData` ne voit que `oblit-inprogress`/`auto-boot`/`sep-debug-args`).
+  → côté AP, **aucun levier** pour fixer/reproduire le nonce. Un rejeu d'un état scellé sous un ancien nonce ne peut **pas** être rendu
+  « frais » par l'AP sous Linux. **Conséquence sur la ligne xART-CHAIN ci-dessus** : « rejeu accepté ? » passe de *non testé* à **quasi-mort
+  côté AP** (hypothèse). Réserve : prouve l'absence de levier **AP**, pas qu'une graine interne ROM n'existe pas (non observable d'ici).
+- **ESSAI B reproduit n=2** (journal 2026-11-12 22:38, `20261112-215313` + `…223837`, Albert a lancé). `sks`(0x12) **et** `sbio`(0x08)
+  ré-annoncés les 2 fois ; les 16 o de tête sont **identiques entre runs** pour les SAVE-locker (empreinte déterministe du contenu,
+  **pas** un nonce) et **diffèrent** pour les SAVE-xART maîtres (TYPE 0x01, = là où vit la fraîcheur). Recoupe le §9. `hypothèse` (n=2,
+  lecture de tampon). **13 re-scellements par run = vraies écritures SEP** ; ne pas relancer (n=2 suffit).
+- **SKS (EP 0x12) = RPC à params DER, pas des opcodes** (kext §14/§14b, `hypothèse (kext)`). L'AP passe par l'API **AKS** (`aks_ref_key_*`,
+  `aks_params_*` sérialisés **DER**) → `__aks_operation` → endpoint SKS ; le mot mailbox 0x12 ne porte qu'un compteur + la longueur
+  (cohérent avec la ligne SKS ci-dessus : `> t n 0 0xLLLL0000`). → un driver Linux devrait **produire le même DER** (schéma à extraire),
+  pas un opcode. **D2 reste la question décisive non testée** : le SEP refuse-t-il `0x09` (match) tant que le keybag est verrouillé ?
+  (tranchable seulement par écriture — EP 0x12 = ligne rouge, Albert).

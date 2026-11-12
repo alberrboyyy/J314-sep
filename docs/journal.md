@@ -14,6 +14,15 @@ Format :
 
 ---
 
+## 2026-11-13 — Claude (Opus 4.8) — Consolidation hors ligne : verification_status.md + driver_plan.md remis à niveau
+- Trace : — (aucun matériel ; Mac inchangé, à power-cycler avant tout SEP).
+- Fait : les deux docs « aval » étaient en retard sur la session décompilation (verification_status s'arrêtait au 11-11, driver_plan
+  datait du 08-11). Ajout daté dans chacun, à partir du journal 12-13/11 et de kext_sepmanager.md §9/§12c/§13/§14 (pas de fait neuf créé).
+- Vu / reporté : format fil sbio `gt_packet_t` **VÉRIFIÉ** contre capture (c12, outil `analysis/sbio_gt_packet.py`) ; pont opcode↔opération
+  (§12c) ; voie C / nonce xART = quasi-morte côté AP (§9, hypothèse kext) ; SKS (0x12) = RPC à params DER, pas des opcodes (§14, hypothèse kext).
+- Interprété : driver_plan acte le basculement de stratégie (Touch ID = driver natif + état SEP valide via DFU restore côté Albert, pas un rejeu).
+- Incidents : aucun.
+
 ## 2026-11-12 (22:38) — Claude (Opus 4.8) + Albert — ESSAI B reproduit (n=2) : sks/sbio ré-annoncés + l'enveloppe 16 o se sépare en digest déterministe (locker) vs variable par boot (xART)
 - Trace : `traces/20261112-223837_xart_replay` (+ `follow_B/`, 13 blobs). Albert a lancé `follow_go.sh`. Comparé à `…215313` (n=1).
 - Fait : rejeu de la même capture (`…113919_snew-reel`) une 2e fois ; diff croisé des deux jeux de 13 blobs B.

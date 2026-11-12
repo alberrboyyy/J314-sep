@@ -161,3 +161,30 @@ Sources : journal du 2026-11-10 (entrées Opus 4.8), docs/verification_status.md
   seule) est **prête sans nouveau code** (`SEP_OOL_EPS=0x13`), attend le câble USB + Albert. Les voies qui écrivent vers le SEP
   (rejeu/forge de lockers) butent sur une clé interne au SEP qu'on s'interdit de chercher : Touch ID complet probablement hors de
   portée sans elle. But réaliste court terme : « Linux parle au capteur », atteint.
+
+## Mise à jour 2026-11-12/13 (Opus 4.8) : stratégie, pont opcode↔opération, archi SKS
+Sources : journal 2026-11-12/13, docs/kext_sepmanager.md §9/§12c/§13/§14, docs/verification_status.md (ajout 2026-11-12/13),
+[[voie-c-xart-fraicheur]]. Rien de nouveau n'est écrit vers le SEP ici ; que de la lecture/décompilation.
+
+- **Basculement de stratégie.** Touch ID sous Linux = **driver natif + état SEP valide et courant**, **pas** un rejeu de lockers.
+  La voie C (« faire accepter un rejeu xART ») **penche fortement vers impossible côté AP** (§9, ci-dessous). Conséquence pratique :
+  le vrai déblocage dépend d'un **état SEP propre** (keybag + empreintes enrôlées), qui vit dans macOS — or macOS est cassé. Donc à
+  un moment : **DFU Restore + ré-enrôler Touch ID + backup disque** (matériel, **Albert**). Tant que cet état n'existe pas, aucun essai
+  SEP en écriture n'est *validable*. Ça ne change pas les composants C-A..C-E ; ça fixe l'ordre : le capteur (C-A) est acquis, le reste
+  attend un SEP sain.
+- **C-B / C-C affermis — format fil sbio VÉRIFIÉ et pont opcode↔opération.** Le buffer OOL d'un message EP 0x08 `type=0xfc` est un
+  `gt_packet_t` (`+0x14 = OPCODE`, `+0x18 = longueur fragment`, `+0x1c = charge`), **vérifié contre capture** (c12, 14/14, fragmentation
+  0x5b) via `analysis/sbio_gt_packet.py`. Le pont kext↔traces est établi (§12c) : `handleMatch`=**0x09**, `handleEnrollment`=0x08,
+  `commandStartEnroll`=0x03, `forceNoMatch`=0x06, `asyncCaptureHandler`=0x07/0x22, `performKeyExchange`=0x15, `cacheMatchPolicy`=0x1f,
+  `initializeSequenceCounter`=0x42, `applySensorParams`=0x5d, `setCalibrationData`=0x63. Le driver peut donc **nommer et parser l'opcode
+  de toute transaction EP 0x08**. Noms d'opérations = `hypothèse (kext)` ; format fil = `vérifié`.
+- **§2 / D2 précisé — SKS (EP 0x12) = RPC à params DER, pas des opcodes** (§14/§14b). L'AP passe par l'API **AKS** (`aks_ref_key_*`,
+  `aks_params_*` **sérialisés DER**) → `__aks_operation` → endpoint SKS ; le mot mailbox 0x12 ne porte qu'un compteur + la longueur.
+  → un driver Linux devrait **produire le même DER** (schéma à extraire), pas un opcode. Reste ouvert (classe 1, inconnue n°3 / D2) :
+  l'énum numérique `kAppleKeyStore*` ↔ TAG fil (0x2f/0x41/0x18), le format DER exact, et **la question décisive** : le SEP refuse-t-il
+  `0x09` tant que le keybag est verrouillé ? Non testable sans écriture (EP 0x12 = ligne rouge, Albert). Décompil SKS plus loin = long
+  et non testable → **faible priorité**.
+- **Voie C / nonce (met à jour l'inconnue n°8).** Le nonce de fraîcheur xART (20 o) est **généré par le SEP** (xART + ROM) ; **aucune
+  API AP pour le poser/semer**, aucune graine NVRAM (§9). → l'acceptation d'un `0x6d`/locker rejoué sous un autre boot n'est plus
+  seulement « inconnue » mais **défavorable côté AP** (hypothèse kext ; réserve : ne couvre pas une graine interne ROM). ESSAI B n=2
+  (journal 12/11) confirme : re-scellement reproductible, fraîcheur dans les blobs xART maîtres. **Ne pas relancer ESSAI B.**
