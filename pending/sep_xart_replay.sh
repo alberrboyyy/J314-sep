@@ -77,6 +77,24 @@
 #     + 1 commande 0x73 bénigne. Au pire le SEP ignore/rejette -> sortie propre. Brick : même classe que
 #     FOLLOW (déjà lancé), pas au-dessus. Linux + données : AUCUN (aucune opération disque).
 #
+# MODE SERVE_GL (ESSAI E, 2026-11-17) — RENDRE le VRAI coffre (lu sur disque) à la puce actuelle.
+#   SERVE_GL=1 : au lieu de rejouer un OOL enregistré (périmé), le script SERT à la puce son coffre
+#   réel, lu sur le disque par tools/read_xart.sh (fichier .gl, variable GL_FILE). À chaque requête du
+#   SEP sur l'EP 0x13, il répond depuis le .gl : op 0x00 (FETCH maître SEP/USER), op 0x05 (FETCH
+#   gigalocker par UUID), op 0x13 (UUID d'OS), op 0x0e (fw-boot). Détail du format : docs/gigalocker.md.
+#   POURQUOI : c'est la 1re fois qu'on a un coffre QUI COLLE à la puce (réparée + Touch ID ré-enrôlé) ;
+#     l'essai FOLLOW d'avant échouait car il rejouait un coffre d'une AUTRE puce. Si ce coffre-ci est
+#     accepté, le SEP ira au bout (gigalockers, sbio FONCTIONNEL) → combiner avec PROBE_SBIO=1.
+#   SÛRETÉ : on N'ACQUITTE JAMAIS un SAVE (op 0x01/0x06). Si la puce rejette un blob (mauvais emballage,
+#     ou coffre jugé non courant), elle émet un SAVE → on S'ARRÊTE SANS acquitter → le compteur scellé
+#     n'avance PAS → pas de brick (c'est l'acquittement de SAVE, évité ici, qui avait cassé le boot). Un
+#     gigalocker non présent dans le coffre → STOP (on ne fabrique rien). Échec FERMÉ partout.
+#   HYPOTHÈSES non vérifiables sans capture de CETTE puce (hyperviseur 13.5 perdu) — cf. docs/gigalocker.md
+#     « Point ENCORE ouvert » : (a) charge fil = charge .gl (+0x22) à l'octet près ; (b) préfixe maître =
+#     0x11 octets nuls ; (c) ordre d'octets de l'UUID d'OS. Si une est fausse → essai non concluant (un
+#     power-cycle « gâché »), PAS un brick. Vérifier d'abord en SELFTEST=1 (montre ce qui serait servi).
+#   Combiner : SERVE_GL=1 PROBE_SBIO=1 (sert le coffre, puis si sbio annoncé, lui envoie le 0x73).
+#
 # PROCÉDURE (ordre impératif — voir docs/voie_c_design.md)
 #   1. Capturer S_new SANS redémarrer macOS ensuite :
 #        SEP_OOL_EPS=0x13 SEP_EPS=0x00,0x13 ./tools/boot_and_trace.sh snew-xart
@@ -133,8 +151,11 @@
 #   PROBE_SBIO=1 FOLLOW=1 ./pending/sep_xart_replay.sh <dossier_capture>  # ESSAI D : après que FOLLOW
 #                 a fait annoncer sbio, lui envoie UNE commande 0x73 (sans doigt) et lit la réponse,
 #                 pour trancher « annoncé vs vivant ». Voir « MODE PROBE_SBIO ». (ou pending/probe_sbio_go.sh)
+#   SERVE_GL=1 [PROBE_SBIO=1] ./pending/sep_xart_replay.sh <dossier_capture>  # ESSAI E : RENDRE le vrai
+#                 coffre (.gl lu sur disque) à la puce, puis (option) sonde sbio. Voir « MODE SERVE_GL ».
+#                 (ou le lanceur court pending/serve_gl_go.sh)
 #   SELFTEST=1 ./pending/sep_xart_replay.sh <dossier_capture> # test hors-ligne, NE TOUCHE PAS le Mac
-#                 (PROBE_SBIO=1 SELFTEST=1 vérifie que le fichier 0x73 (SBIO_A) est bien un 0x73.)
+#                 (PROBE_SBIO=1 SELFTEST=1 vérifie SBIO_A ; SERVE_GL=1 SELFTEST=1 montre ce qui serait servi.)
 #   SKIP_CHAINLOAD=1 ...                                       # si un m1n1 frais tourne déjà
 #
 # PRÉPARÉ PAR : Claude (Opus 4.8), 2026-11-11 ; mode PROBE_SBIO ajouté 2026-11-17 — à relire
@@ -158,6 +179,14 @@ export PROBE_SBIO="${PROBE_SBIO:-0}"  # ESSAI D : après que FOLLOW a fait annon
 # ne construit rien à la main). Capture de boot c12 (OOL de l'EP 0x08). Modifiable si besoin.
 export SBIO_A="${SBIO_A:-traces/20261108-032454_c12-boot-ho/sep.log.ool/000300_08_A.bin}"
 
+# ESSAI E (SERVE_GL) : au lieu de rejouer un OOL enregistré, SERT à la puce son VRAI coffre, lu sur
+# le disque (tools/read_xart.sh -> fichier .gl), en répondant aux FETCH op 0x00 (maître) / 0x05
+# (gigalocker par UUID) / 0x13 (UUID d'OS) / 0x0e (fw). Voir en-tête « MODE SERVE_GL » + docs/gigalocker.md.
+export SERVE_GL="${SERVE_GL:-0}"
+export GL_FILE="${GL_FILE:-traces/20261117-224724_xart_read/xart__74980DEE-AD6A-5674-B233-B7E10A7FD0CB.gl.bin}"
+# UUID d'OS = nom du fichier .gl (apfs-preboot-uuid), servi à l'op 0x13. Modifiable si le .gl change.
+export GL_OS_UUID="${GL_OS_UUID:-74980DEEAD6A5674B233B7E10A7FD0CB}"
+
 if [ "$SELFTEST" != 1 ]; then
   require_mac
   [ -f "$M1N1_DIR/build/m1n1.bin" ] || die "m1n1 non compilé : ./tools/build_m1n1.sh"
@@ -178,6 +207,9 @@ OBSERVE = os.environ["OBSERVE"] == "1"
 FOLLOW = os.environ.get("FOLLOW", "0") == "1"
 PROBE_SBIO = os.environ.get("PROBE_SBIO", "0") == "1"
 SBIO_A = os.environ.get("SBIO_A", "")
+SERVE_GL = os.environ.get("SERVE_GL", "0") == "1"
+GL_FILE = os.environ.get("GL_FILE", "")
+GL_OS_UUID = os.environ.get("GL_OS_UUID", "")
 SNEW = os.environ["SNEW"]
 sys.path.insert(0, os.environ["M1N1_PROXYCLIENT"])
 
@@ -249,8 +281,9 @@ if SELFTEST:
             b = open(SBIO_A, "rb").read()
             op = b[0x14] if len(b) > 0x14 else None
             v0 = b[0x00] if b else None
+            ophex = f"0x{op:02x}" if op is not None else "??"   # éviter TypeError si fichier trop court
             print(f"  sonde sbio : rejouerait {os.path.basename(SBIO_A)} ({len(b)} o) dans le tampon A "
-                  f"de l'EP 0x08, gt_packet version=+0x00={v0} opcode=+0x14=0x{op:02x} "
+                  f"de l'EP 0x08, gt_packet version=+0x00={v0} opcode=+0x14={ophex} "
                   f"(attendu 0x73), puis > EP=0x08 TAG=0xfc TYPE=0x73 PARAM=0 DATA=0, puis LECTURE de B.",
                   flush=True)
             if op != 0x73:
@@ -258,6 +291,30 @@ if SELFTEST:
         else:
             print(f"  sonde sbio : ERREUR — fichier SBIO_A introuvable : {SBIO_A!r}. "
                   f"Donner un .bin de tampon A d'un 0x73 (ex. traces/…c12…/sep.log.ool/000300_08_A.bin).", flush=True)
+    if SERVE_GL:
+        # Aperçu du service : parse le .gl et montre ce qui serait servi (lecture de fichier seule).
+        if not (GL_FILE and os.path.exists(GL_FILE)):
+            print(f"  SERVE_GL : ERREUR — coffre introuvable : {GL_FILE!r} (lancer tools/read_xart.sh).", flush=True)
+        else:
+            d = open(GL_FILE, "rb").read(); SLOT = 0x9000
+            ms, gl = {}, {}
+            for k in range(len(d)//SLOT + 1):
+                b = k*SLOT
+                if b+0x22 > len(d) or not any(d[b:b+SLOT]): continue
+                t = d[b+0x01]; ln = struct.unpack_from("<I", d, b+0x12)[0]
+                if t in (1,2): ms[t] = ln
+                elif t in (3,4): gl[d[b+0x02:b+0x12].hex()] = ln
+            try:
+                ou = bytes.fromhex(GL_OS_UUID); ouok = f"{len(ou)} o"
+            except Exception as e:
+                ouok = f"INVALIDE ({e})"
+            mdesc = ", ".join(f"type 0x{t:02x}:{l:#x}o" for t, l in sorted(ms.items()))
+            print(f"  SERVE_GL : coffre {GL_FILE}", flush=True)
+            print(f"    maîtres servis : {mdesc}  (0x02=SEP-xART, 0x01=USER-xART)", flush=True)
+            print(f"    gigalockers : {len(gl)} (par UUID). UUID d'OS (op 0x13) : {ouok}.", flush=True)
+            if 0x01 not in ms or 0x02 not in ms:
+                print("    !! il manque un maître (0x01 ou 0x02) — le SEP divergera. Vérifier le coffre.", flush=True)
+            print("    (Service réel : échec FERMÉ sur SAVE ; aucun octet envoyé en SELFTEST.)", flush=True)
     print("SELFTEST OK : séquence relue. (Rien envoyé au SEP.)", flush=True)
     sys.exit(0)
 
@@ -446,6 +503,109 @@ def write_A(path):
     data = data[:bufs["A"]["size"]]
     dart_write(bufs["A"]["sid"], bufs["A"]["iova"], data)
 
+def write_A_bytes(data):
+    """Met le tampon A à zéro puis y écrit `data` (tronqué à la taille de A)."""
+    data = data[:bufs["A"]["size"]]
+    iface.writemem(phys_A, b"\x00" * bufs["A"]["size"])   # A est phys_A (mappé en IOVA_A)
+    dart_write(bufs["A"]["sid"], bufs["A"]["iova"], data)
+
+# ---------------------------------------------------------------------------
+# ESSAI E (SERVE_GL) : SERVIR le vrai coffre (.gl lu sur disque) aux FETCH du SEP.
+#   Format (docs/gigalocker.md, VU+hypothèses) :
+#   - .gl = slots de 0x9000 ; locker = +0x01 type (0x01 USER-xART, 0x02 SEP-xART, 0x03/0x04 gigalocker),
+#     +0x02 UUID(16, gigalockers), +0x12 longueur u32, +0x22 charge scellée.
+#   - FETCH maître (op 0x00) : sélecteur = bit0 de l'octet5 (SEP=0 -> type 0x02 ; USER=1 -> type 0x01).
+#     Tampon A = 0x11 octets nuls + charge. Longueur de réponse = 0x11 + len(charge).
+#   - FETCH gigalocker (op 0x05) : UUID (16 o) lu en B -> charge du slot d'UUID égal, écrite en A@0.
+#     Longueur de réponse = len(charge).
+#   - FETCH UUID d'OS (op 0x13) : 16 o d'UUID d'OS écrits en A@0 ; réponse PARAM=0 DATA=0 (comme capturé).
+#   - op 0x0e (fw-boot) : A vide ; réponse comme capturé (PARAM=0 DATA=0x100).
+#   Réponse : TAG=celui de la requête, TYPE=0x00, PARAM=len&0xff, DATA=((len>>8)&0xff)|(selecteur<<8).
+#   >>> HYPOTHÈSES non vérifiables sans capture de CETTE puce (docs/gigalocker.md) : (a) charge fil =
+#       charge .gl (+0x22) à l'octet près ; (b) préfixe maître = exactement 0x11 octets nuls ; (c) ordre
+#       d'octets de l'UUID d'OS. Si FAUX -> le SEP rejette -> SAVE -> on S'ARRÊTE (échec FERMÉ, pas de brick),
+#       essai non concluant. On N'ACQUITTE JAMAIS un SAVE ici (ne pas avancer le compteur scellé).
+def _load_gl():
+    data = open(GL_FILE, "rb").read()
+    SLOT = 0x9000
+    masters = {}   # type(1/2) -> charge
+    gls = {}       # uuid(16o) -> charge
+    for k in range(len(data) // SLOT + 1):
+        base = k * SLOT
+        if base + 0x22 > len(data) or not any(data[base:base + SLOT]):
+            continue
+        typ = data[base + 0x01]
+        ln = struct.unpack_from("<I", data, base + 0x12)[0]
+        payload = data[base + 0x22: base + 0x22 + ln]
+        if typ in (0x01, 0x02):
+            masters[typ] = payload
+        elif typ in (0x03, 0x04):
+            gls[data[base + 0x02: base + 0x12]] = payload
+    return masters, gls
+
+def serve_from_gl(idle_timeout=20):
+    print("=== ESSAI E : SERVIR le vrai coffre (.gl) aux FETCH du SEP (écriture SEP) ===", flush=True)
+    masters, gls = _load_gl()
+    os_uuid = bytes.fromhex(GL_OS_UUID)
+    print(f"  coffre : {len(masters)} maître(s) {sorted(masters)}, {len(gls)} gigalocker(s) ; "
+          f"UUID d'OS={os_uuid.hex()}", flush=True)
+    served = {"master": 0, "gl": 0, "osuuid": 0, "fw": 0}
+    last = time.time()
+    while time.time() - last < idle_timeout:
+        m = next_sep_13(timeout_s=2)
+        if m is None:
+            continue
+        last = time.time()
+        op = m.TYPE
+        if op == 0x0e:    # état fw-boot -> A vide, réponse fixe (comme capturé)
+            write_A_bytes(b"")
+            sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=0x00000100))
+            served["fw"] += 1
+            print(f"  SEP> fw-boot (0x0e) TAG=0x{m.TAG:02x} -> répondu", flush=True)
+        elif op == 0x13:  # UUID d'OS -> 16 o en A, réponse PARAM=0 DATA=0 (comme capturé)
+            write_A_bytes(os_uuid)
+            sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=0x00000000))
+            served["osuuid"] += 1
+            print(f"  SEP> UUID-OS (0x13) TAG=0x{m.TAG:02x} -> servi {os_uuid.hex()}", flush=True)
+        elif op == 0x00:  # FETCH maître
+            sel = (m.DATA >> 8) & 1               # octet5 bit0 : SEP(0)/USER(1)
+            mtype = 0x01 if sel == 1 else 0x02    # USER=type 0x01, SEP=type 0x02
+            pay = masters.get(mtype)
+            if pay is None:
+                print(f"  SEP> FETCH maître sel={sel} (type 0x{mtype:02x}) ABSENT du coffre -> STOP.", flush=True)
+                return served, False
+            A = b"\x00" * 0x11 + pay              # préfixe maître 0x11 (hypothèse)
+            write_A_bytes(A); L = len(A)
+            sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00,
+                                    PARAM=L & 0xff, DATA=((L >> 8) & 0xff) | (sel << 8)))
+            served["master"] += 1
+            print(f"  SEP> FETCH maître sel={sel} (type 0x{mtype:02x}) -> servi {len(pay)} o (A={L} o)", flush=True)
+        elif op == 0x05:  # FETCH gigalocker par UUID (16 o en B)
+            uuid = iface.readmem(phys_B, 16)
+            pay = gls.get(uuid)
+            if pay is None:
+                print(f"  SEP> FETCH gigalocker UUID={uuid.hex()} ABSENT du coffre -> STOP "
+                      f"(on ne fabrique pas de locker).", flush=True)
+                return served, False
+            write_A_bytes(pay); L = len(pay)
+            sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00,
+                                    PARAM=L & 0xff, DATA=((L >> 8) & 0xff)))
+            served["gl"] += 1
+            print(f"  SEP> FETCH gigalocker UUID={uuid.hex()} -> servi {L} o", flush=True)
+        elif op == 0x07:  # locker-absent -> acquittement bénin (comme macOS)
+            sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=m.DATA & 0xffffff00))
+            print(f"  SEP> locker-absent (0x07) TAG=0x{m.TAG:02x} -> acquitté", flush=True)
+        elif op in (0x01, 0x06):  # SAVE -> le SEP REJETTE/re-scelle : échec FERMÉ, on N'ACQUITTE PAS
+            nz, sha, head = read_B(dump=True, tag=m.TAG, typ=op)
+            print(f"  SEP> SAVE (0x{op:02x}) TAG=0x{m.TAG:02x} : le SEP veut re-sceller (= coffre rejeté). "
+                  f"ON S'ARRÊTE SANS ACQUITTER (compteur non avancé). B: nz={nz} head={head}", flush=True)
+            return served, False
+        else:
+            print(f"  SEP> op inconnue 0x{op:02x} TAG=0x{m.TAG:02x} -> STOP (rien envoyé).", flush=True)
+            return served, False
+    print(f"  (silence > {idle_timeout}s)", flush=True)
+    return served, True
+
 def next_sep_13(timeout_s=10):
     t = time.time()
     while time.time() - t < timeout_s:
@@ -626,11 +786,14 @@ def probe_sbio():
         print(f"  ERREUR à l'écriture du 0x73 dans A8 : {e}. RIEN envoyé à l'EP 0x08.", flush=True)
         return
     print(f"  0x73 écrit dans A8 (depuis {os.path.basename(SBIO_A)}). Envoi de la commande...", flush=True)
+    # PURGER tout message 0x08 spontané accumulé AVANT l'envoi (sinon faux positif « vivant » sur un
+    # résidu antérieur au 0x73 — correctif sceptique 2026-11-17).
+    pump_ep0(); sep.msgs[0x08].clear()
     sep.send_msg(SEPMessage(EP=0x08, TAG=0xfc, TYPE=0x73, PARAM=0x00, DATA=0x00000000))
 
     # 4. écouter l'EP 0x08 ~6 s et lire B8. On N'ACQUITTE RIEN, on n'envoie pas de 2e commande.
     got = []
-    t0 = time.time()
+    t0 = time.time()   # APRÈS l'envoi : seuls les messages POST-commande comptent
     while time.time() - t0 < 6:
         pump_ep0()
         while sep.msgs[0x08]:
@@ -660,22 +823,33 @@ def probe_sbio():
               "et à comparer à la réponse macOS c12 (B +0x00=1, +0x14=0x73). NE PAS conclure 'Touch ID "
               "marche' : il reste toute la séquence d'init (clé capteur, etc.) puis un vrai match.", flush=True)
     else:
-        print(">>> ESSAI D : AUCUNE réponse au 0x73 (B8 nul, aucun message EP 0x08). sbio est ANNONCÉ "
-              "mais ne traite pas la 1re commande ici -> 'nom seulement'. Pistes : l'ouverture tardive de "
-              "sbio sous m1n1 ne suffit pas, ou l'état restauré ne rend pas sbio fonctionnel. -> hypotheses.md.", flush=True)
+        print(">>> ESSAI D : AUCUNE réponse au 0x73 (B8 nul, aucun message EP 0x08). sbio est ANNONCÉ, "
+              "mais ici PAS de preuve qu'il traite la commande. 3 causes possibles, À NE PAS confondre : "
+              "(1) le 0x73 n'a pas ATTEINT sbio — l'acquittement des CNTL prouve que le SEP a enregistré "
+              "l'adresse de A8, PAS qu'il lit bien phys_A8 à l'IOVA 0x54000 sous m1n1 (même inconnu DART "
+              "stream/sid que pour xART ; le succès de xART ne garantit pas le stream de sbio) ; "
+              "(2) l'ouverture tardive de sbio sous m1n1 ne suffit pas ; (3) l'état restauré ne rend pas "
+              "sbio fonctionnel. -> hypotheses.md. Ne pas conclure 'sbio mort' sur ce seul silence.", flush=True)
 
 # ---------------------------------------------------------------------------
 # 4. REJEU : on suit la séquence enregistrée. Pour chaque 'recv' on attend une
 #    requête du SEP ; pour chaque 'send' on écrit le locker dans A (si la capture
 #    l'a fait à ce pas) puis on renvoie le message exact.
 # ---------------------------------------------------------------------------
-print("--- début du rejeu EP 0x13 ---", flush=True)
 replay_done = 0        # nb de réponses 'send' réellement renvoyées au SEP
 replay_total = sum(1 for s in steps if s[0] == 'send')
 diverged = False       # le SEP a-t-il divergé de la capture ?
+
+# ESSAI E : SERVE_GL remplace le rejeu enregistré par le SERVICE du vrai coffre (.gl).
+if SERVE_GL:
+    served, ok = serve_from_gl()
+    print(f"--- service du coffre terminé : {served} ; "
+          f"{'pas de rejet détecté' if ok else 'ARRÊT (rejet/SAVE ou locker absent)'} ---", flush=True)
+else:
+    print("--- début du rejeu EP 0x13 ---", flush=True)
 saves_acked = 0        # ESSAI B : nb d'ops ACKABLE acquittées pendant le rejeu (borné)
 SAVE_BUDGET = 40       # garde-fou anti-boucle : au-delà, on s'arrête même en FOLLOW
-for idx, s in enumerate(steps):
+for idx, s in enumerate([] if SERVE_GL else steps):   # SERVE_GL : pas de rejeu enregistré
     if s[0] == 'recv':
         matched = False
         while not matched:
@@ -721,14 +895,21 @@ for idx, s in enumerate(steps):
         sep.send_msg(SEPMessage(EP=0x13, TAG=tag, TYPE=typ, PARAM=param, DATA=data))
         replay_done += 1
 
-print(f"--- rejeu terminé ({replay_done}/{replay_total} réponses rejouées"
-      f"{', DIVERGENCE' if diverged else ''}) ---", flush=True)
+if not SERVE_GL:
+    print(f"--- rejeu terminé ({replay_done}/{replay_total} réponses rejouées"
+          f"{', DIVERGENCE' if diverged else ''}) ---", flush=True)
 
 # Après le rejeu (divergé ou complet) :
-#   FOLLOW  -> on suit le SEP en acquittant les SAVE (écriture), pour voir s'il annonce sks.
-#   OBSERVE -> on écoute B en lecture seule sans rien renvoyer (n'acquitte pas le SAVE).
-#   sinon   -> simple écoute des annonces d'endpoints (EP 0).
-if FOLLOW:
+#   SERVE_GL -> on a déjà servi le coffre ; on écoute juste les annonces d'endpoints.
+#   FOLLOW   -> on suit le SEP en acquittant les SAVE (écriture), pour voir s'il annonce sks.
+#   OBSERVE  -> on écoute B en lecture seule sans rien renvoyer (n'acquitte pas le SAVE).
+#   sinon    -> simple écoute des annonces d'endpoints (EP 0).
+if SERVE_GL:
+    print("--- écoute 10 s des annonces après service du coffre ---", flush=True)
+    t0 = time.time()
+    while time.time() - t0 < 10:
+        pump_ep0(); time.sleep(0.03)
+elif FOLLOW:
     follow_loop(30)
 elif OBSERVE:
     observe_loop(20)
@@ -783,10 +964,12 @@ if FOLLOW:
               "ne lui fournit pas' (étape suivante = servir ce locker depuis la capture). S'il s'est "
               "tu sans FETCH, c'est autre chose. -> docs/hypotheses.md.", flush=True)
 
-# ESSAI D (PROBE_SBIO) : une fois sbio annoncé par FOLLOW, lui poser UNE question (0x73) sans doigt.
+# ESSAI D (PROBE_SBIO) : une fois sbio annoncé (par FOLLOW ou SERVE_GL), lui poser UNE question
+# 0x73 sans doigt. Particulièrement pertinent après SERVE_GL : si le vrai coffre a été accepté et
+# que sbio répond au 0x73, c'est le signal « biométrie fonctionnelle sous Linux ».
 if PROBE_SBIO:
-    if not FOLLOW:
-        print(">>> PROBE_SBIO ignoré : il exige FOLLOW=1 (sbio doit d'abord être annoncé).", flush=True)
+    if not (FOLLOW or SERVE_GL):
+        print(">>> PROBE_SBIO ignoré : il exige FOLLOW=1 ou SERVE_GL=1 (sbio doit d'abord être annoncé).", flush=True)
     else:
         probe_sbio()
 PY

@@ -14,6 +14,31 @@ Format :
 
 ---
 
+## 2026-11-17 (nuit) — Claude (Opus 4.8) — ESSAI E préparé : RENDRE le vrai coffre (.gl) à la puce (mode SERVE_GL, pending/, Albert lance)
+- Trace : — (préparation + SELFTEST hors ligne ; rien lancé vers le Mac). Proxy m1n1 up.
+- Contexte : on a enfin un coffre QUI COLLE (le .gl lu sur disque). Albert a dit « Oui, construis l'essai ».
+- Fait (hors ligne) :
+  - Ajout du mode **`SERVE_GL=1`** à `pending/sep_xart_replay.sh` + lanceur `pending/serve_gl_go.sh` (SERVE_GL+PROBE_SBIO).
+    Au lieu de rejouer un OOL périmé, le script SERT à la puce son coffre réel : op 0x00 (maître SEP/USER depuis slots
+    type 0x02/0x01), op 0x05 (gigalocker par UUID lu en B), op 0x13 (UUID d'OS = nom du .gl), op 0x0e (fw). Format de
+    réponse recalculé (longueur = PARAM|DATA0<<8 ; maître préfixé 0x11, gigalocker non) — cf. docs/gigalocker.md.
+  - **Sûreté** : on N'ACQUITTE JAMAIS un SAVE (0x01/0x06). Si la puce rejette (mauvais emballage ou coffre jugé non
+    courant), elle émet un SAVE → STOP sans acquitter → compteur non avancé → **pas de brick** (c'est l'ack de SAVE,
+    évité ici, qui avait cassé le boot). Gigalocker absent → STOP. Échec FERMÉ partout.
+  - **Protocole décodé avant de coder** (règle CLAUDE.md) : format de réponse FETCH craqué sur c24 (longueur=PARAM|DATA0<<8,
+    vérifié maîtres 0x364/0x814 + gigalocker 0xc0c ; DATA1=sélecteur SEP/USER ; CRC dans le blob). HYPOTHÈSES non
+    vérifiables sans capture de CETTE puce (hyperviseur 13.5 perdu) : charge fil = .gl+0x22 à l'octet près ; préfixe maître
+    = 0x11 nuls ; ordre UUID d'OS. Si fausses → essai non concluant (power-cycle gâché), PAS un brick. docs/gigalocker.md.
+  - Correctifs **sceptique** (revue PROBE_SBIO d'avant, jamais appliqués car redirection) appliqués : purge `sep.msgs[0x08]`
+    avant le 0x73 (faux positif), honnêteté IOVA/stream DART dans le verdict négatif, TypeError SELFTEST.
+  - Vérifs : `bash -n` OK, `py_compile` OK (763 l.), SELFTEST SERVE_GL montre 2 maîtres (SEP-xART 0x352, USER-xART 0x540) +
+    10 gigalockers + UUID d'OS 16 o.
+  - Relecture **sceptique** du mode SERVE_GL lancée (sous-agent).
+- PROCHAIN PAS : relecture sceptique → Albert fait une sauvegarde (idéal) → lance `! ./pending/serve_gl_go.sh`. Si la puce
+  accepte et sbio répond au 0x73 → biométrie fonctionnelle sous Linux (1re fois). Si SAVE/rejet → non concluant, on affine
+  l'emballage (le log dira où ça diverge). **Rien lancé par l'agent.**
+- Incidents : aucun.
+
 ## 2026-11-17 (nuit) — Claude (Opus 4.8) — Coffre décortiqué : 12 lockers (2 maîtres + 10 gigalockers), UUID stables au DFU
 - Trace : analyse hors ligne du dump `traces/20261117-224724_xart_read/…_.gl.bin`. Aucun matériel.
 - Fait : parsé le fichier gigalocker (6 Mo) → `docs/gigalocker.md` + `analysis/parse_gigalocker.py` (reproductible).
