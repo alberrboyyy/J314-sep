@@ -1,0 +1,10 @@
+TTY> Heap limit: 0x1000f5ac000 (128 MiB)
+TTY> nvme: already initialized
+volume xART : APSB @ block 0xadb, omap_oid=0xb3a, root_tree_oid=0x407
+fs-root : niveau=0 nkeys=9 flags=0x3
+
+Fichiers à la racine du volume xART (1):
+  '74980DEE-AD6A-5674-B233-B7E10A7FD0CB.gl'  inode=0x10  extents=1  taille≈6291456 o (0x600000)
+
+  dump '74980DEE-AD6A-5674-B233-B7E10A7FD0CB.gl' -> xart__74980DEE-AD6A-5674-B233-B7E10A7FD0CB.gl.bin : 6291456 o, non nuls 18912, sha256 8c5498a4fcb925b1
+    tête(0x40) : 00042438821b3dc0faf876d7aad6ca4dc668b9010000223e09baa500000000000000a4f53690b48ead3519cdf7cc02ee1b808e5b3952ebe4ed76f1d8d81f0f57

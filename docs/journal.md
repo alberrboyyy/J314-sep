@@ -14,6 +14,28 @@ Format :
 
 ---
 
+## 2026-11-17 (nuit) — Claude (Opus 4.8) — ✅ COFFRE LU sur le disque de la puce réparée (lecture seule, sans macOS)
+- Trace : `traces/20261117-224724_xart_read/` (liste + dump du gigalocker). Proxy m1n1 up, lecture seule.
+- Suite de l'entrée précédente (« coffre pas trouvé par get_gigalocker »). Albert a choisi « cherche où est le coffre ».
+- Fait : porté en Python (lecture seule) la marche APFS de m1n1 (`apfs.rs`) : `tools/apfs_list_volumes.sh` (liste les
+  volumes + rôles de chaque conteneur) puis `tools/read_xart.sh` (parcourt le volume xART : fs-tree racine → dir-records
+  → extents → dump des fichiers). **Rien dans m1n1/.**
+- Vu (FAITS, lectures seules sur la puce actuelle) :
+  - Le volume de **rôle xART (0x100) EXISTE**, dans le conteneur #0 (iBootSystemContainer, LBA 6), nommé `xART` —
+    exactement là où m1n1 cherche. Les autres conteneurs (macOS #1, ALARM, UEFI, Recovery) n'ont pas de volume xART.
+  - Le volume xART contient **UN** fichier : `74980DEE-AD6A-5674-B233-B7E10A7FD0CB.gl` (inode 0x10, 1 extent,
+    **6 291 456 o = 0x600000**, dont **18912 octets non nuls** = creux). SHA256 `8c5498a4fcb925b1…`.
+    Tête : `00042438821b3dc0faf876d7aad6ca4dc668b9010000223e09baa500000000…`.
+  - → **COFFRE RÉCUPÉRÉ** : il COLLE à la puce réparée + Touch ID ré-enrôlé (lu en direct sur l'install macOS 27.2.1),
+    sans réinstaller de macOS traçable, sans hyperviseur. C'est ce qui manquait (le snew-reel 11/11 était périmé).
+- Interprété : si `get_gigalocker` (m1n1 tout-fait) renvoyait vide, c'est le m1n1 en place (v2.0.0-92-g70757dc7) qui est
+  **antérieur** au commit ajoutant l'op (07c2c3af, 2026-07-16) → firmware sans l'op 0x1400. Le portage Python contourne.
+- PROCHAIN PAS (hors ligne d'abord, sans risque) : **parser la structure du .gl** (lockers par UUID, cf. Asahi
+  public_linux_state §B : UUID @0x01, long @0x12, CRC @0x16, payload @0x22) pour (a) comprendre ce qu'il contient, (b)
+  pouvoir **servir les FETCH gigalocker (op 0x05) par UUID** que le SEP réclame sous m1n1 (le « mur » de l'essai FOLLOW).
+  Reste la réserve de fond : l'anti-rejeu interne SEP peut encore refuser ; mais on teste enfin avec un coffre QUI COLLE.
+- Incidents : aucun. Aucune écriture nulle part.
+
 ## 2026-11-17 (nuit) — Claude (Opus 4.8) — Lire le coffre (gigalocker) sur le DISQUE sans macOS : outils OK, mais pas trouvé sur la puce réparée
 - Trace : `traces/20261117-223*_gigalocker_cleanchip` (vide), `…_gpt` (table de partitions). Proxy m1n1 up, lecture seule.
 - Contexte : le vieux coffre (snew-reel, 11/11) ne colle plus à la puce réparée (DFU 16/11) ; on ne peut plus capturer via
