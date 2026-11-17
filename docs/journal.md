@@ -14,6 +14,26 @@ Format :
 
 ---
 
+## 2026-11-17 (nuit) — Claude (Opus 4.8) — Coffre décortiqué : 12 lockers (2 maîtres + 10 gigalockers), UUID stables au DFU
+- Trace : analyse hors ligne du dump `traces/20261117-224724_xart_read/…_.gl.bin`. Aucun matériel.
+- Fait : parsé le fichier gigalocker (6 Mo) → `docs/gigalocker.md` + `analysis/parse_gigalocker.py` (reproductible).
+- Vu (FAITS, parse du dump) :
+  - Fichier = tableau de **slots de 0x9000 o** ; **12 lockers** (slots 0,1,3,4,5,6,7,8,9,10,11,12 ; slot 2 vide).
+  - En-tête d'un locker : +0x00=0, **+0x01=type**, **+0x02..0x12=UUID (16 o, gigalockers)**, **+0x12=longueur (u32)**,
+    +0x16=CRC (u32), **+0x22=charge** (scellée). Taille = 0x22+longueur (recoupe la zone non nulle).
+  - Types : **0x01 = USER-xART (maître)**, **0x02 = SEP-xART (maître)** (sans UUID) ; **0x03/0x04 = gigalocker** (avec UUID).
+    → **2 maîtres + 10 gigalockers**. (Rapproché handoff : SEP-xART+Credential variables, USER-xART stable.)
+  - **UUID STABLES au DFU** : 6 des 10 UUID de gigalockers (slots 0,4,5,8,10,11 ; dont Credential Manager 8624497a ×6)
+    se retrouvent **à l'octet près** dans les tampons OOL des captures c21/c23/c24 (puce d'AVANT le DFU du 16/11).
+- Interprété : ces UUID sont liés à l'appareil (pas à l'état) → les demandes du SEP sous m1n1 correspondront aux slots de
+  ce `.gl`. Le coffre actuel contient TOUT ce que le SEP réclame (2 maîtres + gigalockers par UUID) → le « mur » FOLLOW
+  (« le SEP réclame un gigalocker qu'on ne sert pas ») devient franchissable en servant depuis ce fichier. Réserve inchangée :
+  l'anti-rejeu interne (nonce, probablement dans le maître SEP-xART slot 6) peut encore refuser ; lire ≠ prouver le rejeu.
+- PROCHAIN PAS : préparer un mode « servir les FETCH (op 0x00 maître + op 0x05 gigalocker par UUID) depuis le `.gl` » dans
+  `pending/` (lancé par Albert). D'abord lire le format EXACT de la réponse FETCH (capture macOS + kext §8) — règle
+  « protocole complet avant de répondre ».
+- Incidents : aucun (hors ligne).
+
 ## 2026-11-17 (nuit) — Claude (Opus 4.8) — ✅ COFFRE LU sur le disque de la puce réparée (lecture seule, sans macOS)
 - Trace : `traces/20261117-224724_xart_read/` (liste + dump du gigalocker). Proxy m1n1 up, lecture seule.
 - Suite de l'entrée précédente (« coffre pas trouvé par get_gigalocker »). Albert a choisi « cherche où est le coffre ».
