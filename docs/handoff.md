@@ -1,11 +1,115 @@
-> # 🟠 MAC RÉCUPÉRÉ (ALARM) — CÔTÉ APPLE TOUJOURS CASSÉ (2026-11-12)
-> Les essais voie C (rejeu SEP) ont bousculé l'état de la puce : côté Apple tout bootloope (macOS,
-> recovery, menu Startup Options) ; seul m1n1 démarre. **Mais ALARM (le Linux d'Albert) est RÉCUPÉRÉ
-> et bootable** par tethered boot depuis le PC (`tools/tethered_boot.sh alarm`). Données + ALARM
-> intactes, backup OK, **Mac non brické**. Réparer le côté Apple = DFU Restore (plus tard, 2e Mac).
-> Mémoire : [[mac-boot-casse-recuperation]]. **Aucune réécriture SEP sans l'accord d'Albert** (il lance).
+> # 🟢 MAC RÉCUPÉRÉ ET OPÉRATIONNEL (2026-11-17) — macOS 27.2.1 + ALARM bootent ; SEP PROPRE ; on reprend le projet
+> Suite du DFU Restore (16/11) : **macOS 27.2.1 neuf** et **ALARM réinstallé bootent tous les deux
+> normalement** (ALARM = image bloc `alarm_p5.img` + GRUB refabriqué ; chaîne m1n1→U-Boot→GRUB→LUKS→ALARM,
+> confirmée par Albert ; fstab /efi corrigé par Albert). **Le SEP est propre/neuf** = meilleure base qu'avant.
+> **PERDU au DFU et NON réinstallés** (décision Albert 2026-11-17, « on continue sur 2 ») : les partitions
+> jetables **macOS 13.5** et **Fedora de test (10.0.200.4)**. ⚠️ **À REPRENDRE AVEC ALBERT (2026-11-17)** : il
+> signale que ma compréhension de « ce qui s'est passé avec la 13.5 » est **en partie fausse** — donc NE PAS
+> traiter comme acquis ce qui suit sur le 13.5 (hypervisor exigeait-il vraiment 13.5 ? 13.5 récupérable ? autre
+> version possible ?). Conséquences que j'avais déduites (à confirmer) : plus de **capture SEP sous macOS**
+> (l'hyperviseur ciblait 13.5 d'après README/CLAUDE.md ; mais protocole déjà sorti par décompilation) ;
+> **m1n1 proxy** (ex-volume 13.5) **à refaire** avant tout `sep_boot`/`sep_peek`.
+> ✅ **MISE À JOUR (soir 17/11)** : **Touch ID ré-enrôlé** (Albert) ET **m1n1 proxy RÉ-ÉTABLI sans 13.5** (backdoor
+> Asahi `csrutil` + nouvel outil `tools/catch_proxy.sh`) → **Mac EN PROXY** (m1n1 v2.0.0 frais), prêt pour `sep_peek`.
+> Reste (Albert, pas urgent) : **image disque** avant toute écriture SEP. Détail : **section 2026-11-17 (soir)** +
+> [[mac-boot-casse-recuperation]]. **Aucune écriture SEP sans l'accord d'Albert** (il lance).
 
 Tu reprends le projet sep-touchid dans ~/Desktop/sep-touchid : Touch ID sous Linux sur MacBook Pro 14" M1 Max (j314c). Lis d'abord CLAUDE.md (PHASE 2, seul Albert change cette ligne ; lis surtout « Qui décide quoi » et « Exception : 2e Linux de test »), puis la mémoire du projet, puis le haut de docs/journal.md (entrées du 2026-11-09 au 12).
+
+## POINT DE REPRISE 2026-11-17 (soir, Opus 4.8) — ✅ PROXY m1n1 RÉ-ÉTABLI sans macOS 13.5 ; Touch ID ré-enrôlé
+
+> **TL;DR** : le Mac est de nouveau **pilotable en m1n1 proxy depuis le PC** — la capacité centrale pour tout le
+> travail SEP, qu'on avait perdue avec l'effacement du volume 13.5. Obtenu **sans macOS 13.5**, par la backdoor
+> Asahi (`csrutil`) + un **nouvel outil `tools/catch_proxy.sh`**. Touch ID **ré-enrôlé** par Albert (état scellé SEP
+> valide et courant = base inédite). Mac EN PROXY (m1n1 v2.0.0 frais) à la fin de séance, prêt pour `sep_peek`.
+
+**CE QUI A ÉTÉ FAIT (Albert + Claude, 2026-11-17) :**
+1. **Touch ID ré-enrôlé** dans macOS 27.2.1 (Albert) → état scellé du SEP de nouveau valide et courant.
+2. **Proxy m1n1 ré-établi — méthode NOUVELLE** (l'ancienne, kmutil sur le volume 13.5, est morte) :
+   - **Backdoor Asahi (Albert, recovery/1TR, ligne rouge)** : `csrutil disable` en choisissant l'install **Asahi**
+     — le recovery liste « 1: Macintosh HD, 2: alarm, 3: UEFI boot » ; fait pour **2 (alarm)** ET **3 (UEFI boot)**,
+     **PAS** macOS — puis `nvram boot-args=-v`. **Les DEUX** sont nécessaires (le verbose seul n'ouvre plus la
+     backdoor sur builds récents). Sans ça, m1n1 (payload → U-Boot→GRUB→ALARM) boote droit sur Linux sans jamais
+     présenter le proxy — c'était la cause de tous les échecs d'attrapage. Retour arrière (plus tard) : `nvram
+     boot-args=` + `csrutil enable`, **sans** choisir « full security » (sinon m1n1 désinstallé).
+   - **Attrapage côté PC (Claude, via tools/) : `tools/catch_proxy.sh` (nouveau)** — attend l'apparition des ports
+     USB du m1n1 au boot (fenêtre ~5 s), ouvre if02 pour tenir la fenêtre, puis chainloade un m1n1 frais
+     (`m1n1/build/m1n1.bin`, même invocation que `sep_peek`). NON destructif (RAM). Usage : lancer l'outil en
+     arrière-plan, PUIS power-cycler le Mac et laisser booter l'entrée Linux normale.
+   - **Résultat VÉRIFIÉ** : `Waiting for proxy connection... Connected!`, m1n1 **v2.0.0-92-g7075** up ; ports
+     `usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00/if02` + `/dev/ttyACM0`/`ttyACM2` présents, stables.
+   - ⚠️ **Gotcha outil** : `catch_proxy.sh` finit en **exit 1** (le `chainload.py` fait « Waiting for reconnection… »
+     et dépasse le `M1N1TIMEOUT` par défaut 3 s après la ré-énumération USB) — **mais le proxy EST up** (ports v2.0.0
+     présents). Purement cosmétique. À corriger : sauter la vérif finale, ou `M1N1TIMEOUT` plus long autour du chainload.
+   - ⚠️ **Piège corrigé en séance** : ne JAMAIS mettre `pkill -f catch_proxy.sh` dans la commande qui lance le
+     catcher en arrière-plan → elle se tue elle-même (son cmdline contient « catch_proxy.sh »), exit 144.
+
+**CLARIFICATION macOS 13.5 (résout probablement le « tu as mal compris » d'Albert, 2026-11-17) :** le proxy m1n1 —
+et donc TOUT le travail SEP (sep_peek, sep_boot, driver natif, capteur) — **ne dépend PAS de macOS 13.5**. Le 13.5 ne
+servait **que** pour tracer macOS **sous l'hyperviseur** (`run_guest.py`). **Preuve directe** : le proxy vient d'être
+ré-établi sans aucun macOS 13.5. (Doc Asahi 2026-11-17, `public_linux_state.md` : invités hyperviseur supportés = 13.5
+**et 14.8.3** ; macOS 27.2.1 non supporté comme invité. Repère CLAUDE.md/README « Hyperviseur : 13.5 uniquement »
+**périmé** — correction = décision Albert.)
+
+**ÉTAT MATÉRIEL à la fin de séance :** Mac EN PROXY (m1n1 v2.0.0 frais, lien stable). Backdoor Asahi active (SIP
+désactivé sur les 2 installs Asahi, boot verbose → +~5 s au boot normal d'ALARM, réversible). SEP **propre** (DFU) +
+**Touch ID enrôlé** = 1re fois qu'on a une puce **valide et courante** à étudier.
+
+**PROCHAINS PAS :**
+- [sûr, autonomie] `./tools/sep_peek.sh` (penser `SKIP_CHAINLOAD=1` pour ne pas rechainloader) — **lecture seule** —
+  pour confirmer que le SEP répond sur la puce fraîchement enrôlée.
+- [Albert, pas urgent] **Image disque** avant toute écriture SEP. Rappel : une image **ne répare PAS** un SEP cassé
+  (seul un DFU le fait) ; elle protège les données, pas l'état scellé. Voir [[mac-boot-casse-recuperation]], [[priorites-risque]].
+- [offline, fait 2026-11-17] protocole **sbio EP 0x08 consolidé** dans `messages.md` (format fil `vérifié`, noms d'opcodes `hypothèse/kext`).
+- Reprise SEP = **driver natif sur puce valide** (voir `driver_plan.md`), pas un rejeu (voie C quasi-morte).
+
+---
+
+## POINT DE REPRISE 2026-11-16 (soir, Opus 4.8) — ✅ DFU RESTORE RÉUSSI (Mac restauré, disque effacé)
+
+> **TL;DR** : décision d'Albert → **DFU Restore destructif depuis le PC Linux**. Réussi. macOS 27.2.1 neuf,
+> **SEP + firmware remis à zéro**, bootloop fini. **Le disque interne est intégralement EFFACÉ** (ALARM, Linux
+> de test, macOS 13.5 + m1n1). Deux sauvegardes faites et vérifiées avant. Le projet repart d'un **SEP sain**.
+
+**CE QUI S'EST PASSÉ :** le côté Apple est **réparé** par un DFU Restore lancé par Albert depuis le PC (idevicerestore).
+`Status: Restore Finished / DONE`. **⚠️ Tout le disque du Mac est effacé** → le setup tethered/m1n1 **n'existe plus**
+sur le Mac ; toute reprise SEP par m1n1 demandera de **réinstaller m1n1 via Asahi** d'abord.
+
+**SAUVEGARDES FAITES AVANT (2 filets, vérifiés) :**
+- **Image bloc LUKS complète d'ALARM** : `~/mac-dfu/alarm_p5.img` (**259 172 446 208 o = 506196184 secteurs**,
+  = taille exacte de `/dev/nvme0n1p5` confirmée ; en-tête LUKS2 intact, UUID `123dfd25…1992da`). Faite par `dd` depuis
+  un **Fedora** tethered-booté (ALARM en tethered perd l'USB → Fedora pour avoir le réseau) → PC par `nc`/`/dev/tcp`
+  (LAN câblé, ~109 Mo/s).
+- **Snapshot restic frais** (`bk commit` depuis ALARM tethered) : dépôt `/latif/data/backup/m1max` (pool ZFS `latif`), cf. `RESTORE.md`.
+
+**COMMENT LE DFU A MARCHÉ (crucial — détails dans [[mac-boot-casse-recuperation]]) :**
+- **La version PACKAGÉE d'`idevicerestore` (release 1.0.0) CALE** pile après l'`iBEC` (`ERROR: Device did not disconnect` /
+  `Unable to place device into recovery mode from DFU mode`), **reproductible** (2 fois). Apple signe pourtant (SHSH reçus).
+- **FIX = `idevicerestore` GIT MASTER** : `yay -S idevicerestore-git` (a installé r287 ; corrige le délai de reconnexion
+  post-`iBEC`). Avec le git : recovery → cryptex (SystemOS/AppOS/RosettaOS) → `Sealing System Volume` → DONE.
+- **Gotcha build** : la pile `-git` monte libplist `.so.4 → .so.12`. (a) `libimobiledevice-glue-git` restait liée à `.so.4`
+  → `idevicerestore: libplist-2.0.so.4 cannot open shared object file` → fix **`yay -S --rebuild libimobiledevice-glue-git`**
+  (vérifier `ldd $(command -v idevicerestore)` = 0 « not found »). (b) ça **casse `usbmuxd`/`upower`/KF6Solid** (libplist `.so.4`
+  orpheline) → **ne pas redémarrer usbmuxd pendant le restore** (l'instance déjà lancée suffit). **PC à réconcilier après.**
+- **Séquence DFU 14" M1 Max (a marché)** : éteindre (power ~10 s) → appuyer/relâcher power puis tout de suite
+  **Ctrl-g + Option-g + Maj-DROITE + power** ~10 s → relâcher les 3 touches, garder power ~10 s. Écran NOIR = DFU
+  (`lsusb -d 05ac:` = `05ac:1227`/`1902`). **Taper la confirmation TOUT DE SUITE** (le DFU retombe si on attend plusieurs min).
+  Garde-fou : `pending/dfu_restore.sh` (vérifie IPSW+sha256, usbmuxd, DFU ; confirmation `EFFACER-ET-RESTAURER`).
+
+**PROCHAINS PAS (dans l'ordre) :**
+1. **[Albert, maintenant]** Finir l'assistant macOS — **Verrou d'activation = identifiant Apple + mot de passe exigés** —
+   créer la session, vérifier que macOS boote normalement (plus de bootloop).
+2. **[Albert]** **Ré-enrôler Touch ID** (Réglages → Touch ID et mot de passe) → **revalide l'état scellé du SEP**. C'est le
+   but : repartir d'un SEP **valide et courant** (ce qui manquait pour *valider* toute écriture SEP, cf. sections plus bas).
+3. **[plus tard]** **Réinstaller Asahi/ALARM** (installeur Asahi depuis macOS), puis remonter les données depuis une des 2
+   sauvegardes. ⚠️ un `dd` brut de l'image ne recrée **pas** la politique de boot Asahi → suivre **`RESTORE.md`** (btrfs/LUKS +
+   UUID + grub/m1n1), OU restaurer l'image dans la partition LUKS recréée par l'installeur. À cadrer avec Albert le moment venu.
+4. **[PC, sans urgence]** Réconcilier la pile libimobiledevice (usbmuxd/upower/KDE cassés par le bump libplist) : revert vers
+   stable **ou** rebuild complet `-git`.
+5. **[projet SEP]** La reprise du driver natif repart d'un **SEP sain**. Tout le m1n1/tethered/Linux de test (10.0.200.4) est à
+   **réinstaller via Asahi** (l'exception CLAUDE.md sur `root@10.0.200.4` vise un hôte qui n'existe plus tant qu'il n'est pas refait).
+
+---
 
 ## POINT DE REPRISE 2026-11-13 (Opus 4.8) — session « décompilation » : voie C quasi-morte, protocole sbio vérifié, archi SKS
 

@@ -1,0 +1,6 @@
+date: 20261117-220411
+name: sep_peek_cleanchip
+m1n1_commit: 70757dc7
+proxy_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00
+chainload: non
+mmio_reads: CPU_CONTROL(+0x44) A2I_CONTROL(+0x8110) I2A_CONTROL(+0x8114)

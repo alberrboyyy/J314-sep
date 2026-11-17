@@ -363,3 +363,99 @@ re-scellement est (a) inévitable par conception, ni (b) contournable par rejeu 
   `verification_status.md` L120-123) vont plus loin que tout public : `save(N)=fetch(N+1)`, 2 lockers variables
   sur 10 (SEP-xART TAG 0x03 + un locker Credential Manager), préfixe 16 o = nonce/MAC **hypothèse**, pas de
   compteur en clair. À confronter à la voie B, pas à la doc.
+
+---
+
+## 2026-11-17 — m1n1 proxy sans macOS 13.5 (machine Asahi déjà installée)
+
+Documentaliste, lu le **2026-11-17**. Contexte : après DFU Restore, Asahi réinstallé en « UEFI only »
+(m1n1 stage 1 + stage 2 + U-Boot sur une ESP neuve), ALARM restauré (image bloc, boote m1n1→U-Boot→GRUB→ALARM),
+macOS **27.2.1** neuf présent, **macOS 13.5 effacé et non resignable**. Question : comment obtenir un m1n1
+**mode proxy** (2 ports série USB) pour `chainload.py` / `sep_peek.sh` / `tethered_boot.sh` sans le volume 13.5.
+
+Sources publiques consultées le 2026-11-17 :
+- `m1n1-user-guide` : https://asahilinux.org/docs/sw/m1n1-user-guide/
+- `m1n1-hypervisor` : https://asahilinux.org/docs/sw/m1n1-hypervisor/
+- `tethered-boot` : https://asahilinux.org/docs/sw/tethered-boot/
+- `platform/introduction` (boot process) : https://asahilinux.org/docs/platform/introduction/
+
+Légende identique au reste du fichier : **[public]** = écrit dans la source ; **[déduit]** = notre lecture ;
+**[projet]** = état/règles internes (pas une source publique).
+
+### A. Fait structurant : l'ancienne méthode (kmutil sur 13.5) n'est plus nécessaire
+- [projet] Ancienne voie (README §4, journal 2026-11-07) : poser un m1n1 **sans payload** comme fuOS via
+  `kmutil configure-boot` sur le volume **macOS 13.5** → il tombe en proxy. Elle dépendait d'un macOS 13.5 installé.
+- [public] `tethered-boot` : sur une machine **Asahi déjà installée**, le **stage 2** de m1n1 est chargé depuis
+  l'ESP au chemin **`m1n1/boot.bin`** ; le **stage 1** est posé pendant l'étape 1TR de l'installeur et « ne peut pas
+  être modifié sans un passage par la recovery ». Autrement dit **le m1n1 dev est déjà en place** : plus besoin de
+  `kmutil` ni de macOS 13.5 pour avoir un m1n1 qui peut basculer en proxy.
+
+### B. Voie RECOMMANDÉE (la plus simple et sûre) : flag en recovery + fenêtre de 5 s, puis chainload
+- [public] `tethered-boot` : le mode proxy s'active **depuis la recovery macOS**, en exécutant
+  `csrutil disable && nvram boot-args=-v` **sur le volume Asahi Linux** (pas sur macOS). Ce réglage **n'est pas
+  temporaire** (il reste jusqu'à ce qu'on le remette).
+- [public] `tethered-boot` : une fois le flag posé, « m1n1 attend 5 secondes au boot » ; si l'hôte ouvre le TTY m1n1
+  pendant cette fenêtre, la machine **entre en mode proxy**. Côté PC, `proxyclient/tools/picocom-sec.sh` attend le
+  périphérique et ouvre son **second** port USB comme terminal série ; `proxyclient/tools/shell.py` confirme le
+  proxy ; `proxyclient/tools/linux.py` boote un noyau ; `tools/run_guest_kernel.sh` boote sous l'hyperviseur.
+- [public] `m1n1-user-guide` : pour casser dans un m1n1 **déjà installé** (build release), il faut **SIP désactivé +
+  verbose** ; « le mode verbose seul **n'active plus** la backdoor sur les builds récents » → les **deux**
+  (`csrutil disable` ET `boot-args=-v`) sont nécessaires. Ports : l'hôte voit 2 ACM, le **1er = proxy**
+  (`M1N1DEVICE=/dev/ttyACM0`), le **2e = UART virtuel de l'hyperviseur** ; sous Linux on ouvre le **2e** avec
+  `picocom --omap crlf --imap lfcrlf -b 500000 /dev/ttyACM1` pour déclencher l'entrée en proxy.
+- [public] `m1n1-user-guide` + `m1n1-hypervisor` : une fois en proxy, on **chainloade un m1n1 frais de l'arbre de
+  travail** pour coller à l'ABI : `proxyclient/tools/chainload.py -r build/m1n1.bin` (ou `build/m1n1.macho` pour
+  l'hyperviseur). C'est ce que fait déjà `tools/tethered_boot.sh`.
+- ⚠️ **Albert à la main (ligne rouge)** : l'étape `csrutil disable && nvram boot-args=-v` en **recovery/1TR** touche
+  la **boot policy** et utilise des **outils Apple** (`csrutil`, `nvram`). L'agent **ne la script pas**. La recovery
+  (1TR) s'atteint en maintenant le bouton d'allumage ; elle est **indépendante de la version de macOS** — donc
+  **macOS 13.5 n'est pas requis**, macOS 27.2.1 (ou la 1TR) suffit à poser le flag sur le volume Asahi.
+- [public] Retour arrière (`tethered-boot`/`m1n1-user-guide`) : `nvram boot-args=` puis `csrutil enable` — **ne pas**
+  choisir « full security » au prompt, sinon m1n1 est **désinstallé**. (Albert, à la main également.)
+
+**Bilan voie B** : un **seul** passage en recovery (Albert), aucun fichier de boot modifié, le boot normal
+d'ALARM continue de marcher (juste +5 s et verbose). C'est la voie à privilégier.
+
+### C. Voie alternative « Linux-only » (sans macOS) — plausible mais [déduit] et NON documentée telle quelle
+- [public] `tethered-boot` : stage 2 = `m1n1/boot.bin` sur l'ESP. [public] `m1n1-user-guide` : « si m1n1 n'a pas de
+  payload, ou si le boot du payload échoue, il **retombe en mode proxy** » (`RELEASE=1` garde une « escape hatch to
+  activate an early proxy mode »).
+- [déduit] En **remplaçant `m1n1/boot.bin` par un m1n1 sans payload** (build dev), le stage 1 le charge au boot, il
+  n'a pas de payload → **proxy automatique**, **sans** le flag recovery et **sans** macOS. L'ESP est montable/
+  éditable depuis ALARM, donc l'opération et son **retour arrière** (restaurer l'ancien `boot.bin`) se font
+  entièrement sous Linux. C'est le même mécanisme que l'update normal de m1n1 (on copie un fichier sur l'ESP).
+- ⚠️ **Non documenté noir sur blanc** : aucune page publique ne dit « pose un m1n1 sans payload à `boot.bin` pour
+  avoir le proxy ». C'est une **déduction** en combinant deux pages → à traiter comme hypothèse tant que non testé.
+- ⚠️ **Albert à la main quand même** : modifier `m1n1/boot.bin` = **toucher à m1n1** → interdit à l'agent y compris
+  sur le Linux de test (CLAUDE.md, exception 2e Linux). De plus, tant que ce `boot.bin` sans payload est en place,
+  la machine **ne boote plus ALARM** (elle tombe toujours en proxy) : il faut restaurer `boot.bin` pour re-booter
+  Linux. Reversible depuis Linux, mais à faire en connaissance de cause.
+
+### D. Réponses point par point à l'orchestrateur
+1. **Façon recommandée Asahi** : le m1n1 dev est **déjà installé** (stage 2 `m1n1/boot.bin`). On l'amène en proxy
+   via le flag recovery (`csrutil disable && nvram boot-args=-v` sur le volume Asahi) + fenêtre de 5 s, puis
+   **chainload** d'un m1n1 frais. [public, `tethered-boot` + `m1n1-user-guide`]. Pas besoin de remplacer un fichier.
+2. **Obligatoire de passer par macOS + kmutil/bputil ?** **Non pour `kmutil`/`bputil`**, et **non par macOS 13.5**.
+   Mais la voie recommandée exige **un** passage en **recovery/1TR** pour `csrutil`/`nvram` (outils Apple, boot
+   policy) = Albert. Une voie **entièrement Linux** existe (remplacer `boot.bin`, §C) mais elle est **[déduit]**,
+   non documentée, et reste « Albert » au titre de « ne pas toucher m1n1 ». **Non trouvé dans la doc publique** :
+   un chemin proxy officiel 100 % Linux sans ni recovery ni remplacement de `boot.bin`.
+3. **Chainload USB sans rien installer de permanent ?** **Oui** : le m1n1 **déjà installé** sert de bootstrap ; une
+   fois en proxy (fenêtre 5 s), `chainload.py -r build/m1n1.bin` charge le m1n1 dev **en RAM**, rien de permanent.
+   **Mécanisme de déclenchement exact** [public] : le flag `boot-args=-v` (+ `csrutil disable`) fait **attendre
+   m1n1 5 s** au boot ; l'hôte **ouvre le 2e port série** (`picocom-sec.sh` / `picocom ... /dev/ttyACM1`) pendant
+   ces 5 s → entrée en proxy. Ce n'est **pas** une touche clavier ni un menu : c'est l'**ouverture du TTY** dans la
+   fenêtre. (Sans le flag, un m1n1 **avec** payload ne s'arrête pas ; seul un m1n1 **sans** payload tombe en proxy
+   tout seul — cf. §C.)
+4. **Pièges j314c / macOS récent pour l'hyperviseur** [public, `m1n1-hypervisor`] : cibles macOS **invitées**
+   supportées = **13.5 (M1/M2)** et **14.8.3 (M1→M3)** ; M4+ non figé (SPTM). Donc **macOS 27.2.1 n'est PAS
+   supporté comme invité** sous l'hyperviseur. **Conséquence utile** : pour reprendre le tracing SEP sous
+   hyperviseur (`run_guest.py`), il faudrait réinstaller un macOS **invité supporté** — et la doc liste désormais
+   **14.8.3** en plus de 13.5 pour M1 (le projet ne connaissait que « 13.5 only » — repère technique CLAUDE.md à
+   mettre à jour). **Important** : obtenir le **proxy** et lancer **`sep_peek`** (SEPROM EP 0xff) **ne dépend pas**
+   d'un macOS invité — ça marche dès la voie B, sans aucun macOS 13.5/14.8.3.
+
+### E. Contradiction / mise à jour à signaler au sceptique et au projet
+- **Repère technique périmé** : CLAUDE.md « Hyperviseur : macOS **13.5** uniquement » et README §2. La doc Asahi
+  (`m1n1-hypervisor`, lue 2026-11-17) liste **13.5 (M1/M2)** **et 14.8.3 (M1→M3)**. À corriger (décision Albert).
+- Aucune contradiction doc↔traces sur ce sujet ; il s'agit d'une évolution de la doc publique.

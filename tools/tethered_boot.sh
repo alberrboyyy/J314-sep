@@ -27,7 +27,8 @@ LUKS_ARGS="rd.luks.name=${LUKS_UUID}=cryptroot rd.luks.key=${LUKS_UUID}=/cryptke
 case "$MODE" in
   shell) BOOTARGS="earlycon ${LUKS_ARGS} break=premount loglevel=4" ;;
   alarm) BOOTARGS="earlycon ${LUKS_ARGS} systemd.wants=sshd.service appledrm.show_notch=1 loglevel=4" ;;
-  *) die "mode inconnu : $MODE (attendu : shell | alarm)" ;;
+  fedora) BOOTARGS="${BOOTARGS:-earlycon root=UUID=4f4716b8-37f7-4d0e-a3a9-3d9d9540a52f ro rootflags=subvol=root appledrm.show_notch=1 loglevel=4}" ;;
+  *) die "mode inconnu : $MODE (attendu : shell | alarm | fedora)" ;;
 esac
 
 for f in "$KERNEL" "$DTB" "$INITRAMFS"; do

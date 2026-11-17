@@ -1,8 +1,18 @@
-# 🔴 RÉCUPÉRATION DU MAC — À FAIRE EN PRIORITÉ (session fraîche)
+# ✅ RÉCUPÉRATION DU MAC — TERMINÉE (2026-11-17)
 
-> Lire ce fichier EN ENTIER avant toute action.
-> Le Mac n'est plus utilisable normalement. On NE relance AUCUN essai SEP (voie C) tant
-> qu'il n'est pas récupéré.
+> **RÉSOLU.** Le Mac est récupéré : **DFU Restore (16/11)** → macOS 27.2.1 neuf + SEP propre, puis
+> **réinstall ALARM par image bloc** (`dd` de `alarm_p5.img`) + **GRUB refabriqué** → **ALARM boote
+> nativement** (m1n1→U-Boot→GRUB→LUKS→ALARM, confirmé par Albert). macOS et Linux marchent tous les deux.
+> Perdu et non réinstallés : **macOS 13.5** et le **Fedora de test (10.0.200.4)**.
+> Détail : [[mac-boot-casse-recuperation]] et docs/handoff.md (bandeau 2026-11-17).
+> Le texte ci-dessous est l'**historique** de la procédure (gardé pour référence) — plus rien à faire ici.
+
+---
+
+## Historique (procédure d'origine, résolue)
+
+> État au moment de la rédaction : le Mac n'était plus utilisable normalement ; on ne relançait aucun
+> essai SEP (voie C) tant qu'il n'était pas récupéré.
 
 ## Ce qui s'est passé (2026-11-11)
 Pendant les essais « voie C » (rejeu de lockers xART au SEP, lancés par Albert), l'état
@@ -82,13 +92,57 @@ Succès = logos « pingouins » au framebuffer, puis le boot Linux d'ALARM à l'
 
 ---
 
-## 🟠 SOLUTION 2 — DFU RESTORE + réinstall (dernier recours, DESTRUCTIF, BESOIN D'UN 2e MAC)
-- Nécessite un **deuxième Mac** (Apple Configurator). Entrer en DFU (Mac éteint → power + Maj-droite
-  + Option-gauche + Contrôle-gauche ~10 s, puis garder power). Puis clic droit → **Restaurer**
-  (cette fois **Restaurer**, qui **EFFACE TOUT** le disque — les 4 partitions).
-- Ensuite **réinstaller Asahi ALARM depuis le backup** d'Albert.
-- Remet la puce/menu à zéro (règle le problème), mais long et destructif. À ne faire que si la
-  solution 1 échoue, et **backup confirmé**.
+## 🟠 SOLUTION 2 — DFU RESTORE DEPUIS LE PC LINUX (DESTRUCTIF, SANS 2e MAC) — PRÊT À LANCER
+
+> Corrige l'ancienne version de cette section : **pas besoin d'un 2e Mac.** La restauration DFU
+> d'un Mac Apple Silicon se fait depuis ce PC Linux avec **`idevicerestore`** (libimobiledevice ;
+> confirmé par marcan sur M1 ; wrapper `SimpleMacRestore`). Préparé le 2026-11-16.
+
+**Ce que ça fait :** remet la puce (SEP) + le firmware à zéro → répare le bootloop. **EFFACE TOUT
+le disque** (macOS, macOS 13.5 du projet, ALARM, Linux de test). Restaure le **macOS le plus récent
+(27.2.1)** — le 13.5 n'est plus signé par Apple, on ne peut pas y revenir.
+
+### ⛔ 3 VERROUS avant de cliquer (le script ne peut pas les vérifier à ta place)
+1. **Sauvegarde d'ALARM faite ET vérifiée.** La sauvegarde restic est derrière le pool **ZFS `latif`**,
+   or le module ZFS n'est pas construit pour le noyau courant du PC → **illisible pour l'instant**.
+   → Faire une **sauvegarde fraîche** d'ALARM (sur le disque du PC, `/` a ~430 Go libres) AVANT.
+   (`~/backup_mac_FULL` = vieux système ext4, **pas** ALARM actuel — ne pas s'y fier.)
+2. **Identifiant Apple + mot de passe** du Mac connus (sinon **Verrou d'activation** bloque la
+   reconfiguration après l'effacement).
+3. Accepter que les 4 partitions soient effacées.
+
+### Préparation (déjà faite par l'agent le 2026-11-16)
+- Firmware : `~/mac-dfu/UniversalMac_27.2.1_26B131_Restore.ipsw` (25 595 954 706 o,
+  sha256 `233e85a0…b300814f`). Téléchargé depuis le CDN Apple. **Unique pour tous les Mac Apple Silicon.**
+- Bouton : `pending/dfu_restore.sh` (vérifie firmware+sha256, outil, usbmuxd, Mac en DFU ; refuse de
+  partir sinon ; confirmation tapée obligatoire).
+
+### À faire par Albert, dans l'ordre, le jour J
+1. **Installer l'outil** (une fois) : `yay -S idevicerestore usbmuxd libirecovery`
+   puis `sudo systemctl enable --now usbmuxd`.
+2. **Brancher** le Mac au PC en **USB-C ↔ USB-C data** (pas Thunderbolt-only, **pas de hub**),
+   Mac sur secteur, rien d'autre sur les ports.
+3. **Mettre le Mac en DFU** (écran reste NOIR) :
+   - Éteindre : maintenir le bouton power (Touch ID) ~10 s jusqu'à extinction.
+   - Appuyer puis relâcher power ; **immédiatement** maintenir ensemble **Contrôle-gauche +
+     Option-gauche + Maj-DROITE + power** ~10 s.
+   - Relâcher tout **sauf power** ; garder **power** encore jusqu'à ~10 s.
+   - L'écran reste noir = DFU. (Vérif PC : `lsusb -d 05ac:` montre un appareil Apple.)
+4. **Cliquer le bouton** : `./pending/dfu_restore.sh` → taper `EFFACER-ET-RESTAURER`.
+   **NE RIEN DÉBRANCHER, garder sur secteur** jusqu'à la fin (une coupure peut bloquer le Mac).
+5. Le Mac reboote sur macOS 27.2.1 neuf → assistant de config (Apple ID requis).
+
+### Après le Restore (pour reprendre Touch ID)
+- Créer un compte, **ré-enrôler Touch ID** dans macOS → l'état scellé du SEP est de nouveau valide.
+- Puis **réinstaller Asahi/ALARM** (installateur Asahi) et remonter les données depuis la sauvegarde.
+- La reprise du projet (driver natif) repart de là, sur un SEP en état connu.
+
+### Si ça échoue / s'interrompt
+- Câble/hub = cause n°1 d'échec de détection DFU : câble USB-C data direct, sans hub.
+- Coupure pendant le restore → refaire la séquence DFU et relancer le bouton (le Mac n'est pas
+  perdu tant qu'on peut rentrer en DFU).
+- `idevicerestore` sur portable Apple Silicon depuis Linux : voie non documentée officiellement
+  (faite via SimpleMacRestore/marcan) → possible accroc ; ce n'est pas garanti « premier coup ».
 
 ---
 

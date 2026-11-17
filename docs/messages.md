@@ -9,7 +9,10 @@ Dans les colonnes « Vu » : `Lnnn` = numéro de ligne de `sep.log` de la trace 
 (log noyau macOS de la même capture). C1 = `traces/20261107-033436_c1-boot`. C3 = `traces/20261107-035930_c3-touchid`
 (rapport : `analysis/out/c3_report.md`, tentatives : `analysis/out/c3_lock_cycles.txt`).
 
-**Rien n'est `vérifié` dans ce fichier.** Les rôles supposés sont des interprétations de logs.
+**Rien n'est `vérifié` dans ce fichier, à deux exceptions près** (consolidation 2026-11-17, voir « SBIO (0x08) —
+carte opcode↔opération ») : le **format fil sbio** (`gt_packet_t`) et le **verdict de match 0x09**, marqués `vérifié`
+en **report** de `docs/verification_status.md` (décision du sceptique) — l'analyste ne verifie rien lui-même. Tout le
+reste reste `hypothèse`/`connu-doc` : les rôles supposés sont des interprétations de logs ou de kext.
 
 ## Contrôles de cohérence du découpage de bits (C1, 2026-11-07)
 
@@ -130,6 +133,67 @@ Note CNTL — vu sur les 9 endpoints : DATA(T3) = DATA(T2) + T4/0x1000 + 4, et D
 (0x14→0x1c→0x24→0x30→0x3c→0x48→0x54→0x5c→0x64→0x6c→0x74→0x80→0x8c→0x94→0x9c→0xb0→0xbc→0xc4, sans exception).
 Interprété : deux buffers OOL par endpoint, alloués à la suite en pages de 4 Kio avec 4 pages d'écart ; lequel est
 « entrée » ou « sortie » : inconnu. La base (page 0x14) n'est reliée à aucune adresse connue.
+
+### SBIO (0x08) — carte opcode↔opération + statut fil (consolidation 2026-11-17, analyste)
+
+Report dans `messages.md` de ce que `docs/verification_status.md` et `docs/kext_sepmanager.md` §13/§13b/§13c établissent
+pour l'EP 0x08, afin que le driver puisse **nommer et parser l'opcode de toute transaction sbio**. L'analyste ne passe rien
+en `vérifié` lui-même : les deux statuts `vérifié` ci-dessous reprennent une décision du sceptique
+(`verification_status.md`, lignes « Mot sbio GT », « En-tête OOL 0x1c o », « 0x09 réponse 0xca2 »).
+
+**Format fil — `vérifié` (contre capture c12).** Source : trace + kext §13b ; outil `analysis/sbio_gt_packet.py`.
+Une commande sbio = une transaction mailbox `type=0xfc` (PARAM=0, DATA=0) ; **l'opcode et la charge ne sont PAS dans le
+mot mailbox** mais dans le buffer OOL, qui commence par un en-tête `gt_packet_t` de 0x1c o :
+
+| offset | champ |
+|---|---|
+| +0x00 | `kind` = 1 |
+| +0x04 | longueur totale du transfert |
+| +0x08 | offset du fragment courant |
+| +0x0c | flags |
+| +0x10 | 0 (réservé) |
+| **+0x14** | **OPCODE** (0x09 match, 0x42 compteur…) |
+| +0x18 | longueur du fragment |
+| +0x1c | charge (payload de la commande) |
+
+Confirmé sur c12 (`traces/20261108-032454_c12-boot-ho`) : `+0x00=1` sur 14/14 buffers A ; fragmentation vérifiée (opcode
+0x5b, total 0xfc99, offsets 0→0x3fe4→0x7fc8→0xbfac) ; les opcodes lus à `+0x14` recoupent octet-à-octet la séquence
+d'init déjà `vérifiée`. → le sens « `+0x14` = opcode » est croisé sur la capture, plus seulement lu dans le kext.
+
+**Noms d'opérations — `hypothèse`, `source: kext`.** L'opcode `+0x14` est nommé d'après la fonction `sepTransact`
+appelante du kext Mesa (kext §12c). Carte des opérations pertinentes (noms = `hypothèse (source: kext)` ; le **format fil**
+qui les porte est, lui, `vérifié`) :
+
+| opcode (`+0x14`) | opération (nom kext) | recoupement trace |
+|---|---|---|
+| 0x09 | `handleMatch` — l'ordre de match (verdict **vérifié**, voir plus bas) | ✓ `<09` = match, 240-356 ms (C3/C8/C11) |
+| 0x08 | `handleEnrollment` | non vu (aucun enrôlement capturé) |
+| 0x03 | `commandStartEnroll` | ✓ `…70 03 21` (fin de séquence match) |
+| 0x06 | `forceNoMatch` | ✓ `23 06 65…` (début de tentative) |
+| 0x07 | `asyncCaptureHandler` | ✓ `…07 09…` |
+| 0x22 | `asyncCaptureHandler` | ✓ `…1f 22 70…` |
+| 0x15 | `performKeyExchange` | ✓ clé de session capteur (init) |
+| 0x1f | `cacheMatchPolicy` | ✓ `…09 1f 22…`, et init |
+| 0x42 | `initializeSequenceCounter` | ✓ compteur de séquence (init) |
+| 0x5d | `applySensorParams` | ✓ ordre 5d-5c-6a (init) |
+| 0x63 | `setCalibrationData` | ✓ à l'init |
+
+Les opcodes 0x03/0x06/0x07/0x09/0x1f/0x22 = exactement la sous-séquence de match `23 06 65 07 09 1f 22 70 03 21` déjà
+`vérifiée` en trace. Table complète des opcodes (0x01…0x7e) et détail des entrées/sorties : section « lecture du kext »
+ci-dessous et kext §12c/§12d.
+
+**Verdict de match — opcode 0x09 → `match_info_t`, 0xca2 o — `vérifié` (c6/c8/c11).** Source : trace + kext §13c. La réponse
+(buffer B) d'une transaction `0xfc` opcode 0x09 porte le verdict en tête :
+
+| charge +off | succès | échec |
+|---|---|---|
+| +0x00 (u32) | `0x1f5` (= 501, uid utilisateur macOS) | `0xffffffff` |
+| +0x04 (16 o) | identifiant du gabarit `fe6003d8cea5414fb48a0338dc7c371b` | zéros |
+
+Reproductible sur 3 captures doigt (c6, c8, c11), ~35 réponses 0x09 : tous les succès portent `0x1f5` + le même
+identifiant, tous les échecs `0xffffffff` + zéros, 0 faux positif. C'est le signal « doigt reconnu » que le driver Linux
+lira. Détail des ~3200 octets restants du `match_info_t` (métadonnées d'image/score, non décodés) : voir « Formats OOL »
+plus bas. `vérifié` = report de `verification_status.md` ligne « 0x09 réponse 0xca2 » (HE) ; décision du sceptique.
 
 ### SBIO (0x08) — lecture du kext (phase 2, **source: kext**, 2026-11-08)
 

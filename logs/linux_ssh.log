@@ -81,3 +81,9 @@
 2026-11-12 08:41:11 run: uname -r; uptime -p
 2026-11-12 08:41:23 run: uname -r; uptime -p
 2026-11-12 08:41:35 run: uname -r; uptime -p
+2026-11-13 00:48:46 run: uname -sr; uptime
+2026-11-13 00:49:02 run: uname -sr; uptime
+2026-11-13 00:49:18 run: uname -sr; uptime
+2026-11-13 00:49:34 run: uname -sr; uptime
+2026-11-13 00:49:50 run: uname -sr; uptime
+2026-11-16 00:42:36 run: echo ALARM_OK; uname -r; uptime -p; echo "--- disque racine:"; findmnt -no SOURCE / ; echo "--- Touch-ID/biometrickit côté Linux: (info)"; ls /dev/ttyACM* 2>/dev/null || true

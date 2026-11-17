@@ -188,3 +188,11 @@ Sources : journal 2026-11-12/13, docs/kext_sepmanager.md §9/§12c/§13/§14, do
   API AP pour le poser/semer**, aucune graine NVRAM (§9). → l'acceptation d'un `0x6d`/locker rejoué sous un autre boot n'est plus
   seulement « inconnue » mais **défavorable côté AP** (hypothèse kext ; réserve : ne couvre pas une graine interne ROM). ESSAI B n=2
   (journal 12/11) confirme : re-scellement reproductible, fraîcheur dans les blobs xART maîtres. **Ne pas relancer ESSAI B.**
+
+## Mise à jour 2026-11-17 (analyste) : carte opcode↔opération EP 0x08 intégrée à messages.md
+- `docs/messages.md` section « SBIO (0x08) — carte opcode↔opération + statut fil » consolide : **format fil `gt_packet_t`**
+  (`vérifié` contre c12, opcode à `+0x14`, outil `analysis/sbio_gt_packet.py`) et **verdict de match 0x09** (`vérifié` c6/c8/c11,
+  `+0x00`=0x1f5/−1). Noms d'opérations (`handleMatch`=0x09, `handleEnrollment`=0x08, `commandStartEnroll`=0x03, `forceNoMatch`=0x06,
+  `asyncCaptureHandler`=0x07/0x22, `performKeyExchange`=0x15, `cacheMatchPolicy`=0x1f, `initializeSequenceCounter`=0x42,
+  `applySensorParams`=0x5d, `setCalibrationData`=0x63) = `hypothèse (source: kext)`. → le driver peut **nommer et parser l'opcode de
+  toute transaction EP 0x08** (= `gt_packet_t.+0x14` du buffer A) à partir de messages nommés, format fil vérifié.

@@ -14,6 +14,52 @@ Format :
 
 ---
 
+## 2026-11-17 (soir) — Claude (Opus 4.8) + Albert — ✅ Proxy m1n1 ré-établi sans macOS 13.5 (backdoor csrutil + tools/catch_proxy.sh)
+- Trace : — (pas de capture ; mise en place du proxy). Mac EN PROXY à la fin.
+- Fait :
+  - **Touch ID ré-enrôlé** par Albert (macOS 27.2.1) → état scellé SEP valide et courant.
+  - **Backdoor Asahi activée** par Albert en recovery/1TR : `csrutil disable` sur **2 (alarm)** ET **3 (UEFI boot)**
+    (pas macOS), + `nvram boot-args=-v`. Les deux sont nécessaires. Diagnostic clé : sans la backdoor, les m1n1
+    installés (payload → ALARM) ne présentent **jamais** le proxy → échecs d'attrapage précédents expliqués.
+  - **Nouvel outil `tools/catch_proxy.sh`** (Claude) : attend les ports USB du m1n1 au boot, ouvre if02, chainloade
+    `m1n1/build/m1n1.bin`. Lancé en arrière-plan, Albert power-cycle → attrapé.
+- Vu (FAITS) : `Waiting for proxy connection... Connected!` ; m1n1 **v2.0.0-92-g7075** up ; ports
+  `usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00/if02` + `/dev/ttyACM0`/`ttyACM2` présents et stables.
+  Modèle confirmé par m1n1 : MacBookPro18,4 / J314c / Chip-ID 0x6001 / M1 Max. `Boot policy: sip0 = 127` (SIP désactivé).
+  - **Vérif lecture seule** (`SKIP_CHAINLOAD=1 ./tools/sep_peek.sh`, trace `20261117-220411_sep_peek_cleanchip`) :
+    `sep_reg0_base=0x396400000` ; `CPU_CONTROL=0x0 RUN=0` ; `A2I_CONTROL=0x00028801` et `I2A_CONTROL=0x00029901`
+    (les deux boîtes aux lettres `ENABLE=1`, `EMPTY=1` = au repos). Lien PC→m1n1→SEP OK de bout en bout sur la puce enrôlée.
+- Interprété : **le proxy m1n1 (et tout le travail SEP) ne dépend PAS de macOS 13.5** — preuve par l'expérience (ré-établi
+  sans 13.5). Le 13.5 ne servait qu'au tracing macOS sous hyperviseur (`run_guest.py`). Repère CLAUDE.md « 13.5 uniquement »
+  périmé (doc Asahi : invités supportés 13.5 ET 14.8.3). Résout probablement le « tu as mal compris la 13.5 » d'Albert.
+- Incidents : (1) `catch_proxy.sh` sort en exit 1 (chainload « Waiting for reconnection… » > M1N1TIMEOUT 3 s après ré-énum)
+  mais le proxy EST up — cosmétique, à corriger. (2) `pkill -f catch_proxy.sh` dans la commande de lancement en arrière-plan
+  se tue elle-même (self-match, exit 144) — ne plus le faire. Aucune écriture SEP ; aucune écriture disque.
+
+## 2026-11-17 — Claude (Opus 4.8) + Albert — Mac récupéré ; reprise du projet sur SEP propre ; perte de macOS 13.5 actée
+- Trace : — (aucun matériel ce jour ; récap d'état).
+- Fait : constat d'état à la reprise. Docs remises à niveau (handoff bandeau, RECUPERATION_MAC marqué RÉSOLU,
+  mémoire [[mac-boot-casse-recuperation]] enrichie de la conséquence stratégique).
+- Vu (rapporté par Albert) : **macOS 27.2.1 neuf ET ALARM réinstallé bootent tous les deux normalement**
+  (ALARM par image bloc `alarm_p5.img` + GRUB refabriqué ; fstab /efi corrigé par Albert). **SEP propre/neuf.**
+  **Perdu et non réinstallés** : partitions jetables **macOS 13.5** et **Fedora de test (10.0.200.4)**.
+  Décision d'Albert : « linux et macos sont bons … on continue sur 2 » = reprendre le projet Touch ID.
+- Interprété (conséquences, pas des faits neufs sur le SEP) :
+  - ⚠️ **À REPRENDRE AVEC ALBERT** : le 2026-11-17 il a dit « je crois pas que tu as compris ce qui s'est passé avec
+    la 13.5 », puis « continue en autonomie » sans détailler. Le point ci-dessous est donc **mon hypothèse NON validée**.
+  - **(hypothèse) Capture SEP sous macOS = close.** J'avais déduit : l'hyperviseur m1n1 (`run_guest.py`) ciblait macOS
+    **13.5** (README/CLAUDE.md), 13.5 ne serait plus signé → plus d'observation de macOS faisant Touch ID. À confirmer/
+    corriger avec Albert. Robuste quoi qu'il arrive : l'essentiel du protocole est déjà sorti par décompilation (sans Mac),
+    et la stratégie était déjà « driver natif + SEP propre ».
+  - **m1n1 proxy à refaire** : il vivait sur le volume 13.5 (install kmutil). ALARM boote via m1n1 (ESP) mais le mode
+    *proxy* nu (« Running proxy… », `sep_boot`/`sep_peek` sans macOS) reste à remonter avant toute reprise SEP matérielle.
+  - **Base inédite** : 1re fois qu'on pourrait essayer contre une puce **valide et à jour** (après ré-enrôlement Touch ID),
+    là où avant l'état SEP était cassé/invalide donc rien n'était *validable*.
+- Prochain (matériel, Albert, pas urgent) : ré-enrôler Touch ID (macOS 27.2.1) → revalide l'état scellé ; réinstaller
+  m1n1 proxy ; image disque avant toute écriture SEP. Offline (Claude, maintenant) : consolider le protocole sorti des
+  kexts (opcodes nommés sbio EP 0x08, archi SKS EP 0x12) dans messages.md/driver_plan.md, prêt pour le driver.
+- Incidents : aucun.
+
 ## 2026-11-13 — Claude (Opus 4.8) — Consolidation hors ligne : verification_status.md + driver_plan.md remis à niveau
 - Trace : — (aucun matériel ; Mac inchangé, à power-cycler avant tout SEP).
 - Fait : les deux docs « aval » étaient en retard sur la session décompilation (verification_status s'arrêtait au 11-11, driver_plan
@@ -1492,3 +1538,17 @@ Format :
   spi0/spi2/spi4, même désactivés. Mais ps_spi0..ps_spi4 existent dans le PMGR. Pas de pinctrl spi2/spi4. Pas de mesa.
 - Déduit (hypothèse) : pas de 0x4000 par contrôleur => spi2 = 0x39b108000, IRQ 1108. Rien en trace à ce jour. À lire dans l'ADT.
 - Détail et lignes : docs/public_linux_state.md, section « 2026-11-09 — SPI t6001 ».
+
+## 2026-11-17 — documentaliste — m1n1 proxy sans macOS 13.5 (doc publique)
+- Question : obtenir un m1n1 mode proxy après DFU Restore (Asahi réinstallé UEFI-only, m1n1 déjà sur l'ESP,
+  macOS 13.5 effacé, macOS 27.2.1 présent).
+- Sources (lues 2026-11-17) : asahilinux.org/docs tethered-boot, m1n1-user-guide, m1n1-hypervisor, platform/introduction.
+- Trouvé : le m1n1 dev est DÉJÀ installé (stage 2 = ESP `m1n1/boot.bin`). Voie recommandée = flag en recovery/1TR
+  `csrutil disable && nvram boot-args=-v` SUR le volume Asahi → m1n1 attend 5 s → l'hôte ouvre le 2e port série
+  (picocom-sec.sh) → proxy → `chainload.py -r build/m1n1.bin`. Plus besoin de kmutil ni de macOS 13.5.
+  L'étape recovery (outils Apple, boot policy) = Albert à la main (ligne rouge).
+- Voie Linux-only (remplacer `boot.bin` par un m1n1 sans payload → proxy auto) : plausible mais [déduit], non
+  documentée, et « toucher à m1n1 » = Albert aussi.
+- Changement de compréhension : la doc hyperviseur liste désormais macOS 14.8.3 (M1→M3) EN PLUS de 13.5 comme
+  invité supporté ; macOS 27.2.1 n'est PAS supporté comme invité. « 13.5 only » (CLAUDE.md/README) est à mettre à jour.
+- Détail et citations : docs/public_linux_state.md, section « 2026-11-17 — m1n1 proxy sans macOS 13.5 ».
