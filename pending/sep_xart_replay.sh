@@ -55,6 +55,28 @@
 #   Sinon -> le SEP vérifie plus que save(N)=fetch(N+1) ; la voie C est close, on le saura.
 #   Quel que soit le résultat : on n'envoie rien de plus, on coupe, Albert redémarre le Mac.
 #
+# MODE PROBE_SBIO (ESSAI D, 2026-11-17) — « sbio annoncé vs vivant », SANS DOIGT, UNE commande.
+#   PROBE_SBIO=1 FOLLOW=1 : après que FOLLOW a fait annoncer sbio (0x08), le script OUVRE l'EP 0x08
+#   (alloue/mappe/annonce A8+B8 de 0x4000, mécanique CNTL déjà éprouvée pour 0x13) puis envoie
+#   EXACTEMENT le 1er message que macOS adresse à sbio : la commande 0x73 `initSbioCommunication`
+#   (entrée = u32 constante 1), rejouée OCTET POUR OCTET depuis une capture (SBIO_A, défaut = le 0x73
+#   de c12). Il LIT ensuite le tampon B8 et écoute l'EP 0x08, SANS rien acquitter ni envoyer d'autre.
+#   BUT : trancher « sbio est-il seulement un nom annoncé, ou traite-t-il une commande ? » — la vraie
+#     question ouverte (docs/hypotheses.md « annoncé vs fonctionnel », HV3). C'est la 1re fois qu'on
+#     interroge sbio sur une puce PROPRE et Touch ID RÉ-ENRÔLÉ (avant, l'état SEP était cassé).
+#   RÉPONSE DE RÉFÉRENCE (macOS c12) : le SEP poste < EP=0x08 TAG=0x04 puis < TAG=0xfc TYPE=0x73, et
+#     écrit dans B un gt_packet avec +0x00=1 et +0x14=0x73. Verdict : même réponse => sbio VIVANT ;
+#     B nul + silence => simple nom. NE PROUVE PAS « Touch ID marche » (reste l'init capteur + un match).
+#   SÉCURITÉ : 0x73 = poignée de main, entrée constante, AUCUN doigt, AUCUN enrôlement, AUCUN secret.
+#     L'EP 0x08 n'est PAS dans les endpoints « écriture interdite » (0x12/0x13/0x10/0x15/gigalockers/
+#     IMG4) ; mais comme PROBE_SBIO implique FOLLOW (qui, lui, écrit sur 0x13), l'ensemble reste une
+#     ÉCRITURE SEP -> Albert relit et lance. Échec FERMÉ à chaque étape : si sbio n'est pas annoncé, si
+#     l'ouverture n'est pas acquittée, ou si SBIO_A n'est pas un 0x73 -> on n'envoie RIEN et on s'arrête.
+#     Une seule commande, jamais de 2e, jamais de réponse à ce que le SEP renvoie.
+#   Risque incrémental vs FOLLOW seul : faible. On ajoute 4 CNTL (ouverture d'un EP, comme à chaque boot)
+#     + 1 commande 0x73 bénigne. Au pire le SEP ignore/rejette -> sortie propre. Brick : même classe que
+#     FOLLOW (déjà lancé), pas au-dessus. Linux + données : AUCUN (aucune opération disque).
+#
 # PROCÉDURE (ordre impératif — voir docs/voie_c_design.md)
 #   1. Capturer S_new SANS redémarrer macOS ensuite :
 #        SEP_OOL_EPS=0x13 SEP_EPS=0x00,0x13 ./tools/boot_and_trace.sh snew-xart
@@ -108,10 +130,15 @@
 #   FOLLOW=1 ./pending/sep_xart_replay.sh <dossier_capture>   # ESSAI B (suivi) : rejoue puis
 #                 ACQUITTE les SAVE du SEP (ÉCRITURE : avance le re-scellement) et écoute si
 #                 `sks` (0x12) finit par être annoncé. Plus invasif qu'OBSERVE. Voir « MODE FOLLOW ».
+#   PROBE_SBIO=1 FOLLOW=1 ./pending/sep_xart_replay.sh <dossier_capture>  # ESSAI D : après que FOLLOW
+#                 a fait annoncer sbio, lui envoie UNE commande 0x73 (sans doigt) et lit la réponse,
+#                 pour trancher « annoncé vs vivant ». Voir « MODE PROBE_SBIO ». (ou pending/probe_sbio_go.sh)
 #   SELFTEST=1 ./pending/sep_xart_replay.sh <dossier_capture> # test hors-ligne, NE TOUCHE PAS le Mac
+#                 (PROBE_SBIO=1 SELFTEST=1 vérifie que le fichier 0x73 (SBIO_A) est bien un 0x73.)
 #   SKIP_CHAINLOAD=1 ...                                       # si un m1n1 frais tourne déjà
 #
-# PRÉPARÉ PAR : Claude (Opus 4.8), 2026-11-11 — à relire (sceptique + Albert) puis lancer par Albert.
+# PRÉPARÉ PAR : Claude (Opus 4.8), 2026-11-11 ; mode PROBE_SBIO ajouté 2026-11-17 — à relire
+#   (sceptique + Albert) puis lancer par Albert.
 # =============================================================================
 set -euo pipefail
 source "$(dirname "$0")/../tools/env.sh"
@@ -124,6 +151,12 @@ export SNEW M1N1_PROXYCLIENT="$M1N1_DIR/proxyclient"
 export SELFTEST="${SELFTEST:-0}"
 export OBSERVE="${OBSERVE:-1}"   # observation (lecture seule de B) activée par défaut ; OBSERVE=0 pour l'ancien comportement
 export FOLLOW="${FOLLOW:-0}"     # ESSAI B : acquitte les SAVE et suit le SEP (ÉCRITURE). Défaut 0. Prend le pas sur OBSERVE.
+export PROBE_SBIO="${PROBE_SBIO:-0}"  # ESSAI D : après que FOLLOW a fait annoncer sbio (0x08), envoie UNE commande
+                                 # 0x73 (initSbioCommunication, 1er message macOS) et lit la réponse. « annoncé vs vivant ».
+                                 # Exige FOLLOW=1. Voir en-tête « MODE PROBE_SBIO ».
+# Octets EXACTS du 1er 0x73 que macOS envoie à sbio (tampon A = gt_packet), rejoués tels quels (on
+# ne construit rien à la main). Capture de boot c12 (OOL de l'EP 0x08). Modifiable si besoin.
+export SBIO_A="${SBIO_A:-traces/20261108-032454_c12-boot-ho/sep.log.ool/000300_08_A.bin}"
 
 if [ "$SELFTEST" != 1 ]; then
   require_mac
@@ -143,6 +176,8 @@ import os, sys, re, time, struct, glob
 SELFTEST = os.environ["SELFTEST"] == "1"
 OBSERVE = os.environ["OBSERVE"] == "1"
 FOLLOW = os.environ.get("FOLLOW", "0") == "1"
+PROBE_SBIO = os.environ.get("PROBE_SBIO", "0") == "1"
+SBIO_A = os.environ.get("SBIO_A", "")
 SNEW = os.environ["SNEW"]
 sys.path.insert(0, os.environ["M1N1_PROXYCLIENT"])
 
@@ -206,6 +241,23 @@ if SELFTEST:
             extra = f"  [écrit A: {os.path.basename(a)} {sz}o]" if a else ""
             print(f"  envoyer  >  TAG=0x{tag:02x} TYPE=0x{typ:02x} PARAM=0x{param:02x} "
                   f"DATA=0x{data:08x}{extra}", flush=True)
+    if PROBE_SBIO:
+        if not FOLLOW:
+            print("SELFTEST PROBE_SBIO: ATTENTION — PROBE_SBIO exige FOLLOW=1 (il faut que sbio "
+                  "soit d'abord annoncé). Au lancement réel sans FOLLOW, la sonde sera ignorée.", flush=True)
+        if SBIO_A and os.path.exists(SBIO_A):
+            b = open(SBIO_A, "rb").read()
+            op = b[0x14] if len(b) > 0x14 else None
+            v0 = b[0x00] if b else None
+            print(f"  sonde sbio : rejouerait {os.path.basename(SBIO_A)} ({len(b)} o) dans le tampon A "
+                  f"de l'EP 0x08, gt_packet version=+0x00={v0} opcode=+0x14=0x{op:02x} "
+                  f"(attendu 0x73), puis > EP=0x08 TAG=0xfc TYPE=0x73 PARAM=0 DATA=0, puis LECTURE de B.",
+                  flush=True)
+            if op != 0x73:
+                print("  !! l'octet +0x14 n'est pas 0x73 : le fichier SBIO_A n'est pas un 0x73. Corriger SBIO_A.", flush=True)
+        else:
+            print(f"  sonde sbio : ERREUR — fichier SBIO_A introuvable : {SBIO_A!r}. "
+                  f"Donner un .bin de tampon A d'un 0x73 (ex. traces/…c12…/sep.log.ool/000300_08_A.bin).", flush=True)
     print("SELFTEST OK : séquence relue. (Rien envoyé au SEP.)", flush=True)
     sys.exit(0)
 
@@ -516,6 +568,102 @@ def observe_loop(seconds=20):
         print("--- bilan observation : AUCUN message 0x13 reçu pendant l'écoute "
               "(le SEP attend peut-être une réponse qu'on ne donne pas, ou s'est arrêté) ---", flush=True)
 
+def probe_sbio():
+    """ESSAI D — « sbio annoncé vs vivant », SANS DOIGT, UNE seule commande.
+    À n'appeler qu'après que FOLLOW a fait annoncer sbio (0x08). On fait EXACTEMENT ce que macOS
+    fait en 1er avec sbio (cf. docs/messages.md §SBIO) :
+      1. ouvrir l'EP 0x08 : allouer A8/B8 (0x4000 chacun, = c12), mapper dans le DART du SEP,
+         les ANNONCER par 4 CNTL (param=0x08) — même mécanique que pour 0x13, déjà éprouvée.
+      2. écrire dans A8 les octets EXACTS du 1er 0x73 (initSbioCommunication, entrée u32=1)
+         rejoués depuis la capture (SBIO_A) — on ne construit pas le gt_packet à la main.
+      3. envoyer > EP=0x08 TAG=0xfc TYPE=0x73 PARAM=0 DATA=0, puis LIRE B8 et écouter l'EP 0x08.
+    Réponse macOS de référence (c12) : le SEP poste < EP=0x08 TAG=0x04 puis < TAG=0xfc TYPE=0x73,
+    et écrit dans B8 un gt_packet avec +0x00=1 et +0x14=0x73 (écho de l'opcode). macOS N'ACQUITTE
+    RIEN ensuite ; nous non plus → on lit et on s'arrête. AUCUN doigt, AUCUN enrôlement, AUCUN secret.
+    VERDICT : B8[+0x00]==1 et B8[+0x14]==0x73 (ou un < TAG=0xfc TYPE=0x73 reçu) => sbio VIVANT ;
+    B8 nul et silence => sbio seulement ANNONCÉ (nom), pas fonctionnel. Échec FERMÉ partout."""
+    print("=== ESSAI D : sonde sbio (0x73, sans doigt, une seule commande) ===", flush=True)
+    if 0x08 not in sep.epnum2name:
+        print("  sbio (0x08) n'est PAS annoncé : rien à sonder. (PROBE_SBIO exige que FOLLOW ait "
+              "d'abord fait annoncer sbio.) On ne fait rien.", flush=True)
+        return
+    if not (SBIO_A and os.path.exists(SBIO_A)):
+        print(f"  ERREUR: fichier SBIO_A introuvable ({SBIO_A!r}). On n'envoie RIEN.", flush=True)
+        return
+    a_bytes = open(SBIO_A, "rb").read()
+    if len(a_bytes) <= 0x14 or a_bytes[0x14] != 0x73 or a_bytes[0] != 1:
+        print(f"  ERREUR: SBIO_A n'est pas un gt_packet 0x73 (+0x00={a_bytes[:1].hex()} "
+              f"+0x14={a_bytes[0x14:0x15].hex()}). On n'envoie RIEN.", flush=True)
+        return
+
+    # 1. ouvrir sbio : allouer + mapper + annoncer A8/B8 (0x4000). IOVA = celles de macOS pour sbio
+    #    (c12 : A=0x54000, B=0x5c000), distinctes des IOVA xART (0x2c000/0x38000) déjà mappées.
+    SZ8 = 0x4000
+    IOVA_A8, IOVA_B8 = 0x54000, 0x5c000
+    try:
+        phys_A8 = u.heap.memalign(0x4000, SZ8)
+        phys_B8 = u.heap.memalign(0x4000, SZ8)
+        iface.writemem(phys_A8, b"\x00" * SZ8)
+        iface.writemem(phys_B8, b"\x00" * SZ8)
+        p.dart_map(sep.dart_handle, IOVA_A8, phys_A8, SZ8)
+        p.dart_map(sep.dart_handle, IOVA_B8, phys_B8, SZ8)
+    except Exception as e:
+        print(f"  ERREUR à l'allocation/mapping des tampons sbio : {e}. On n'envoie RIEN de plus.", flush=True)
+        return
+    for label, typ, data in [("A8 taille", 0x04, SZ8), ("A8 adresse", 0x02, IOVA_A8 >> 12),
+                             ("B8 taille", 0x05, SZ8), ("B8 adresse", 0x03, IOVA_B8 >> 12)]:
+        if not cntl_send(typ, data, 0x08, label):
+            print(f"  le SEP n'a PAS acquitté le CNTL {label} (ouverture sbio) en 5 s. "
+                  f"-> sbio ne s'ouvre pas tard sous m1n1. On s'arrête, RIEN envoyé à l'EP 0x08.", flush=True)
+            return
+        print(f"  CNTL {label} (ouverture sbio) : acquitté", flush=True)
+
+    # 2. écrire le 0x73 dans A8 (octets exacts de la capture), puis 3. l'envoyer.
+    try:
+        sid_A8 = find_sid(IOVA_A8)
+        dart_write(sid_A8, IOVA_A8, a_bytes[:SZ8])
+    except Exception as e:
+        print(f"  ERREUR à l'écriture du 0x73 dans A8 : {e}. RIEN envoyé à l'EP 0x08.", flush=True)
+        return
+    print(f"  0x73 écrit dans A8 (depuis {os.path.basename(SBIO_A)}). Envoi de la commande...", flush=True)
+    sep.send_msg(SEPMessage(EP=0x08, TAG=0xfc, TYPE=0x73, PARAM=0x00, DATA=0x00000000))
+
+    # 4. écouter l'EP 0x08 ~6 s et lire B8. On N'ACQUITTE RIEN, on n'envoie pas de 2e commande.
+    got = []
+    t0 = time.time()
+    while time.time() - t0 < 6:
+        pump_ep0()
+        while sep.msgs[0x08]:
+            m = sep.msgs[0x08].popleft()
+            got.append((m.TAG, m.TYPE))
+            print(f"  SEP> EP=0x08 TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x} PARAM=0x{m.PARAM:02x} "
+                  f"DATA=0x{m.DATA:08x}", flush=True)
+        time.sleep(0.02)
+    try:
+        b8 = iface.readmem(phys_B8, SZ8)
+    except Exception as e:
+        b8 = b""
+        print(f"  (lecture de B8 impossible : {e})", flush=True)
+    nz = sum(1 for x in b8 if x)
+    if b8 and os.environ.get("OUT"):
+        try:
+            with open(os.path.join(os.environ["OUT"], "sbio_probe_B.bin"), "wb") as f:
+                f.write(b8)
+        except Exception:
+            pass
+    b_ok = len(b8) > 0x14 and b8[0] == 1 and b8[0x14] == 0x73
+    msg_ok = any(typ == 0x73 for _, typ in got) or any(tag == 0x04 for tag, _ in got)
+    print(f"  B8 : {nz} octets non nuls ; tête={b8[:0x20].hex() if b8 else '—'}", flush=True)
+    if b_ok or msg_ok:
+        print(">>> ESSAI D : sbio a RÉPONDU au 0x73 (gt_packet B8 +0x14=0x73 et/ou message EP 0x08). "
+              "sbio est VIVANT sous m1n1, pas seulement annoncé. Résultat majeur — à reproduire (n>=3) "
+              "et à comparer à la réponse macOS c12 (B +0x00=1, +0x14=0x73). NE PAS conclure 'Touch ID "
+              "marche' : il reste toute la séquence d'init (clé capteur, etc.) puis un vrai match.", flush=True)
+    else:
+        print(">>> ESSAI D : AUCUNE réponse au 0x73 (B8 nul, aucun message EP 0x08). sbio est ANNONCÉ "
+              "mais ne traite pas la 1re commande ici -> 'nom seulement'. Pistes : l'ouverture tardive de "
+              "sbio sous m1n1 ne suffit pas, ou l'état restauré ne rend pas sbio fonctionnel. -> hypotheses.md.", flush=True)
+
 # ---------------------------------------------------------------------------
 # 4. REJEU : on suit la séquence enregistrée. Pour chaque 'recv' on attend une
 #    requête du SEP ; pour chaque 'send' on écrit le locker dans A (si la capture
@@ -634,6 +782,13 @@ if FOLLOW:
               "un FETCH-locker (0x05) non servi, le verrou est 'le SEP réclame un gigalocker qu'on "
               "ne lui fournit pas' (étape suivante = servir ce locker depuis la capture). S'il s'est "
               "tu sans FETCH, c'est autre chose. -> docs/hypotheses.md.", flush=True)
+
+# ESSAI D (PROBE_SBIO) : une fois sbio annoncé par FOLLOW, lui poser UNE question (0x73) sans doigt.
+if PROBE_SBIO:
+    if not FOLLOW:
+        print(">>> PROBE_SBIO ignoré : il exige FOLLOW=1 (sbio doit d'abord être annoncé).", flush=True)
+    else:
+        probe_sbio()
 PY
 
 # Logs d'une écriture SEP en lecture seule (policy « traces/ en lecture seule après capture »).

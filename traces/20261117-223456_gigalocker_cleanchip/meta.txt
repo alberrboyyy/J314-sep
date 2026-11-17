@@ -1,0 +1,6 @@
+date: 20261117-223456
+name: gigalocker_cleanchip
+m1n1_commit: 70757dc7
+proxy_port: /dev/serial/by-id/usb-Asahi_Linux_m1n1_uartproxy_v2.0.0-92-g7075_WHFWP7FYXF-if00
+chainload: non
+op: ProxyUtils.get_gigalocker (lecture seule, APFS role xART)

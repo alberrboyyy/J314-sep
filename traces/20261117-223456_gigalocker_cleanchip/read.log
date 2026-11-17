@@ -1,0 +1,8 @@
+TTY> Heap limit: 0x1000f578000 (128 MiB)
+lecture du gigalocker (APFS role xART, lecture seule)...
+TTY> nvme: ANS is on die 0
+TTY> sart: SARTv3 /arm-io/sart-ans at 0x393c50000
+TTY> rtkit(nvme): booting with version 12
+TTY> rtkit(nvme): unknown system endpoint 0x0a
+TTY> nvme: initialized at 0x393cc0000
+Aucune donnée renvoyée (volume xART introuvable, ou fichier gigalocker absent).

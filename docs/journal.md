@@ -14,6 +14,57 @@ Format :
 
 ---
 
+## 2026-11-17 (nuit) — Claude (Opus 4.8) — Lire le coffre (gigalocker) sur le DISQUE sans macOS : outils OK, mais pas trouvé sur la puce réparée
+- Trace : `traces/20261117-223*_gigalocker_cleanchip` (vide), `…_gpt` (table de partitions). Proxy m1n1 up, lecture seule.
+- Contexte : le vieux coffre (snew-reel, 11/11) ne colle plus à la puce réparée (DFU 16/11) ; on ne peut plus capturer via
+  l'hyperviseur (13.5 perdu). Albert a choisi : **chercher à LIRE le coffre directement** là où macOS le range, sans réinstaller.
+- Fait (hors ligne + lectures seules via tools/) :
+  - Découvert (déjà dans `public_linux_state.md` §D) que **m1n1 sait lire le coffre sur disque sans macOS** :
+    `ProxyUtils.get_gigalocker()` (op proxy `P_READ_GIGALOCKER=0x1400`, `rust_read_gigalocker` dans m1n1/rust/src/apfs.rs).
+    **100 % lecture** (vérifié : apfs.rs n'a que des `pread`, 0 `pwrite`). Ne touche NI SEP NI macOS NI table de partitions.
+  - Écrit 3 outils lecture-seule (dans tools/, **rien dans m1n1/**) : `read_gigalocker.sh`, `dump_gpt.sh`, `apfs_magic.sh`.
+- Vu (FAITS, lectures seules sur la puce actuelle) :
+  - `get_gigalocker` → **AUCUNE donnée** (« volume xART introuvable »). Le NVMe s'initialise et lit bien (pas un pb de lien).
+  - GPT (`dump_gpt.sh`) : 8 partitions. #0 `69646961-…` «iBootSystemContainer» (0,5 Go), #1 `7c3457ef` «Container» macOS (84 Go),
+    #2 APFS (2,5 Go), #3 EFI, #4 Linux (401 Go), #5 APFS (2,5 Go), #6 EFI, #7 RecoveryOSContainer. **Un seul** conteneur `69646961`.
+  - `scan_disks` de m1n1 ne scanne que la **1re** partition de GUID `69646961` (= #0) et n'essaie pas les autres conteneurs.
+  - APFS (`apfs_magic.sh`) : tous les conteneurs = **NXSB standard, INCOMPAT=0x2 (APFS v2), block 4096** → **pas** un format trop récent.
+- Interprété (HYPOTHÈSE) : le parseur public lit bien ces conteneurs (format standard) ; donc s'il ne trouve pas de volume de rôle
+  xART dans #0, c'est que **le volume xART n'est pas dans #0 sur ce disque** (ailleurs, non scanné par m1n1), **ou pas encore créé**.
+  Sur un Mac « normal » où `get_gigalocker` marche, le xART est dans le conteneur `69646961`. Pourquoi pas ici : à trancher.
+- PROCHAIN PAS (read-only, sans risque) : **énumérer les volumes APFS** (rôle) de chaque conteneur (marche d'omap B-tree, portage
+  Python de `apfs.rs`) pour localiser le volume de rôle xART (0x100), puis lire son gigalocker. Si introuvable partout → le coffre
+  n'est pas (encore) matérialisé sur ce disque, et « lire le coffre » bute ici.
+- RÉSERVE de fond inchangée : même avec le coffre lu, l'anti-rejeu (nonce interne SEP) peut refuser le rejeu ; lire le coffre sert
+  surtout à avoir un coffre QUI COLLE (pour servir les FETCH gigalocker / tester « sbio vivant »), pas à prouver le rejeu.
+- Incidents : un appel python-m1n1 direct (hors tools/) refusé par le classifieur (règle « hardware uniquement via tools/*.sh ») →
+  rangé en `tools/apfs_magic.sh`. Aucune écriture nulle part.
+
+## 2026-11-17 (nuit) — Claude (Opus 4.8) — ESSAI D préparé : sonde sbio « annoncé vs vivant » (mode PROBE_SBIO, pending/, à lancer par Albert)
+- Trace : — (préparation ; aucune action hardware). Proxy m1n1 up (puce propre, Touch ID ré-enrôlé).
+- Contexte : Albert a choisi « prépare l'essai » (réveiller la partie empreinte + lui poser une question
+  inoffensive). C'est le PROCHAIN PAS (iii) déjà identifié dans hypotheses.md (« une fois sbio/sks annoncé,
+  tester une lecture côté sbio pour annoncé-vs-vivant, script pending/, Albert »). 1re fois sur une puce VALIDE.
+- Fait (hors ligne, rien lancé) :
+  - Ajout du mode **`PROBE_SBIO=1` (exige FOLLOW=1)** à `pending/sep_xart_replay.sh` (v3.1 → +essai D) et
+    lanceur court `pending/probe_sbio_go.sh`. Après que FOLLOW a fait annoncer sbio (0x08), le script ouvre
+    l'EP 0x08 (alloue/mappe/annonce A8+B8 de 0x4000 par CNTL param=0x08, mécanique déjà éprouvée pour 0x13),
+    écrit dans A8 les **octets EXACTS** du 1er `0x73` `initSbioCommunication` (rejoués depuis c12
+    `000300_08_A.bin`, pas construits), envoie `> EP=0x08 TAG=0xfc TYPE=0x73`, lit B8 ~6 s, **n'acquitte rien,
+    une seule commande, sans doigt**. Échec FERMÉ partout (sbio non annoncé / CNTL non acquitté / SBIO_A pas un
+    0x73 → rien envoyé).
+  - **Protocole complet avant de coder** (règle CLAUDE.md) : wire ancré octet-à-octet dans c12 — ouverture sbio
+    (sep.log L126-135), `0x73` (L318), réponse SEP de référence `< TAG=0x04` puis `< TAG=0xfc TYPE=0x73`, B
+    (000301_08_B.bin) = +0x00=1, +0x14=0x73. Verdict du script = B8[+0x00]==1 & B8[+0x14]==0x73, ou message EP 0x08.
+  - Vérifs : `bash -n` OK ; Python embarqué (617 l.) `py_compile` OK ; SELFTEST PROBE_SBIO OK (valide que SBIO_A
+    est bien un 0x73). Bug corrigé avant commit : `OUT` utilisé comme variable Python au lieu de `os.environ["OUT"]`
+    (NameError sur un chemin non couvert par SELFTEST).
+  - Relecture **sceptique** lancée (sous-agent) sur le seul mode PROBE_SBIO.
+- Inconnu assumé (dit dans l'en-tête et la sortie) : le stream/IOVA DART que la GT de sbio lit sous m1n1 (on a mis
+  les valeurs macOS 0x54000/0x5c000) ; si le SEP ne lit pas A8 là → silence = faux négatif possible (même classe
+  d'inconnu que pour xART). Et « sbio vivant » ≠ « Touch ID marche » (reste l'init capteur + un vrai match).
+- Incidents : aucun. **Rien lancé vers le Mac** — Albert relit + lance (`! ./pending/probe_sbio_go.sh`), de préférence après une sauvegarde ; récup si ça rate = power-cycle, au pire DFU Restore depuis le PC (déjà éprouvé).
+
 ## 2026-11-17 (soir) — Claude (Opus 4.8) + Albert — ✅ Proxy m1n1 ré-établi sans macOS 13.5 (backdoor csrutil + tools/catch_proxy.sh)
 - Trace : — (pas de capture ; mise en place du proxy). Mac EN PROXY à la fin.
 - Fait :

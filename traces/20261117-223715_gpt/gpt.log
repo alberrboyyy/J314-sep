@@ -1,0 +1,12 @@
+TTY> Heap limit: 0x1000f5ac000 (128 MiB)
+TTY> nvme: already initialized
+GPT OK : 128 entrées max de 128 o à partir du LBA 2 (BS=4096)
+  # 0 69646961-6700-11aa-aa11-00306543ecac  LBA 6..128005 (~0.5 Go)  « iBootSystemContainer »
+  # 1 7c3457ef-0000-11aa-aa11-00306543ecac  <-- APFS  LBA 128006..20725509 (~84.4 Go)  « Container »
+  # 2 7c3457ef-0000-11aa-aa11-00306543ecac  <-- APFS  LBA 20725510..21335813 (~2.5 Go)  «  »
+  # 3 c12a7328-f81f-11d2-ba4b-00a0c93ec93b  LBA 21335814..21457925 (~0.5 Go)  «  »
+  # 4 0fc63daf-8483-4772-8e79-3d69d8477de4  LBA 21457926..119516698 (~401.6 Go)  «  »
+  # 5 7c3457ef-0000-11aa-aa11-00306543ecac  <-- APFS  LBA 119516699..120127002 (~2.5 Go)  «  »
+  # 6 c12a7328-f81f-11d2-ba4b-00a0c93ec93b  LBA 120127003..120249114 (~0.5 Go)  «  »
+  # 7 52637672-7900-11aa-aa11-00306543ecac  LBA 120827419..122138127 (~5.4 Go)  « RecoveryOSContainer »
+8 partitions. Les '<-- APFS' sont les conteneurs ; get_gigalocker ne lit QUE le 1er.
