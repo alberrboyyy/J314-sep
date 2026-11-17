@@ -93,10 +93,26 @@ Donc pour **rendre le coffre actuel** à une puce démarrée par m1n1, il faut, 
 - op **0x05** → lire l'UUID (16 o) en B, trouver le slot `.gl` d'UUID égal (+0x02), écrire sa **charge** (+0x22) en A ;
 - op **0x06** (SAVE) → à décider (acquitter = laisser la puce avancer son état ; c'est l'écriture risquée).
 
-Reste à fixer AVANT de coder (règle « protocole complet avant de répondre ») : l'**en-tête exact** éventuel autour de la
-charge dans A (offset, longueur, CRC ré-émis), et le **code de réponse** (octet 2) + PARAM/DATA à renvoyer — à relire sur les
-`.bin` A de snew-reel (seq 92/94/96) et kext §8. Le mode `FOLLOW` de `pending/sep_xart_replay.sh` fournit déjà l'ossature
-(boucle de réponse EP 0x13) ; le nouveau mode remplacerait « rejouer l'OOL enregistré » par « servir depuis le `.gl` ».
+### Format de la réponse FETCH — DÉCODÉ (VU, corrélation sur c24)
+
+Message de réponse AP→SEP : `> EP=0x13 TAG=<même que la requête> TYPE=0x00 PARAM=<lo> DATA=<...>`.
+- **Longueur totale écrite dans A** = `PARAM | (DATA[octet0] << 8)` (halfword « octets 3-4 » du kext §8). Vérifié :
+  maître SEP `PARAM=0x64 DATA0=0x03` → 0x364 = 0x11+0x353 (payload) ; maître USER `0x14/0x08` → 0x814 = 0x11+0x803 ;
+  gigalocker `0x0c/0x0c` → 0xc0c. **Le driver doit donc RECALCULER PARAM/DATA0 depuis la taille du blob servi** (on ne
+  peut pas rejouer la valeur capturée : le blob diffère).
+- `DATA[octet1]` = **sélecteur SEP/USER** (bit 0), à **ré-émettre** tel que reçu dans la requête. `DATA[octet2,3]` = 0.
+- Le **CRC** n'est PAS dans le message : il est **dans le blob** (le `.gl` le porte à +0x16) ; le SEP le revérifie en interne.
+
+### Point ENCORE ouvert (bloquant pour un code byte-correct) : l'en-tête du tampon A
+- **Maître (op 0x00)** : A = `[0x11 octets]` (16 nuls + 1 octet nul observé) **puis** la charge (payload à +0x11). VU : seq94/96.
+- **Gigalocker (op 0x05)** : A observé commence **directement à l'offset 0** par la charge (seq133 : `e2fa4b48…`, **pas** l'UUID,
+  **pas** 16 nuls). VU.
+- → **Incohérence non résolue** : maître préfixé de 0x11, gigalocker non. Et l'appariement exact « quel UUID (tampon B) ↔ quelle
+  réponse A » est brouillé par la réutilisation des tampons (`changed=none`). **On ne peut pas lever ça sur les captures
+  pré-DFU** (contenu d'une autre puce) **ni capturer la puce actuelle** (hyperviseur = 13.5, perdu). C'est le seul octet-près
+  qui manque pour écrire un service **garanti** correct. Un mode « servir » codé sur la meilleure hypothèse resterait **sûr**
+  (échec FERMÉ sur SAVE : si le SEP rejette un blob mal emballé, il émet un SAVE → on s'arrête sans acquitter → compteur non
+  avancé, pas de brick), mais un emballage faux = **essai non concluant** (un power-cycle d'Albert « gâché »).
 
 ## La vraie question que ça permet enfin de tester (honnête)
 - L'essai FOLLOW d'avant (puce **d'avant** le DFU, coffre **périmé**) : après les 2 maîtres, le SEP **re-scellait** (op 0x01)
