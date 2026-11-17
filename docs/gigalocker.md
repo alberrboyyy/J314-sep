@@ -73,9 +73,37 @@ Credential Manager = étiquette 8624497a » ; « SEP-xART + Credential Manager v
   dans le **maître SEP-xART (type 0x02, slot 6)** — c'est le candidat à surveiller. Lire le coffre **ne prouve pas** que le
   rejeu passe ; ça donne un coffre **qui colle** pour enfin tester proprement.
 
-## À faire ensuite (préparation d'un essai lancé par Albert)
-- Étendre `pending/sep_xart_replay.sh` (ou un nouveau mode) pour **servir les FETCH depuis ce `.gl`** : à chaque op 0x05
-  (FETCH gigalocker, UUID lu en tampon B) et op 0x00 (FETCH maître), répondre avec la charge du slot correspondant, au lieu
-  de rejouer un OOL périmé. Écriture SEP → script `pending/`, **lancé par Albert**.
-- Reste à cadrer avant de coder (règle « protocole complet avant de répondre ») : format EXACT de la réponse FETCH (en-tête
-  tampon A, où va la charge, l'UUID est-il ré-émis), lu depuis une capture macOS + `kext_sepmanager.md §8`.
+## Protocole de service des FETCH (VU dans la capture snew-reel + kext §8)
+
+Séquence d'un boot (capture `snew-reel`, EP 0x13), chaque requête SEP `<` suivie de la réponse AP `>` de même TAG :
+
+| le SEP demande (`<`) | op | l'AP répond (`>`) — ce qu'il écrit dans A |
+|---|---|---|
+| TAG 0x02 TYPE **0x0e** | état fw-boot | A vide, réponse (acquittement) |
+| TAG 0x01 TYPE **0x13** | UUID d'OS | **16 o d'UUID d'OS** écrits en A@0 (= `apfs-preboot-uuid`) |
+| TAG 0x03 TYPE **0x00** | FETCH maître (bit SEP/USER) | **blob maître** écrit en A@0 (ici ~847 o = SEP-xART) |
+| TAG 0x04 TYPE **0x00** | FETCH maître (l'autre) | **blob maître** écrit en A@0 (USER-xART) |
+| — | — | *puis le SEP annonce sbio/skdl/sse/sks/scrd (TYPE 0x1d)* |
+| TAG 0x05 TYPE **0x05** PARAM 0x10 | FETCH gigalocker | **UUID 16 o lu en B** → **locker** écrit en A ; réponse |
+
+Donc pour **rendre le coffre actuel** à une puce démarrée par m1n1, il faut, à chaque requête :
+- op **0x0e** → acquitter (comme aujourd'hui) ;
+- op **0x13** → écrire l'UUID d'OS (16 o) en A ;
+- op **0x00** → écrire le **maître** du `.gl` : slot 6 (SEP-xART) si bit SEP, slot 9 (USER-xART) si bit USER (octet 5 bit 0) ;
+- op **0x05** → lire l'UUID (16 o) en B, trouver le slot `.gl` d'UUID égal (+0x02), écrire sa **charge** (+0x22) en A ;
+- op **0x06** (SAVE) → à décider (acquitter = laisser la puce avancer son état ; c'est l'écriture risquée).
+
+Reste à fixer AVANT de coder (règle « protocole complet avant de répondre ») : l'**en-tête exact** éventuel autour de la
+charge dans A (offset, longueur, CRC ré-émis), et le **code de réponse** (octet 2) + PARAM/DATA à renvoyer — à relire sur les
+`.bin` A de snew-reel (seq 92/94/96) et kext §8. Le mode `FOLLOW` de `pending/sep_xart_replay.sh` fournit déjà l'ossature
+(boucle de réponse EP 0x13) ; le nouveau mode remplacerait « rejouer l'OOL enregistré » par « servir depuis le `.gl` ».
+
+## La vraie question que ça permet enfin de tester (honnête)
+- L'essai FOLLOW d'avant (puce **d'avant** le DFU, coffre **périmé**) : après les 2 maîtres, le SEP **re-scellait** (op 0x01)
+  au lieu de réclamer les gigalockers (op 0x05). Lecture (`hypotheses.md` HV1-B) : l'état rendu n'était **pas jugé courant**.
+- Un anti-rejeu classique protège contre le **rollback** (rendre un **vieux** état), pas contre rendre le **dernier** état.
+  Ce `.gl` est, lui, le **dernier état sauvé** de la puce actuelle. **SI** le compteur/nonce interne du SEP n'a pas avancé
+  depuis cette sauvegarde (pas de SAVE SEP entre-temps), le servir **pourrait être accepté** → le SEP irait au bout
+  (FETCH gigalockers, sbio **fonctionnel**). **SI** le nonce est régénéré à chaque boot et lié à `pnon` (0x15), même le
+  dernier état serait périmé au boot suivant → refus. **C'est précisément ce qui n'a jamais été testé** (on n'avait jamais
+  de coffre qui colle). Première fois possible. `hypothèse`, à trancher par l'essai (écriture SEP → `pending/`, Albert, image disque).
