@@ -33,8 +33,13 @@ Format :
     avant le 0x73 (faux positif), honnêteté IOVA/stream DART dans le verdict négatif, TypeError SELFTEST.
   - Vérifs : `bash -n` OK, `py_compile` OK (763 l.), SELFTEST SERVE_GL montre 2 maîtres (SEP-xART 0x352, USER-xART 0x540) +
     10 gigalockers + UUID d'OS 16 o.
-  - Relecture **sceptique** du mode SERVE_GL lancée (sous-agent).
-- PROCHAIN PAS : relecture sceptique → Albert fait une sauvegarde (idéal) → lance `! ./pending/serve_gl_go.sh`. Si la puce
+  - Relecture **sceptique** du mode SERVE_GL : **sûreté CONFIRMÉE** — aucun chemin n'acquitte un SAVE ni n'avance le
+    compteur scellé, fail-closed réel, pas de brick, aucun endpoint interdit hors 0x13 (cible)/0x08 (autorisé). 4 corrections
+    appliquées : (1) la branche SAVE + le résumé disent qu'un SAVE **ne tranche pas** (emballage faux = non concluant VS vrai
+    refus) ; (2) verdict dédié SERVE_GL (l'ancien imprimait « 0 rejoués / divergence 0/N », absurde) ; (3) liste d'hypothèses
+    complétée (d valeurs fixes 0x0e/0x13, e UUID lu à l'offset 0 de B, f pas de sélecteur gigalocker) ; (4) garde pré-boot
+    GL_FILE/GL_OS_UUID (meurt proprement sans toucher le Mac si coffre absent/UUID invalide). Re-vérif bash/py/SELFTEST OK.
+- PROCHAIN PAS : Albert fait une sauvegarde (idéal) → lance `! ./pending/serve_gl_go.sh`. Si la puce
   accepte et sbio répond au 0x73 → biométrie fonctionnelle sous Linux (1re fois). Si SAVE/rejet → non concluant, on affine
   l'emballage (le log dira où ça diverge). **Rien lancé par l'agent.**
 - Incidents : aucun.

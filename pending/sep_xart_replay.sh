@@ -91,8 +91,12 @@
 #     gigalocker non présent dans le coffre → STOP (on ne fabrique rien). Échec FERMÉ partout.
 #   HYPOTHÈSES non vérifiables sans capture de CETTE puce (hyperviseur 13.5 perdu) — cf. docs/gigalocker.md
 #     « Point ENCORE ouvert » : (a) charge fil = charge .gl (+0x22) à l'octet près ; (b) préfixe maître =
-#     0x11 octets nuls ; (c) ordre d'octets de l'UUID d'OS. Si une est fausse → essai non concluant (un
-#     power-cycle « gâché »), PAS un brick. Vérifier d'abord en SELFTEST=1 (montre ce qui serait servi).
+#     0x11 octets nuls ; (c) ordre d'octets de l'UUID d'OS ; (d) valeurs FIXES des réponses op 0x0e
+#     (DATA=0x100) et op 0x13 (DATA=0), copiées d'une capture (si elles dépendent du contenu → fausses) ;
+#     (e) l'UUID du gigalocker se lit à l'OFFSET 0 du tampon B (l'appariement A/B était « brouillé » en
+#     capture) ; (f) la réponse gigalocker n'émet aucun sélecteur (DATA octet1=0). Si une est fausse →
+#     le SEP diverge → SAVE/op inconnue → STOP (échec FERMÉ) → essai non concluant (un power-cycle
+#     « gâché »), PAS un brick. Vérifier d'abord en SELFTEST=1 (montre ce qui serait servi).
 #   Combiner : SERVE_GL=1 PROBE_SBIO=1 (sert le coffre, puis si sbio annoncé, lui envoie le 0x73).
 #
 # PROCÉDURE (ordre impératif — voir docs/voie_c_design.md)
@@ -186,6 +190,14 @@ export SERVE_GL="${SERVE_GL:-0}"
 export GL_FILE="${GL_FILE:-traces/20261117-224724_xart_read/xart__74980DEE-AD6A-5674-B233-B7E10A7FD0CB.gl.bin}"
 # UUID d'OS = nom du fichier .gl (apfs-preboot-uuid), servi à l'op 0x13. Modifiable si le .gl change.
 export GL_OS_UUID="${GL_OS_UUID:-74980DEEAD6A5674B233B7E10A7FD0CB}"
+
+# Garde pré-boot SERVE_GL : vérifier le coffre AVANT de démarrer le SEP (sinon on gâche un power-cycle
+# à planter dans _load_gl après le boot). Reflète les checks du SELFTEST.
+if [ "$SERVE_GL" = 1 ] && [ "$SELFTEST" != 1 ]; then
+  [ -f "$GL_FILE" ] || die "SERVE_GL : coffre introuvable : $GL_FILE (lancer tools/read_xart.sh)"
+  [ "${#GL_OS_UUID}" = 32 ] && printf '%s' "$GL_OS_UUID" | grep -qiE '^[0-9a-f]{32}$' \
+    || die "SERVE_GL : GL_OS_UUID doit être 32 hexa (16 o) : '$GL_OS_UUID'"
+fi
 
 if [ "$SELFTEST" != 1 ]; then
   require_mac
@@ -523,8 +535,9 @@ def write_A_bytes(data):
 #   Réponse : TAG=celui de la requête, TYPE=0x00, PARAM=len&0xff, DATA=((len>>8)&0xff)|(selecteur<<8).
 #   >>> HYPOTHÈSES non vérifiables sans capture de CETTE puce (docs/gigalocker.md) : (a) charge fil =
 #       charge .gl (+0x22) à l'octet près ; (b) préfixe maître = exactement 0x11 octets nuls ; (c) ordre
-#       d'octets de l'UUID d'OS. Si FAUX -> le SEP rejette -> SAVE -> on S'ARRÊTE (échec FERMÉ, pas de brick),
-#       essai non concluant. On N'ACQUITTE JAMAIS un SAVE ici (ne pas avancer le compteur scellé).
+#       d'octets de l'UUID d'OS ; (d) valeurs fixes des réponses 0x0e/0x13 ; (e) UUID gigalocker lu à
+#       l'offset 0 de B ; (f) réponse gigalocker sans sélecteur. Si FAUX -> le SEP rejette -> SAVE -> on
+#       S'ARRÊTE (échec FERMÉ, pas de brick), essai non concluant. On N'ACQUITTE JAMAIS un SAVE ici.
 def _load_gl():
     data = open(GL_FILE, "rb").read()
     SLOT = 0x9000
@@ -595,10 +608,16 @@ def serve_from_gl(idle_timeout=20):
         elif op == 0x07:  # locker-absent -> acquittement bénin (comme macOS)
             sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=m.DATA & 0xffffff00))
             print(f"  SEP> locker-absent (0x07) TAG=0x{m.TAG:02x} -> acquitté", flush=True)
-        elif op in (0x01, 0x06):  # SAVE -> le SEP REJETTE/re-scelle : échec FERMÉ, on N'ACQUITTE PAS
+        elif op in (0x01, 0x06):  # SAVE -> le SEP veut re-sceller : échec FERMÉ, on N'ACQUITTE PAS
             nz, sha, head = read_B(dump=True, tag=m.TAG, typ=op)
-            print(f"  SEP> SAVE (0x{op:02x}) TAG=0x{m.TAG:02x} : le SEP veut re-sceller (= coffre rejeté). "
-                  f"ON S'ARRÊTE SANS ACQUITTER (compteur non avancé). B: nz={nz} head={head}", flush=True)
+            print(f"  SEP> SAVE (0x{op:02x}) TAG=0x{m.TAG:02x} : le SEP veut re-sceller. ON S'ARRÊTE SANS "
+                  f"ACQUITTER (compteur non avancé, pas de brick). B: nz={nz} head={head}", flush=True)
+            print(f"      >>> CE SAVE NE TRANCHE PAS : il peut venir (1) d'un EMBALLAGE FAUX de notre part "
+                  f"(préfixe maître, octet-près de la charge, UUID lu au mauvais offset de B, valeurs fixes "
+                  f"0x0e/0x13) -> essai NON CONCLUANT, voie C TOUJOURS OUVERTE ; OU (2) d'un vrai refus "
+                  f"anti-rejeu -> voie C fermée. On ne peut PAS distinguer ici. NE PAS conclure 'voie C fermée' "
+                  f"sur ce seul SAVE. Regarder à QUELLE transaction ça diverge (ci-dessus) pour corriger l'emballage.",
+                  flush=True)
             return served, False
         else:
             print(f"  SEP> op inconnue 0x{op:02x} TAG=0x{m.TAG:02x} -> STOP (rien envoyé).", flush=True)
@@ -844,7 +863,7 @@ diverged = False       # le SEP a-t-il divergé de la capture ?
 if SERVE_GL:
     served, ok = serve_from_gl()
     print(f"--- service du coffre terminé : {served} ; "
-          f"{'pas de rejet détecté' if ok else 'ARRÊT (rejet/SAVE ou locker absent)'} ---", flush=True)
+          f"{'pas de SAVE/arrêt détecté' if ok else 'ARRÊT sur SAVE/locker-absent/inconnu (voir ci-dessus : ne TRANCHE PAS entre emballage faux = non concluant et vrai refus anti-rejeu)'} ---", flush=True)
 else:
     print("--- début du rejeu EP 0x13 ---", flush=True)
 saves_acked = 0        # ESSAI B : nb d'ops ACKABLE acquittées pendant le rejeu (borné)
@@ -937,7 +956,20 @@ for num, name in sorted(sep.epnum2name.items()):
 #  a été annoncé pendant cet échange partiel, au point normal, PAS depuis les seuls tampons.
 #  "annoncé" != "fonctionnel" ; sks (0x12) restait absent.)
 sbio_la = 0x08 in sep.epnum2name   # par numéro : les noms ont un NUL en tête (cf. plus haut)
-if sbio_la and not diverged and replay_done == replay_total:
+if SERVE_GL:
+    # Verdict propre à SERVE_GL (pas de « rejeu » : les compteurs replay_done/total n'ont pas de sens ici).
+    sks_la = 0x12 in sep.epnum2name
+    if sbio_la:
+        print(">>> SERVE_GL : sbio (0x08) ANNONCÉ" + (" ET sks (0x12)" if sks_la else "") +
+              " après service du VRAI coffre. La puce a avancé jusqu'aux endpoints applicatifs. "
+              "'annoncé' != 'fonctionnel' -> voir la sonde 0x73 (PROBE_SBIO) ci-dessous pour savoir s'il RÉPOND. "
+              "Si on est arrivé ici SANS SAVE/rejet, c'est le signal recherché (coffre plausiblement accepté), à "
+              "CONFIRMER par la sonde + reproductibilité (n>=3) ; PAS une preuve de Touch ID.", flush=True)
+    else:
+        print(">>> SERVE_GL : sbio ABSENT. Soit la puce a demandé un SAVE (= arrêt plus haut ; RAPPEL : un SAVE PEUT "
+              "venir d'un emballage faux (hyp. a/b/c, offset UUID, valeurs fixes) = essai NON CONCLUANT, PAS "
+              "forcément voie C fermée), soit elle s'est tue avant d'annoncer sbio. Regarder le log du service.", flush=True)
+elif sbio_la and not diverged and replay_done == replay_total:
     print(">>> sbio PRÉSENT après un rejeu COMPLET sans divergence : rejeu plausiblement accepté.", flush=True)
 elif sbio_la and (diverged or replay_done < replay_total):
     print(f">>> sbio PRÉSENT après {replay_done} lockers rejoués, puis divergence ({replay_done}/{replay_total}). "

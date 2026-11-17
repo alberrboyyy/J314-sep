@@ -114,6 +114,14 @@ Message de réponse AP→SEP : `> EP=0x13 TAG=<même que la requête> TYPE=0x00 
   (échec FERMÉ sur SAVE : si le SEP rejette un blob mal emballé, il émet un SAVE → on s'arrête sans acquitter → compteur non
   avancé, pas de brick), mais un emballage faux = **essai non concluant** (un power-cycle d'Albert « gâché »).
 
+**Liste complète des hypothèses du mode `SERVE_GL`** (toutes fail-closed → au pire non concluant, jamais brick) :
+(a) charge fil = charge `.gl` (+0x22) à l'octet près ; (b) préfixe maître = exactement 0x11 octets nuls ; (c) ordre
+d'octets de l'UUID d'OS servi à l'op 0x13 ; (d) valeurs **fixes** des réponses op 0x0e (`DATA=0x100`) et op 0x13
+(`DATA=0`), copiées d'une capture ; (e) l'UUID réclamé (op 0x05) se lit à l'**offset 0** du tampon B ; (f) la réponse
+gigalocker n'émet **aucun** sélecteur (`DATA` octet1 = 0). Un SAVE au lancement **ne tranche pas** entre « une de ces
+hypothèses est fausse » (non concluant, voie C ouverte) et « vrai refus anti-rejeu » (voie C fermée) — le log dit à quelle
+transaction ça diverge, ce qui permet de corriger l'emballage et relancer.
+
 ## La vraie question que ça permet enfin de tester (honnête)
 - L'essai FOLLOW d'avant (puce **d'avant** le DFU, coffre **périmé**) : après les 2 maîtres, le SEP **re-scellait** (op 0x01)
   au lieu de réclamer les gigalockers (op 0x05). Lecture (`hypotheses.md` HV1-B) : l'état rendu n'était **pas jugé courant**.
