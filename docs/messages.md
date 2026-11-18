@@ -682,6 +682,36 @@ app »). Pour `TYPE=0x01 PARAM=0x53|0x9c` et `TYPE=0x06`, DATA>>16 = CRC affich�
 d'endpoint en ASCII (PARAM + DATA, ex. L106 `sbio`). Les lignes doc-asahi (`> TYPE 0`, `< TYPE 5/7 PARAM 0x10`) décrivent
 donc un sens qui n'est pas celui observé ici : à revoir (hypothèse : la doc décrit l'usage depuis m1n1/Linux).
 
+### xART (0x13) — format de la réponse FETCH DÉCODÉ + coffre lu sur disque (2026-11-17, Claude Opus 4.8)
+
+Deux acquis nouveaux, détaillés dans **`docs/gigalocker.md`** (décodage complet) ; résumés ici pour la table canonique.
+
+**1. Longueur de la réponse FETCH (op 0x00 maître, op 0x05 gigalocker) = `PARAM | (DATA[octet0] << 8)`** — VU
+(corrélation sur c24). C'est la taille totale écrite par l'AP dans le tampon A. Recoupé :
+- SEP-xART : `PARAM=0x64 DATA0=0x03` → **0x364** = 0x11 (préfixe) + 0x353 (charge du `.gl`) ; cf. ligne 704 ci-dessus.
+- USER-xART : `PARAM=0x14 DATA0=0x08` → **0x814** = 0x11 + 0x803.
+- gigalocker : `PARAM=0x0c DATA0=0x0c` → **0xc0c**.
+
+`DATA[octet1]` = sélecteur SEP/USER (bit 0), ré-émis tel que reçu. `DATA[octet2,3]` = 0. Le **CRC n'est PAS dans le
+message** : il est dans le blob (`.gl` à +0x16), le SEP le revérifie. → un responder doit **recalculer** PARAM/DATA0
+depuis la taille du blob servi (la valeur capturée n'est pas rejouable, le blob diffère).
+
+**Octet-près non tranché** : préfixe maître = 0x11 octets nuls (VU seq94/96) mais gigalocker commence à l'offset 0
+sans préfixe (VU seq133) — incohérence non levable sans capture de la puce actuelle (hyperviseur 13.5 perdu).
+Reste `hypothèse` pour un code garanti ; voir `gigalocker.md §« Point ENCORE ouvert »`.
+
+**2. Le coffre (fichier `<UUID>.gl`) se lit directement sur le disque, sans macOS** (lecture SEULE, `tools/read_xart.sh`)
+→ **12 lockers** (2 maîtres type 0x01/0x02 + 10 gigalockers type 0x03/0x04, chacun avec un UUID 16 o). UUID **stables au
+DFU** (6/10 retrouvés dans c21/c23/c24 pré-DFU) → liés à l'appareil, pas à l'état scellé. Table complète dans `gigalocker.md`.
+
+**Essai SERVE_GL (écriture SEP → `pending/`, Albert lance)** : `pending/sep_xart_replay.sh` mode `SERVE_GL=1`
+(lanceur `pending/serve_gl_go.sh`) sert ce coffre réel à la puce démarrée par m1n1 (op 0x0e acquitté, op 0x13 = UUID d'OS,
+op 0x00 = maître du slot 6/9, op 0x05 = gigalocker par UUID lu en B). **Fail-closed** : n'acquitte JAMAIS un SAVE
+(0x01/0x06) → compteur non avancé → pas de brick (sceptique CONFIRMÉ). Un SAVE au lancement **ne tranche pas** entre
+emballage faux (non concluant) et vrai anti-rejeu. But : voir si la puce accepte son dernier état scellé et va jusqu'à
+réveiller sbio (0x08). `hypothèse`, jamais testé avant (on n'avait pas de coffre qui colle). Voir `gigalocker.md`
+et `voie-c-xart-fraicheur` (mémoire).
+
 ### xART au boot — traces (analyste, 2026-11-10, hors ligne, aucune écriture SEP)
 
 Sources : les 19 `sep.log` de `traces/` (C1 = `20261107-033436_c1-boot`, référence pour les numéros `Lnnn`) et leurs `hv_uart.log` (noyau).
