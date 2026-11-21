@@ -1,3 +1,35 @@
+# ▶️ COMMENCE ICI — REPRISE 2026-11-22 (nuit) — 🎯 ROUTE NATIVE RÉUSSIE sur matériel : SEP scelle un état frais pour Linux, sbio+sks armés
+
+**Si contexte neuf / après /clear : lis ceci, puis `docs/route_native.md`, puis le haut de `docs/journal.md` (2026-11-22 00:46), puis la mémoire [[route-native-0x13-breakthrough]]. CLAUDE.md = règles (PHASE 2 ; écriture SEP = Albert lance).**
+
+**CE QUI VIENT D'ARRIVER (2026-11-22, Albert a lancé `pending/sep_native_persist.sh`) :** la question décisive de `route_native.md` §6 est TRANCHÉE. En répondant ABSENT (forme kext) aux FETCH puis en **ACQUITTANT les SAVE d'un état FRAIS**, le SEP **se stabilise** (`idle`, 12 SAVE, PAS la boucle voie C) et garde **sbio (0x08) ET sks (0x12)** armés. État scellé légitime natif, obtenu **sans macOS**. Trace `traces/20261122-004526_native_persist` ; état scellé dans `xart_store_linux/` (gitignoré). Compteur anti-rejeu avancé de 12 (irréversible, prévu) ; Linux intact ; filet DFU + `alarm_p5.img` prêts.
+
+**CATCH PROXY : RÉGLÉ.** `tools/catch_lib.sh` v2 (nœud brut `/dev/ttyACM*` + baseline anti-fantôme + vérif produit USB) rattrape le proxy en local au 1er coup (t+13s). Warning bénin `Permission denied` sur l'ouverture du nœud brut avant droits udev → le chainload prend le relais ; à durcir par un retry d'ouverture ~50 ms (non bloquant).
+
+**PROCHAIN PAS (préparé, PAS encore lancé) :** sonde **sbio « annoncé vs vivant »** — greffer la mécanique `0x73` (poignée de main, SANS doigt) de `sep_xart_replay.sh` (MODE PROBE_SBIO, l.58-77/309-334) sur le flux natif de PERSIST, dans un store FRAIS SÉPARÉ (ne pas polluer `xart_store_linux/`). Puis : sonde sks, test inter-boot (resservir le store → le SEP reconnaît-il son état sans re-sceller ?), puis enrôlement (doigt = session humaine). **Mac EN PROXY en fin de séance** (USB local, PC branché).
+
+---
+
+<!-- HISTORIQUE — le « blocage catch proxy » ci-dessous est RÉSOLU (voir bandeau du haut). Gardé pour le fil des idées. -->
+
+# ▶️ REPRISE 2026-11-21 (soir) — route native qui MARCHE, bloquée sur le catch proxy
+
+**Si contexte neuf / après /clear : lis ceci, puis `docs/catch_proxy_diagnostic.md`, puis le haut de `docs/journal.md` (2026-11-21), puis la mémoire [[route-native-0x13-breakthrough]]. CLAUDE.md = règles (PHASE 2, qui-décide-quoi, lignes rouges : écriture SEP = Albert lance).**
+
+**TL;DR de la journée :** on a prouvé sur matériel que la **route native** marche (le rejeu est mort) : répondre *« pas de xART »* au SEP avec la **bonne forme** (trouvée en décompil : maître absent = `TYPE=0x00` longueur `0x11` ; gigalocker absent = longueur 0 ; **jamais** `0x07`) → le SEP **annonce toute la pile biométrique (sbio inclus)** puis **demande à sceller un xART frais (SAVE)**. On s'est arrêté avant d'écrire.
+
+**LE BLOCAGE (à régler en premier) : on ne rattrape plus le Mac en proxy.** m1n1 boote direct sur Arch. Cause quasi sûre = la **backdoor a sauté** (`csrutil disable` sur Asahi + `nvram boot-args=-v`) → la fenêtre proxy de m1n1 (5 s) ne s'ouvre QUE si `display==0` ET `sip0==127` (VU dans m1n1/src/main.c). Linux INTACT, Mac récupérable, rien écrit/poussé.
+- **1re action au retour d'Albert :** allumer le Mac, **lire le texte blanc m1n1** → noter `Boot policy: sip0 = N`, `video: display: 0x…`, et si `Waiting for proxy connection...` s'affiche. Arbre de décision complet dans **`docs/catch_proxy_diagnostic.md`** : léger (booter lid fermé si display≠0) → moyen (réarmer la backdoor en 1TR si sip0≠127) → lourd (DFU restore si 1TR bootloope aussi ; filet prêt, cf. `RECUPERATION_MAC.md`).
+
+**QUAND LE PROXY EST REVENU (plan) :**
+1. `./pending/sep_native_persist.sh` (Albert lance — ÉCRITURE : acquitte+stocke le SAVE du xART frais). Verdict guetté : `idle` (SEP stabilisé = 🎯) vs `MÊME MUR QUE VOIE C`.
+2. Si stabilisé → sonder **sbio (0x08)** « annoncé vs vivant » (0x73), et handler **SKS (0x12)** = `AppleKeyStore::sep_deliver_msg` (prépa en [[sks-kext-study-pending]]). ➜ **déléguer la décompil 0x12/0x08 à l'agent `reverseur`** (nouveau, `.claude/agents/reverseur.md` ; parallélisable, Opus 4.8 pour éviter le filtre cyber).
+3. Enrôlement Touch ID = session humaine (doigt).
+
+**Prêt / fait aujourd'hui :** `pending/sep_native_0x13.sh` (recon, OBSERVE), `pending/sep_native_persist.sh` (écriture), `tools/catch_lib.sh` (catch agressif, saisit if02), modules offline VU `driver/sepreplay/xart.py`+`xart_responder.py` (tests step6/7 verts), CRC `.gl` vérifié 12/12. Décompil : `macos/kernel.macho`, outils `analysis/kext/{ksyms,kdis}.py` + venv capstone à recréer (`python3 -m venv <scratchpad>/venv && venv/bin/pip install capstone`, effacé au reboot). Rien n'est committé ni poussé.
+
+---
+
 > # 🟢 MAC RÉCUPÉRÉ ET OPÉRATIONNEL (2026-11-17) — macOS 27.2.1 + ALARM bootent ; SEP PROPRE ; on reprend le projet
 > Suite du DFU Restore (16/11) : **macOS 27.2.1 neuf** et **ALARM réinstallé bootent tous les deux
 > normalement** (ALARM = image bloc `alarm_p5.img` + GRUB refabriqué ; chaîne m1n1→U-Boot→GRUB→LUKS→ALARM,

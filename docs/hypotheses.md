@@ -122,6 +122,44 @@ l'ESSAI B (`traces/20261112-215313_xart_replay/follow_B/`, diff octet par octet)
   c'est passif). Si ce blob **ressemble** à un re-scellement d'état restauré (et si le SEP a demandé en B, aux TAG 0x02/01/03/04,
   **les mêmes UUID** que macOS) → (A). S'il part d'un état vide/différent → (B). Les blobs sont chiffrés (contenu opaque), mais
   **la taille, l'UUID réclamé, et le point d'annonce des endpoints** sont observables. → Essai A ci-dessous.
+- **MAJ MAJEURE (2026-11-18, ESSAI E / SERVE_GL, le VRAI coffre, trace `20261118-082622`)** : la divergence **se reproduit avec le
+  coffre réel** (lu sur disque, qui colle à la puce réparée + Touch ID ré-enrôlé), pas seulement avec les vieux blobs de FOLLOW. Flux :
+  2 maîtres servis → 5 annonces d'endpoint (0x1d) acquittées → **SAVE op 0x01 à TAG=0x05**, **gl:0** (aucun FETCH gigalocker). Deux
+  apports qui **recadrent** A vs B :
+  1. **Un SAVE n'est PAS un refus en soi.** Dans la capture macOS (`snew-reel`), le SEP émet aussi des SAVE (op 0x01/0x06) aux TAG
+     0x13/0x14/0x15 et **macOS les acquitte** (L113/117/121), puis le boot continue. Donc « le SEP émet un SAVE » ≠ « le SEP refuse ».
+  2. **Ce qui diverge, c'est le MOMENT.** macOS : masters → annonces → **FETCH des 14 gigalockers (TAG 0x05→0x12)** → *puis* SAVE.
+     Nous : masters → annonces → **SAVE immédiat (TAG 0x05), zéro gigalocker réclamé**. Le SEP **saute toute la phase gigalockers**.
+  Le blob re-scellé en B (`follow_B/001_tag05_op01.bin`) = **127 octets non nuls puis du vide** (≈ une petite structure racine/scellée,
+  PAS un maître recopié ; ne ressemble à aucune charge de maître du vault). → le SEP re-scelle une mini-structure neuve au lieu de
+  continuer. **Lecture** : soit (B) re-scellement par rejet de contexte/fraîcheur **même avec le bon coffre** (penche B / voie C
+  fragile), soit **notre EMBALLAGE du maître est faux** (préfixe 0x11 ? mapping sel↔type ? octet-près ?) et corrompt des blobs
+  pourtant corrects (→ A/voie C ouverte). **On ne peut PAS trancher offline** : la discrimination définitive exige d'**acquitter le
+  SAVE** = écriture risquée (compteur) → **Albert + backup disque** (inexistant à ce jour, cf. [[priorites-risque]]). Donc : NE PAS
+  gâcher de runs à deviner ; **lever d'abord offline les doutes d'emballage** (voir TODO sous messages/gigalocker), attendre le backup
+  pour le test décisif. Étend [[voie-c-xart-fraicheur]].
+- **BUG D'EMBALLAGE TROUVÉ (2026-11-18, offline, tranché par les logs macOS)** : les `hv_uart.log` de macOS écrivent « Fetched
+  **SEP**-xART » en réponse au TAG 0x03 (**sel=1**) et « Fetched **USER**-xART » au TAG 0x04 (**sel=0**) — snew-reel L1573-1576,
+  c5-ool-boot L1525-1541. Donc **sel=1 → SEP-xART, sel=0 → USER-xART**. Or `serve_from_gl` servait l'INVERSE (sel=1→USER) : **les deux
+  maîtres étaient croisés.** Servir au SEP un mauvais maître-racine explique directement le re-scellement précoce (SAVE@TAG05, gl:0),
+  en SERVE_GL comme en FOLLOW. **Corrigé** (`mtype = 0x02 if sel==1 else 0x01`), docs corrigées (kext §8 L260, gigalocker.md). **Ceci
+  RÉACTIVE l'hypothèse (A)/voie C ouverte** avec un test concret : au prochain run propre, si la puce **réclame ses gigalockers (op
+  0x05)** au lieu de SAVE@TAG05 → emballage faux confirmé, voie C vivante ; si elle re-scelle encore → recentre sur (B)/anti-rejeu.
+  **Ne plus citer « voie C penche fermée » sans ce test** : la divergence pré-correctif venait au moins en partie d'un bug à nous.
+- **RÉSULTAT DU TEST (2026-11-18 08:52, trace `20261118-085250`, maîtres CORRIGÉS)** : correctif **confirmé appliqué** (sel=1→SEP 850 o,
+  sel=0→USER 1344 o) **mais le comportement est IDENTIQUE** : 5 annonces 0x1d → **SAVE op 0x01 à TAG=0x05, gl:0**. Donc **l'hypothèse
+  « maîtres croisés = cause » est RÉFUTÉE** (n=2 : croisés 08:26 et corrects 08:52 → même SAVE@TAG05). Le contenu/ordre des maîtres
+  n'est **pas** le déclencheur. **Ça recentre vers (B)** : la puce re-scelle même avec les **bons** blobs du **bon** coffre → le rejeu
+  n'apporte pas le **contexte de fraîcheur** (nonce/graine de session) que la puce exige, cohérent avec les symboles kext (nonce_/
+  erase_session_seeds). **(A)/voie C recule** mais **n'est pas prouvée fermée** : il reste (i) le doute **préfixe 0x11** du maître (seul
+  emballage encore non testé, non vérifiable offline) et (ii) « SAVE ≠ refus » en général. **Test décisif = acquitter le SAVE** (écriture
+  risquée, compteur) → **Albert + backup disque** (inexistant). D'ici là, ne pas gâcher de runs à deviner l'emballage.
+- **CLÔTURE (2026-11-18 midi, R1+R2, confiance ÉLEVÉE) : voie C FERMÉE pour le rejeu d'un coffre disque.** Les doutes restants sont levés :
+  (i) le **préfixe 0x11** est **prouvé conforme** par désassemblage (kext §8b) ; (ii) **R2 (input pourri)** — servir des maîtres ZÉROS donne
+  le MÊME SAVE@TAG05 que le vrai coffre → **la puce n'évalue pas le contenu servi**, elle re-scelle sur son état interne, donc l'emballage
+  n'est PAS la cause (n cumulé = 4 runs / 3 inputs). Appuyé par le guide Apple (fraîcheur dans une puce matérielle séparée) + le nonce ROM
+  non semable côté AP. **« SAVE ≠ refus » reste vrai mais ne sauve pas la voie C** : la puce re-scelle quoi qu'on serve. Non prouvé à 100 %
+  (seul R3/ACK_SAVE tranche, risqué) mais la direction est claire. Détail : journal 2026-11-18 (HANDOFF), [[voie-c-xart-fraicheur]].
 
 ## HV2 (révisée) — La bifurcation TAG=0x05 TYPE=0x01 est RÉELLE (pas un ack CNTL décalé, pas un résidu)
 - Statut : **ouverte**, mais l'hypothèse « ack retardé / désalignement du script » de la 1re version est **écartée** : `grep`
@@ -148,6 +186,24 @@ l'ESSAI B (`traces/20261112-215313_xart_replay/follow_B/`, diff octet par octet)
   sous m1n1 (trace `…215313`). Donc « sks s'annonce bien » quand on suit assez loin. **Mais** « annoncé ≠ fonctionnel » (même
   réserve que sbio) : reste à prouver qu'on peut ouvrir/utiliser le trousseau. HV3 **toujours ouverte**, basculée côté « sks
   atteignable à l'annonce », pas « fonctionnel ».
+- **MAJ (2026-11-18, ESSAI E / SERVE_GL, le vrai coffre, n=1, trace `20261118-075343`)** : en servant le **vrai** `.gl` (coffre qui
+  colle à la puce réparée), le SEP a pris les **2 maîtres SANS émettre de SAVE**, puis a annoncé sbio + 10 autres endpoints. **sks
+  (0x12) de nouveau ABSENT** dans cette liste — MAIS le service s'est **arrêté à tort** sur la 1re annonce (op 0x1d non gérée → faux-
+  arrêt, même classe que 0x07, cf. `journal.md` 2026-11-18). Donc « sks absent » **encore non concluant** : le flux a été coupé avant
+  la boucle complète. Corrigé (0x1d acquitté) ; à rejouer. HV3 **toujours ouverte**.
+- **MAJ (2026-11-18 08:26, ESSAI E avec correctif 0x1d, APRÈS power-cycle, n=1, trace `20261118-082622`)** : flux complet. Après les
+  2 maîtres, le SEP a annoncé **sbio/skdl/sse/sks/scrd** (5× TYPE 0x1d, tous acquittés 0x16) — **`sks` nom annoncé ici** — puis a émis
+  un **SAVE (op 0x01) à TAG=0x05** (on s'arrête sans acquitter). **gl:0** : aucun FETCH gigalocker (0x05) avant le SAVE, alors que chez
+  macOS TAG=0x05 = 1er FETCH gigalocker. **C'est LA divergence réelle de la voie C.** Elle **ne tranche pas** accept/refus (emballage
+  faux non concluant OU vrai anti-rejeu). On a désormais le blob re-scellé (`follow_B/001_tag05_op01.bin`, nz=127) et le point exact.
+  La liste FD d'endpoints (écoute 10 s) **n'inclut toujours pas 0x12 sks** malgré l'annonce 0x1d de son nom → « nom annoncé ≠ endpoint
+  enregistré ». HV3 ouverte. **Prochaine analyse (hors ligne)** : décoder le re-scellé + comparer la divergence au snew-reel ; concevoir
+  l'expérience qui sépare « emballage faux » de « anti-rejeu » (la vraie question voie C). Reproduire SAVE@TAG05 (n≥3).
+- **Sonde sbio 0x73 SANS doigt (ESSAI D, 2026-11-18, n=1)** : commande 0x73 écrite en A8, envoyée → **aucune réponse** (B8 nul, aucun
+  message EP 0x08). Trois causes **non tranchées**, à ne pas confondre : (1) le 0x73 n'a peut-être pas **atteint** sbio (stream/sid
+  DART de sbio sous m1n1 inconnu ; le succès du stream xART ne le garantit pas) ; (2) ouverture tardive de sbio insuffisante ;
+  (3) l'état restauré n'active pas sbio. **Ne PAS conclure « sbio mort »** sur ce seul silence. Prochaine passe : rejouer avec le
+  correctif 0x1d (flux non tronqué) + vérifier le stream DART de A8/B8 avant de dire que la commande est parvenue.
 - Expérience « annoncé vs fonctionnel » SANS doigt (point 4), du moins au plus intrusif :
   - **[LS — tout de suite, dès qu'un log imprime tous les messages]** après l'annonce de sbio, le SEP émet-il un **trafic sbio
     spontané** (init type C1 L320-449 : 0x17/0x15/0x16…) ou **seulement son nom** puis silence ? (L'essai 1 n'imprimait pas ces
@@ -155,6 +211,179 @@ l'ESSAI B (`traces/20261112-215313_xart_replay/follow_B/`, diff octet par octet)
   - **[pending/ + Albert — SANS doigt]** après annonce de sbio, envoyer **une seule** commande sbio **de lecture** (statut /
     énumération, début de l'init C1 0x17/0x15) et comparer à la réponse d'init macOS. Cohérente → sbio vit ; erreur/silence →
     simple nom. Écriture SEP vers 0x08 → `pending/`, décision d'Albert ; **pas** de doigt. (À ne faire qu'après Essai A.)
+
+---
+
+# Revue sceptique — SAVE@TAG05 reproduit (coffre réel, maîtres croisés PUIS corrects) : « penche B » tient-il ? — 2026-11-18 (agent sceptique)
+
+> Mission : attaquer la lecture « corriger les maîtres n'a rien changé (n=2) → pas le contenu → penche B (anti-rejeu) ».
+> Sources relues, aucun hardware, aucune écriture : `traces/20261118-082622_xart_replay/xart_replay.log` (maîtres CROISÉS)
+> et `…-085250…/xart_replay.log` (maîtres CORRIGÉS), leurs `follow_B/001_tag05_op01.bin`, `…-075343…` (run tronqué),
+> `docs/journal.md` (6 entrées 2026-11-18), `docs/gigalocker.md`, `docs/kext_sepmanager.md` §8/§9, `pending/sep_xart_replay.sh`.
+
+## VU (faits bruts des deux logs, vérifiés ligne à ligne)
+- **082622 (croisés)** : servi fw-boot(0x0e) → UUID-OS(0x13) → maître **sel=1 type 0x01 USER 1344 o (A=1361)** → maître
+  **sel=0 type 0x02 SEP 850 o (A=867)** → 5 annonces 0x1d (sbio/skdl/sse/sks/scrd) acquittées (0x16) → **SAVE op 0x01 à
+  TAG=0x05**, B `nz=127` tête `da87a669…`. Arrêt sans acquitter. gl:0. Sonde 0x73 : B8 nul.
+- **085250 (corrigés)** : idem mais maître **sel=1 type 0x02 SEP 850 o** / **sel=0 type 0x01 USER 1344 o** (sens inversé,
+  = le bon d'après les logs noyau). **Même résultat** : 5 annonces 0x1d → **SAVE op 0x01 à TAG=0x05**, B `nz=126` tête
+  `1dad4bb6…`. Arrêt sans acquitter. gl:0. Sonde 0x73 : B8 nul.
+- Dans **les deux**, le préfixe maître **0x11** est appliqué (A = charge + 17 = 1361/867). Le `.gl` servi est le **même**
+  fichier (lu le 2026-11-17 22:47) dans les deux runs. Le point de bifurcation (TAG=0x05) et l'op (0x01) sont **identiques**.
+- Les deux blobs re-scellés sont **petits** (`nz` 126/127 sur 32768) ≠ taille d'un maître (le SEP-xART du `.gl` fait 850 o).
+
+## INTERPRÉTÉ — où le cadrage « penche B » est juste, et où il est SUR-VENDU
+
+**1. Ce que n=2 prouve réellement est plus étroit qu'annoncé.** Les deux runs ne varient **que l'affectation
+sel↔maître** (lequel des deux blobs 0x11-préfixés part en sel=1 vs sel=0). Ils **ne varient pas** : le préfixe 0x11, le
+cadrage de la charge, la fraîcheur du `.gl`, ni la façon dont le SEP est amorcé. Donc la bonne conclusion est **« l'ordre
+SEP/USER des maîtres n'est pas le déclencheur »**, PAS « le contenu des maîtres est hors de cause ». Dire le second, c'est
+étendre un contrôle à 1 variable à toutes les variables d'emballage. **Le vrai pilier de « penche B » n'est pas cette trace
+n=2 — c'est le désassemblage `kext §9`** (aucun levier de nonce côté AP ; nonce ROM 20 o par boot, non semable, absent de la
+NVRAM lisible). C'est lui qui porte l'argument ; la trace n'est qu'une corroboration faible. Donc : **B est bien favorisée,
+mais par le kext, pas par le n=2** — ne pas inverser le poids des preuves.
+
+**2. (C) « m1n1 lit mal A (DART stream/IOVA) → blobs inexploitables » — largement RÉFUTÉ pour la voie xART, encore VIVANT
+pour sbio.**
+- CONTRE (C) sur xART : si le SEP ne lisait pas A, il **buterait au 1er FETCH** (fw-boot/UUID), pas après avoir ingéré
+  fw-boot + UUID + 2 maîtres + 5 annonces. Le flux complet jusqu'à TAG=0x05 prouve que la mécanique A/B/DART de l'EP 0x13
+  **fonctionne** (les CNTL sont acquittés, les tailles PARAM|DATA0 recalculées sont acceptées, le SEP avance). Le `.gl` est
+  donc bien **parvenu** au SEP.
+- NUANCE IMPORTANTE (à ne pas sur-vendre dans l'autre sens) : le journal 085250 écrit « têtes différentes **car** maîtres
+  servis différents ». **C'est une sur-interprétation.** Un SAVE-xART re-chiffre tout à chaque seal (cf. plus haut, MAJ n=2
+  du 2026-11-12 : tête 16 o **et** corps changent run-à-run même à entrée identique, à cause du nonce de boot). Deux têtes
+  qui diffèrent entre deux boots **ne prouvent donc PAS** que le SEP a lu des maîtres différents : elles diffèreraient aussi
+  avec des maîtres **identiques**. On ne peut pas conclure « le SEP a lu le contenu » depuis la seule différence de tête.
+- POUR (C) côté **sbio** uniquement : la sonde 0x73 ne rend **aucune réponse** dans les 3 runs. C'est compatible avec « le
+  stream/sid DART de sbio sous m1n1 est faux, la puce ne lit pas A8 ». Mais c'est un **autre** EP (0x08), un **autre** stream
+  que xART (0x13) ; le succès de xART ne le garantit pas. → (C) reste à trancher **pour sbio seul**, indépendamment de xART.
+
+**3. Explication SOUS-ESTIMÉE par le cadrage : (B′) « l'amorçage m1n1 n'établit jamais le contexte de session sous lequel
+l'état a été scellé ».** C'est une variante de B, mais le mécanisme change la conclusion pratique.
+- `pending/sep_boot.sh` fait GET_STATUS / BOOT_TZ0 / BOOT_IMG4 / SET_SHMEM — il **n'invoque pas** `generateROMNonce` ni
+  l'échange pnon (0x15) qu'un vrai iBoot/SEPOS ferait (kext §9). Donc le nonce « courant » du SEP après sep_boot est celui
+  que la ROM a produit **à ce cold-boot**, sans rapport avec le nonce sous lequel les maîtres du `.gl` ont été scellés.
+- Conséquence : le SEP trouvera l'état restauré « non courant » **quelle que soit la fraîcheur du `.gl`** (même le dernier
+  état scellé). Ce n'est ni « rollback » (vieux état) ni « emballage faux » : c'est « cérémonie de boot absente ». Et kext §9
+  dit qu'il n'existe **aucune API AP pour poser le nonce** → ce trou ne se comble pas côté AP. **Si** B′ est la cause, la voie
+  C « faire accepter un rejeu » est **fermée par construction**, indépendamment du backup et de l'emballage.
+- Cette lecture explique aussi pourquoi **macOS** réussit à chaque boot sans « rejouer un état figé » : il **restaure puis
+  re-scelle** (SAVE aux TAG 0x13-0x15, acquittés) sous le nonce que iBoot vient d'établir. macOS n'a jamais besoin de
+  connaître le nonce ; le SEP le gère en interne à travers la session iBoot. m1n1 saute cette session.
+
+**4. « Sous m1n1 la puce re-scelle TOUJOURS quel que soit l'input » — pas distinguable des traces actuelles, mais
+distinguable par UN contrôle non risqué (voir point suivant).** Tous nos essais finissent en SAVE ; le run 075343 n'a PAS
+SAVé mais il a été **tronqué au 1er 0x1d** (avant TAG=0x05) → il ne prouve pas une acceptation. On n'a donc **jamais** observé
+le SEP **ne pas** re-sceller une fois arrivé à TAG=0x05 sous m1n1. Impossible de séparer « toujours re-scelle » de B/B′ sans
+un contrôle qui **fait varier la validité de l'input**.
+
+**Verdict sceptique sur le cadrage** : « penche B » est la direction raisonnable, mais (a) l'argument porteur est le kext,
+pas le n=2 ; (b) il faut distinguer **B (fraîcheur/compteur lié au disque)** de **B′ (contexte de session de boot absent
+sous m1n1)** — car B laisse une chance au « servir le dernier état », B′ non ; (c) (C) reste ouvert **pour sbio**. « voie C
+fermée » reste **non prouvé** ; « voie C fragile et probablement fermée pour un rejeu pur » est l'énoncé honnête.
+
+## Point 2 — Reste-t-il un test discriminant SANS matériel / SANS écriture risquée ?
+
+**2a. Comparer les deux blobs re-scellés `follow_B/001_tag05_op01.bin` entre eux : NON, ça ne tranche rien.** Ils sont
+chiffrés et un SAVE-xART re-chiffre tout à chaque seal (tête 16 o + corps varient run-à-run même à entrée identique, VU
+2026-11-12). Deux blobs qui diffèrent est l'attendu **sous A comme sous B** → aucun pouvoir discriminant. (À acter pour ne
+pas regénérer cette analyse en croyant qu'elle tranchera.)
+
+**2b. Comparer le re-scellé à un « xART vierge » : pas de référence disponible, et chiffré de toute façon.** On n'a aucune
+capture d'un seal « racine vide » propre à cette puce. Le seul fait exploitable, déjà VU, est **structurel** : le re-scellé
+fait ~127 o non nuls, **très en deçà** d'un maître (850 o) → le SEP scelle une **mini-structure racine**, pas une recopie de
+maître. Cohérent avec « le SEP conclut qu'il n'a pas d'état restaurable et initialise un xART neuf » (B/B′). Mais ça ne
+sépare toujours pas emballage-faux de B/B′.
+
+**2c. Contrôle « input invalide » (hardware, AUTO via `tools/`/`pending/`, NON risqué, fail-closed) — le plus utile.** Un run
+qui sert **des maîtres volontairement dégradés** (charges mises à zéro, ou tronquées, ou CRC cassé) et compare le point de
+divergence à un run normal. C'est fail-closed (on s'arrête sur le SAVE sans jamais l'acquitter — exactement comme
+aujourd'hui, **aucune écriture SEP**). Discrimination :
+  - Si maîtres **valides** et maîtres **poubelle** donnent le **même** SAVE@TAG05 au même point → les maîtres ne sont **pas
+    évalués** avant le re-scellement → appuie **B′** (« m1n1 re-scelle quoi qu'on serve », contexte de boot) et **affaiblit**
+    A (emballage) : un emballage faux et un emballage juste produiraient le même résultat, donc l'emballage n'est pas le
+    levier.
+  - Si les maîtres poubelle **changent** le comportement (divergence plus tôt, op différente, ou pas de 5 annonces) → le SEP
+    **évalue** le contenu des maîtres → l'emballage **compte** → A/voie C reprend de la vigueur, et il faut re-travailler
+    l'emballage avant tout verdict.
+  C'est le seul test qui attaque « toujours re-scelle » vs « re-scelle parce que l'input ne colle pas », **sans** backup ni
+  écriture. À préparer dans `pending/` (nouveau mode `SERVE_GL_GARBAGE=1` ou un flag), Albert lance. **n≥2** (zéros + tronqué).
+
+**2d. Un contrôle « fraîcheur disque » est inutile offline et quasi inutile hardware.** Le `.gl` **est** l'état persistant du
+SEP ; macOS le met à jour quand le SEP SAVe. Tant qu'aucun boot macOS n'a eu lieu depuis le dernier SAVE, le `.gl` lu
+**est** le dernier état scellé → pas de rollback disque à craindre. Donc re-lire le `.gl` « plus frais » ne changerait rien
+**si** le verrou est un nonce de boot non persisté (B′). Ne pas gâcher de run là-dessus ; le point 2c est plus informatif.
+
+## Point 3 — Le doute « préfixe 0x11 » est-il testable offline ?
+
+**Partiellement OUI, et il est moins incertain que le cadrage ne le dit.**
+- EMPIRIQUE (déjà VU, `gigalocker.md`) : dans la capture macOS, l'AP écrit en A **0x11 octets nuls puis la charge** (seq
+  `000094`/`000096_13_A.bin` de snew-reel, présents sur disque) ; la longueur de réponse **inclut** ce préfixe (0x364 =
+  0x11 + 0x353). Notre script fait **exactement** ça. Donc « rejouer 0x11 zéros + charge » **reproduit ce que macOS a fait**,
+  sur une vraie capture — ce n'est pas une invention. Le résidu n'est pas « 0x11 est-il la bonne taille » (il colle à la
+  capture) mais « ces 17 octets sont-ils don't-care ou porteurs (p.ex. un champ que macOS laissait à zéro ici) ».
+- DÉSASSEMBLAGE (offline, phase 2 autorisée, **non encore fait**) : lire le handler **op 0x00 (0x6e8)** — qui écrit le blob
+  en A — et **op 0x01 (0x838)** — qui lit le blob en B — dans le kext, pour voir la **structure exacte** du tampon : y a-t-il
+  un en-tête de 0x11 octets avec des champs (longueur/CRC/UUID), ou une copie brute précédée d'un remplissage ? Croisé avec
+  les octets réels de seq94/96, cela **confirme ou réfute** le préfixe **sans matériel**. C'est le seul doute d'emballage
+  qu'on peut encore lever hors ligne ; il devrait être fait **avant** de « dépenser » le test décisif en écriture.
+- CE QU'ON NE PEUT PAS faire offline : capturer la puce **actuelle** (hyperviseur 13.5 perdu) pour voir ce qu'elle, elle,
+  attend. Le cadrage est juste là-dessus.
+
+## Point 4 — EXPÉRIENCE DÉCISIVE (à faire APRÈS qu'un backup disque existe) — EXPÉRIENCE HUMAINE (Albert)
+
+Objectif : séparer **A/emballage** et **B/B′/anti-rejeu** de façon définitive, ce que l'observation seule ne peut pas.
+
+**Pré-requis absolus (sinon NE PAS lancer) :**
+1. **Backup disque complet du Mac existant et vérifié** (restaurable). C'est la seule protection : le pire cas est un état
+   SEP incohérent exigeant un **DFU Restore** (qui ré-appaire le SEP et efface) ; le backup protège **Linux + données**, pas
+   l'appairage SEP (ré-enrôlement Touch ID = déjà fait une fois, acceptable).
+2. **Point 2c (contrôle input invalide) et point 3 (désassemblage 0x11) traités AVANT.** Si 2c montre que l'emballage n'est
+   pas évalué (B′), ou si le désassemblage invalide le préfixe, on **corrige/relit d'abord** : inutile de risquer une
+   écriture si l'emballage est encore douteux.
+3. `.gl` relu **juste avant**, **aucun boot macOS** entre la lecture et le run (garantit qu'on sert le dernier état scellé).
+
+**Ce qu'on envoie (mode FOLLOW sur le vrai coffre, `SERVE_GL=1 FOLLOW=1`) :** servir le `.gl` comme aujourd'hui jusqu'à
+TAG=0x05 ; **là où on s'arrête aujourd'hui, ACQUITTER le SAVE** au lieu de stopper : `> EP=0x13 TAG=<req> TYPE=0x00
+PARAM=0x00 DATA=(DATA & 0xFFFFFF00)` (gabarit macOS TAG 0x13/0x14/0x15, VU octet-près), **sans** écrire A, puis continuer à
+suivre le SEP (acquitter les SAVE suivants, servir les FETCH gigalocker op 0x05 depuis le `.gl`, acquitter 0x07/0x1d),
+**dumper chaque B re-scellé** dans `follow_B/`. Budget de SAVE borné (anti-boucle). Après stabilisation : sonde sbio 0x73
+(sans doigt) pour « annoncé vs fonctionnel ».
+
+**Ce qu'« acquitter le SAVE » implique concrètement (le risque) :** l'acquittement dit au SEP « ton blob est stocké » → le
+SEP **fait avancer son compteur/état scellé interne** vers une nouvelle génération. Comme l'AP **n'écrit pas** ce blob sur le
+`.gl` disque, l'état interne du SEP et le `.gl` **divergent** : le SEP est « en avance » sur le disque. Si ensuite macOS boote
+nativement, son SEP FETCH le maître du `.gl` (ancien) → en retard sur le compteur avancé → **re-scelle/refuse** →
+FileVault/trousseau/Touch ID potentiellement cassés → au pire **DFU Restore** nécessaire. C'est l'écriture que la voie C
+évitait ; elle n'est tentable **qu'avec** le backup.
+
+**Lecture des résultats :**
+- **A (voie C vivante)** : après avoir acquitté le(s) SAVE, le SEP se met à **FETCH ses gigalockers (op 0x05)** puis atteint
+  un état où **sbio répond au 0x73** (gt_packet +0x00=1, +0x14=0x73, cf. §référence c12). Signifierait : le SEP voulait
+  seulement **re-sceller son maître sous le nonce courant d'abord**, puis restaurer le reste → un driver Linux devrait
+  **persister** ce maître re-scellé et pourrait obtenir une biométrie. (Résultat espéré mais, vu kext §9, **peu probable**.)
+- **B/B′ (voie C fermée pour le rejeu pur)** : le SEP **enchaîne des SAVE** sans jamais FETCH de gigalocker ni rendre sbio
+  fonctionnel (0x73 muet), **comme l'Essai C bis l'a déjà montré avec de vieux blobs** (13 SAVE, sks annoncé mais jamais
+  prouvé fonctionnel). Signifierait : le re-scellement est l'issue par conception, le rejeu d'un état ne « ressuscite » pas
+  la biométrie.
+- **Discriminateur emballage vs anti-rejeu** (ce que l'acquittement apporte vraiment) : si après acquittement le SEP
+  **reprend la séquence macOS** (FETCH 0x05 des bons UUID du `.gl`, dans l'ordre), alors nos maîtres étaient **bien formés**
+  (A réfutée) et le blocage était la fraîcheur/le compteur (B). Si le SEP **continue à ignorer les gigalockers** et ne fait
+  que re-sceller, c'est B′ (contexte de boot) ou un emballage encore faux — à départager avec le contrôle 2c fait en amont.
+
+**Critère d'arrêt (impératif) :** stopper immédiatement et couper l'alim si (i) le SEP part en boucle de SAVE au-delà du
+budget ; (ii) une op **inconnue** apparaît (règle « inconnu → STOP ») ; (iii) le SEP réclame un gigalocker **absent** du
+`.gl` ; (iv) tout gel PMU/timeout. Ne **jamais** improviser une réponse non documentée. Après le run, **avant** tout boot
+macOS : décider si on persiste l'état re-scellé sur le `.gl` (autre décision Albert, autre risque) ou si on restaure le
+backup.
+
+## Ce qui ne change pas
+- **Aucune écriture SEP par un agent.** Les points 2c et 4 sont des scripts `pending/` lancés par Albert ; le point 4 exige
+  en plus le **backup disque** (inexistant → bloqué). Les points 1/3 (désassemblage, relecture de captures) sont faisables
+  **tout de suite** en observation pure.
+- Statut voie C : **ouverte mais penchant fermée pour un rejeu pur** (kext §9 porteur). Blocage principal noté : **le test
+  décisif exige un backup disque qui n'existe pas** (cf. [[priorites-risque]]). Propositions non bloquantes d'ici là :
+  désassembler op 0x00/0x01 (préfixe 0x11), préparer le contrôle « input invalide » (2c).
 
 ---
 

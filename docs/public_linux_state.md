@@ -459,3 +459,193 @@ d'ALARM continue de marcher (juste +5 s et verbose). C'est la voie à privilégi
 - **Repère technique périmé** : CLAUDE.md « Hyperviseur : macOS **13.5** uniquement » et README §2. La doc Asahi
   (`m1n1-hypervisor`, lue 2026-11-17) liste **13.5 (M1/M2)** **et 14.8.3 (M1→M3)**. À corriger (décision Albert).
 - Aucune contradiction doc↔traces sur ce sujet ; il s'agit d'une évolution de la doc publique.
+
+---
+
+## 2026-11-18 — Rejeu xART à travers les boots : viable ou cul-de-sac ? (ré-instruction, sources publiques)
+
+Documentaliste, lu/relu le **2026-11-18**. Question de l'orchestrateur : est-il **théoriquement possible** de
+restaurer/rejouer un état xART sauvegardé vers le SEP à travers des boots (voie C), ou le design anti-rejeu
+oblige-t-il le SEP à **re-sceller** au lieu de **restaurer** ? Cette section **met à jour** celle du 2026-11-12
+(« xART anti-rejeu / nonce ») avec : (a) une re-vérification des sources, (b) un angle neuf — **grep de l'open
+source Apple publié** — et (c) le rappel que nos essais SERVE_GL du jour (traces, PAS une source publique)
+tranchent côté pratique plus loin que tout public. Légende inchangée : **[public]** / **[déduit]** / **[trace]** /
+**[kext]** (contraste phase 2, pas une source publique).
+
+### A. Re-vérification des sources publiques — rien de neuf depuis le 2026-11-12
+- [public] **m1n1 inchangé** : clone local toujours au commit `70757dc7` (2026-11-04). Le seul code xART/gigalocker
+  reste `rust/src/apfs.rs` (`VOL_ROLE_XART = 0x100` l.162 ; `rust_read_gigalocker` l.378-392 ; proxy
+  `P_READ_GIGALOCKER = 0x1400` `src/proxy.h:184`). Il **lit** le fichier gigalocker du volume APFS de rôle xART et
+  rend son contenu brut — **aucune notion de fraîcheur, nonce, compteur ou anti-rejeu côté AP**. Grep
+  `xart|gigalocker|anti.?replay|monotonic|rollback|ratchet|nonce` sur `rust/ proxyclient/ src/` : pas une seule
+  occurrence liée à la fraîcheur (seuls `nonce` = aléa de boot Linux via GETRAND, et `NO_ROLLBACK` = flag libfdt,
+  sans rapport).
+- [public] **Doc Asahi inchangée** (relue ce jour) : `platform/security/` affirme toujours l'**intention**
+  (« The xART prevents replay attacks from capturing the VEK » ; VEK en « airgapped memory », « can never be read
+  by the application cores ») **sans décrire le mécanisme** : la page « does not mention nonces, monotonic counters,
+  or freshness checks … does not describe how the SEP detects or rejects replayed data ». `hw/soc/sep/` garde la
+  table d'endpoints (0x10 xars « xART setup? startup/shutdown » ; 0x12 SKS ; 0x13 « manages xARTs, gigalockers and
+  keybags (needed for SKS to start) » ; 0x15 pnon « boot policy related ») et le format de locker partiel
+  (fetch = type 0, succès = 0x5, erreur = 0x7 param 0x10). **Aucun type SAVE/store documenté**, **aucun nonce ni
+  compteur**. Le *comment* reste « non trouvé » côté doc.
+- [public] **linux-asahi inchangé** : le stub `drivers/soc/apple/sep.rs` ne gère que TZ0/IMG4/shmem/découverte et
+  **ignore** tous les autres endpoints ; aucun code xART/nonce/boot-policy.
+
+### B. Angle neuf — l'open source Apple publié ne contient PAS le mécanisme xART
+- [public] J'ai cloné (depth 1) et grepé le dépôt **`apple-oss-distributions/Security`** (176 Mo, framework Security
+  de macOS, publié) pour `xart`, `anti.?replay`, `monotonic`, `ratchet`, `replay attack`, `boot nonce`.
+  **Résultat : aucune référence au xART du SEP ni à son anti-rejeu.** Les seuls « xart » sont des **fragments
+  base64 fortuits** dans des certificats de test (`tests/TrustTests/…/*.crt.pem`). Les « anti-replay / monotonic /
+  replay attack » trouvés concernent **tout autre chose** : SCEP (`OSX/sec/Security/SecSCEP.c:1152`), synchro de
+  pairs de confiance iCloud (`keychain/TrustedPeersHelper/Container.swift:7518` « checks signatures and clocks to
+  prevent replay attacks »), compteur de politique de certificat (`SecFrameworkStrings.h`), index de base de données
+  trousseau (`libsecurity_filedb/AppleDatabase.cpp`). Rien sur la fraîcheur xART/SEP.
+- [public, confirmé] Cohérent avec le fait **structurel** : Apple **ne publie pas** le firmware SEPOS ni les kexts
+  SEP-side (AppleSEPManager, AppleSEPKeyStore/AppleKeyStore, la classe `AppleSEPXART`). Le mécanisme de fraîcheur
+  vit **entièrement** dans ces binaires fermés. **Non trouvé dans l'open source Apple publié** — et il n'y a aucune
+  raison qu'il y figure.
+- [déduit, limite de méthode] Le code-search plein-texte de GitHub sur `org:apple-oss-distributions` exige une
+  **authentification** (non disponible ici) ; grep.app est derrière un checkpoint. J'ai donc échantillonné le dépôt
+  le plus pertinent (Security) plutôt que l'ensemble des dépôts. Conclusion robuste malgré tout vu que les
+  composants SEP ne sont pas open source.
+
+### C. Existence d'une description publique Apple HORS périmètre (lead pour Albert, NON utilisée ici)
+- Apple publie un document de conception public (« Apple Platform Security », support.apple.com) qui décrit, au
+  niveau conception, un **composant de stockage sécurisé à compteur anti-rejeu** et un **boot nonce** pour le SEP.
+  **Ce document n'est PAS dans la liste de sources autorisées** pour cette phase (asahilinux.org/docs, m1n1,
+  linux-asahi, opensource.apple.com). Je le **signale seulement** comme piste : si Albert l'autorise, il donnerait
+  le *modèle mental* officiel du « comment » (compteur monotone matériel → un état scellé **ancien** est rejeté).
+  Je ne cite **aucune** de ses affirmations comme établie ici. Ce n'est ni un leak ni un firmware : c'est de la
+  doc de conception publiée par Apple, mais elle sort du périmètre convenu.
+
+### D. Réponses point par point (sources publiques autorisées uniquement)
+1. **Mécanisme de fraîcheur / anti-rejeu (nonce, compteur monotone, graine de session liée au boot)** :
+   **non documenté dans les sources autorisées.** Asahi affirme l'objectif, pas le moyen ; m1n1 et linux-asahi
+   n'en ont aucune trace ; l'open source Apple publié n'en parle pas. → **« comment » = non trouvé.**
+2. **« restaurer » vs « re-sceller » au démarrage** : **aucune source autorisée ne décrit cette décision.** La doc
+   Asahi documente seulement le **FETCH** (le SEP réclame un locker, type 0, réponse 0x5/0x7) ; elle ne documente
+   **aucun** message SAVE ni la règle de bascule. → non trouvé côté public.
+3. **Rôle des gigalockers / SEP-xART / USER-xART** : [public] Asahi dit que 0x13 « manages xARTs, gigalockers and
+   keybags (needed for SKS to start) » et que les gigalockers portent les keybags wrappés (format locker partiel).
+   La **distinction** xART **maître** (SEP-xART / USER-xART, les racines de fraîcheur) vs **gigalockers** (lockers
+   applicatifs réclamés par FETCH) **n'est PAS dans le public** : elle vient de **nos traces** et du **kext**
+   (`source: kext`, cf. §B/D plus bas et `kext_sepmanager.md`), pas d'une source publique.
+4. **Un rejeu de xART/gigalocker déjà montré faisable (ou explicitement impossible) publiquement ?** **Non, ni l'un
+   ni l'autre.** [public] Le seul fait public voisin : le **stockage AP est trivialement rejouable** (m1n1
+   `get_gigalocker` relit le blob chiffré sur disque). **Rien côté AP n'empêche de le resservir** ; mais **aucune
+   source publique ne montre un SEP acceptant un xART rejoué**, ni ne le déclare impossible. → non trouvé.
+
+### E. Verdict théorique (sources publiques seules)
+**Indéterminé publiquement — confirmé et renforcé par rapport au 2026-11-12.** Les sources autorisées établissent
+l'**intention** anti-rejeu et la **rejouabilité du stockage AP**, mais **ne tranchent pas** entre :
+- **monotonie de version** (seul un état *ancien* est rejeté → le *dernier* SAVE resterait acceptable → voie C
+  viable en « relais du dernier état »), et
+- **nonce/graine régénéré à chaque boot** (le dernier état devient périmé au boot suivant → un rejeu, même fidèle,
+  est re-scellé → voie C fondamentalement bloquée sans reproduire le contexte de fraîcheur).
+
+Aucune source publique ne départage ces deux modèles. **On ne peut donc PAS, à partir du seul public, dire que la
+voie C est viable ni qu'elle est un cul-de-sac connu.** Ce n'est **pas** un verrou « documenté comme impossible » :
+c'est un **inconnu public**.
+
+### F. Ce que nos traces ajoutent (NON public — à garder séparé, pour le sceptique)
+À ne PAS confondre avec le public ci-dessus. Nos essais SERVE_GL/FOLLOW (hypotheses.md HV1, `verification_status.md`
+xART-CHAIN ; traces `20261118-082622`, `…085250`) montrent, côté **pratique** :
+- [trace] En servant le **vrai** coffre `.gl` (qui colle à la puce réparée + Touch ID ré-enrôlé), le SEP prend les
+  **2 maîtres** puis **re-scelle immédiatement (SAVE op 0x01 à TAG=0x05), gl:0** — il **saute toute la phase FETCH
+  des gigalockers** que macOS fait au même point. C'est **la** divergence voie C.
+- [trace] L'hypothèse « maîtres croisés (bug d'emballage) = cause » est **réfutée** (n=2 : croisés 08:26 **et**
+  corrigés 08:52 → **même** SAVE@TAG05). Le contenu/ordre des maîtres n'est pas le déclencheur. → **recentre vers
+  le modèle « nonce/graine par boot » (re-scellement), voie C qui recule.**
+- [trace/kext] **MAIS ce n'est pas prouvé fermé** : (i) « un SAVE n'est pas un refus » (macOS émet aussi des SAVE
+  acquittés et continue) ; (ii) reste le doute **préfixe 0x11** de l'emballage du maître, seul emballage non
+  testé et **non vérifiable hors ligne**. La discrimination définitive « emballage faux » vs « vrai anti-rejeu »
+  exige d'**acquitter le SAVE** = **écriture risquée** (fait avancer un compteur scellé potentiel) → **Albert +
+  backup disque** (inexistant à ce jour). Voir `docs/voie-c-xart-fraicheur` (mémoire) et hypotheses.md HV1.
+- [kext, contraste] La classe `AppleSEPXART` expose `nonce_generate`/`nonce_read`/`nonce_invalidate`,
+  `setup_OS_UUID`, `erase_session_seeds_for_UUID` — **compatible** avec une fraîcheur liée à un nonce/graine de
+  session par boot, mais **le rôle exact (par-boot vs par-session) et l'ancrage matériel ne sont pas établis**.
+  Hypothèse, pas une source publique.
+
+### G. Contradiction doc publique ↔ nos traces (pour le sceptique)
+- **Aucune contradiction** : le public est seulement **muet** sur le mécanisme. Nos traces vont plus loin que tout
+  public (SAVE@TAG05 reproduit, maîtres corrigés sans effet) et **penchent côté pratique vers le re-scellement**,
+  mais **sans preuve crypto** (blobs chiffrés, n petit, test décisif = écriture non encore faite). Le seul risque
+  d'incohérence serait de **présenter « voie C penche fermée » comme un fait public** : ce n'en est pas un — c'est
+  une lecture de **nos traces**, à trancher par l'expérience d'écriture (Albert + backup), pas par la doc.
+
+## 2026-11-18 (après-midi) — Guide « Apple Platform Security » autorisé : (a) compteur vs (b) nonce par boot ?
+
+Albert a **autorisé ce jour une source publique supplémentaire** : le guide officiel **« Apple Platform
+Security »** (support.apple.com, document de conception public, ni leak ni firmware). But : départager le modèle
+anti-rejeu (a) compteur monotone de version [rejeu du dernier coffre viable] vs (b) nonce régénéré par boot [rejeu
+figé impossible]. Page lue : **« Secure Enclave »**, URL
+`https://support.apple.com/guide/security/secure-enclave-sec59b0b31ff/web`, lue le **2026-11-18**. Légende :
+**[public, guide Apple]** = citation verbatim du guide ; **[déduit]** = pont vers notre vocabulaire (xART).
+
+### H. Ce que le guide dit VERBATIM (citations exactes)
+- [public, guide Apple] **Composant matériel dédié** : « In devices with A12, S4, or later SoCs, the Secure Enclave
+  is paired with a **Secure Storage Component** for entropy storage. » Le M1 (A14/M1-class) est postérieur à A12 →
+  concerné.
+- [public, guide Apple] **Canal exclusif chiffré+authentifié** : « The Secure Enclave and Secure Storage Component
+  communicate using an **encrypted and authenticated protocol** that provides **exclusive access to the entropy**. »
+  Et : « The secure nonvolatile storage is connected to the Secure Enclave using a **dedicated I2C bus**, so that it
+  can only be accessed by the Secure Enclave. »
+- [public, guide Apple] **Racine d'entropie hors disque AP** : « All user data encryption keys are **rooted in
+  entropy stored in the Secure Enclave nonvolatile storage**. » ; « The Secure Storage Component **generates the
+  salt value using its random number generator** » ; « … returns the generated lockbox entropy value to the Secure
+  Enclave ».
+- [public, guide Apple] **Services anti-rejeu NV liés à des « frontières », PAS à chaque boot** : « The secure
+  nonvolatile storage is used for **all anti-replay services** in the Secure Enclave. » Ces services servent à la
+  « revocation of data over events that mark **anti-replay boundaries** », dont la liste est : **changement de code**,
+  activation/désactivation/reset de Face/Touch/Optic ID, **ajout/retrait d'un doigt/visage**, ajout/retrait d'une
+  carte Apple Pay, « Erase All Content and Settings ». **Le boot n'est pas dans cette liste.**
+- [public, guide Apple] **Compteur des lockboxes = limiteur de tentatives, PAS un compteur de version** : « Each
+  counter lockbox stores a 128-bit salt, a 128-bit passcode verifier, an **8-bit counter**, and an 8-bit maximum
+  attempt value. » À chaque essai : « first **increments the counter** » ; bon code → « resets the counter to 0 » ;
+  dépassement → « **completely erases the counter lockbox** ». C'est un anti-brute-force de code, pas un compteur de
+  fraîcheur xART.
+- [public, guide Apple] **Mémoire vive (RAM) du SEP : clé éphémère régénérée au démarrage** (= par boot) : « When the
+  device starts up, the Secure Enclave Boot ROM **generates a random ephemeral memory protection key** for the Memory
+  Protection Engine. » ; « the Memory Protection Engine stores a **unique one-off number, called an anti-replay
+  value** », « protected using an **integrity tree rooted in dedicated SRAM** ». Mais ceci concerne la **protection
+  mémoire volatile**, pas le stockage xART persistant.
+
+### I. Ce que le guide NE dit PAS (honnêteté)
+- Le guide **n'emploie jamais** les mots « xART », « boot nonce », « monotonic counter » (au sens version), ni ne dit
+  que l'état NV **périme à chaque boot**. Il **ne tranche donc pas explicitement (a) vs (b)** dans ces termes pour le
+  stockage xART. Dit franchement : **le guide reste vague sur le choix (a)/(b) exact.**
+
+### J. Ce que le guide tranche quand même — et qui dépasse (a)/(b)
+- [déduit, de H] Les deux indices textuels **penchent CONTRE (b) « nonce régénéré à chaque boot »** pour le stockage
+  **persistant** : (i) les frontières anti-rejeu NV sont des **événements de révocation** (code, biométrie, Apple
+  Pay), **le boot n'en fait pas partie** → l'état scellé **survit** à un boot ordinaire ; (ii) le seul « éphémère
+  par boot » explicite est la **clé de protection mémoire (RAM)**, pas le coffre NV. → Le modèle persistant ressemble
+  plus à (a) **état invalidé seulement aux frontières de révocation** qu'à (b) **tout périmé au boot**.
+- [déduit, décisif] **MAIS cela ne rouvre PAS la voie C au sens « rejouer le coffre disque ».** Le fait structurel
+  établi par le guide est que la **racine de fraîcheur/entropie vit dans un composant matériel séparé (Secure Storage
+  Component)**, accessible **uniquement par le SEP** via un **bus I2C dédié** et un **protocole chiffré+authentifié à
+  accès exclusif**. Le blob xART/gigalocker **sur disque** est **enveloppé avec des clés enracinées dans cette
+  entropie matérielle** (« All user data encryption keys are rooted in entropy stored in the Secure Enclave
+  nonvolatile storage »). Donc **rejouer le coffre figé du disque est insuffisant par conception, que le modèle soit
+  (a) ou (b)** : l'AP (m1n1/Linux) **ne peut ni lire, ni rejouer, ni reproduire** l'entropie détenue dans ce silicium.
+  C'est un **troisième axe** que (a)/(b) ne capturaient pas : le verrou n'est pas « ancien vs dernier état », c'est
+  **« la fraîcheur n'est pas dans le disque, elle est dans une puce que seul le SEP adresse »**.
+
+### K. Mise à jour du verdict (public, maintenant guide Apple inclus)
+- **Avant (section E)** : indéterminé public entre (a) et (b). **Maintenant** : le guide **oriente contre (b) pur**
+  pour le NV (l'état survit à un boot simple), **mais** établit un fait plus fort pour notre projet — **l'ancrage
+  matériel hors-disque**. Conséquence pour la voie C « servir le coffre disque sauvegardé » : **le guide la rend
+  improbable au niveau conception** (le coffre seul ne porte pas la fraîcheur), **sans la déclarer formellement
+  impossible** (le guide ne décrit pas le protocole SEP↔Secure Storage Component au boot, ni s'il faut un
+  ré-appariement/une resynchro d'entropie à chaque démarrage). Le point restant indéterminé : **est-ce la perte de ce
+  contexte matériel (apparié par iBoot/sepOS natif, absent sous m1n1) qui force le re-scellement observé dans nos
+  traces ?** — cohérent avec notre **hypothèse B′**, mais non prouvé par le guide.
+- **Lien avec nos traces (§F)** : le re-scellement observé (SAVE@TAG05, maîtres corrigés sans effet) est **compatible**
+  avec « le SEP ne retrouve pas l'entropie du Secure Storage Component dans notre contexte de boot m1n1 et repart sur
+  une base fraîche ». Le guide **appuie** cette lecture au niveau conception, sans la démontrer.
+- **Pas de contradiction** doc↔traces : le guide est muet sur le protocole de boot précis ; nos traces montrent le
+  comportement, le guide donne le **pourquoi plausible** (fraîcheur hors-disque, matérielle).
+
+### L. Ligne rouge / périmètre
+- Source = **document de conception public Apple**, cité verbatim, **aucune clé ni secret extrait**, aucun firmware.
+  Conforme (Albert a autorisé cette source ce jour, pour ce point précis). Rien envoyé vers Asahi.

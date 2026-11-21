@@ -6,3 +6,5 @@ __pycache__/
 .current_capture
 .stop_capture
 .appel_msg
+xart_store_linux/
+/restore_*.log

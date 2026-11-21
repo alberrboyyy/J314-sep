@@ -14,6 +14,203 @@ Format :
 
 ---
 
+## 2026-11-22 00:46 — Albert (lance) + Claude (Opus 4.8) — 🎯 ROUTE NATIVE CONFIRMÉE : le SEP scelle un état frais pour Linux, SE STABILISE, et arme sbio + sks
+- Trace : traces/20261122-004526_native_persist (log complet). Store scellé : xart_store_linux/ (master_2.bin 420o + glsave_0..3.bin 106/56/613/385o). Proxy rattrapé en local par catcher v2 ; check lecture seule traces/20261122-004523_proxy_check.
+- Fait :
+  1. Catcher v2 réécrit (tools/catch_lib.sh) : surveille le NŒUD BRUT /dev/ttyACM* (pas le lien udev), baseline des ports préexistants (anti-fantôme), vérif produit/fabricant USB (ignore un CDC-ACM non-m1n1 type téléphone). Rattrapé le proxy en LOCAL au 1er coup (t+13s), chainload m1n1 frais OK.
+  2. sep_peek lecture seule : SEP vivant (CPU RUN=0 pré-boot ; mailboxes A2I/I2A EMPTY=1 ENABLE=1).
+  3. PERSIST (Albert lance, `M1N1TIMEOUT=20 ./pending/sep_native_persist.sh`) : boot SEPOS, xarm annoncé, réponses ABSENT (forme kext) aux FETCH maîtres → le SEP ACQUITTÉ les SAVE (12) → **idle** (budget 48 NON atteint).
+- Vu (faits bruts du log) :
+  - Séquence : fw-boot ack → os-uuid (UUID Linux servi) → FETCH-maître ×2 → ABSENT → annonces 'sbi','skd','sse','sks','scr' (ack 0x16) → 12 SAVE (8 SAVE-xART + 4 SAVE-locker) tous ACK+stockés → absent(SEP) ×1 → puis plus rien pendant 25 s = **idle**.
+  - Tailles des SAVE maîtres croissantes puis stables (127→225→323→420 o, répétées par paire) ; lockers 106/56/613/385 o.
+  - Endpoints finaux : cntl, **sbio(0x08)**, scrd(0x0a), sse(0x0c), hdcp(0x0e), xars(0x10), **sks(0x12)**, xarm(0x13), hibe(0x14), pnon(0x15), skdl(0x17), stac(0x18).
+- Interprété :
+  - **La question décisive de `route_native.md` §6 est tranchée : OUI.** Acquitter les SAVE d'un état FRAIS (jamais du rejeu macOS) → le SEP SE STABILISE (idle, pas la boucle de re-SAVE de la voie C) et laisse **sbio ET sks** armés. C'est l'état scellé légitime natif, obtenu sans macOS. Mur de fond franchi.
+  - RÉSERVE (pas encore vérifié) : « annoncé ≠ vivant ». sbio/sks sont ANNONCÉS, pas prouvés fonctionnels. n=1 pour la stabilisation-sur-ack (le recon absent→annonce→SAVE était n≥2, cf. 20261121-164915). À confirmer : sonde sbio (0x73 « vivant ? », sans doigt) et sks ; test inter-boot (resservir le store → le SEP reconnaît-il son état sans re-sceller ?) ; puis enrôlement (doigt = session humaine).
+- Incidents : warning bénin `catch_lib.sh:83 /dev/ttyACM0: Permission denied` (ouverture du nœud brut avant que udev pose les droits uucp ; le chainload a pris le relais dans la fenêtre → catch réussi). À durcir : retry d'ouverture ~50 ms. Compteur anti-rejeu avancé de 12 crans (écriture irréversible, prévu). macOS désynchronisé (ne bootait déjà plus) ; Linux intact ; filet DFU + alarm_p5.img prêts. Rien poussé.
+
+## 2026-11-21 (après-midi) — Claude (Opus 4.8) — BLOCAGE : catch proxy KO (m1n1 file sur Arch) ; Linux OK, Mac récupérable ; diagnostic écrit
+- Trace : — (Albert au taf ensuite ; je bosse hors-hardware). Lecture m1n1/src/main.c.
+- Fait : après le script PERSIST prêt, impossible de rattraper le Mac en proxy (plusieurs power-cycles). Le Mac a bootloopé macOS un moment (« passé sous macOS »), startup options/1TR bouclent, puis il boote **Arch normalement** (Linux INTACT, rien perdu). Tenté catch intégré aux scripts natifs → marchait pas chez Albert → **reverti** (scripts natifs = connexion seule ; catch via `tools/catch_proxy.sh` que Claude lance). Rendu le catcher **agressif** (saisie immédiate de if02, boucle serrée) dans `tools/catch_lib.sh` (+ `catch_proxy.sh` refactoré dessus, faux-échec UartTimeout corrigé).
+- Vu (code m1n1) : la fenêtre de catch (5 s, `EARLY_PROXY_TIMEOUT`) ne s'ouvre QUE si `cur_boot_args.video.display==0` **ET** `lp_sip0==127` ; sinon m1n1 saute direct au payload (Arch). → c'est pourquoi le catch rate maintenant (une des 2 conditions a basculé ; cohérent avec « boot policy changée »). Diagnostic complet + test « lire l'écran » + arbre de décision : `docs/catch_proxy_diagnostic.md`.
+- Interprété : on n'a jamais touché la boot policy par script (ligne rouge tenue) ; cause probable = coupures d'alim répétées / tentatives macOS ont basculé le disque par défaut et/ou la LocalPolicy. **Non confirmé** — à trancher en lisant le texte m1n1 à l'écran au prochain boot (lignes « Boot policy: sip0 = N », « video: display: 0x… », et si « Waiting for proxy connection... » s'affiche).
+- Incidents : aucun dommage matériel. Mac récupérable (DFU en dernier recours, filet prêt). Rien poussé.
+
+## 2026-11-21 — Claude (Opus 4.8) — Script PERSIST prêt (pending/sep_native_persist.sh) — run d'ÉCRITURE, à lancer par Albert
+- Trace : — (hors-hardware, SELFTEST OK). Store xART Linux sur CE PC : `xart_store_linux/` (vide au départ).
+- Fait : écrit `pending/sep_native_persist.sh` = politique native complète. Acquitte + STOCKE les SAVE (maître par type 1/2, gigalocker brut indexé — clé UUID = TODO), SERT depuis le store au re-FETCH (maître = 0x11 zéros + charge ; gl par UUID), ABSENT sinon (formes kext). Budget SAVE borné (MAX_SAVES=48). En-tête go/no-go en langage clair.
+- But : trancher si « sceller du frais + le STOCKER + le re-servir » STABILISE le SEP (idle après SAVE, sbio reste armé) vs boucle de re-SAVE (= même mur que voie-C FOLLOW). Différence clé vs FOLLOW : on stocke et on ressert (FOLLOW acquittait en servant du périmé).
+- ⚠️ ÉCRITURE : acquitter un SAVE fait avancer le compteur scellé → DFU derrière (backup prêt ; macOS sacrifié, on s'en fiche). Décision + lancement = Albert. Store sur ce PC ; transfert vers le Linux du Mac par USB = étape future (driver natif noyau).
+- Incidents : — (pas encore lancé). Rien poussé.
+
+## 2026-11-21 — Albert (lancé) — ⭐ RECON natif n°2 : la forme d'absent kext MARCHE → SEP annonce sbio + VEUT SCELLER DU FRAIS (SAVE)
+- Trace : traces/<dernier _native_0x13> (native_0x13.log). `SKIP_CHAINLOAD=1 ./pending/sep_native_0x13.sh` (ABSENT_FORM=kext, OS_UUID_MODE=fixed), m1n1 frais (catch OK).
+- Fait : boot SEPOS + politique native OBSERVE avec la forme d'absent fidèle au kext (TYPE=0x00, maître len 0x11 / gl len 0).
+- Vu (vs recon n°1 qui CALAIT au 1er maître) : fw-boot→ack ; os-uuid→UUID Linux ; **FETCH maître TAG=0x03 (sel=1 SEP) → ABSENT** ; **FETCH maître TAG=0x04 (sel=0 USER) → ABSENT** (le SEP demande MAINTENANT les DEUX maîtres) ; puis **annonces sbi/skd/sse/sks/scr** (ackées 0x16) ; puis **SAVE-xART TAG=0x05** = la puce veut re-sceller → **on s'est ARRÊTÉ SANS acquitter** (OBSERVE). Endpoints finaux : cntl, **0x08:sbio**, 0x0a:scrd, 0x0c:sse, 0x0e:hdcp, 0x10:xars, 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x17:skdl, 0x18:stac. **sbio ANNONCÉ.**
+- Interprété : l'hypothèse « absent → le SEP scelle du frais » est **SOUTENUE** — refuser proprement les 2 maîtres amène le SEP à annoncer toute la pile biométrique (sbio/skdl/sse/scrd) puis à demander un SAVE pour sceller son propre xART frais. **AUCUNE écriture** (SAVE non acquitté → compteur non avancé → récupérable). ⚠️ HONNÊTETÉ : ce point (annonces + SAVE@TAG05) est **le MÊME** qu'atteignait voie-C FOLLOW ; la différence qui doit compter = le run PERSIST **stockera** le blob frais (cohérent au re-fetch), là où FOLLOW ne faisait qu'acquitter en servant du périmé → re-SAVE sans fin. « sbio annoncé » ≠ « sbio fonctionnel » (question annoncé/vivant encore ouverte).
+- Incidents : aucun. Prochain = run PERSIST (acquitter + STOCKER le SAVE) = ÉCRITURE SEP = porte Albert (backup+DFU prêts). Rien poussé.
+
+## 2026-11-21 — Claude (Opus 4.8) — KEXT (2 vérifs avant recon n°2) : OS-UUID « absent » = TYPE=0x02 ; préfixe maître 0x11 = zéros (confirmé)
+- Trace : — (décompil, même fonction + dispatch). Opcode du message = **octet TYPE** (byte 2) ; table de saut à 0x9986db8 pour op 0..0x0e, op 0x13 traité à part.
+- Vu : (1) op 0x13 (os-uuid) : `_determineOsUuidGated` lit `apfs-preboot-uuid` ; si flag `[this+0xd9]==0` (pas d'UUID) → réponse **TYPE=0x02**, rien en A ; sinon 16 o en A + TYPE=0x00. (2) préfixe maître : `strb wzr,[x21],#0x11` + `memset(A+1,0x10,0)` → **A[0..0x11]=0x11 zéros** (mon script était déjà correct).
+- Interprété : pour Linux (pas d'apfs-preboot-uuid) le « pas d'UUID d'OS » fidèle = TYPE=0x02. Ajouté `OS_UUID_MODE` au script (défaut `fixed` = UUID Linux comme au recon n°1, pour ne changer QU'UNE variable — la forme d'absent — au recon n°2 ; `none` = TYPE=0x02 dispo pour un recon n°3). SELFTEST OK (2 modes). Doc : gigalocker.md.
+- Incidents : aucun. Script prêt pour recon n°2 (ABSENT_FORM=kext). Rien poussé.
+
+## 2026-11-21 — Claude (Opus 4.8) — KEXT : forme exacte de la réponse « introuvable » trouvée (explique le cale du recon n°1)
+- Trace : — (décompil hors-ligne ; `AppleSEPXART::_handle_sep_driven_msg` @0xfffffe0009986588, kernel.macho / com.apple.driver.AppleSEPManager ; capstone venv scratchpad). Autorisé par Albert (droit suisse, usage perso).
+- Fait : désassemblé le handler 0x13 côté AP pour trouver comment macOS répond quand un enregistrement est ABSENT (notre recon n°1 avait deviné 0x07 → SEP calé).
+- Vu (source: kext) : réponse écrite dans la struct message (8 o = mot mailbox) : octet2=TYPE(code retour, 0=ok), octets3-4=longueur → **PARAM=len&0xff, DATA0=len>>8** (confirme notre codec depuis le binaire), octet5=sélecteur ré-émis. « Introuvable » **n'est pas une erreur** : FETCH normal TYPE=0x00 avec **maître → longueur 0x11 (préfixe seul, A=0x11 zéros)** ; **gigalocker → longueur 0, A vide**. CRC-16 CCITT (poly 0x1021) sur la charge pour le log, pas dans le message. Aussi : `_determineOsUuidGated` lit `apfs-preboot-uuid` de `/chosen` avec un chemin explicite « OS UUID determined not to exist » (macOS tourne SANS UUID d'OS).
+- Interprété : **ça débloque le recon** — on utilisait une forme invalide (0x07). Corrigé `pending/sep_native_0x13.sh` : ABSENT_FORM=kext (défaut) = maître len 0x11 / gl len 0, TYPE=0x00. Détail dans `gigalocker.md` §Réponse… SELFTEST OK.
+- ⚠️ NON résolu (reste du pari) : que le SEP, recevant un maître VIDE, **génère du frais + SAVE** (le kext dit ce que macOS ENVOIE, pas ce que le SEP fait ensuite sur un store vide) ; l'UUID d'OS à donner sous Linux (fake vs « aucun » — à retracer dans setup_OS_UUID) ; contenu exact du préfixe 0x11.
+- Incidents : aucun. m1n1 non touché. Rien poussé.
+
+## 2026-11-21 — Albert (lancé) — RECON natif n°1 : ABSENT (forme 0x07) sur le 1er FETCH maître → le SEP CALE (pas de SAVE, pas de sbio)
+- Trace : traces/<dernier _native_0x13> (native_0x13.log). Lancé `SKIP_CHAINLOAD=1 ./pending/sep_native_0x13.sh` sur m1n1 frais (catch_proxy OK, « Running proxy »).
+- Fait : boot SEPOS + politique native OBSERVE (absent sur FETCH, stop sans acquitter sur SAVE).
+- Vu : BOOT OK ; endpoints annoncés = cntl, hdcp(0x0e), xars(0x10), xarm(0x13), hibe(0x14), pnon(0x15), stac(0x18) — **ni sks(0x12) ni sbio(0x08)**. Séquence : fw-boot(TAG 0x02)→ack ; os-uuid(TAG 0x01)→UUID Linux servi ; **FETCH-maître TAG=0x03 DATA=0x100 (sél=1 = SEP-xART) → on répond ABSENT (0x07) → SILENCE** (idle 20 s, aucune autre requête). bilan : FETCH-maître×1, fw-boot×1, os-uuid×1.
+- Interprété : la forme d'« absent » 0x07 (AP→SEP) n'a **pas** déclenché de scellage frais ; le SEP **cale** sur le 1er maître refusé. Hypothèses : (a) 0x07 n'est pas la bonne forme « introuvable » dans ce sens ; (b) le SEP lit le **tampon A** et un A vide le bloque. NON tranché. **AUCUNE écriture** (le SEP n'a jamais demandé de SAVE → compteur non avancé → rien à récupérer ; garde-fou OK).
+- Décision (Albert) : **prioriser la route kext/hors-hardware** — trouver dans `AppleSEPManager` (handler 0x13) la forme exacte « locker introuvable » que le SEP attend, AVANT de re-tenter sur matériel (chaque essai = 1 power-cycle). Décompilation large autorisée (droit suisse, usage personnel).
+- Incidents : aucun. Rien committé/poussé.
+
+## 2026-11-21 — Claude (Opus 4.8) — Script de RECON natif préparé (pending/sep_native_0x13.sh), OBSERVE pur, à lancer par Albert
+- Trace : — (prépa hors-hardware ; SELFTEST validé, Mac non branché). Décision technique déléguée par Albert (« je suis l'architecte »).
+- Fait : écrit `pending/sep_native_0x13.sh` — 1er pas de la route native, en 1 temps RECON (OBSERVE pur, aucune écriture au-delà du boot routine). Boot SEPOS (scaffold éprouvé) → répond **ABSENT** aux FETCH maître/locker (hypothèse : forme = op 0x07, que le SEP utilise lui-même ; variante `empty`) → ack VU pour fw-boot/os-uuid/annonce → **STOP sans acquitter sur SAVE** (donc compteur NON avancé). But : voir si « prétendre n'avoir aucun xART » pousse la puce à vouloir sceller du frais (émettre un SAVE) et annoncer sbio.
+- Vu : en-tête en **langage clair** pour la décision go/no-go d'Albert (ce que ça fait, risque, récupérable). SELFTEST OK (2 formes d'absent). Fail-closed sur op inconnue et sur SAVE.
+- Interprété : inconnue assumée — la **forme AP->SEP d'un « absent »** n'a aucune capture (macOS avait toujours ses lockers) ; ce recon sert aussi à la découvrir. Risque = classe OBSERVE (pas de SAVE-ack → pas d'avancement de compteur → récupérable comme nos runs passés). L'UUID d'OS Linux renvoyé (op 0x13) = un choix (`4c494e5558…` = "LINUX"+0), à ajuster.
+- Incidents : aucun. Le run d'ÉCRITURE (PERSIST = acquitter+persister le SAVE = la vraie porte) n'est **pas** écrit : je l'écrirai APRÈS avoir vu la réaction du recon. Rien committé, rien poussé.
+
+## 2026-11-21 — Claude (Opus 4.8) — Recadrage : booter SEPOS n'est PAS une porte à ouvrir (déjà fait en routine) ; la vraie porte = politique 0x13 native (SAVE-ack)
+- Trace : — (lecture de `pending/sep_xart_replay.sh` l.17-20/520 + `m1n1/proxyclient/m1n1/hw/sep.py`). Lecture seule, rien poussé.
+- Fait : prépa hors-hardware de la route native. En lisant notre propre harnais, constaté que **le boot SEPOS est déjà effectué à chaque run** (`sep.boot()` = GET_STATUS/BOOT_TZ0/**BOOT_IMG4**/SET_SHMEM), « déjà lancé sans incident » (= ouverture de tous les essais voie C). L'IMG4 = firmware SEP **propre à la machine** (ADT `/chosen/memory-map` SEPFW, préchargé iBoot), pas un leak.
+- Vu : `route_native.md` §3.1/§6 et `handler_0x13.md` §4 présentaient à tort « booter SEPOS » comme la 1re porte non franchie. CORRIGÉ : le boot est franchi en routine via proxyclient ; le « SEP | WIP » d'Asahi concerne leur **driver noyau** (`sep.rs`, désactivé), pas notre chemin.
+- Interprété : la **vraie** porte de la route native = la **politique 0x13 native** (répondre *absent* aux FETCH pour laisser la puce sceller du frais, puis **acquitter + persister le SAVE**). Le **SAVE-ack** est l'écriture qui fait avancer le compteur scellé = porte Albert (backup+DFU en filet). Le harnais `sep_xart_replay.sh` (boot + bootstrap CNTL + tampons A/B) est le **scaffold réutilisable** ; le handler natif en est un mode frère — l'**opposé** du replay (mort) : il ne resert pas le coffre macOS, il laisse sceller du frais.
+- Incidents : aucun. m1n1 lu, non modifié, non poussé (ban IA = contribution, pas lecture — accord Albert 2026-11-21). Prochain pas = écrire le `pending/` du run natif (en-tête but/risque/résultat, fail-closed, budget SAVE borné) — après relecture de la politique par Albert.
+
+## 2026-11-20 (matin) — Claude (Opus 4.8) — CRC des slots .gl IDENTIFIÉ et vérifié (12/12) : CRC-32/ISO-HDLC de la charge
+- Trace : traces/20261117-224724_xart_read/*.gl.bin (coffre réel, 12 lockers). Analyse hors-ligne (chercheur de CRC générique, catalogue CRC-16/32 × régions).
+- Fait : confronté le CRC stocké (+0x16, u32 LE) de chaque locker à un catalogue d'algos sur plusieurs régions.
+- Vu : **CRC-32/ISO-HDLC (`zlib.crc32`) de la CHARGE seule `[0x22:0x22+longueur]` reproduit les 12/12 CRC stockés**, exactement. Aucun autre algo/région ne matche. → passe `gigalocker.md` « algo non vérifié » à **VÉRIFIÉ**. Ajouté `xart.slot_crc()` + `Locker.crc_ok` + `serialize_locker()` (round-trip d'un slot À L'OCTET PRÈS, testé) + `build_header()` (nouveau locker). step6 = 10 tests verts (dont CRC 12/12 et round-trip).
+- Vu aussi : un **u16 à +0x1a** (puis 6 o nuls) varie par locker ; **PAS** un CRC-16 courant de la charge ni une longueur (toutes variantes du catalogue écartées). Champ **inconnu**, documenté ; mis à 0 par `build_header` avec un ⚠️ (à confirmer sur matériel avant un vrai SAVE natif).
+- Interprété : le format `.gl` est maintenant **entièrement sérialisable en VU** sauf ce u16. Débloque proprement le « store xART écrivable » du handler natif (handler_0x13.md §4bis) — le seul reste hypothétique est le u16 + la POLITIQUE (quand écrire), qui restent porte Albert.
+- Incidents : aucun. Rien committé. (chercheur de CRC = scratchpad, exploratoire ; l'algo retenu est dans xart.py avec test.)
+
+## 2026-11-20 (matin) — Claude (Opus 4.8) — Étape 7 : modèle de la réponse AP à l'EP 0x13 (xART), VU, validé en reproduisant snew-reel
+- Trace : traces/20261111-113919_snew-reel (EP 0x13, 30 échanges). Hors-hardware, rien émis vers le SEP.
+- Fait : écrit `driver/sepreplay/xart_responder.py` (modèle du côté AP du protocole 0x13) + `driver/tests/test_step7_xart_responder.py` (8 tests, verts). Fait suite au codec VU de l'étape 6 (`xart.py`).
+- Vu (reproduit ligne à ligne sur snew-reel) : macOS répond à CHAQUE requête 0x13 du SEP de façon régulière —
+  - fw-boot (TYPE 0x0e) → ack `TYPE=0x00 DATA=0x100` ;
+  - OS-UUID (0x13) → `TYPE=0x00 DATA=0` + 16 o d'UUID écrits en tampon A ;
+  - FETCH maître/gigalocker (0x00/0x05) → `TYPE=0x00`, longueur `PARAM|DATA0<<8` + **sélecteur ré-émis** (DATA[1]) — reproduit exactement par notre codec à partir de la longueur encodée ;
+  - locker-absent émis par le SEP (0x07, TAG 0x0b) → simple ack `DATA=0` ;
+  - **SAVE (0x01 maître / 0x06 locker, TAG 0x13/0x14/0x15) → macOS ACQUITTE** : `TYPE=0x00 DATA = req.data & 0xFFFFFF00` ;
+  - annonce d'endpoint (0x1d) → ack `TYPE=0x16 DATA = req.data & 0xFFFFFF00`.
+- Interprété : le côté AP du 0x13 est entièrement déterministe et VU ; notre modèle le reproduit → base solide du futur handler natif. ⚠️ La POLITIQUE native (répondre « absent » quand le store Linux est vide ; **persister** le blob d'un SAVE) DIVERGE de macOS sur 2 points seulement, isolés dans `native_fetch_decision()`/`native_on_save()`, marqués HYPOTHÈSE — **aucune vérité terrain**, validables seulement sur matériel (porte Albert, cf. handler_0x13.md §2/§3, route_native.md).
+- Incidents : aucun. Suite : step1-4+6+7 verts ; step5_daemon échoue encore (compteur de captures codé en dur 18 ≠ 23 réelles — pré-existant, indépendant de ce travail). Rien committé.
+
+## 2026-11-18 (midi) — Claude (Opus 4.8) — ⭐ HANDOFF / ÉTAT DES LIEUX : voie C (rejeu xART) fermée avec confiance élevée ; R3 (décisif) préparé mais optionnel
+- Trace : — (synthèse ; détails dans les entrées ci-dessous et les 4 rapports d'agents).
+- **CONCLUSION (confiance élevée, non prouvée à 100 %)** : **rejouer le coffre xART pour obtenir Touch ID sous Linux ne marche pas**, pour des raisons MATÉRIELLES, pas par manque d'essais. Faisceau convergent :
+  - **R2 (input pourri)** : servir des maîtres ZÉROS donne le MÊME comportement que le vrai coffre (SAVE@TAG05, gl:0). → **la puce n'évalue pas ce qu'on sert**, elle re-scelle sur son propre état interne. C'est le résultat le plus décisif.
+  - **R1 (sbio stream 15)** : le silence de la sonde 0x73 n'est PAS un problème de canal DART (stream 15 programmé, A8 mappé sid 0 ET 15, toujours muet). → sbio n'est pas « armé » tant que le xART n'est pas scellé.
+  - **Guide Apple** (documentaliste) : la fraîcheur/entropie vit dans une **puce matérielle séparée** (Secure Storage Component, bus I2C dédié SEP-only), PAS sur le disque → rejouer un coffre disque ne peut pas la restituer.
+  - **Nonce** (analyste) : nonce xART généré par la ROM du SEP, **aucun levier côté AP** pour le fixer/semer.
+  - **Désassemblage** (analyste) : notre emballage maître (préfixe 0x11) est **prouvé conforme** → le re-scellement n'est pas un bug à nous.
+- **IL RESTE 1 test risqué, OPTIONNEL — R3 (ACK_SAVE)** : `pending/serve_gl_decisif_go.sh`. Acquitte le SAVE → fait AVANCER le compteur anti-rejeu matériel → certitude A/B à 100 %, mais ⚠️ Touch ID à récupérer par DFU ensuite. Pronostic : confirmera la fermeture (enchaîne des SAVE). **Décision d'Albert, backup frais d'abord.**
+- **Pattern macOS** : dès qu'on pilote le SEP par m1n1, **macOS refuse de booter ensuite** (notre sécurité baissée + étage de boot m1n1 = incompatible avec un boot macOS normal) ; **Linux boote toujours**. Récupération = **DFU Restore** (remet tout d'usine, puce intacte). Ce n'est PAS un brick profond : R1/R2 n'ont rien gravé ni avancé aucun compteur.
+- **FILET DE RÉCUP (vérifié)** : `~/mac-dfu/alarm_p5.img` (242 Go, image LUKS de la partition Linux p5, **sha256 OK**) + `~/mac-dfu/UniversalMac_27.2.1_26B131_Restore.ipsw` (DFU). Chaîne éprouvée le 2026-11-17. macOS sacrifiable. Albert refait une backup fraîche avant R3.
+- **PLAN** : backup fraîche (Albert, aprem) → ce soir, posé : cold-boot → proxy (`tools/catch_proxy.sh`) → **R3** → DFU → re-restore alarm_p5.img → ré-enrôler Touch ID. macOS n'est plus requis pour le projet.
+- **Lanceurs prêts dans pending/** (Albert lance, jamais l'agent) : `probe_sbio_stream15_go.sh` (R1, sûr), `serve_gl_garbage_go.sh` (R2, sûr), `serve_gl_decisif_go.sh` (R3, risqué). Flags du core : `SBIO_STREAM15`, `GL_GARBAGE`, `ACK_SAVE` dans `sep_xart_replay.sh` (défauts OFF).
+- **Outillage** : `tools/catch_proxy.sh` reçoit `M1N1TIMEOUT=20` (le `UartTimeout` au chainload était un faux échec — le proxy monte quand même). Rien n'est committé.
+- Incidents : aucun dommage. macOS non-bootable (attendu, → DFU ce soir).
+
+## 2026-11-18 (midi) — Albert (lancé) — R2 : input POURRI (maîtres zéros) → comportement IDENTIQUE → la puce ignore le contenu servi (B′ confirmé)
+- Trace : traces/<dernier _xart_replay de R2> (follow_B dumpé). Lancé : `./pending/serve_gl_garbage_go.sh` (GL_GARBAGE=1), puce fraîche (cold-boot).
+- Fait : servi des maîtres de MÊME longueur mais remplis de ZÉROS, reste du flux inchangé.
+- Vu : `FETCH maître sel=1/0 [GARBAGE: contenu nul]` → annonces sbio/skdl/sse/sks/scrd (acquittées 0x16) → **SAVE op 0x01 à TAG=0x05, gl:0** (re-scellé head=ca700f8d…). **IDENTIQUE** aux runs à vrai coffre (082622/085250) et à coffre croisé.
+- Interprété : **la puce n'évalue pas le contenu des maîtres** (vrai coffre, inversé, ou zéros → même SAVE@TAG05). Elle re-scelle sur son état interne (fraîcheur matérielle), pas sur notre input. **Confirme (B′)** ; voie C fermée côté « rejeu d'un coffre disque ». n cumulé = 4 runs / 3 inputs différents, même résultat.
+- Incidents : catch_proxy a reporté un exit 1 cosmétique (proxy monté quand même). Aucune écriture SEP persistée (fail-closed sur SAVE).
+
+## 2026-11-18 (midi) — Albert (lancé) — R1 : sonde sbio avec stream 15 DART → toujours muet → cause « canal DART » ÉCARTÉE, c'est l'état (sbio non armé)
+- Trace : traces/<_xart_replay de R1>. Lancé : `./pending/probe_sbio_stream15_go.sh` (SBIO_STREAM15=1), puce fraîche.
+- Fait : servi le vrai coffre (pour arriver au point d'annonce sbio), programmé AUSSI le stream 15 du dart-sep, mappé A8/B8 en sid 0 ET 15 (écriture DART côté AP seulement, aucune écriture SEP), ré-envoyé le 0x73.
+- Vu : diagnostic `A8 (IOVA 0x54000) mappé dans les streams : [0, 15]` (stream 0 préservé) → 0x73 envoyé → **B8 nul, aucun message EP 0x08**. (xART re-scelle au même point, head 6b0a27b8…)
+- Interprété : le silence du 0x73 **n'est PAS un problème de canal DART** (cause i de `docs/voie_sbio.md` écartée). sbio est muet car **non armé tant que le xART n'est pas scellé** (cause ii/iii). → piloter sbio directement sans franchir le SAVE est fermé. Détail : `docs/voie_sbio.md`.
+- Incidents : catch_proxy exit 1 cosmétique (proxy OK). Aucune écriture SEP, aucun compteur avancé.
+
+## 2026-11-18 (après-midi) — Claude (Opus 4.8, documentaliste) — Guide « Apple Platform Security » autorisé : le modèle de conception appuie B′ (fraîcheur hors-disque, matérielle)
+- Trace : — (recherche doc publique, pas de hardware)
+- Fait : Albert a autorisé le guide public « Apple Platform Security » (support.apple.com) pour départager (a) compteur de version vs (b) nonce par boot. Lu la page « Secure Enclave » (`.../secure-enclave-sec59b0b31ff/web`). Citations + analyse dans `docs/public_linux_state.md` §H–L et `docs/sources.md`.
+- Vu (verbatim guide) : le SEP est apparié à un **Secure Storage Component** matériel (entropie), via **I2C dédié** + **protocole chiffré/authentifié à accès exclusif** ; **toutes les clés data-user sont enracinées dans l'entropie de ce NV** ; services anti-rejeu NV = révocation aux « anti-replay boundaries » (code, biométrie, Apple Pay, EACS) — **le boot n'en fait pas partie** ; clé de protection **mémoire (RAM)** régénérée **à chaque démarrage**. Le guide **n'utilise pas** « xART / boot nonce / monotonic counter » et **ne dit pas** que l'état NV périme au boot.
+- Interprété : le guide **penche contre (b) pur** pour le NV (l'état survit à un boot simple → plutôt (a)-like), **mais tranche un point plus fort** : la fraîcheur/entropie n'est **PAS dans le blob disque**, elle vit dans une **puce que seul le SEP adresse**. → **rejouer le coffre figé du disque est insuffisant par conception, (a) comme (b)**. Cohérent avec notre **hypothèse B′** (re-scellement observé = le SEP ne retrouve pas le contexte d'entropie matériel sous boot m1n1). Le guide **appuie** cette lecture sans la **prouver** (il ne décrit pas le protocole de boot SEP↔Secure Storage Component). Pour le sceptique : pas de contradiction doc↔traces, le guide donne le « pourquoi » plausible du re-scellement.
+- Incidents : — : la divergence SAVE@TAG05 PERSISTE → les maîtres croisés n'étaient PAS la cause (recentre vers anti-rejeu)
+- Trace : traces/20261118-085250_xart_replay (follow_B/001_tag05_op01.bin). Albert a power-cyclé (proxy ré-armé après plusieurs essais) puis lancé `./pending/serve_gl_go.sh` avec les 2 correctifs (sel-mapping + gigalocker byte1).
+- Fait : servi le vrai coffre, maîtres dans le BON sens cette fois.
+- Vu : (a) correctif sel-mapping **confirmé appliqué** : `sel=1 → type 0x02 SEP (850 o)`, `sel=0 → type 0x01 USER (1344 o)` (inverse du run 08:26). (b) **MALGRÉ ÇA, comportement IDENTIQUE** : 5 annonces 0x1d acquittées, puis **SAVE op 0x01 à TAG=0x05, gl:0** (aucun gigalocker réclamé). (c) blob re-scellé nz=126 head=1dad4bb6… (≠ run 08:26 nz=127 head=da87a669…). ⚠️ CORRECTION (sceptique) : ces têtes diffèrent **de run en run même à entrée identique** (un SAVE-xART re-chiffre tout à chaque seal ; VU 2026-11-12) → la différence NE prouve PAS que la puce a lu des maîtres différents, et comparer les deux follow_B ne tranche RIEN. (d) sonde sbio 0x73 : toujours aucune réponse. (e) correctif gigalocker byte1 **jamais exercé** (gl:0).
+- Interprété : **hypothèse « maîtres croisés = cause du SAVE@TAG05 » RÉFUTÉE** (n=2 : croisés ET corrects donnent le même SAVE@TAG05). ⚠️ CORRECTION (sceptique) : conclusion correcte = « l'**ORDRE** sel↔maître n'est PAS le déclencheur », PAS « le contenu des maîtres est hors de cause » (les 2 runs ne varient que l'affectation sel↔blob, pas le préfixe 0x11 ni la charge ni la fraîcheur). Le vrai pilier de « penche B » n'est pas ce n=2 mais le **désassemblage kext §9** (aucun levier de nonce côté AP ; nonce ROM 20 o par boot, non semable). Ça **recentre vers (B)/(B′)** : la puce re-scelle car l'amorçage m1n1 (`sep_boot.sh`) **n'établit jamais le contexte de session** (pas de generateROMNonce ni pnon 0x15) → son nonce n'a aucun rapport avec celui sous lequel le `.gl` fut scellé → re-scellement quel que soit l'input. (B′ = pas de rejeu pur possible ; distinct de B « compteur disque ».) macOS réussit car il RESTAURE puis RE-SCELLE sous le nonce iBoot, il ne rejoue pas un état figé. Le correctif sel↔type reste **juste** mais n'était pas la cause. Doute d'emballage restant : **préfixe 0x11** (partiellement vérifiable offline : colle déjà à snew-reel seq 000094/000096 ; reste à désassembler op 0x00/0x01).
+- Statut voie C : **penche plus nettement vers fragile/fermée**, SANS être prouvée fermée (reste le doute préfixe + le fait que « SAVE ≠ refus » en général). Le test **décisif** = acquitter le SAVE (écriture risquée, compteur) → exige **Albert + backup disque** (inexistant, cf. [[priorites-risque]]). Ne PAS gâcher d'autres runs à deviner l'emballage.
+- Incidents : ré-arment du proxy laborieux (catch_proxy a signalé UartTimeout au chainload mais le Mac est quand même revenu en proxy frais → le run a tourné). Aucun dommage, aucune écriture SEP (arrêt avant d'acquitter le SAVE). Mac à redémarrer.
+
+## 2026-11-18 (analyse, hors ligne) — Claude (Opus 4.8) — BUG D'EMBALLAGE TROUVÉ : maîtres SEP/USER servis CROISÉS (mapping sel↔type inversé) → cause probable du SAVE@TAG05
+- Trace : — (logs noyau macOS snew-reel + c5-ool-boot ; aucun hardware).
+- Fait : cherché, dans les `hv_uart.log` de macOS, les lignes « Fetched %s-xART with CRC ». Elles **tranchent** la correspondance sel↔maître.
+- Vu : snew-reel/hv_uart.log L1573 « Fetched **SEP**-xART » → réponse au **TAG 0x03** (requête SEP portant **sel=1**) ; L1575 « Fetched **USER**-xART » → **TAG 0x04** (**sel=0**). Confirmé par c5-ool-boot (L1525 SEP, L1541 USER). Donc **sel=1 → SEP-xART, sel=0 → USER-xART**.
+- Bug : `serve_from_gl` faisait l'INVERSE (`sel==1 → USER type 0x01`). **On servait les deux maîtres croisés** : à la requête sel=1 (la puce veut son SEP-xART = sa racine), on envoyait le USER-xART, et vice-versa. Un maître racine erroné → la puce ne peut pas restaurer son état → elle re-scelle (**SAVE op 0x01 à TAG=0x05, gl:0**). Explique naturellement la divergence vue en SERVE_GL ET en FOLLOW.
+- Origine de l'erreur : note kext §8 (L260) « sélecteur SEP(0)/USER(1) » — **lecture inversée** du `tst w22,#1`. La L286 du même doc (« TAG 0x03 = SEP-xART ») et les logs macOS avaient raison. Docs corrigées (kext §8 L260, gigalocker.md).
+- Correctif 1 (hors ligne, prêt) : 1 ligne dans `serve_from_gl` → `mtype = 0x02 if sel==1 else 0x01`. Syntaxe OK. Sûreté inchangée (on n'acquitte toujours pas un SAVE ; fail-closed). **Hypothèse à tester** : avec les maîtres dans le bon sens, la puce devrait **réclamer ses gigalockers (op 0x05)** au lieu de SAVE@TAG05. Si oui → « emballage faux » confirmé, **voie C vivante**. Si elle re-scelle encore → penche anti-rejeu.
+- **2e BUG trouvé en blindant la suite** (op 0x05 gigalocker) : la réponse doit **ré-émettre l'octet1 de DATA de la requête** (drapeau 0x00/0x01), comme la réponse maître ré-émet le sélecteur. VU **17/17** dans snew-reel (req byte1 == resp byte1). Le script mettait byte1=0 → décalage sur les 13 gigalockers à byte1=0x01. **Corrigé** : `DATA=((L>>8)&0xff) | (m.DATA & 0x0000ff00)`. C'était le **mur suivant** (il aurait bloqué juste après le correctif 1). Validé en SELFTEST (aucune erreur). Avec les 2 correctifs, un run propre devrait, si l'emballage était bien la cause, **servir les maîtres + ~14 gigalockers puis s'arrêter sur le 1er VRAI SAVE vers TAG 0x13** (comme macOS) — et non plus SAVE@TAG05.
+- À FAIRE : au retour d'Albert, UN run propre (cold-boot → proxy → `./pending/serve_gl_go.sh`). C'est l'expérience qui fait avancer la question A/B sans écriture risquée (on s'arrête toujours avant d'acquitter un SAVE).
+- Incidents : aucun.
+
+## 2026-11-18 08:26 — Claude (Opus 4.8) — ESSAI E (correctif 0x1d) APRÈS power-cycle : flux complet → le SEP demande un SAVE à TAG=0x05 (divergence réelle, sûre)
+- Trace : traces/20261118-082622_xart_replay (xart_replay.log ; **follow_B/001_tag05_op01.bin** = blob re-scellé dumpé au SAVE ; sbio_probe_B.bin). Albert a power-cyclé le Mac (BOOT OK, heap 0x1001028c000 ≠ runs précédents = puce fraîche) puis lancé `./pending/serve_gl_go.sh`.
+- Fait : servi le vrai coffre, avec le **correctif 0x1d actif** (acquitte les annonces d'endpoint au lieu de stopper). Flux allé jusqu'à la 1re divergence, puis sonde sbio 0x73.
+- Vu (faits bruts) :
+  - Servi sans erreur : fw-boot (0x0e), UUID-OS (0x13) 74980dee…, **maître sel=1 type 0x01 USER (1344 o)**, **maître sel=0 type 0x02 SEP (850 o)**. (Idem 07:53.)
+  - **Correctif 0x1d OK** : le SEP a annoncé 5 endpoints par TYPE 0x1d — **'sbio', 'skdl', 'sse ', 'sks ', 'scrd'** — chacun **acquitté par `> 0x16`** ; le service a **continué** (plus de faux-arrêt). NB : le nom **`sks`** (trousseau) EST annoncé ici via 0x1d.
+  - **Puis : SAVE (op 0x01) à TAG=0x05.** Le SEP veut re-sceller. Responder : **ARRÊT SANS acquitter** (compteur anti-rejeu non avancé, pas de brick). Blob B re-scellé : nz=127/32768, head=`da87a66904d56e4b…`, dumpé dans follow_B/.
+  - **gl:0** : le SEP n'a FETCHé **aucun gigalocker** (op 0x05). Il est passé des 2 maîtres + annonces **directement au SAVE** à TAG=0x05 — là où, sous macOS (snew-reel), TAG=0x05 est le 1er FETCH gigalocker.
+  - Écoute 10 s : 11 endpoints annoncés (FD) dont **0x08 sbio** ; **0x12 sks ABSENT de cette liste FD** (bien que son NOM ait été annoncé via 0x1d plus haut). Même set qu'au 07:53.
+  - Sonde sbio 0x73 (sans doigt) : **toujours AUCUNE réponse** (B8 nul, aucun msg EP 0x08).
+- Interprété (→ hypotheses.md) :
+  - Le **SAVE à TAG=0x05 est la VRAIE divergence** (reproductible à viser, n≥3). Il **NE TRANCHE PAS** accept vs refus : (1) emballage faux de notre part (préfixe maître 0x11, octet-près charge, UUID/offset, valeurs fixes) → **non concluant, voie C ouverte** ; OU (2) vrai refus anti-rejeu → voie C fermée. Indécidable sur ce seul run. On a maintenant le **blob re-scellé** (follow_B) et le **point exact** de divergence pour attaquer l'emballage.
+  - Léger penchant « maîtres au moins bien formés » : la puce a pris les 2 maîtres, acquitté 5 annonces, et n'a demandé le SAVE **qu'après** (pas de SAVE immédiat après le 1er maître). FAIBLE, à ne pas sur-vendre.
+  - `gl:0` + SAVE au lieu de FETCH gigalocker : cohérent avec HV1 (sous m1n1 le SEP passe en phase SAVE plus tôt que macOS). À creuser : pourquoi aucun 0x05 ?
+  - sbio/sks « annoncés ≠ fonctionnels » : sbio silencieux au 0x73 (3 causes non tranchées, cf. hypotheses HV3) ; sks nom annoncé mais 0x12 absent de la liste FD.
+- Incidents : aucun (run propre, arrêt volontaire sans danger). Mac à redémarrer (le script l'indique).
+
+## 2026-11-18 (analyse, hors ligne) — Claude (Opus 4.8) — Recadrage du SAVE@TAG05 : un SAVE n'est pas un refus ; le vrai coffre reproduit la divergence connue
+- Trace : — (analyse de `20261118-082622` + capture `snew-reel`, aucun hardware).
+- Fait : comparé le flux de notre run à la capture macOS (EP 0x13, TAG/TYPE) ; décodé le blob re-scellé en B.
+- Vu : (a) macOS émet aussi des SAVE (op 0x01/0x06) aux TAG 0x13/0x14/0x15 et **les acquitte** → un SAVE ≠ un refus. (b) macOS FETCH ses 14 gigalockers (TAG 0x05→0x12) AVANT tout SAVE ; nous, SAVE direct à TAG=0x05 sans aucun FETCH gigalocker. (c) blob re-scellé = 127 o puis vide (petite structure racine, pas un maître). (d) la divergence SAVE@TAG05 était DÉJÀ vue en FOLLOW (12/11, vieux blobs) ; elle **se reproduit avec le VRAI coffre**.
+- Interprété : deux lectures encore ouvertes — (B) re-scellement par rejet de fraîcheur/contexte même avec le bon coffre (penche B, voie C fragile) ; OU emballage maître faux de notre part (préfixe 0x11 / mapping sel↔type / octet-près) qui corrompt des blobs corrects (→ A, voie C ouverte). **Indécidable offline** : trancher exige d'acquitter le SAVE = écriture risquée (compteur) → Albert + **backup disque** (inexistant). Détail dans hypotheses.md HV1 (MAJ MAJEURE).
+- À FAIRE (offline, sans gâcher de run) : **vérifier l'emballage du maître contre `kext_sepmanager.md` §8** — (1) le préfixe de 0x11 octets est-il réel/juste ? (2) le mapping sel↔type (sel=1→USER, sel=0→SEP) est-il prouvé ou supposé ? (indice faible : tailles relatives inversées vs snew-reel, mais puces ≠). Tant que ces doutes tiennent, « emballage faux » reste possible → ne pas conclure « voie C fermée ». Le test décisif (acquitter le SAVE) attend un backup disque.
+- Incidents : aucun.
+
+## 2026-11-18 (soir) — Claude (Opus 4.8) — Relance ESSAI E (avec correctif 0x1d) : BOOT SEP BLOQUÉ, pas de power-cycle depuis le run du matin
+- Trace : — (aucun dossier créé ; run coupé avant de servir quoi que ce soit).
+- Fait : Albert a relancé `./pending/serve_gl_go.sh` (chainload m1n1 OK, python a démarré). Bloqué à « démarrage du SEP par m1n1 (séquence publique)… » **sans jamais atteindre `BOOT OK`** (>2 min). Run tué (TaskStop) ; rien d'écrit vers le SEP (coincé AVANT la phase de service).
+- Vu : au run de 07:53 le `BOOT OK` tombait immédiatement ; ici, silence. Le port proxy (`/dev/serial/by-id/...uartproxy...`) et m1n1.bin étaient OK ; le coffre et l'UUID aussi (toutes les gardes pré-boot passent).
+- Interprété (hypothèse) : le SEP était **déjà démarré + servi** au run du matin (avancé jusqu'à sbio, puis coupé SANS redémarrer le Mac). Dans cet état « déjà utilisé », le chainload m1n1 (qui ré-initialise l'AP) ne ré-initialise PAS le SEP → la séquence de boot publique attend une réponse qui ne vient pas. **Un chainload m1n1 ne reset pas le SEP ; il faut un démarrage à froid (power-cycle SoC).**
+- 2e relance (08:20, sans power-cycle) : **échec différent et pire** — `chainload.py` meurt sur `m1n1.proxy.UartTimeout: Reconnection timed out` (le Mac ne revient pas après le reset de chainload ; `xart_replay.log` vide, rien servi). Confirme que l'état se dégrade à chaque relance sans cold-boot (1re relance = boot SEP figé ; 2e = m1n1 ne reconnecte plus). Erreur dans `chainload.log`, pas à l'écran (tee >/dev/null) → sortie terminal vide, trompeuse.
+- À FAIRE avant toute relance (session suivante) : **power-cycle physique du Mac** (Albert) → ré-armer le proxy m1n1 → UN run propre de `./pending/serve_gl_go.sh`. Le correctif 0x1d est en place. Ne pas relancer sans cold-boot (ça échoue au boot/chainload, de pire en pire).
+- Incidents : 1) boot SEP figé (pas de BOOT OK), run tué proprement ; 2) chainload UartTimeout. Aucun dommage, AUCUNE écriture SEP (les deux échecs sont AVANT la phase de service).
+
+## 2026-11-18 07:53 — Claude (Opus 4.8) — ESSAI E LANCÉ (Albert) : le SEP prend les 2 maîtres SANS SAVE, annonce sbio, mais le responder s'arrête à tort sur l'annonce (0x1d)
+- Trace : traces/20261118-075343_xart_replay (xart_replay.log, sbio_probe_B.bin). Coffre servi = le vrai .gl lu sur disque (UUID d'OS 74980dee…). Albert a lancé `./pending/serve_gl_go.sh`.
+- Fait : m1n1 a démarré le SEP (BOOT OK, xarm 0x13 annoncé), mappé A/B, puis le responder a SERVI le coffre réel aux FETCH, puis sonde sbio 0x73 (sans doigt).
+- Vu (faits bruts) :
+  - Servi, sans erreur côté SEP : fw-boot (0x0e) acquitté ; UUID-OS (0x13) = 74980dee… ; **FETCH maître sel=1 (type 0x01 USER-xART) → 1344 o** ; **FETCH maître sel=0 (type 0x02 SEP-xART) → 850 o**. Tally `{master:2, gl:0, osuuid:1, fw:1}`.
+  - **AUCUN SAVE (0x01/0x06) émis** par le SEP après réception des 2 maîtres. Le SEP n'a PAS redemandé de re-scellement.
+  - Le message qui a stoppé le service — logué « op inconnue 0x1d TAG=0x00 » — est **l'annonce d'endpoint** `< EP=0x13 TAG=0x00 TYPE=0x1d PARAM=0x6f DATA=0x00736269` = « sbio » (identique à snew-reel L30). Le responder ne gérait pas 0x1d → chute dans « inconnue → STOP ». **Faux-arrêt** (même classe que 0x07 ; cf. mémo protocole-complet-avant-de-repondre).
+  - Écoute 10 s après : le SEP a annoncé **11 endpoints** dont **0x08 sbio**, 0x0a scrd, 0x0c sse, 0x17 skdl (+ 0x00 cntl, 0x0e hdcp, 0x10 xars, 0x13 xarm, 0x14 hibe, 0x15 pnon, 0x18 stac). **sks (0x12, trousseau) ABSENT** (comme aux boots hv précédents, cf. 2026-11-?? entrées sbio).
+  - Sonde sbio 0x73 (ESSAI D) : 0x73 écrit en A8, commande envoyée → **B8 = 0 octet non nul, aucun message EP 0x08**. Pas de réponse.
+- Interprété (→ docs/hypotheses.md) :
+  - Positif mais NON conclusif : le SEP a accepté les 2 maîtres (aucun SAVE) et a avancé jusqu'aux endpoints applicatifs dont sbio. Le flux a été **tronqué par un bug à nous** (STOP sur 0x1d), pas par un refus de la puce. « Accepté » reste à CONFIRMER après correctif + reproductibilité (n≥3). Ce n'est PAS une preuve de Touch ID.
+  - gl:0 (aucun gigalocker fetché) : ordre différent de snew-reel (où 14 fetchs 0x05 précédaient l'annonce sbio). Ici le SEP a annoncé sbio juste après les 2 maîtres. Ne pas sur-interpréter : le STOP a pu couper avant des 0x05, et les ordres d'annonce varient déjà (hypotheses.md).
+  - Silence sbio au 0x73 : 3 causes NON tranchées (stream/sid DART de sbio sous m1n1 inconnu ; ouverture tardive insuffisante ; état restauré n'active pas sbio). **Ne pas conclure « sbio mort ».**
+- Correctif (hors ligne, prêt pour relance par Albert) : ajout dans `serve_from_gl` du cas **op 0x1d → acquitter `> TYPE=0x16 DATA=(DATA & 0xFFFFFF00)` et CONTINUER** (format VU dans snew-reel L46-54). La sûreté est inchangée : on N'ACQUITTE TOUJOURS PAS un SAVE (0x01/0x06) → compteur anti-rejeu non avancé → pas de brick. Prochaine étape : Albert relance `./pending/serve_gl_go.sh` ; on verra si le SEP, une fois les annonces acquittées, fetch des gigalockers (0x05) / va plus loin / émet un SAVE.
+- Incidents : aucun (pas de gel ; script a coupé proprement, Mac à redémarrer par Albert).
+
 ## 2026-11-17 (nuit) — Claude (Opus 4.8) — ESSAI E préparé : RENDRE le vrai coffre (.gl) à la puce (mode SERVE_GL, pending/, Albert lance)
 - Trace : — (préparation + SELFTEST hors ligne ; rien lancé vers le Mac). Proxy m1n1 up.
 - Contexte : on a enfin un coffre QUI COLLE (le .gl lu sur disque). Albert a dit « Oui, construis l'essai ».
@@ -1675,3 +1872,81 @@ Format :
 - Changement de compréhension : la doc hyperviseur liste désormais macOS 14.8.3 (M1→M3) EN PLUS de 13.5 comme
   invité supporté ; macOS 27.2.1 n'est PAS supporté comme invité. « 13.5 only » (CLAUDE.md/README) est à mettre à jour.
 - Détail et citations : docs/public_linux_state.md, section « 2026-11-17 — m1n1 proxy sans macOS 13.5 ».
+
+## 2026-11-18 — analyste — Structure du blob re-scellé au SAVE (SERVE_GL)
+- Source (lecture seule) : `traces/20261118-082622_xart_replay/follow_B/001_tag05_op01.bin` (maîtres croisés, nz=127),
+  `…085250…/001_tag05_op01.bin` (maîtres corrects, nz=126), + rafales FOLLOW `…20261112-215313…` et `…223837…`
+  (001..013). Comparé au coffre `traces/20261117-224724_xart_read/…74980DEE….gl.bin` (parse_gigalocker.py) et aux
+  SAVE macOS de `traces/20261107-043828_c6-doigt-ool/hv_uart.log` (lignes 2002-2025).
+- VU : le 1er SAVE est un SAVE-xART **maître** (TYPE 0x01) de ~127 o, haute entropie, **régénéré à chaque run**
+  (0 octet constant sur 4 runs, têtes ≠ tous UUID du `.gl`). 127 o ≠ toute taille de slot du coffre (maîtres
+  850/1344 o) → petite structure indépendante, pas une copie de maître. DATA du SAVE = `0x0100`+CRC-16 (recoupe
+  « Saving … with CRC »). macOS normal persiste un enregistrement **complet** (gl_rec_write type 2) ; pas de blob
+  de re-scellement macOS directement comparable en capture.
+- INTERPRÉTÉ (hypothèse, non tranché) : faisceau penche vers « état neuf/défaut, anti-rejeu » (B) plutôt que
+  « réparation de notre input » (A) — même 1er SAVE pour croisés / corrects / rejeu brut. Opaque = non prouvé.
+- Détail et citations : docs/gigalocker.md, section « 2026-11-18 — Structure du blob RE-SCELLÉ ».
+
+## 2026-11-19 — Claude (Opus 4.8) — Carte de doc + décision 13.5 + E1 sbio rendue concluante
+Aucune expérience réelle (pas de Mac ce soir, Albert dans le bus). Travail 100 % hors hardware : rangement
+doc, décision stratégique, outillage E1 validé par SELFTEST.
+- **Carte de navigation créée** : `docs/INDEX.md` (agent bibliothécaire, lecture seule). Classe les 20 docs en
+  4 familles + « par où commencer » + liste des recouvrements (handoff/journal, sources/annexe-sources, etc.).
+  Rien déplacé/fusionné : la carte signale, Albert décide. Signalé : `CLAUDE.md`/`README` « 13.5 uniquement »
+  périmé ; `agent-macos.md` statut `périmé?` ; bandeau `handoff.md` (17/11) en retard sur le journal (18/11).
+- **Décision 13.5 (tranchée avec Albert)** : la partition macOS 13.5 n'existe plus (effacée au DFU) mais est
+  recréable. **Pas recréée** : elle ne sert QUE au tracing macOS sous hyperviseur, et le match complet par sbio
+  dépend de toute façon du lien SPI capteur + blobs scellés (voir voie_sbio §6). 13.5 = outil de *compréhension*,
+  pas raccourci vers Touch ID. Invité hv possible = 13.5 OU 14.8.3 (pas 27.2.1). Mémoire mise à jour.
+- **Voie sbio = seule piste vivante ; E1 rendue concluante** (sceptique + tracer, SELFTEST OK, Mac non touché) :
+  - Sceptique : E1 **sûre** (aucun SAVE acquitté possible, fail-closed intact ; seules écritures en plus = tables
+    DART côté AP). Mais un run E1 seul ne tranche pas → il faut un run de contrôle + idéalement le registre de faute.
+  - Tracer : ajout d'une **lecture seule du registre de faute du dart-sep** (`DART_ERROR=0x40`, sid 27:24,
+    READ_FAULT bit 4 ; source lecture m1n1 `hw/dart8020.py`/`src/dart.c`) avant/après le 0x73
+    (`pending/sep_xart_replay.sh` l.462-479, 928-966) ; **lanceur de contrôle** `pending/probe_sbio_control_go.sh`
+    (sans stream 15) ; **protocole en 2 runs** écrit dans `probe_sbio_stream15_go.sh` ; wording « (i) écartée »
+    → « (i) fortement affaiblie ». Les deux SELFTEST passent, rien envoyé au SEP.
+  - **Discriminant net** : au run de contrôle (sans stream 15), une faute de LECTURE neuve sur **sid 15** =
+    preuve directe que le SEP lit l'OOL sbio via sid 15 (cause « canal »), même si sbio reste muet.
+- **À FAIRE PAR ALBERT (au Mac, quand dispo)** : cold-boot + proxy m1n1 → `./pending/probe_sbio_stream15_go.sh`
+  (E1) → cold-boot → `./pending/probe_sbio_control_go.sh` (contrôle) → comparer verdicts + lignes `[DART-faute …]`.
+  Ligne rouge : c'est Albert qui lance (SERVE_GL). Backup données = `alarm_p5.img` (ne répare pas un SEP cassé).
+- **Incertitudes notées (non affirmées)** : le DMA de l'OOL sbio passe-t-il vraiment par CE dart-sep ? la faute
+  est-elle latchée ? décodage sid/causes à confirmer au 1er run réel. Détail : `docs/voie_sbio.md` §6.
+
+## 2026-11-19 — Albert (runs) + Claude (analyse) — E1 + contrôle sbio : le silence n'est PAS le canal DART
+- Source : 2 runs réels d'Albert sur le Mac (proxy m1n1 v1.6.1, SEP booté par m1n1, OS FW 13.5), boots frais,
+  cold-boot entre les deux. `./pending/probe_sbio_stream15_go.sh` (E1) puis `./pending/probe_sbio_control_go.sh`
+  (contrôle). catch_proxy sortait en exit 1 cosmétique (proxy up quand même, confirmé par les runs).
+- VU — E1 (stream 15) : A8 mappé en sid **[0, 15]** ; 0x73 → **B8 nul, aucun msg EP 0x08** ; faute dart-sep
+  `FLAG=0` avant/après. Contrôle (sans stream 15) : A8 en sid **[0]** ; 0x73 → **B8 nul** ; faute `FLAG=0`
+  avant/après, **aucune faute de lecture sur sid 15**. Dans les deux : SERVE_GL va jusqu'au SAVE, arrêt sans
+  acquitter (compteur non avancé), sbio (0x08) annoncé. (B du SAVE : nz=127 en E1, nz=126 en contrôle.)
+- INTERPRÉTÉ : cause (i) « le SEP lit l'OOL sbio via sid 15 non programmé » **écartée par l'expérience**
+  (ouvrir sid 15 ne change rien ; sans sid 15 pas de faute sid 15). Reste la cause **(ii)/(iii) : l'ÉTAT** —
+  sbio annoncé mais pas armé, probablement tant que xART n'est pas scellé.
+- Réserves : E1 n=1 (muet sans-stream-15 désormais n=4) → répéter E1 n≥3 pour clouer ; « aucune faute DART »
+  suppose DMA sbio par ce dart-sep + faute latchée (non prouvé).
+- CONSÉQUENCE : le test décisif de l'état = sceller xART, or sceller = acquitter SAVE = avancer le compteur =
+  **écriture SEP = ligne rouge** (ce qui a bické en voie C). Décision Albert. Détail : `docs/voie_sbio.md` §7.
+
+## 2026-11-19 (soir) — Albert (chat Asahi) + Claude — PALIER : Touch ID sous Linux CONFIRMÉ faisable
+Albert a posé des questions GÉNÉRIQUES au chat Asahi (#asahi-dev, OFTC/Matrix). Réponses = témoignages de
+**membres du board** (haute autorité, mais « non vérifié par nous »). Consigné verbatim dans `docs/sources.md`
+§« Chat communauté Asahi ». Rappel règle : on tire l'info, on ne pousse rien (Asahi interdit les contribs IA ;
+projet 100% Claude → [[asahi-ban-pas-secret]]).
+- **James Calligeros (dev SEP du board)** : Touch ID sous Linux « **definitely possible** », « looked at » mais
+  « not high on priority, extremely involved » ; « tracing SEP is excruciatingly slow, a massive time sink » ;
+  « break gigalocker → you earn yourself a dfu restore ». → (1) **faisabilité confirmée** (fondation du projet
+  acquise) ; (2) **terrain largement ouvert** ; (3) **tracer SEP = LE time-sink** (valide priorité tracer du
+  CLAUDE.md) ; (4) casser gigalocker = **DFU-récupérable**. [[touchid-linux-faisable-james]]
+- **« Michael Reeves »** : le danger DÉFINITIF = Secure Element **« Stockholm »** (séparé du SEP) touché en
+  DIRECT (DFU n'aide pas) ; via le SEP = « should be fine but still risky ». On n'a aucun accès direct → notre
+  classe = récupérable. [[stockholm-se-brick-definitif]]
+- **« chaos_princess » (Sasha Finkelstein, board)** : casse le gigalocker exprès sur un mac mini sacrificiel,
+  « still alive » → classe through-SEP récupérable.
+- **Conclusion stratégique** : la route = **driver natif** (sbio ne s'arme pas en rejeu m1n1, mur d'état prouvé
+  E1+contrôle ce soir) ; le but est **validé faisable** ; le risque est **borné** (through-SEP = DFU, permanent
+  seulement via Stockholm direct qu'on ne touche pas). Ligne rouge SEP **maintenue** (justifiée par Stockholm) ;
+  SAVE-ack **non fait** (gain borné). Prochain : définir le 1er pas concret de la route native + lire d'éventuelles
+  notes prior-art Asahi (si James en pointe).

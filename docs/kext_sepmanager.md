@@ -257,7 +257,11 @@ Méthode : `com.apple.driver.AppleSEPManager` du fileset `macos/kernel.macho` ; 
 
 **Structure `XARTMessage` (offsets lus dans le handler).** Le message SEP→AP (`<` sur EP 0x13) est vu octet par octet :
 octet 1 = TAG, **octet 2 = opération (ce que la trace appelle TYPE)**, octets 3-4 = longueur (halfword, `[x19,#3]`),
-**octet 5 bit 0 = sélecteur SEP(0) / USER(1)** (`tst w22,#1` → chaîne `"SEP"` ou `"USER"`). Deux tampons OOL portés par l'objet :
+**octet 5 bit 0 = sélecteur SEP(1) / USER(0)** (`tst w22,#1` → chaîne `"SEP"` ou `"USER"`). ⚠️ **CORRIGÉ 2026-11-18** : le
+sens est **sel=1 → SEP-xART, sel=0 → USER-xART**, tranché par les **logs noyau macOS** (snew-reel/hv_uart.log L1573-1576,
+c5-ool-boot L1525-1541 : « Fetched SEP-xART » répond au TAG 0x03 qui porte sel=1 ; « Fetched USER-xART » au TAG 0x04, sel=0).
+La 1re lecture du `tst` (« SEP(0)/USER(1) ») était **inversée** ; c'est elle qui a causé le bug d'emballage de SERVE_GL (maîtres
+croisés → SAVE@TAG05). Deux tampons OOL portés par l'objet :
 `this+0xc8` = tampon **A** (AP→SEP, ce que l'AP *écrit* pour le SEP) et `this+0xd0` = tampon **B** (SEP→AP, ce que le SEP a
 *déposé* : UUID réclamé ou blob à sauver). Concorde avec notre convention de trace (A = AP→SEP, B = SEP→AP).
 
@@ -289,6 +293,48 @@ sous m1n1 a émis **op 0x01 (SAVE xART maître)**. Donc le SEP ne réclame pas l
 maître. Cohérent avec « l'état restauré n'a pas été jugé valide/courant → le SEP re-scelle » (hypothèse B de `hypotheses.md` HV1) —
 et un SAVE acquitté ferait vraisemblablement **avancer le compteur scellé** du SEP (ce qui collerait avec la casse du boot Apple
 constatée après l'essai). À **ne pas** acquitter sans décision d'Albert **et** sans image disque préalable.
+
+### 8b. 2026-11-18 — Structure exacte de l'en-tête A (op 0x00 FETCH / op 0x01 SAVE) — Claude, source: kext
+
+But : lever le doute d'emballage de SERVE_GL — le **préfixe de 0x11 octets** devant la charge du maître dans le tampon A
+est-il exact et que contient l'en-tête ? Méthode : désassemblage du handler `_handle_sep_driven_msg`
+(`__ZN12AppleSEPXART22_handle_sep_driven_msgEPNS_11XARTMessageE`, VA `0xfffffe0009986588`) avec `analysis/kext/kdis.py func`
+(listing non commité) ; symboles des appelés résolus par `ksyms.py --at`. La table de saut (op → handler) a été lue dans le
+binaire : op 0x00 → `0x…66e8` (= le « 0x6e8 » du §8), op 0x01 → `0x…6838` (= « 0x838 »). Croisé avec la capture
+`snew-reel` (`sep.log` seq 93/94 = op 0x00 TAG 0x03 SEP-xART ; fichiers `000094_13_A.bin` / `000096_13_A.bin`).
+**Statut : hypothèse (source: kext), mais l'emballage 0x11-nuls est désormais lu dans le code, pas seulement dans la capture.**
+
+**op 0x00 — FETCH xART maître (handler `0x…66e8`), ce qui est écrit dans le tampon A :**
+1. garde : un octet global (`0xb881…9a8`) doit être ≠ 0 (sinon `brk`/trap de bounds-safety) ; et `(len>>4) < 0x7ff`.
+2. `x24 = this->bufA` (`[this+0xc8]`, = tampon A, concorde §8).
+3. `strb wzr, [x21], #0x11` : **écrit 1 octet nul en A[0]** et avance le pointeur de **0x11 (17)**.
+4. `memset_s(A+1, 0x10, 0, 0x10)` (appel `_memset_s`) : **met à zéro les 16 octets A[0x01..0x10]**.
+   → **en-tête A = 0x11 (17) octets, tous à zéro** (1 octet explicite + 16 octets memset). La charge commence en **A[0x11]**.
+5. `gl_rec_read(ctx, gl_rec_id, &ok, dest=A+0x11, &len)` (`__Z11gl_rec_readPK6gl_ctx…`) : le blob maître est lu depuis le
+   **coffre « gl »** (même stockage que les gigalockers, `gl_ctx` à `0xb8819b0`) et déposé en **A+0x11** ; `len` est initialisé
+   à **0x7fef** (= `0x8000 − 0x11`, la capacité du tampon moins l'en-tête). Le `gl_rec_id` (pile `x29-0x50`) ne porte qu'un
+   **octet de type = 1 (SEP) / 2 (USER)** selon le bit 0 de l'octet 5 (pas d'UUID pour le maître, contrairement à op 0x05).
+6. longueur du message = `0x11 + len_blob` (`sturh` en msg+3). Puis CRC-16 (init 0xffff, table `0x74a2940`) **sur la charge
+   seule** (A+0x11..) **uniquement pour le log** `"%s: Fetched %s-xART with CRC: 0x%x"` — **le CRC n'est PAS écrit dans A**.
+
+**Conclusion emballage (source: kext).** Notre `serve_from_gl` op 0x00 (`A = 0x11 octets nuls + charge .gl`,
+`pending/sep_xart_replay.sh`) est **CONFORME au code** : le kext écrit exactement 17 octets nuls (octet 0 + 16 octets) puis la
+charge en A[0x11], et déclare `len = 0x11 + len_charge`. Aucun champ non nul n'est attendu dans l'en-tête pour le maître
+(ni longueur, ni type, ni flags, ni CRC dans le tampon). **Écart : aucun** sur la taille et le contenu de l'en-tête.
+Interprétation (non prouvée) : le découpage 1+16 ressemble à un emplacement {type, UUID(16)} analogue au `gl_rec_id`, mais
+il est **entièrement nul** pour l'xART maître — donc rien à remplir côté AP.
+
+**op 0x01 — SAVE xART maître (handler `0x…6838`), comment le tampon B est relu :**
+1. `len = u16[msg+3]`. `x10 = this->bufB` (`[this+0xd0]`). CRC-16 (init 0xffff, table `0x74a2940`) **sur B[0..len-1]** — la
+   charge à sauver commence donc en **B[0]** (⚠️ **pas** de préfixe 0x11 côté SAVE ; l'en-tête nul n'existe qu'à la FETCH).
+2. le CRC calculé (2 octets) est comparé par `_memcmp(…, msg+6, 2)` au **CRC attendu que le SEP place dans msg+6..7 (champ
+   DATA)**. Mismatch → trap. C'est donc le SEP qui fournit le CRC-16 de contrôle, l'AP le vérifie avant d'écrire.
+3. `gl_rec_write(ctx, gl_rec_id{type=1/2}, data=B, len)` (`__Z12gl_rec_writeP6gl_ctx…`) : écrit la charge **lue depuis B[0]**,
+   `len` octets, dans le coffre gl. Log `"%s: Saving %s-xART with CRC: 0x%x"`.
+
+**Récapitulatif position/CRC (source: kext).** FETCH (A) : en-tête 0x11 nuls, charge en A[0x11], `len=0x11+charge`, CRC sur la
+charge pour le log (pas stocké). SAVE (B) : charge en B[0], `len=msg+3`, CRC-16 sur B[0..len-1], **CRC de contrôle dans le
+message en bytes 6-7**, vérifié par memcmp. L'asymétrie (en-tête 0x11 seulement à la FETCH) est explicite dans le code.
 
 ## 9. xART — fraîcheur / nonce : d'où vient l'anti-rejeu ? (2026-11-12, Claude — source: kext, macOS 13.5)
 

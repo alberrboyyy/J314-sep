@@ -182,6 +182,14 @@ export PROBE_SBIO="${PROBE_SBIO:-0}"  # ESSAI D : après que FOLLOW a fait annon
 # Octets EXACTS du 1er 0x73 que macOS envoie à sbio (tampon A = gt_packet), rejoués tels quels (on
 # ne construit rien à la main). Capture de boot c12 (OOL de l'EP 0x08). Modifiable si besoin.
 export SBIO_A="${SBIO_A:-traces/20261108-032454_c12-boot-ho/sep.log.ool/000300_08_A.bin}"
+# EXPÉRIENCE E1 (2026-11-18) — teste la cause (i) « canal DART » du silence du 0x73 (docs/voie_sbio.md §5/§6).
+# Le dart-sep déclare sids=0x8001 (streams 0 ET 15) mais m1n1 ne programme QUE le stream 0. Si SBIO_STREAM15=1,
+# la sonde sbio PROGRAMME AUSSI le stream 15 du dart-sep et mappe A8/B8 (IOVA 0x54000/0x5c000 -> mêmes phys que
+# le stream 0) dans LES DEUX streams, PUIS ré-envoie le 0x73. Si le SEP répond alors -> c'était le canal (le SEP
+# lisait A8 via sid 15, non programmé) ; s'il reste muet -> ce n'est PAS le canal, c'est l'état (sbio pas armé
+# tant que xART non scellé). Action = ÉCRITURE DART côté AP uniquement (tables de traduction du dart-sep),
+# MÊME classe d'opération que le stream 0 déjà programmé ; AUCUNE écriture SEP, aucun compteur avancé. Défaut 0.
+export SBIO_STREAM15="${SBIO_STREAM15:-0}"
 
 # ESSAI E (SERVE_GL) : au lieu de rejouer un OOL enregistré, SERT à la puce son VRAI coffre, lu sur
 # le disque (tools/read_xart.sh -> fichier .gl), en répondant aux FETCH op 0x00 (maître) / 0x05
@@ -218,10 +226,23 @@ SELFTEST = os.environ["SELFTEST"] == "1"
 OBSERVE = os.environ["OBSERVE"] == "1"
 FOLLOW = os.environ.get("FOLLOW", "0") == "1"
 PROBE_SBIO = os.environ.get("PROBE_SBIO", "0") == "1"
+SBIO_STREAM15 = os.environ.get("SBIO_STREAM15", "0") == "1"  # E1 : programmer AUSSI le stream 15 du dart-sep
 SBIO_A = os.environ.get("SBIO_A", "")
 SERVE_GL = os.environ.get("SERVE_GL", "0") == "1"
 GL_FILE = os.environ.get("GL_FILE", "")
 GL_OS_UUID = os.environ.get("GL_OS_UUID", "")
+# ESSAI DE CONTRÔLE (sceptique, 2026-11-18) : si GL_GARBAGE=1, on sert des maîtres de MÊME LONGUEUR mais
+# remplis de ZÉROS (contenu scellé invalide). But : isoler la variable « contenu ». Si la puce donne le
+# MÊME SAVE@TAG05 qu'avec les vrais maîtres -> elle n'évalue PAS ce qu'on sert -> appuie B′ (re-scellement
+# indépendant de l'input). Si le comportement CHANGE -> la puce évalue le contenu -> l'emballage/contenu
+# compte encore. Fail-closed : on s'arrête toujours sur le SAVE sans acquitter (aucune écriture SEP persistée).
+GL_GARBAGE = os.environ.get("GL_GARBAGE", "0") == "1"
+# ⚠️ TEST DÉCISIF RISQUÉ (2026-11-18, décidé par Albert, backup DFU+alarm_p5.img prêt) : si ACK_SAVE=1, on
+# ACQUITTE le SAVE du SEP (au lieu de s'arrêter) pour le laisser AVANCER et voir s'il va jusqu'au fonctionnel
+# (FETCH gigalockers + réponse 0x73) = voie C vivante, OU enchaîne des SAVE sans fin = voie C fermée.
+# CECI FAIT AVANCER LE COMPTEUR ANTI-REJEU SCELLÉ (matériel) → désync avec le coffre disque → Touch ID
+# devra être récupéré par DFU Restore ensuite. NE PAS activer sans backup vérifié. Albert lance, jamais l'agent.
+ACK_SAVE = os.environ.get("ACK_SAVE", "0") == "1"
 SNEW = os.environ["SNEW"]
 sys.path.insert(0, os.environ["M1N1_PROXYCLIENT"])
 
@@ -286,9 +307,9 @@ if SELFTEST:
             print(f"  envoyer  >  TAG=0x{tag:02x} TYPE=0x{typ:02x} PARAM=0x{param:02x} "
                   f"DATA=0x{data:08x}{extra}", flush=True)
     if PROBE_SBIO:
-        if not FOLLOW:
-            print("SELFTEST PROBE_SBIO: ATTENTION — PROBE_SBIO exige FOLLOW=1 (il faut que sbio "
-                  "soit d'abord annoncé). Au lancement réel sans FOLLOW, la sonde sera ignorée.", flush=True)
+        if not FOLLOW and not SERVE_GL:
+            print("SELFTEST PROBE_SBIO: ATTENTION — PROBE_SBIO a besoin que sbio (0x08) soit d'abord "
+                  "annoncé (via FOLLOW=1 ou SERVE_GL=1). Sans ni l'un ni l'autre, la sonde sera ignorée.", flush=True)
         if SBIO_A and os.path.exists(SBIO_A):
             b = open(SBIO_A, "rb").read()
             op = b[0x14] if len(b) > 0x14 else None
@@ -300,6 +321,14 @@ if SELFTEST:
                   flush=True)
             if op != 0x73:
                 print("  !! l'octet +0x14 n'est pas 0x73 : le fichier SBIO_A n'est pas un 0x73. Corriger SBIO_A.", flush=True)
+            print("  (lecture registre faute DART au run réel : ERROR@0x40/ADDR@0x50-0x54 du dart-sep, "
+                  "read32 only, avant et après le 0x73 — non exécutée en SELFTEST.)", flush=True)
+            if SBIO_STREAM15:
+                print("  E1 (SBIO_STREAM15=1) : au run réel, la sonde PROGRAMMERA AUSSI le stream 15 du "
+                      "dart-sep (p.request(P_DART_INIT, dart_base, 15, 0, 2)) et mappera A8/B8 (IOVA "
+                      "0x54000/0x5c000) en sid 0 ET sid 15, puis ré-enverra le 0x73. Écriture DART côté AP "
+                      "seulement ; AUCUNE écriture SEP, aucun compteur avancé. Verdict imprimé : canal (i) "
+                      "vs état (ii/iii).", flush=True)
         else:
             print(f"  sonde sbio : ERREUR — fichier SBIO_A introuvable : {SBIO_A!r}. "
                   f"Donner un .bin de tampon A d'un 0x73 (ex. traces/…c12…/sep.log.ool/000300_08_A.bin).", flush=True)
@@ -416,6 +445,36 @@ def dart_write(sid, iova, data):
             raise RuntimeError(f"page IOVA 0x{page:x} non mappée (écriture refusée)")
         pa += cur - page; _check(pa, n)
         iface.writemem(pa, data[off:off + n]); off += n; cur += n
+
+# ---------------------------------------------------------------------------
+# LECTURE SEULE de l'état de faute du dart-sep (E1, 2026-11-18).
+#   But : après l'envoi du 0x73, voir si une TRADUCTION a fauté côté dart-sep, et sur QUEL stream/sid
+#   + à quelle adresse. Une faute READ neuve sur sid 15 = preuve directe que le SEP lit l'OOL sbio via
+#   sid 15 (cause « canal »). Offsets/décodage = définitions PUBLIQUES de m1n1 (source EXACTE :
+#   proxyclient/m1n1/hw/dart8020.py:11-23 (R_ERROR) et :67-69 (ERROR/ERROR_ADDR_LO/HI) ; src/dart.c:17-39).
+#   Le dart-sep est de famille t8020/t6000 : la MÊME carte de registres DART8020Regs couvre "dart,t8020"
+#   ET "dart,t6000" (dart8020.py:80-83), donc ERROR@0x40 / ADDR_LO@0x50 / ADDR_HI@0x54 s'appliquent.
+#   ON NE FAIT QUE read32 : AUCUNE écriture, on NE remet PAS le registre à zéro (la RAZ = write, interdite).
+#   LIMITE (honnête, cf. rapport) : le registre LATCHE la faute et garde FLAG jusqu'à une RAZ ; si le
+#   baseline a déjà FLAG=1, une nouvelle faute peut ne PAS s'y inscrire -> on ne peut alors pas trancher
+#   (refaire sur cold-boot propre, baseline FLAG=0). Et rien ne PROUVE que le DMA de l'OOL sbio passe par
+#   CE dart (plausible : les tampons A/B du SEP sont mappés via dart-sep) ni que la faute serait latchée.
+DART_ERROR, DART_ERROR_ADDR_LO, DART_ERROR_ADDR_HI = 0x40, 0x50, 0x54
+_DART_ERR_BITS = (("NO_DAPF_MATCH", 11), ("WRITE", 10), ("SUBPAGE_PROT", 7), ("PTE_READ_FAULT", 6),
+                  ("READ_FAULT", 4), ("WRITE_FAULT", 3), ("NO_PTE", 2), ("NO_PMD", 1), ("NO_TTBR", 0))
+
+def read_dart_fault():
+    """Lit (read32 only) l'état de faute du dart-sep. Retourne un dict décodé. Aucune écriture."""
+    raw = p.read32(dart_base + DART_ERROR)
+    addr = (p.read32(dart_base + DART_ERROR_ADDR_HI) << 32) | p.read32(dart_base + DART_ERROR_ADDR_LO)
+    bits = [nm for nm, b in _DART_ERR_BITS if raw & (1 << b)]
+    return {"raw": raw, "flag": (raw >> 31) & 1, "sid": (raw >> 24) & 0xf, "bits": bits, "addr": addr}
+
+def print_dart_fault(label):
+    f = read_dart_fault()
+    print(f"  [DART-faute {label}] ERROR=0x{f['raw']:08x} FLAG={f['flag']} sid={f['sid']} "
+          f"causes={','.join(f['bits']) or '—'} ADDR=0x{f['addr']:x}", flush=True)
+    return f
 
 # --- construction manuelle du SEP (dart_init signature correcte, cf. sep_boot.sh) ---
 sep = SEP.__new__(SEP)
@@ -581,18 +640,26 @@ def serve_from_gl(idle_timeout=20):
             served["osuuid"] += 1
             print(f"  SEP> UUID-OS (0x13) TAG=0x{m.TAG:02x} -> servi {os_uuid.hex()}", flush=True)
         elif op == 0x00:  # FETCH maître
-            sel = (m.DATA >> 8) & 1               # octet5 bit0 : SEP(0)/USER(1)
-            mtype = 0x01 if sel == 1 else 0x02    # USER=type 0x01, SEP=type 0x02
+            sel = (m.DATA >> 8) & 1               # octet5 bit0 (sélecteur du maître réclamé)
+            # CORRECTIF 2026-11-18 : mapping sel->type TRANCHÉ par les logs noyau macOS (snew-reel/hv_uart.log
+            # L1573-1576, c5-ool-boot L1525-1541) : "Fetched SEP-xART" répond au TAG 0x03 (sel=1), "Fetched
+            # USER-xART" au TAG 0x04 (sel=0). Donc sel=1 -> SEP (type 0x02), sel=0 -> USER (type 0x01).
+            # AVANT (bug) : sel=1->USER / sel=0->SEP (croisé) -> on servait le mauvais maître -> SAVE@TAG05.
+            # (La note kext §8 L260 "SEP(0)/USER(1)" lisait le sens à l'envers ; L286 et les logs ont raison.)
+            mtype = 0x02 if sel == 1 else 0x01    # sel=1 -> SEP-xART (0x02) ; sel=0 -> USER-xART (0x01)
             pay = masters.get(mtype)
             if pay is None:
                 print(f"  SEP> FETCH maître sel={sel} (type 0x{mtype:02x}) ABSENT du coffre -> STOP.", flush=True)
                 return served, False
+            garb = ""
+            if GL_GARBAGE:                       # ESSAI CONTRÔLE : même longueur, contenu nul
+                pay = b"\x00" * len(pay); garb = " [GARBAGE: contenu nul]"
             A = b"\x00" * 0x11 + pay              # préfixe maître 0x11 (hypothèse)
             write_A_bytes(A); L = len(A)
             sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00,
                                     PARAM=L & 0xff, DATA=((L >> 8) & 0xff) | (sel << 8)))
             served["master"] += 1
-            print(f"  SEP> FETCH maître sel={sel} (type 0x{mtype:02x}) -> servi {len(pay)} o (A={L} o)", flush=True)
+            print(f"  SEP> FETCH maître sel={sel} (type 0x{mtype:02x}) -> servi {len(pay)} o (A={L} o){garb}", flush=True)
         elif op == 0x05:  # FETCH gigalocker par UUID (16 o en B)
             uuid = iface.readmem(phys_B, 16)
             pay = gls.get(uuid)
@@ -601,24 +668,50 @@ def serve_from_gl(idle_timeout=20):
                       f"(on ne fabrique pas de locker).", flush=True)
                 return served, False
             write_A_bytes(pay); L = len(pay)
+            # CORRECTIF 2026-11-18 : la réponse gigalocker doit RÉ-ÉMETTRE l'octet1 de DATA de la requête
+            # (drapeau 0x00/0x01), comme la réponse maître ré-émet le sélecteur. VU 17/17 dans snew-reel
+            # (req byte1 == resp byte1). AVANT : byte1=0 -> décalage sur les 13 gigalockers à byte1=0x01.
             sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00,
-                                    PARAM=L & 0xff, DATA=((L >> 8) & 0xff)))
+                                    PARAM=L & 0xff, DATA=((L >> 8) & 0xff) | (m.DATA & 0x0000ff00)))
             served["gl"] += 1
             print(f"  SEP> FETCH gigalocker UUID={uuid.hex()} -> servi {L} o", flush=True)
         elif op == 0x07:  # locker-absent -> acquittement bénin (comme macOS)
             sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=m.DATA & 0xffffff00))
             print(f"  SEP> locker-absent (0x07) TAG=0x{m.TAG:02x} -> acquitté", flush=True)
-        elif op in (0x01, 0x06):  # SAVE -> le SEP veut re-sceller : échec FERMÉ, on N'ACQUITTE PAS
+        elif op in (0x01, 0x06):  # SAVE -> le SEP veut re-sceller
             nz, sha, head = read_B(dump=True, tag=m.TAG, typ=op)
-            print(f"  SEP> SAVE (0x{op:02x}) TAG=0x{m.TAG:02x} : le SEP veut re-sceller. ON S'ARRÊTE SANS "
-                  f"ACQUITTER (compteur non avancé, pas de brick). B: nz={nz} head={head}", flush=True)
-            print(f"      >>> CE SAVE NE TRANCHE PAS : il peut venir (1) d'un EMBALLAGE FAUX de notre part "
-                  f"(préfixe maître, octet-près de la charge, UUID lu au mauvais offset de B, valeurs fixes "
-                  f"0x0e/0x13) -> essai NON CONCLUANT, voie C TOUJOURS OUVERTE ; OU (2) d'un vrai refus "
-                  f"anti-rejeu -> voie C fermée. On ne peut PAS distinguer ici. NE PAS conclure 'voie C fermée' "
-                  f"sur ce seul SAVE. Regarder à QUELLE transaction ça diverge (ci-dessus) pour corriger l'emballage.",
-                  flush=True)
-            return served, False
+            if ACK_SAVE:
+                # ⚠️ MODE RISQUÉ : on ACQUITTE et on CONTINUE. Le compteur anti-rejeu AVANCE (DFU ensuite).
+                sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x00, PARAM=0x00, DATA=m.DATA & 0xffffff00))
+                served["save"] = served.get("save", 0) + 1
+                print(f"  SEP> SAVE (0x{op:02x}) TAG=0x{m.TAG:02x} -> ACQUITTÉ [ACK_SAVE : LE COMPTEUR AVANCE] "
+                      f"(#{served['save']}) B: nz={nz} head={head} ; on continue", flush=True)
+                if served["save"] >= 40:   # garde-fou : enchaînement sans fin de SAVE = verdict (B)
+                    print(f"  >>> ACK_SAVE : 40 SAVE acquittés sans atteindre le fonctionnel (aucun FETCH "
+                          f"gigalocker, 0x73 jamais tenté) -> ENCHAÎNEMENT DE RE-SCELLEMENTS = verdict (B) voie C "
+                          f"fermée pour le rejeu. ARRÊT (DFU Restore ensuite pour récupérer Touch ID).", flush=True)
+                    return served, False
+            else:
+                print(f"  SEP> SAVE (0x{op:02x}) TAG=0x{m.TAG:02x} : le SEP veut re-sceller. ON S'ARRÊTE SANS "
+                      f"ACQUITTER (compteur non avancé, pas de brick). B: nz={nz} head={head}", flush=True)
+                print(f"      >>> CE SAVE NE TRANCHE PAS : il peut venir (1) d'un EMBALLAGE FAUX de notre part "
+                      f"(préfixe maître, octet-près de la charge, UUID lu au mauvais offset de B, valeurs fixes "
+                      f"0x0e/0x13) -> essai NON CONCLUANT, voie C TOUJOURS OUVERTE ; OU (2) d'un vrai refus "
+                      f"anti-rejeu -> voie C fermée. On ne peut PAS distinguer ici. NE PAS conclure 'voie C fermée' "
+                      f"sur ce seul SAVE. Regarder à QUELLE transaction ça diverge (ci-dessus) pour corriger l'emballage.",
+                      flush=True)
+                return served, False
+        elif op == 0x1d:  # ANNONCE d'endpoint par le SEP (sbio/skdl/sse/sks/scrd...) -> acquitter
+            # comme macOS et NE PAS STOPPER. Nom = DATA[16:8:0]+PARAM ; ack = TYPE 0x16, DATA & 0xFFFFFF00.
+            # VU dans snew-reel : annonces L30-41 (0x1d), acks L46-54 (0x16, DATA=DATA&0xFFFFFF00). Faux-arrêt
+            # corrigé le 2026-11-18 (même classe que 0x07 ; cf. docs/journal.md 2026-11-18 et mémo protocole-complet).
+            name = bytes([(m.DATA >> 16) & 0xff, (m.DATA >> 8) & 0xff, m.DATA & 0xff, m.PARAM & 0xff])
+            try:
+                name_s = name.decode("ascii")
+            except Exception:
+                name_s = name.hex()
+            sep.send_msg(SEPMessage(EP=0x13, TAG=m.TAG, TYPE=0x16, PARAM=0x00, DATA=m.DATA & 0xffffff00))
+            print(f"  SEP> annonce endpoint 0x1d ({name_s!r}) TAG=0x{m.TAG:02x} -> acquitté (0x16), on continue", flush=True)
         else:
             print(f"  SEP> op inconnue 0x{op:02x} TAG=0x{m.TAG:02x} -> STOP (rien envoyé).", flush=True)
             return served, False
@@ -784,8 +877,19 @@ def probe_sbio():
         phys_B8 = u.heap.memalign(0x4000, SZ8)
         iface.writemem(phys_A8, b"\x00" * SZ8)
         iface.writemem(phys_B8, b"\x00" * SZ8)
+        # Stream 0 (comportement normal m1n1) : toujours mappé.
         p.dart_map(sep.dart_handle, IOVA_A8, phys_A8, SZ8)
         p.dart_map(sep.dart_handle, IOVA_B8, phys_B8, SZ8)
+        # EXPÉRIENCE E1 : programmer AUSSI le stream 15 du dart-sep et y mapper A8/B8 (mêmes phys).
+        # Même DART (sep.dart_base), même type T6000 (=2), on change SEULEMENT le sid (0 -> 15). Appel
+        # byte-pour-byte identique à l'init du stream 0 (l.~446), qui est éprouvé. find_sid() scanne 0
+        # d'abord, donc dart_write/dart_read continuent de passer par le stream 0 : l'existant est intact.
+        if SBIO_STREAM15:
+            dart_handle_15 = p.request(p.P_DART_INIT, sep.dart_base, 15, 0, 2)  # T6000, sid=15
+            p.dart_map(dart_handle_15, IOVA_A8, phys_A8, SZ8)
+            p.dart_map(dart_handle_15, IOVA_B8, phys_B8, SZ8)
+            print("  E1 : stream 15 du dart-sep PROGRAMMÉ ; A8/B8 mappés en sid 0 ET sid 15 "
+                  "(écriture DART côté AP seulement, aucune écriture SEP).", flush=True)
     except Exception as e:
         print(f"  ERREUR à l'allocation/mapping des tampons sbio : {e}. On n'envoie RIEN de plus.", flush=True)
         return
@@ -796,6 +900,19 @@ def probe_sbio():
                   f"-> sbio ne s'ouvre pas tard sous m1n1. On s'arrête, RIEN envoyé à l'EP 0x08.", flush=True)
             return
         print(f"  CNTL {label} (ouverture sbio) : acquitté", flush=True)
+
+    # Diagnostic E1 : lister TOUS les streams où A8 est désormais traduisible (preuve que le sid 15
+    # est bien programmé côté AP). N'envoie rien ; lectures de tables DART uniquement.
+    def _maps(sid):
+        try:
+            return translate_page(sid, IOVA_A8) is not None
+        except RuntimeError:
+            return False
+    sids_A8 = [s for s in range(16) if _maps(s)]
+    print(f"  A8 (IOVA 0x{IOVA_A8:x}) mappé dans les streams : {sids_A8}", flush=True)
+    if SBIO_STREAM15 and 15 not in sids_A8:
+        print("  !! E1 : le stream 15 n'apparaît PAS mappé malgré SBIO_STREAM15=1 — l'init du sid 15 a "
+              "échoué ; le test E1 n'est pas valide. On continue (stream 0 reste bon) mais ne pas conclure sur E1.", flush=True)
 
     # 2. écrire le 0x73 dans A8 (octets exacts de la capture), puis 3. l'envoyer.
     try:
@@ -808,6 +925,9 @@ def probe_sbio():
     # PURGER tout message 0x08 spontané accumulé AVANT l'envoi (sinon faux positif « vivant » sur un
     # résidu antérieur au 0x73 — correctif sceptique 2026-11-17).
     pump_ep0(); sep.msgs[0x08].clear()
+    # Baseline de l'état de faute du dart-sep AVANT le 0x73 (lecture seule). Comparé à l'après-envoi
+    # pour savoir si la traduction a fauté et sur quel sid (direct : sid 15 => le SEP lit l'OOL via sid 15).
+    fault_before = print_dart_fault("avant 0x73 (baseline)")
     sep.send_msg(SEPMessage(EP=0x08, TAG=0xfc, TYPE=0x73, PARAM=0x00, DATA=0x00000000))
 
     # 4. écouter l'EP 0x08 ~6 s et lire B8. On N'ACQUITTE RIEN, on n'envoie pas de 2e commande.
@@ -821,6 +941,29 @@ def probe_sbio():
             print(f"  SEP> EP=0x08 TAG=0x{m.TAG:02x} TYPE=0x{m.TYPE:02x} PARAM=0x{m.PARAM:02x} "
                   f"DATA=0x{m.DATA:08x}", flush=True)
         time.sleep(0.02)
+    # État de faute du dart-sep APRÈS le 0x73 (lecture seule), puis comparaison au baseline.
+    fault_after = print_dart_fault("après 0x73")
+    changed = (fault_after["raw"] != fault_before["raw"]) or (fault_after["addr"] != fault_before["addr"])
+    if fault_after["flag"] and (fault_before["flag"] == 0 or changed):
+        rf = "READ_FAULT" in fault_after["bits"]
+        print(f"  >>> FAUTE DART NEUVE après le 0x73 : sid={fault_after['sid']} "
+              f"causes={','.join(fault_after['bits']) or '—'} adresse=0x{fault_after['addr']:x}.", flush=True)
+        if fault_after["sid"] == 15 and rf:
+            print("      sid=15 + READ_FAULT => le SEP a TENTÉ de LIRE l'OOL sbio via le stream 15 "
+                  "(preuve directe du canal). Attendu : SANS stream 15 (run de contrôle) cette faute "
+                  "apparaît ; AVEC stream 15 ouvert, elle disparaît et sbio répond.", flush=True)
+        elif fault_after["sid"] == 0:
+            print("      sid=0 => faute sur le stream DÉJÀ programmé : ce n'est pas le canal « sid 15 ».", flush=True)
+        else:
+            print(f"      sid={fault_after['sid']} => interpréter selon le mapping dart-sep ; ne pas sur-conclure.", flush=True)
+    elif fault_before["flag"]:
+        print("  >>> le registre de faute DART portait DÉJÀ un drapeau au baseline et n'a pas changé : "
+              "on NE peut PAS trancher (le latch garde la 1re faute jusqu'à une RAZ qu'on ne fait pas). "
+              "Refaire sur un cold-boot propre pour un baseline FLAG=0.", flush=True)
+    else:
+        print("  >>> AUCUNE faute DART neuve après le 0x73 (FLAG reste 0). Le silence ne vient donc PAS "
+              "d'une traduction DART fautée latchée ici. Réserve : une faute peut n'être pas latchée, ou "
+              "le DMA de l'OOL sbio peut ne pas passer par ce dart (hypothèse, à ne pas affirmer).", flush=True)
     try:
         b8 = iface.readmem(phys_B8, SZ8)
     except Exception as e:
@@ -841,7 +984,23 @@ def probe_sbio():
               "sbio est VIVANT sous m1n1, pas seulement annoncé. Résultat majeur — à reproduire (n>=3) "
               "et à comparer à la réponse macOS c12 (B +0x00=1, +0x14=0x73). NE PAS conclure 'Touch ID "
               "marche' : il reste toute la séquence d'init (clé capteur, etc.) puis un vrai match.", flush=True)
+        if SBIO_STREAM15:
+            print(">>> VERDICT E1 : réponse obtenue AVEC le stream 15 programmé alors que les runs "
+                  "sans stream 15 (n=3, docs/voie_sbio.md) étaient MUETS -> cause (i) CONFIRMÉE : le "
+                  "silence venait du CANAL DART (le SEP lit l'OOL sbio via le sid 15, non programmé par "
+                  "m1n1). Grande avancée, sans risque. Le driver devra mapper l'OOL sbio en sid 15. "
+                  "À reproduire n>=3 et faire un run de contrôle SANS SBIO_STREAM15 (même boot) pour "
+                  "confirmer que c'est bien le sid 15 qui fait la différence.", flush=True)
     else:
+        if SBIO_STREAM15:
+            print(">>> VERDICT E1 : TOUJOURS MUET malgré le stream 15 programmé et A8 mappé en sid 0 ET "
+                  f"sid 15 (streams vus : {sids_A8}). -> cause (i) « canal DART » FORTEMENT AFFAIBLIE "
+                  "(une PTE valide côté AP ne PROUVE pas que le SEP a TENTÉ de lire l'OOL via sid 15 ; "
+                  "regarder l'état de faute DART ci-dessus : une faute READ neuve sur sid 15 au run de "
+                  "CONTRÔLE — sans stream 15 — confirmerait le canal, son absence l'affaiblit encore). "
+                  "Reste probable : l'ÉTAT (sbio pas armé tant que xART n'est pas scellé / endpoint non "
+                  "prêt, cause ii/iii de docs/voie_sbio.md). Prochaine piste : E2 (variante sans écriture "
+                  "SEP : envoyer le 0x73 à différents instants du boot).", flush=True)
         print(">>> ESSAI D : AUCUNE réponse au 0x73 (B8 nul, aucun message EP 0x08). sbio est ANNONCÉ, "
               "mais ici PAS de preuve qu'il traite la commande. 3 causes possibles, À NE PAS confondre : "
               "(1) le 0x73 n'a pas ATTEINT sbio — l'acquittement des CNTL prouve que le SEP a enregistré "
