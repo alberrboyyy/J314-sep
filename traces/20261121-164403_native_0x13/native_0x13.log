@@ -1,0 +1,48 @@
+TTY> Heap limit: 0x100104a4000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+démarrage du SEP par m1n1 (séquence publique, routine)...
+Traceback (most recent call last):
+  File "<stdin>", line 121, in <module>
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hw/sep.py", line 109, in boot
+    self.expect_msg(0xFF, BootRomStatus.STATUS_OK)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hw/sep.py", line 130, in expect_msg
+    msg = self.recv_msg(ep, block=True)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hw/sep.py", line 164, in recv_msg
+    self._try_recv_msgs()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/hw/sep.py", line 146, in _try_recv_msgs
+    while not self.asc.OUTBOX_CTRL.reg.EMPTY:
+              ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/utils.py", line 878, in reg
+    val = self.val
+          ^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/utils.py", line 870, in val
+    return self.rd(self.addr)
+           ~~~~~~~^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxyutils.py", line 166, in read
+    val = self._read[width](addr)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxyutils.py", line 119, in <lambda>
+    32: lambda addr: self.proxy.read32(addr),
+                     ~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 873, in read32
+    return self.request(self.P_READ32, addr)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 758, in request
+    return self._request(opcode, *args2, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 722, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 401, in proxyreq
+    return self.reply(self.REQ_PROXY)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 272, in reply
+    reply += self.readfull(1)
+             ~~~~~~~~~~~~~^^^
+  File "/home/albert/Desktop/sep-touchid/m1n1/proxyclient/m1n1/proxy.py", line 204, in readfull
+    block = self.dev.read(size - len(d))
+  File "/usr/lib/python3.14/site-packages/serial/serialposix.py", line 595, in read
+    raise SerialException(
+        'device reports readiness to read but returned no data '
+        '(device disconnected or multiple access on port?)')
+serial.serialutil.SerialException: device reports readiness to read but returned no data (device disconnected or multiple access on port?)

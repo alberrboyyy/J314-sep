@@ -1,0 +1,49 @@
+S_new: 60 étapes EP 0x13, 30 réponses AP, 14 écritures tampon A
+TTY> Heap limit: 0x1001028c000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+démarrage du SEP par m1n1 (séquence publique)...
+BOOT OK
+xarm (0x13) annoncé. Endpoints : 0x00:cntl, 0x0e:hdcp, 0x10:xars, 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x18:stac
+  SECMODE acquitté
+tampons mappés : A iova=0x2c000<-phys=0x100102d0000 | B iova=0x38000<-phys=0x100102d8000
+  CNTL A taille : acquitté
+  CNTL A adresse : acquitté
+  CNTL B taille : acquitté
+  CNTL B adresse : acquitté
+tampons prêts : A sid=0 | B sid=0
+=== ESSAI E : SERVIR le vrai coffre (.gl) aux FETCH du SEP (écriture SEP) ===
+  coffre : 2 maître(s) [1, 2], 10 gigalocker(s) ; UUID d'OS=74980deead6a5674b233b7e10a7fd0cb
+  SEP> fw-boot (0x0e) TAG=0x02 -> répondu
+  SEP> UUID-OS (0x13) TAG=0x01 -> servi 74980deead6a5674b233b7e10a7fd0cb
+  SEP> FETCH maître sel=1 (type 0x01) -> servi 1344 o (A=1361 o)
+  SEP> FETCH maître sel=0 (type 0x02) -> servi 850 o (A=867 o)
+  SEP> annonce endpoint 0x1d ('sbio') TAG=0x00 -> acquitté (0x16), on continue
+  SEP> annonce endpoint 0x1d ('skdl') TAG=0x00 -> acquitté (0x16), on continue
+  SEP> annonce endpoint 0x1d ('sse ') TAG=0x00 -> acquitté (0x16), on continue
+  SEP> annonce endpoint 0x1d ('sks ') TAG=0x00 -> acquitté (0x16), on continue
+  SEP> annonce endpoint 0x1d ('scrd') TAG=0x00 -> acquitté (0x16), on continue
+  SEP> SAVE (0x01) TAG=0x05 : le SEP veut re-sceller. ON S'ARRÊTE SANS ACQUITTER (compteur non avancé, pas de brick). B: nz=127 head=da87a66904d56e4bd7467737b52d27e4cbd82c38950824f566c9798cd6cef6ee
+      >>> CE SAVE NE TRANCHE PAS : il peut venir (1) d'un EMBALLAGE FAUX de notre part (préfixe maître, octet-près de la charge, UUID lu au mauvais offset de B, valeurs fixes 0x0e/0x13) -> essai NON CONCLUANT, voie C TOUJOURS OUVERTE ; OU (2) d'un vrai refus anti-rejeu -> voie C fermée. On ne peut PAS distinguer ici. NE PAS conclure 'voie C fermée' sur ce seul SAVE. Regarder à QUELLE transaction ça diverge (ci-dessus) pour corriger l'emballage.
+--- service du coffre terminé : {'master': 2, 'gl': 0, 'osuuid': 1, 'fw': 1} ; ARRÊT sur SAVE/locker-absent/inconnu (voir ci-dessus : ne TRANCHE PAS entre emballage faux = non concluant et vrai refus anti-rejeu) ---
+--- écoute 10 s des annonces après service du coffre ---
+Endpoints annoncés par le SEP :
+  0x00 cntl
+  0x08 sbio  <-- BIOMÉTRIE (sbio) !
+  0x0a scrd
+  0x0c sse
+  0x0e hdcp
+  0x10 xars
+  0x13 xarm
+  0x14 hibe
+  0x15 pnon
+  0x17 skdl
+  0x18 stac
+>>> SERVE_GL : sbio (0x08) ANNONCÉ après service du VRAI coffre. La puce a avancé jusqu'aux endpoints applicatifs. 'annoncé' != 'fonctionnel' -> voir la sonde 0x73 (PROBE_SBIO) ci-dessous pour savoir s'il RÉPOND. Si on est arrivé ici SANS SAVE/rejet, c'est le signal recherché (coffre plausiblement accepté), à CONFIRMER par la sonde + reproductibilité (n>=3) ; PAS une preuve de Touch ID.
+=== ESSAI D : sonde sbio (0x73, sans doigt, une seule commande) ===
+  CNTL A8 taille (ouverture sbio) : acquitté
+  CNTL A8 adresse (ouverture sbio) : acquitté
+  CNTL B8 taille (ouverture sbio) : acquitté
+  CNTL B8 adresse (ouverture sbio) : acquitté
+  0x73 écrit dans A8 (depuis 000300_08_A.bin). Envoi de la commande...
+  B8 : 0 octets non nuls ; tête=0000000000000000000000000000000000000000000000000000000000000000
+>>> ESSAI D : AUCUNE réponse au 0x73 (B8 nul, aucun message EP 0x08). sbio est ANNONCÉ, mais ici PAS de preuve qu'il traite la commande. 3 causes possibles, À NE PAS confondre : (1) le 0x73 n'a pas ATTEINT sbio — l'acquittement des CNTL prouve que le SEP a enregistré l'adresse de A8, PAS qu'il lit bien phys_A8 à l'IOVA 0x54000 sous m1n1 (même inconnu DART stream/sid que pour xART ; le succès de xART ne garantit pas le stream de sbio) ; (2) l'ouverture tardive de sbio sous m1n1 ne suffit pas ; (3) l'état restauré ne rend pas sbio fonctionnel. -> hypotheses.md. Ne pas conclure 'sbio mort' sur ce seul silence.
