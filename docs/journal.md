@@ -2189,3 +2189,11 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `sks_sequence_c12.md` dit `TYPE = opcode séquentiel`. Même observation (TYPE +1 par requête) : l'opération est
   dans le DER (kext §15.2), le TAG reste à interpréter. Hypothèse ouverte : sur un état scellé par Linux (sans keybag
   utilisateur), sbio n'exige peut-être que l'ouverture 0x12 + négociation IPC, pas les 25 RPC de c12.
+
+## 2026-11-22 20:12 — Claude (session ALARM) — avis c9 sur J5 ; Mac PAS encore rebooté
+- c9 (session PC « Plan d'expérience sbio ALARM ») : séquence J5 VALIDÉE telle quelle (0x17 16→0, 0x15 4→40, 0x16 40→0,
+  0x42 0→64, 0x18 64→0, 0x5f 2→22158 o ; trames SPI 0x72/0x73 ; prélude `80 60 00 07 00 00 00` + bloc en 1 transfert PIO ;
+  verdict corps[8]==0x29). PRIORITÉ = J5 maintenant (sbio frais, pas besoin de SKS) ; SKS (persistance) ensuite.
+- État : boot du Mac 19:55:58 (= boot de J3d), `sep_native` encore chargé → reboot du Mac requis avant J5.
+- À la reprise (nouvelle session ALARM) : sur go d'Albert, `sudo pending/j5_sensor_run.sh` (store neuf par défaut).
+- (Correction : l'entrée « 20:30 » ci-dessus a été écrite vers 20:10 ; l'heure était fausse.)
