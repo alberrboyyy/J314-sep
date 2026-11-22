@@ -2352,3 +2352,17 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `.v3` 56996c18…3c34).
 - Écarts choisis / incertains : coupure 40 ms (macOS 11 ms) ; pas de 80 78 (comme macOS, jamais fait sous Linux) ;
   0x19 jamais envoyé hors macOS ; sensibilité au délai 0x63→0x19 inconnue. 1er run `UPTO=pass2` = go d'Albert.
+
+## 2026-11-22 22:11 — Albert + Claude (session ALARM) — 🎯 J5c pass2 : 2e passe macOS COMPLÈTE en Linux natif, capteur au repos final de macOS
+- Go d'Albert (power-cycle, `sudo UPTO=pass2 pending/j5c_params_run.sh`, allow_sbio_params=3, store neuf). Logs bruts :
+  `logs/20261122-221109_j5e-pass2/`.
+- VU, 1re passe : patch n°1 chargé (n=4, IRQ t+43 ms), params = macOS (n=3), 0x5b acquitté + 0x63 = macOS (n=2).
+- VU, transition : capteur coupé 40 ms (gpio0 196) puis rallumé, IRQ haute t+5 ms ; états `…60000018 5233…` puis
+  `…60000000 5233…` (= macOS C17-C20 : patch perdu à la coupure) ; **0x19 handleReset acquitté** (0→0).
+- VU, 2e passe : relais 0x17→0x18 ; 0x5f → **patch n°2 0x70ce = 28878 o** ; push même motif → **chargé**
+  (`2901007c`, IRQ t+55 ms ; macOS 49-55 ms) ; 0x5d, 0x5c, 0x6a (→68 o, trame 0x4d), **0x6f** (→77 o, trame 0x55 de
+  86 o), 0x31/0x32, 0x01, 0x1f (`05 05`), **0x63 ×2 = macOS**. Tous les états post-trame = macOS. VERDICT sbiod :
+  « 2e passe terminée, capteur au repos final de macOS ». Aucun Halt. Capteur éteint ensuite.
+- ⇒ **toute l'init capteur de macOS (2 passes, 0x73 → 0x63×2) est reproduite en Linux natif.** n=1 pour la 2e passe.
+- Suite = J6 : enrôlement / match = session HUMAINE (doigt). Protocole d'abord : `docs/sbio_enroll.md`, `docs/sbio_match.md`
+  (0x6c/0x6d, 0x23/0x06/0x65/0x09 ; D2 = gating SKS/keybag possible sur un état Linux sans keybag).
