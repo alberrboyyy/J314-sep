@@ -80,7 +80,18 @@ catch_proxy_run() {
         00|02) ;;                                        # proxy (00) / vuart (02) : saisissables
         *) seen["$d"]=1; continue ;;                     # 01/03 = interfaces data, pas de tty pilotable
       esac
-      ( exec 3<>"$d"; sleep 30 ) &                       # OUVRIR = m1n1 reste en « Running proxy »
+      # Ouvrir le port DÈS que les droits udev le permettent : le nœud brut peut rester root-only
+      # ~quelques ms avant qu'udev pose le groupe uucp (-> "Permission denied"). On RÉESSAIE
+      # l'ouverture jusqu'à ~3 s au lieu d'abandonner au 1er refus (= le bug qui ratait la fenêtre).
+      local opened=""
+      for _ in $(seq 1 200); do
+        if ( exec 3<>"$d" ) 2>/dev/null; then opened=1; break; fi
+        sleep 0.015
+      done
+      if [ -z "$opened" ]; then
+        seen["$d"]=1; echo ">>> $d vu mais pas ouvrable à temps (droits udev) — ignoré."; continue
+      fi
+      ( exec 3<>"$d"; sleep 30 ) &                       # droits OK -> on TIENT le port ouvert
       HOLD_PID=$!; grab_dev="$d"; grab_if="$ifn"
       echo ">>> SAISI $d (if$ifn) à t+$(( $(date +%s) - t_start ))s — m1n1 tenu en proxy."
       break
