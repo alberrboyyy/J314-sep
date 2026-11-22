@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 02:36 — Albert (lance) + Claude (Opus 4.8) — sbio4 : key exchange relayé à MOITIÉ (le SEP rend bien le blob 40o ; la réponse SPI capteur = 11o, pas 40 → enveloppe SPI du 0x72 à reverser)
+- Trace : traces/20261122-023626_native_sbio4 (spi_0x72_resp_raw.bin, kx_0x15_B.bin).
+- Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio4.sh` (Albert lance). Phase 1-3 OK (stab **n=7**, sbio vivant **n=6**, 0x17 franchi). Phase 4 : 0x15 envoyé → le SEP rend un blob de 40o (0x28) `7ad7436c0366aa4e59891dbb3a16f6b4feeb23bb0456de33f062ea4fd7da28a7958cbf8492e296ff` (offset +0x1c, taille confirmée par capture). Relais SPI trame 0x72 (47o) → poll état 0x10 : pending = **0x0b (11o)** → réponse brute **11o = `80d4000b00000000 0272 ed57`** (≠ 40o attendus) → STOP fail-closed (on ne devine pas). Teardown capteur (power_off+restore) OK.
+- Vu (faits bruts) : la moitié SEP du key exchange fonctionne (blob 40o produit). La réponse du capteur au 0x72 = 11o `80d4000b00000000 0272 ed57` (forme `80 d4 00 <len> 00000000 <payload>`, payload = `02 72` + CRC `ed57` ; ressemble à un ACK/status court, PAS la réponse-clé de 40o).
+- Interprété : le mur = l'**ENVELOPPE SPI du 0x72** (comment obtenir la réponse de 40o du capteur), point explicitement non reversé (`sbio_keyexchange.md §8`). Hypothèses à tester : réponse-clé via un **2e read** après l'ACK court ; délai de calcul capteur (re-poll) ; ou frame 0x72 à ajuster. À reverser depuis les captures du bus capteur + kext `SessionKeyExchange`/`transferData`.
+- Incidents : RAS. Compteur +12 (xart_store_sbio4). Capteur restauré. Linux intact ; DFU prêt.
+
 ## 2026-11-22 02:13 — Albert (lance) + Claude (Opus 4.8) — 🎯 0x17 FRANCHI nativement : l'AP lit le serial capteur EN DIRECT et le SEP l'accepte ; mur suivant = 0x15 key exchange
 - Trace : traces/20261122-021249_native_sbio3. Script : pending/sep_native_sbio3.sh (relu, SELFTEST vert) ; moteur SPI : analysis/mesa_spi_proxy.py.
 - Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio3.sh` (Albert lance, après reboot + catcher permanent). PHASE 1 persist (**stab n=6**) + PHASE 2 0x73 (**sbio vivant n=5**) + PHASE 3 : dans la MÊME session proxy, `MesaSPI(iface,p,u)` → `power_on()` → `read_id()` → identité capteur `80d4001b00000000 70 0219c05c0fd2aa349a81c76e030200d8 7576` ; série [9:25] = `0219c05c0fd2aa349a81c76e030200d8` (== gabarit c12) ; construit la commande 0x17 (gabarit + série lue live) → envoie EP 0x08 TAG=0xfc TYPE=0x17.
