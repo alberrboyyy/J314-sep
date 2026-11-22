@@ -144,6 +144,17 @@ fn native_absent_and_persist() {
     assert_eq!(r.w, rq(5, 0, lb.len() as u8, (lb.len() >> 8) as u32 | 0x100));
     assert_eq!(r.a, lb);
     assert_eq!(Store::load(&dir).unwrap().lockers.get(&lu), Some(&lb));
+    // J7b: same store, locker served WITHOUT its UUID (B[16..]), length recomputed
+    d.strip_locker_uuid = true;
+    let r = d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &lu).unwrap();
+    assert_eq!(r.w, rq(5, 0, (lb.len() - 16) as u8, ((lb.len() - 16) >> 8) as u32 | 0x100));
+    assert_eq!(r.a, lb[16..]);
+    // a stored blob not starting with its UUID: no reply (fail-closed)
+    let other = [0x47u8; 16];
+    d.store.lockers.insert(other, vec![0x11; 0x30]);
+    assert!(d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &other).is_err());
+    d.store.lockers.remove(&other);
+    d.strip_locker_uuid = false;
     // SAVE with a B length different from the announced one: refused
     assert!(d.answer(&rq(5, OP_SAVE_XART, 0x10, 0x100), &blob).is_err());
     // announce / absent acks

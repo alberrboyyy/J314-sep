@@ -2481,3 +2481,14 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `PARAM 0 DATA 0x100`, A 0 o) ou **servi tel quel** (J3b, J3d, J7a : `PARAM 0x6a DATA 0x100`, A 106 o) → **comportement
   du SEP identique** dans les deux cas : 2e FETCH du même UUID, puis silence, ni SAVE ni locker suivant. ⇒ notre locker servi
   fait **le même effet qu'un locker absent** (hypothèse : il est rejeté ; emballage ou anti-rejeu, non tranché).
+
+## 2026-11-22 — Claude (session ALARM) — J7b préparé : J7a avec lockers servis SANS UUID ; rien lancé
+- Reverse kext op 0x05/0x06 (agent reverseur) **non fait** : `macos/kernel.macho` (13.5) n'est que sur le PC c9 → à
+  relancer là-bas (handlers 0x…6874 / 0x…699c de `_handle_sep_driven_msg`). Le format reste donc une hypothèse.
+- Indice (VU, comparaison de tailles) : slot `.gl` de 9133c5d5… = 0x28 = 40 o ; notre SAVE B de ce locker = 56 o = 16 + 40.
+  Les 3 autres diffèrent (état scellé différent : non comparable). Les 4 `locker_save_*.bin` du store commencent par leur UUID.
+- Code : `sepd --locker-strip-uuid` (FETCH locker → A = B[16..] ; blob ne commençant pas par l'UUID demandé = arrêt sans
+  réponse). Test `snew.rs` étendu (3/3 verts), clippy 0. Binaire `~/kbuild/j5/sepd.j7b` sha256
+  `94f334db796903e68a86661dc2b93232bcbd647997c886264056e9419bdc6428` (`sepd` J7a inchangé). `sep_native.ko` = celui de J7a.
+- `pending/j7b_sks_open_chained_nouuid.sh STORE` : corps = J7a + vérif sha256 de sepd.j7b + copie du STORE hors repo avant
+  run + `--locker-strip-uuid`. **Script neuf → 1er run = go d'Albert.**

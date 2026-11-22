@@ -1,7 +1,7 @@
 //! sepd: serves EP 0x13 (xART) of `sep_native` through `/dev/sep_native`. See `lib.rs` for the policy and
 //! `driver/rust/kmod/SEP_NATIVE.md` for the interface and the test plan.
 //!
-//! Usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH]
+//! Usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH] [--locker-strip-uuid]
 //!   defaults: /var/lib/sepd, /etc/sepd/os_uuid, /dev/sep_native.
 //! Every exchange is logged to stderr and appended to DIR/sepd.log. Any error = exit WITHOUT replying.
 use sep_proto::xart::op_name;
@@ -32,15 +32,20 @@ impl Log {
 
 fn main() {
     let (mut store, mut uuid_file, mut dev) = (PathBuf::from(DEFAULT_STORE), PathBuf::from(DEFAULT_UUID_FILE), PathBuf::from(DEFAULT_DEV));
+    let mut strip = false;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
+        if a == "--locker-strip-uuid" {
+            strip = true;
+            continue;
+        }
         let v = args.next().map(PathBuf::from);
         match (a.as_str(), v) {
             ("--store", Some(v)) => store = v,
             ("--os-uuid-file", Some(v)) => uuid_file = v,
             ("--dev", Some(v)) => dev = v,
             _ => {
-                eprintln!("usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH]");
+                eprintln!("usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH] [--locker-strip-uuid]");
                 exit(64);
             }
         }
@@ -54,13 +59,15 @@ fn main() {
     let st = Store::load(&store).unwrap_or_else(|e| log.die(1, &format!("store {}: {e}", store.display())));
     log.0 = OpenOptions::new().create(true).append(true).open(store.join("sepd.log")).ok();
     log.line(&format!(
-        "sepd: store {} (masters {:?}, lockers {}), dev {}",
+        "sepd: store {} (masters {:?}, lockers {}), dev {}, lockers served {}",
         store.display(),
         st.masters.keys().collect::<Vec<_>>(),
         st.lockers.len(),
-        dev.display()
+        dev.display(),
+        if strip { "WITHOUT UUID (J7b)" } else { "verbatim" }
     ));
     let mut d = Daemon::new(st, uuid);
+    d.strip_locker_uuid = strip;
     let mut f = OpenOptions::new().read(true).write(true).open(&dev).unwrap_or_else(|e| log.die(2, &format!("{}: {e}", dev.display())));
     let mut buf = vec![0u8; REC_MAX];
     loop {

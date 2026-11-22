@@ -13,6 +13,9 @@
 //! - 0x06 SAVE locker  -> B persisted (`locker_save_<uuid>.bin`, UUID = B[0..16], verified J3) BEFORE the ACK, and
 //!   served back VERBATIM on a later FETCH 0x05 with that UUID (c9, 2026-11-22: on a chained boot, sbio stays unarmed
 //!   if lockers are ABSENT; serving form = hypothesis to confirm on hardware)
+//!   With `strip_locker_uuid` (J7b, `--locker-strip-uuid`): served as B[16..] instead, i.e. WITHOUT the leading UUID
+//!   (hypothesis: a macOS FETCH A starts with the payload, `docs/gigalocker.md`; `.gl` slot of 9133c5d5… = 0x28 o =
+//!   its SAVE B 56 o minus 16). A stored blob that does not start with the requested UUID = error (fail-closed).
 //! - anything else     -> error: the daemon stops WITHOUT replying (fail-closed).
 use sep_proto::word::Word;
 use sep_proto::xart::*;
@@ -121,11 +124,13 @@ pub struct Daemon {
     pub store: Store,
     pub os_uuid: [u8; UUID_LEN],
     pub nsave: u32,
+    /// J7b: serve a locker FETCH as B[16..] of its SAVE (UUID stripped) instead of verbatim.
+    pub strip_locker_uuid: bool,
 }
 
 impl Daemon {
     pub fn new(store: Store, os_uuid: [u8; UUID_LEN]) -> Self {
-        Daemon { store, os_uuid, nsave: 0 }
+        Daemon { store, os_uuid, nsave: 0, strip_locker_uuid: false }
     }
 
     /// Reply to the SEP request `req` (`b` = copy of buffer B made by the kernel). For a SAVE the blob is durable
@@ -153,6 +158,14 @@ impl Daemon {
             OP_FETCH_GL => {
                 let uuid: [u8; UUID_LEN] = b.try_into().map_err(|_| format!("FETCH locker: B = {} o, 16 expected", b.len()))?;
                 let (a, what) = match self.store.lockers.get(&uuid) {
+                    Some(p) if self.strip_locker_uuid => {
+                        if p.len() <= UUID_LEN || p[..UUID_LEN] != uuid {
+                            return Err(format!("FETCH locker {}: stored blob does not start with its UUID", hex(&uuid)));
+                        }
+                        let a = p[UUID_LEN..].to_vec();
+                        let what = format!("locker {} SERVED WITHOUT UUID ({} o of {})", hex(&uuid), a.len(), p.len());
+                        (a, what)
+                    }
                     Some(p) => (p.clone(), format!("locker {} SERVED ({} o)", hex(&uuid), p.len())),
                     None => (vec![], format!("locker {} ABSENT", hex(&uuid))),
                 };
@@ -182,7 +195,7 @@ impl Daemon {
                     if let Ok(k) = <[u8; UUID_LEN]>::try_from(uuid) {
                         self.store.lockers.insert(k, b.to_vec());
                     }
-                    format!("SAVE locker {} PERSISTED ({} o, served verbatim on FETCH)", hex(uuid), b.len())
+                    format!("SAVE locker {} PERSISTED ({} o, served {} on FETCH)", hex(uuid), b.len(), if self.strip_locker_uuid { "without UUID" } else { "verbatim" })
                 };
                 self.nsave += 1;
                 Reply { w: w(RESP_DONE, 0, ack), a: vec![], what: format!("{what} [SAVE #{}/{MAX_SAVES}]", self.nsave) }
