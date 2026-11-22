@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+/*
+ * Ajout À CHAUD d'un nœud distinct « j314c,sep-native » pour le pilote Rust driver/rust/kmod/sep_native.ko
+ * (option (b) de docs/driver_rust_design.md §2). Chargé par sep_native_ovl.ko (dtbo dans /lib/firmware) ;
+ * rien n'est écrit sur disque ni dans la chaîne de démarrage, un reboot enlève tout.
+ *
+ * Le nœud d'origine /soc/sep@396400000 (compatible "apple,sep") N'EST PAS touché et reste "disabled" :
+ * le pilote intégré apple_sep (sep.rs) ne se lie donc jamais. Le nouveau nœud reprend ses références.
+ *
+ * Le DT vivant n'a pas de __symbols__ : chaque référence est un MARQUEUR 0xdeadbe0N que sep_native_ovl.ko
+ * remplace, au chargement, par la valeur lue sur le DT vivant (chaque marqueur doit apparaître une fois) :
+ *   0xdeadbe01  mboxes           ← mboxes du nœud sep        (sep_mbox,   /soc/mbox@396408000)
+ *   0xdeadbe02  iommus, cellule 0 ← iommus du nœud sep       (sep_dart,   /soc/iommu@3952c0000)
+ *   0xdeadbe03  iommus, cellule 1 ← stream id du nœud sep     (0 sur le DT lu le 2026-11-22)
+ *   0xdeadbe04  power-domains    ← power-domains du nœud sep (ps_sep, apple,always-on)
+ *   0xdeadbe05  memory-region    ← memory-region "sepfw" du nœud sep (sep-firmware, ajouté par m1n1
+ *                                  seulement si le DT de boot porte l'alias sep)
+ *   0xdeadbe06  j314c,sep-node   ← phandle du nœud sep lui-même (manifestes local-policy-manifest /
+ *                                  iboot-manifest, que sep_native lit là où m1n1 les a mis)
+ * Pas de « reg » : sep_native n'utilise pas les registres du SEP (seulement la mailbox), et on évite de
+ * déclarer deux fois la même zone MMIO.
+ *
+ * Compilation (hors kbuild ; les 3 -Wno- taisent les avertissements attendus sur les phandles numériques) :
+ *   dtc -Wno-mboxes_property -Wno-iommus_property -Wno-power_domains_property \
+ *       -I dts -O dtb -o sep-native.dtbo sep-native-overlay.dts
+ */
+/dts-v1/;
+/plugin/;
+/ {
+	fragment@0 {
+		target-path = "/soc";
+		__overlay__ {
+			sep-native {
+				compatible = "j314c,sep-native";
+				mboxes = <0xdeadbe01>;
+				mbox-names = "mbox";
+				iommus = <0xdeadbe02 0xdeadbe03>;
+				power-domains = <0xdeadbe04>;
+				memory-region = <0xdeadbe05>;
+				memory-region-names = "sepfw";
+				j314c,sep-node = <0xdeadbe06>;
+				status = "okay";
+			};
+		};
+	};
+};

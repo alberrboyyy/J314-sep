@@ -1,0 +1,539 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: sep-touchid draft <noreply@invalid>
+Date: Sun, 22 Nov 2026 00:00:00 +0100
+Subject: [DRAFT][PATCH] spi: apple: optional SIO dmaengine TX path;
+ dmaengine: apple-sio: one-shot slave_sg
+
+*** DRAFT - NOT COMPILED, NOT TESTED ON HARDWARE, NOT APPLIED.
+*** PRIVATE PROJECT: never send upstream / to Asahi.
+*** Base: linux-asahi tag asahi-7.2.12-3 (~/kbuild/src/linux-asahi-7.2.12-3),
+*** produced with diff -u on copies; `patch -p1 --dry-run` applies cleanly.
+*** Design, recommended out-of-tree test path and test plan:
+*** docs/dma_spi2_design.md (sections 3, 4, 5).
+
+apple-sio:
+ - add device_prep_slave_sg: one coprocessor descriptor per sg entry,
+   no wrap-around, vchan_cookie_complete on the last MSG_REPORT;
+ - announce DMA_SLAVE and DMA_DEV_TO_MEM (odd channels are RX already);
+ - fix desc_allocated size (2 bytes allocated for a 64-bit bitmap);
+ - sio_synchronize also synchronizes the vchan tasklet.
+ The cyclic path (dpaudio) keeps its behaviour.
+
+spi-apple:
+ - optional "tx" DMA channel from DT (dmas/dma-names); without it the
+   driver behaves exactly as before (spi1/spi3 have no dmas);
+ - can_dma only for 8-bit TX-only transfers >= dma_min (default 256);
+ - DMA transfer_one follows the register sequence macOS uses on spi2
+   (project trace C19): SIO issue, RXCNT=0/TXCNT=len, STATUS=0x400023,
+   CFG mode DMA + FIFO_THRESH field 2, CTRL=0xd, wait SIO report,
+   drain, CFG back to IRQ mode, CTRL=0;
+ - refuses (fail closed) a transfer mapped to more than one sg entry.
+
+Known unknowns: SIO channel config values (apple-sio hardcodes the
+dpaudio ones: fifo/threshold/limit 0x800, timeout 0), STATUS bits 5/22,
+SPI-side completion in DMA mode, SHIFTCFG bit 2. See design doc section 6.
+
+---
+diff -Naur a/drivers/dma/apple-sio.c b/drivers/dma/apple-sio.c
+--- a/drivers/dma/apple-sio.c
++++ b/drivers/dma/apple-sio.c
+@@ -54,7 +54,8 @@
+  *
+  * There's the struct sio_tx, and the struct dma_async_tx_descriptor embedded
+  * inside, which jointly represent a transaction to the dmaengine subsystem.
+- * At this time we only support those transactions to be cyclic.
++ * Those transactions are either cyclic (dpaudio) or, DRAFT, one-shot slave_sg
++ * (one coprocessor descriptor per scatterlist entry, e.g. SPI).
+  *
+  * Then there are the coprocessor descriptors, which is what the coprocessor
+  * knows and understands. These don't seem to have a cyclic regime, so we can't
+@@ -68,6 +69,13 @@
+  */
+ #define SIO_MAX_NINFLIGHT	4
+ 
++/*
++ * DRAFT (sep-touchid, untested): upper bound on scatterlist entries of one
++ * slave_sg transaction. Descriptor slots are shared by all channels
++ * (SIO_NO_DESC_SLOTS), keep a single transaction from eating them all.
++ */
++#define SIO_MAX_SG		16
++
+ struct sio_coproc_desc {
+ 	u32 pad1;
+ 	u32 flag;
+@@ -136,10 +144,12 @@
+ 	struct completion done;
+ 
+ 	bool terminated;
+-	size_t period_len;
+-	int nperiods;
++	bool cyclic;		/* DRAFT: false for slave_sg (one-shot) */
++	size_t period_len;	/* cyclic only */
++	int nperiods;		/* cyclic: periods; one-shot: sg entries */
+ 	int ninflight;
+ 	int next;
++	int ndone;		/* DRAFT, one-shot only: descriptors reported */
+ 
+ 	struct sio_coproc_desc *siodesc[];
+ };
+@@ -270,6 +280,7 @@
+ 		return NULL;
+ 
+ 	init_completion(&siotx->done);
++	siotx->cyclic = true;
+ 	siotx->period_len = period_len;
+ 	siotx->nperiods = nperiods;
+ 
+@@ -292,6 +303,57 @@
+ 	return vchan_tx_prep(&siochan->vc, &siotx->vd, flags);
+ }
+ 
++/*
++ * DRAFT (sep-touchid, untested on hardware): one-shot transfer.
++ *
++ * One coprocessor descriptor per scatterlist entry, same descriptor fields as
++ * the cyclic path (flag = 1, iova, size). Matches what the project saw macOS
++ * do on SIO channel 0x18 for a 0x568e-byte SPI write: a single MSG_ISSUE with
++ * a single descriptor, then a single MSG_REPORT (docs/dma_spi2_design.md).
++ */
++static struct dma_async_tx_descriptor *sio_prep_slave_sg(
++		struct dma_chan *chan, struct scatterlist *sgl,
++		unsigned int sg_len, enum dma_transfer_direction direction,
++		unsigned long flags, void *context)
++{
++	struct sio_chan *siochan = to_sio_chan(chan);
++	struct sio_tx *siotx;
++	struct scatterlist *sg;
++	unsigned int i;
++
++	if (direction != sio_chan_direction(siochan->no))
++		return NULL;
++	if (!sg_len || sg_len > SIO_MAX_SG)
++		return NULL;
++
++	siotx = kzalloc(struct_size(siotx, siodesc, sg_len), GFP_NOWAIT);
++	if (!siotx)
++		return NULL;
++
++	init_completion(&siotx->done);
++	siotx->cyclic = false;
++	siotx->nperiods = sg_len;
++
++	for_each_sg(sgl, sg, sg_len, i) {
++		struct sio_coproc_desc *d;
++
++		siotx->siodesc[i] = d = sio_alloc_desc(siochan->host);
++		if (!d || !sg_dma_len(sg)) {
++			siotx->vd.tx.chan = &siochan->vc.chan;
++			sio_tx_free(&siotx->vd);
++			return NULL;
++		}
++
++		memset(d, 0, sizeof(*d));	/* slots are reused: clear unk/pad */
++		d->flag = 1; /* same as cyclic path, meaning unknown */
++		d->iova = sg_dma_address(sg);
++		d->size = sg_dma_len(sg);
++	}
++	dma_wmb();
++
++	return vchan_tx_prep(&siochan->vc, &siotx->vd, flags);
++}
++
+ static enum dma_status sio_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ 				     struct dma_tx_state *txstate)
+ {
+@@ -310,7 +372,15 @@
+ 	spin_lock_irqsave(&siochan->vc.lock, flags);
+ 	siotx = siochan->current_tx;
+ 
+-	if (siotx && siotx->vd.tx.cookie == cookie) {
++	if (siotx && siotx->vd.tx.cookie == cookie && !siotx->cyclic) {
++		int i;
++
++		/* DRAFT: one-shot, residue = size of the not-yet-reported descriptors */
++		ret = DMA_IN_PROGRESS;
++		residue = 0;
++		for (i = siotx->ndone; i < siotx->nperiods; i++)
++			residue += siotx->siodesc[i]->size;
++	} else if (siotx && siotx->vd.tx.cookie == cookie) {
+ 		ret = DMA_IN_PROGRESS;
+ 		periods_residue = siotx->next - siotx->ninflight;
+ 		while (periods_residue < 0)
+@@ -322,7 +392,14 @@
+ 		vd = vchan_find_desc(&siochan->vc, cookie);
+ 		if (vd) {
+ 			siotx = to_sio_tx(&vd->tx);
+-			residue = siotx->period_len * siotx->nperiods;
++			if (siotx->cyclic) {
++				residue = siotx->period_len * siotx->nperiods;
++			} else {
++				int i;
++
++				for (i = 0; i < siotx->nperiods; i++)
++					residue += siotx->siodesc[i]->size;
++			}
+ 		}
+ 	}
+ 	spin_unlock_irqrestore(&siochan->vc.lock, flags);
+@@ -350,7 +427,10 @@
+ 		goto out;
+ 
+ 	tx = siochan->current_tx;
+-	tx->next = (tx->next + 1) % tx->nperiods;
++	if (tx->cyclic)
++		tx->next = (tx->next + 1) % tx->nperiods;
++	else
++		tx->next++;
+ 	tx->ninflight++;
+ 	sio_fill_in_locked(siochan);
+ 
+@@ -362,11 +442,15 @@
+ {
+ 	struct sio_data *sio = siochan->host;
+ 	struct sio_tx *tx = siochan->current_tx;
+-	struct sio_coproc_desc *d = tx->siodesc[tx->next];
++	struct sio_coproc_desc *d;
+ 	int ret;
+ 
+ 	if (tx->ninflight >= SIO_MAX_NINFLIGHT || tx->terminated)
+ 		return false;
++	/* DRAFT: a one-shot transaction never wraps around */
++	if (!tx->cyclic && tx->next >= tx->nperiods)
++		return false;
++	d = tx->siodesc[tx->next];
+ 
+ 	static_assert(sizeof(dma_cookie_t) <= sizeof(void *));
+ 	ret = sio_send_siomsg_atomic(sio, FIELD_PREP(SIOMSG_EP, siochan->no) |
+@@ -461,6 +545,7 @@
+ 	struct sio_chan *siochan = to_sio_chan(chan);
+ 
+ 	flush_work(&siochan->terminate_wq);
++	vchan_synchronize(&siochan->vc);	/* DRAFT: one-shot callbacks */
+ }
+ 
+ static void sio_free_chan_resources(struct dma_chan *chan)
+@@ -499,9 +584,28 @@
+ 
+ 		if (tx->ninflight)
+ 			tx->ninflight--;
+-		vchan_cyclic_callback(&tx->vd);
+-		if (!sio_fill_in_locked(siochan) && !tx->ninflight)
+-			complete(&tx->done);
++
++		if (!tx->cyclic && !tx->terminated) {
++			/*
++			 * DRAFT: one-shot. Reports are assumed to come back in
++			 * issue order (seen on channels 0x18/0x19 under macOS,
++			 * one descriptor per transfer; never seen with several).
++			 */
++			tx->ndone++;
++			if (tx->ndone >= tx->nperiods && !tx->ninflight) {
++				complete(&tx->done);
++				siochan->current_tx = NULL;
++				vchan_cookie_complete(&tx->vd);
++				sio_update_current_tx_locked(siochan);
++			} else {
++				sio_fill_in_locked(siochan);
++			}
++		} else {
++			if (tx->cyclic)
++				vchan_cyclic_callback(&tx->vd);
++			if (!sio_fill_in_locked(siochan) && !tx->ninflight)
++				complete(&tx->done);
++		}
+ 	}
+ 	spin_unlock_irqrestore(&siochan->vc.lock, flags);
+ }
+@@ -715,8 +819,9 @@
+ 		return -ENOMEM;
+ 
+ 	sio->shmem_desc_base = (struct sio_coproc_desc *) (sio->shmem + 56);
+-	sio->desc_allocated = devm_kzalloc(sio->dev, SIO_NO_DESC_SLOTS / 32,
+-					   GFP_KERNEL);
++	/* DRAFT fix: was SIO_NO_DESC_SLOTS / 32 = 2 bytes for a 64-bit bitmap */
++	sio->desc_allocated = devm_kcalloc(sio->dev, BITS_TO_LONGS(SIO_NO_DESC_SLOTS),
++					   sizeof(unsigned long), GFP_KERNEL);
+ 	if (!sio->desc_allocated)
+ 		return -ENOMEM;
+ 
+@@ -829,6 +934,7 @@
+ 	dma = &sio->dma;
+ 	dma_cap_set(DMA_PRIVATE, dma->cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, dma->cap_mask);
++	dma_cap_set(DMA_SLAVE, dma->cap_mask);	/* DRAFT */
+ 
+ 	dma->dev = &pdev->dev;
+ 	dma->device_free_chan_resources = sio_free_chan_resources;
+@@ -837,13 +943,16 @@
+ 	dma->device_terminate_all = sio_terminate_all;
+ 	dma->device_synchronize = sio_synchronize;
+ 	dma->device_prep_dma_cyclic = sio_prep_dma_cyclic;
++	dma->device_prep_slave_sg = sio_prep_slave_sg;	/* DRAFT */
+ 	dma->device_config = sio_device_config;
+ 
+-	dma->directions = BIT(DMA_MEM_TO_DEV);
++	/* DRAFT: odd channels are DEV_TO_MEM (sio_chan_direction), announce it */
++	dma->directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
+ 	dma->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
+ 	dma->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+ 			       BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+ 			       BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	dma->src_addr_widths = dma->dst_addr_widths;
+ 
+ 	INIT_LIST_HEAD(&dma->channels);
+ 	for (i = 0; i < nchannels; i++) {
+diff -Naur a/drivers/spi/spi-apple.c b/drivers/spi/spi-apple.c
+--- a/drivers/spi/spi-apple.c
++++ b/drivers/spi/spi-apple.c
+@@ -9,14 +9,20 @@
+ #include <linux/bitfield.h>
+ #include <linux/bits.h>
+ #include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/dmaengine.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
++#include <linux/sizes.h>
+ #include <linux/spi/spi.h>
+ 
++#include "internals.h"
++
+ #define APPLE_SPI_CTRL			0x000
+ #define APPLE_SPI_CTRL_RUN		BIT(0)
+ #define APPLE_SPI_CTRL_TX_RESET		BIT(2)
+@@ -46,6 +52,11 @@
+ #define APPLE_SPI_STATUS_RXCOMPLETE	BIT(0)
+ #define APPLE_SPI_STATUS_TXRXTHRESH	BIT(1)
+ #define APPLE_SPI_STATUS_TXCOMPLETE	BIT(2)
++/*
++ * DRAFT: value macOS writes to STATUS before each SIO-DMA transfer on spi2
++ * (sep-touchid trace C19, spi2.log). Bits 5 and 22 are undocumented.
++ */
++#define APPLE_SPI_STATUS_CLEAR_DMA	0x400023
+ 
+ #define APPLE_SPI_PIN			0x00c
+ #define APPLE_SPI_PIN_KEEP_MOSI		BIT(0)
+@@ -120,10 +131,20 @@
+  */
+ #define APPLE_SPI_TIMEOUT_MS		200
+ 
++/*
++ * DRAFT (sep-touchid, untested): optional SIO DMA, TX-only transfers only.
++ * Below this length PIO is kept (macOS uses DMA for everything on spi2, we
++ * only need it for the ~22 KB sensor patch). Tunable for the first tests.
++ */
++static unsigned int apple_spi_dma_min = 256;
++module_param_named(dma_min, apple_spi_dma_min, uint, 0644);
++MODULE_PARM_DESC(dma_min, "DRAFT: minimum TX-only length sent through SIO DMA");
++
+ struct apple_spi {
+ 	void __iomem      *regs;        /* MMIO register address */
+ 	struct clk        *clk;         /* bus clock */
+ 	struct completion done;         /* wake-up from interrupt */
++	struct completion dma_done;     /* DRAFT: wake-up from SIO DMA callback */
+ };
+ 
+ static inline void reg_write(struct apple_spi *spi, int offset, u32 value)
+@@ -354,11 +375,112 @@
+ 	*rx_ptr = ((u8 *)*rx_ptr) + bytes_per_word * read;
+ }
+ 
++/* DRAFT: DMA is only used for 8-bit TX-only transfers (RX DMA left for later). */
++static bool apple_spi_can_dma(struct spi_controller *ctlr, struct spi_device *device,
++			      struct spi_transfer *t)
++{
++	return ctlr->dma_tx && t->tx_buf && !t->rx_buf &&
++	       t->bits_per_word == 8 && t->len >= apple_spi_dma_min;
++}
++
++static void apple_spi_dma_callback(void *data)
++{
++	struct apple_spi *spi = data;
++
++	complete(&spi->dma_done);
++}
++
++/*
++ * DRAFT, untested on hardware. Register sequence follows what macOS does on
++ * spi2 for a TX-only SIO transfer (C19 spi2.log): SIO descriptor issued
++ * first, then RXCNT/TXCNT, STATUS clear, CFG mode DMA + FIFO threshold
++ * field = 2, CTRL = RUN | TX_RESET | RX_RESET; completion = SIO report,
++ * then CFG back out of DMA mode and CTRL = 0.
++ */
++static int apple_spi_transfer_one_dma(struct spi_controller *ctlr, struct spi_transfer *t)
++{
++	struct apple_spi *spi = spi_controller_get_devdata(ctlr);
++	struct dma_async_tx_descriptor *desc;
++	unsigned long timeout;
++	dma_cookie_t cookie;
++	u32 fifostat;
++	int ret = 0;
++
++	/* Fail closed: one contiguous burst like macOS, or nothing. */
++	if (t->tx_sg.nents != 1) {
++		dev_err(&ctlr->dev, "DMA: %u sg entries, refusing (want 1)\n",
++			t->tx_sg.nents);
++		return -EINVAL;
++	}
++
++	apple_spi_prep_transfer(spi, t);	/* CLKDIV + SHIFTCFG bits */
++
++	reg_write(spi, APPLE_SPI_CTRL, 0);
++	reg_write(spi, APPLE_SPI_IF_XFER, ~0);
++	reg_write(spi, APPLE_SPI_IF_FIFO, ~0);
++	reg_write(spi, APPLE_SPI_IE_XFER, 0);
++	reg_write(spi, APPLE_SPI_IE_FIFO, 0);
++
++	desc = dmaengine_prep_slave_sg(ctlr->dma_tx, t->tx_sg.sgl, t->tx_sg.nents,
++				       DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT);
++	if (!desc) {
++		/* nothing touched the wire yet: let the core fall back to PIO */
++		t->error |= SPI_TRANS_FAIL_NO_START;
++		return -EBUSY;
++	}
++
++	reinit_completion(&spi->dma_done);
++	desc->callback = apple_spi_dma_callback;
++	desc->callback_param = spi;
++	cookie = dmaengine_submit(desc);
++	ret = dma_submit_error(cookie);
++	if (ret) {
++		t->error |= SPI_TRANS_FAIL_NO_START;
++		return ret;
++	}
++	dma_async_issue_pending(ctlr->dma_tx);
++
++	reg_write(spi, APPLE_SPI_RXCNT, 0);
++	reg_write(spi, APPLE_SPI_TXCNT, t->len);
++	reg_write(spi, APPLE_SPI_STATUS, APPLE_SPI_STATUS_CLEAR_DMA);
++	reg_mask(spi, APPLE_SPI_CFG, APPLE_SPI_CFG_MODE | APPLE_SPI_CFG_FIFO_THRESH,
++		 FIELD_PREP(APPLE_SPI_CFG_MODE, APPLE_SPI_CFG_MODE_DMA) |
++		 FIELD_PREP(APPLE_SPI_CFG_FIFO_THRESH, APPLE_SPI_CFG_FIFO_THRESH_1B));
++	reg_write(spi, APPLE_SPI_CTRL, APPLE_SPI_CTRL_RUN |
++		  APPLE_SPI_CTRL_TX_RESET | APPLE_SPI_CTRL_RX_RESET);
++
++	/* wire time (8 bits per byte) x2, plus the usual margin */
++	timeout = msecs_to_jiffies(2 * DIV_ROUND_UP_ULL(8000ULL * t->len, t->speed_hz) +
++				   APPLE_SPI_TIMEOUT_MS);
++	if (!wait_for_completion_timeout(&spi->dma_done, timeout)) {
++		dev_err(&ctlr->dev, "DMA: no SIO report for %u bytes\n", t->len);
++		dmaengine_terminate_sync(ctlr->dma_tx);
++		ret = -ETIMEDOUT;
++		goto out;
++	}
++
++	/* SIO reported: last bytes may still sit in the TX FIFO / shifter. */
++	ret = readl_relaxed_poll_timeout(spi->regs + APPLE_SPI_FIFOSTAT, fifostat,
++					 !FIELD_GET(APPLE_SPI_FIFOSTAT_LEVEL_TX, fifostat),
++					 1, 1000);
++	if (ret)
++		dev_err(&ctlr->dev, "DMA: TX FIFO not drained (FIFOSTAT %#x)\n", fifostat);
++	else
++		udelay(DIV_ROUND_UP(2 * 8 * USEC_PER_SEC, t->speed_hz));	/* shifter */
++
++out:
++	reg_mask(spi, APPLE_SPI_CFG, APPLE_SPI_CFG_MODE | APPLE_SPI_CFG_FIFO_THRESH,
++		 FIELD_PREP(APPLE_SPI_CFG_MODE, APPLE_SPI_CFG_MODE_IRQ) |
++		 FIELD_PREP(APPLE_SPI_CFG_FIFO_THRESH, APPLE_SPI_CFG_FIFO_THRESH_8B));
++	reg_write(spi, APPLE_SPI_CTRL, 0);
++	return ret;
++}
++
+ static int apple_spi_transfer_one(struct spi_controller *ctlr, struct spi_device *device,
+ 				  struct spi_transfer *t)
+ {
+ 	struct apple_spi *spi = spi_controller_get_devdata(ctlr);
+-	bool poll = apple_spi_prep_transfer(spi, t);
++	bool poll;
+ 	const void *tx_ptr = t->tx_buf;
+ 	void *rx_ptr = t->rx_buf;
+ 	unsigned int bytes_per_word;
+@@ -368,6 +490,11 @@
+ 	int retries = 100;
+ 	int ret = 0;
+ 
++	if (spi_xfer_is_dma_mapped(ctlr, device, t))
++		return apple_spi_transfer_one_dma(ctlr, t);
++
++	poll = apple_spi_prep_transfer(spi, t);
++
+ 	if (t->bits_per_word > 16)
+ 		bytes_per_word = 4;
+ 	else if (t->bits_per_word > 8)
+@@ -454,6 +581,52 @@
+ 	return ret;
+ }
+ 
++static void apple_spi_release_dma(void *data)
++{
++	struct spi_controller *ctlr = data;
++
++	if (ctlr->dma_tx)
++		dma_release_channel(ctlr->dma_tx);
++	ctlr->dma_tx = NULL;
++}
++
++/*
++ * DRAFT: optional. Without a "tx" entry in "dmas" (every Apple SPI node in
++ * the public DTs today) this is a no-op and the controller stays PIO-only.
++ */
++static int apple_spi_request_dma(struct platform_device *pdev, struct spi_controller *ctlr)
++{
++	struct dma_slave_config cfg = {
++		.direction = DMA_MEM_TO_DEV,
++		.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE,
++	};
++	struct dma_chan *chan;
++	int ret;
++
++	chan = dma_request_chan(&pdev->dev, "tx");
++	if (IS_ERR(chan)) {
++		ret = PTR_ERR(chan);
++		if (ret == -EPROBE_DEFER)
++			return ret;
++		return 0;	/* no DMA described: PIO only */
++	}
++
++	ret = dmaengine_slave_config(chan, &cfg);
++	if (ret) {
++		dev_warn(&pdev->dev, "SIO DMA config failed (%d), PIO only\n", ret);
++		dma_release_channel(chan);
++		return 0;
++	}
++
++	ctlr->dma_tx = chan;
++	ctlr->can_dma = apple_spi_can_dma;
++	ctlr->max_dma_len = SZ_64K;
++	dev_info(&pdev->dev, "DRAFT: TX DMA via %s for transfers >= %u bytes\n",
++		 dma_chan_name(chan), apple_spi_dma_min);
++
++	return devm_add_action_or_reset(&pdev->dev, apple_spi_release_dma, ctlr);
++}
++
+ static int apple_spi_probe(struct platform_device *pdev)
+ {
+ 	struct apple_spi *spi;
+@@ -466,6 +639,7 @@
+ 
+ 	spi = spi_controller_get_devdata(ctlr);
+ 	init_completion(&spi->done);
++	init_completion(&spi->dma_done);
+ 
+ 	spi->regs = devm_platform_ioremap_resource(pdev, 0);
+ 	if (IS_ERR(spi->regs))
+@@ -495,6 +669,10 @@
+ 	ctlr->use_gpio_descriptors = true;
+ 	ctlr->auto_runtime_pm = true;
+ 
++	ret = apple_spi_request_dma(pdev, ctlr);
++	if (ret)
++		return dev_err_probe(&pdev->dev, ret, "requesting DMA channel\n");
++
+ 	pm_runtime_set_active(&pdev->dev);
+ 	ret = devm_pm_runtime_enable(&pdev->dev);
+ 	if (ret < 0)

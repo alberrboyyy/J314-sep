@@ -2045,3 +2045,32 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   seulement via Stockholm direct qu'on ne touche pas). Ligne rouge SEP **maintenue** (justifiée par Stockholm) ;
   SAVE-ack **non fait** (gain borné). Prochain : définir le 1er pas concret de la route native + lire d'éventuelles
   notes prior-art Asahi (si James en pointe).
+
+## 2026-11-22 — agent (étude DMA spi2, lecture seule) — mur DMA J5 : SIO Linux ≈ SIO macOS, il manque un slave_sg
+- Sources : `~/kbuild/src/linux-asahi-7.2.12-3` (`drivers/dma/apple-sio.c`, `drivers/spi/spi-apple.c`, `spi.c`, DT
+  t600x, `.config`), m1n1 `src/sio.c`, DT vivant `/proc/device-tree/soc/sio@39bc00000`, trace C19
+  (`traces/20261110-002829_c19-spi-dma-boot/{sio.log,spi2.log}`, relue, non modifiée). Rien chargé, compilé ni envoyé.
+- VU (C19) : le patch 0x568e part en **un seul `ISSUE` canal 0x18, un seul descripteur, un seul `REPORT`** ~23 ms après
+  l'ACK (`sio.log:854-858`) ; TX seul ⇒ 0x19 inutilisé ; aucun `TERMINATE`/`NACK` sur toute la capture. Séquence
+  spi2 relevée : `RXCNT=0, TXCNT=len, STATUS=0x400023, CFG=0x40042, CTRL=0xd` puis `CFG=0x40002, CTRL=0`
+  (`spi2.log:820-850`).
+- VU (DT vivant vs C19) : `apple,sio-firmware-params` Linux = mêmes clés/tailles que les `SETUP` macOS (dont dmashim
+  `SSPI` et device-type `dSPI`) ; seules les IOVA diffèrent (+ shmem 0x1000 vs 0xaaa). Phandle `sio` = 0x38.
+- DÉDUIT : layout descripteur Linux (offset 56, 48 o, DATA = 4×index) = celui lu par notre traceur (`+0x40+DATA*0xc`,
+  ptr +8) ; `apple-sio` est cyclique seulement et rebouclerait (`sio.c:353`) ⇒ ajouter `prep_slave_sg`. Bug latent
+  `desc_allocated` (2 o). rmmod/insmod d'`apple_sio` = SIO probablement mort jusqu'au reboot.
+- Livrables : `docs/dma_spi2_design.md`, brouillon `driver/linux/patches/0001-spi-apple-dmaengine-draft.patch`
+  (non appliqué ; dry-run OK). Chemin recommandé : forks hors arbre (spi2 par `compatible` propre + SIO via blacklist
+  + reboot), précédé d'un essai « patch en PIO noyau ». Tout 1er run = go d'Albert. Statut : **hypothèses**.
+
+## 2026-11-22 — Claude (Opus 5.5) — squelette `sep_native` (Rust) + overlay `sep_native_ovl` (C), compilés, jamais chargés
+- Fait (hors matériel, rien chargé, rien envoyé) : `driver/rust/kmod/sep_native.rs`, `driver/linux/sep_native_ovl.c`,
+  `driver/linux/sep-native-overlay.dts`, `driver/rust/kmod/SEP_NATIVE.md` ; option (b) de `docs/driver_rust_design.md`.
+  Build : `build.sh` et `build.sh CLIPPY=1` sans avertissement ; overlay C compilé en W=1 dans le scratchpad ; vermagic
+  `7.2.12-3-1-ARCH` ; tous les symboles indéfinis présents dans `Module.symvers`.
+- VU (lecture de code public) : `GET_STATUS` = EP 0xFF TYPE 2 → 0x66 (m1n1 `hw/sep.py`) ; m1n1 mappe le firmware sans bit
+  de protection DART (`src/dart.c`) alors que `sep.rs` utilise DMA_TO_DEVICE (→ NO_WRITE, `io-pgtable-dart.c:209`) ;
+  `sep.rs::remove` passe l'adresse physique (et non l'IOVA) à `dma_unmap_resource` ; le Rust de cet arbre n'a pas de
+  spinlock coupant les IRQ ni de `dma_wmb`.
+- DÉDUIT : anneau RX atomique (1 producteur sous `mbox->rx_lock`, 1 work) au lieu d'un `SpinLock` ; DATA de 0x66
+  contrôlée strictement (1 puis 2, `source: kext`). Statut : **hypothèses** ; 1er `allow_boot=1` = go d'Albert.
