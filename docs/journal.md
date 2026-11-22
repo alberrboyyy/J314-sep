@@ -2510,3 +2510,10 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
      handoff 2026-11-22). Le mur était l'emballage des lockers. Ouvrir skdl/sks/scrd sans contenu a suffi ; reste à savoir
      si même ces ouvertures sont nécessaires (test : J7b sans allow_sks).
   3. La **tension persistance ↔ armement sbio** (handoff 2026-11-22) **tombe** : un état scellé est rechargé ET sbio répond.
+
+## 2026-11-23 — Claude (session ALARM) — J7b re-run (n=2) : PRÉDICTION écrite AVANT le run
+- Script et binaires inchangés (`pending/j7b_sks_open_chained_nouuid.sh`, sep_native.ko `ff799c11…`, sepd.j7b `94f334db…`).
+  Store `/var/lib/sepd-run-20261122-230441` identique octet pour octet à sa copie d'avant J7b (5 .bin, `cmp`), J7b n'ayant fait 0 SAVE.
+- Prédiction : (1) sepd : master t2 SERVED 437 o, t1 ABSENT ; FETCH 407e…(90 o) ×2, e01e…(597 o) ×2, op 0x07, 2438…(369 o)
+  ×2, 9133…(40 o) ×2 ; **0 SAVE** ; (2) dmesg : `découverte : EP 0x12 = 'sks'` tailles 0x02010201, skdl/sks/scrd ouverts
+  (4 acks chacun), table 12 EP ; (3) `VERDICT sbio : VIVANT` (B8 +0x00=1 +0x14=0x73). Tout écart = n=2 non obtenu, à analyser.
