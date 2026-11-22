@@ -152,3 +152,13 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
   (cohérent avec la ligne SKS ci-dessus : `> t n 0 0xLLLL0000`). → un driver Linux devrait **produire le même DER** (schéma à extraire),
   pas un opcode. **D2 reste la question décisive non testée** : le SEP refuse-t-il `0x09` (match) tant que le keybag est verrouillé ?
   (tranchable seulement par écriture — EP 0x12 = ligne rouge, Albert).
+- **ROUTE NATIVE — le SEP scelle un état frais pour Linux + sbio VIVANT (2026-11-22, Albert lance)** : `vérifié` (matériel, reproductible).
+  (1) Répondre **ABSENT** (forme kext : maître len 0x11 / gigalocker len 0, pas 0x07) aux FETCH de l'EP 0x13 puis **ACQUITTER les SAVE** d'un
+  état FRAIS (store vide) → le SEP **se stabilise** (`idle`, 12 SAVE : 8 xART + 4 locker, pas la boucle de re-SAVE de la voie-C FOLLOW) et
+  annonce **sbio(0x08)+sks(0x12)+scrd+sse+skdl** : **n=4** runs identiques (`sep_native_persist.sh` 00:46 + 3× `sep_native_sbio.sh`).
+  (2) Sonde **sbio 0x73** (poignée `initSbioCommunication`, entrée u32=1, SANS doigt) juste après la stabilisation → le SEP répond
+  **octet-identique à macOS c12** : `< EP=0x08 TAG=0x04` puis `< TAG=0xfc TYPE=0x73`, B8 = gt_packet `+0x00=1 / +0x14=0x73`, via le
+  **stream 0 normal** (aucune faute DART, pas besoin du stream 15) : **n=3 → `vérifié`**. → **tranche `voie_sbio §5/§6`** : le silence de
+  la voie-C venait de l'**ÉTAT** (sbio non armé car xART non scellé légitimement), **pas** du canal DART. Traces `20261122-004526_native_persist`,
+  `20261122-010801/012059/013535_native_sbio` ; code relu `pending/sep_native_{persist,sbio}.sh`. RÉSERVE : « sbio vivant » ≠ « match » ;
+  la suite (init capteur SPI en lockstep, blobs, **match = doigt = session humaine**, D2 keybag) reste ouverte — carte : `docs/sbio_sequence.md`.
