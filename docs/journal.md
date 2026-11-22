@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 03:18 — Albert (lance) + Claude (Opus 4.8) — patch capteur REÇU+RÉASSEMBLÉ nativement (poignée fe/fd, 22158o) ; reste le PUSH (DMA) au capteur
+- Trace : traces/20261122-033138_native_sbio6 (patch_spi_push.bin = prélude+bloc construit, NON émis).
+- Fait : `./pending/sep_native_sbio6.sh` (Albert lance, store neuf). KX + compteur relayés (connus). PHASE 6 RECON : envoi 0x5f → fragment TAG=0xfc (op=0x5f kind=1 total=0x568e offset=0 fraglen=0x3fe4=16356, tête `8c563a…`) → réclame suite (TAG=0xfe) → fragment TAG=0xfd (offset=0x3fe4 fraglen=0x16aa=5802) → **patch 22158o (0x568e) réassemblé, préfixe 2o == total-2**. Trame de push construite (prélude `80600007` + bloc) NON émise, dumpée. STOP avant push. Teardown OK.
+- Vu (faits bruts) : le SEP livre le patch SEP→AP via la poignée GenericTransfer `fe/fd` **exactement comme macOS** (2 fragments, mêmes tailles). Réception + réassemblage natif validés sur matériel.
+- Interprété : **la livraison du patch marche nativement.** Reste UN seul mur SPI : **pousser les 22Ko au capteur** (prélude 0x60 + bloc en 1 transfert ; macOS = DMA SIO ; FIFO scruté = non testé, CS-maintenu incertain) = sbio7. Puis params (0x55, faciles), n° série module, calibration (mailbox, pas SPI), puis enroll + match (doigts).
+- Incidents : RAS. Compteur +12 (xart_store_sbio6_1). Capteur restauré. Linux intact ; DFU prêt.
+
 ## 2026-11-22 03:05 — Albert (lance) + Claude (Opus 4.8) — 🎯 COMPTEUR DE SÉQUENCE RELAYÉ : 2e maillon lockstep (0x42/0x18, frame 0x73) ; mur suivant = patch 0x5f (DMA)
 - Trace : traces/20261122-031411_native_sbio5 (store neuf xart_store_sbio5_1 ; cnt_0x42_B.bin, spi_0x73_resp_raw.bin).
 - Fait : `./pending/sep_native_sbio5.sh` (Albert lance). Phase 1-4 OK (key exchange relayé de nouveau). Phase 5 : 0x42 → le SEP rend blob 64o `3a0000000000003e9f8ad3…` → relais SPI trame 0x73 (71o, en-tête `80730047000000`) → état 0x10 = 0x4b (75) → réponse 75o → 64o @ offset 9 → 0x18 → **le SEP ACQUITTE (`< EP=0x08 TYPE=0x18`)**.
