@@ -2163,3 +2163,8 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   ⇒ L'ouverture de 0x08 exige l'état « seal frais » : après un chaînage (master servi), le CNTL 0x08 reste sans ack,
   même avec les lockers servis. Tension persistance ↔ armement de sbio, à résoudre. Logs :
   `logs/20261122-192013_j3c-sbio-fresh/`.
+- 19:57 (J3 chaîné + ouverture TÔT, store sepd-run-20261122-192013 servi, `j3_chained_run.sh`) : master t2 servi,
+  0 SAVE ; dès l'ack du 0x1d 'sbio' → 4 CNTL 0x08 (TAG 06/07/08/01) **ACKÉS** (1re fois sur un boot chaîné : l'ouverture
+  tôt débloque le CNTL, confirme le timing c12). Puis 2 s de calme, 0x73 → **MUET** (aucun mot 0x08, B8 vide en 6 s).
+  ⇒ progrès partiel : sur un boot chaîné, le CNTL passe s'il est tôt, mais la poignée 0x73 envoyée 2 s plus tard ne
+  répond pas. Logs : `logs/20261122-195701_j3d-chained-early/`.
