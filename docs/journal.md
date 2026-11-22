@@ -2124,3 +2124,14 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - `pending/j3_sbio_run.sh` (store en argument, défaut neuf `/var/lib/sepd-run-<horodatage>`). Question ouverte : servir
   le store J4 ou repartir neuf (à trancher avec l'orchestrateur). 1er run = go d'Albert.
 - Build : `build.sh` et `CLIPPY=1` sans avertissement ; tests sepd et sep-proto verts. Aucun chargement, aucun matériel.
+
+## 2026-11-22 18:56 — Albert + Claude (session ALARM) — J3 : xART SERVI depuis le store → accepté sans re-scellement ; ouverture sbio sans ack
+- Go d'Albert. Reboot, puis `j3_sbio_run.sh /var/lib/sepd` (store du run J4 servi). Logs bruts :
+  `logs/20261122-185633_j3-sbio-open/`.
+- **Vu : FETCH maître t2 → SERVI (437 o = 0x11 + 420) ; maître t1 → ABSENT ; AUCUN SAVE** ; annonces 0x1d immédiates
+  (sbio, skdl, sse, sks, scrd) ; 2 FETCH locker 0x05 (UUID 407e94c4f60495b3f2fbf5a8a31ae719, = nom d'un
+  locker_save_ du run J4) → ABSENT (sepd ne re-sert pas les lockers), et le SEP s'en contente.
+  ⇒ **le master scellé au boot précédent est accepté au reboot suivant (chaînage cross-reboot, n=1)**, et l'UUID du
+  locker = les 16 premiers octets de B au SAVE (le nom de fichier concorde).
+- sbio : xART calme 2 s, puis 1er CNTL d'ouverture `> 0x0000400008040600` (EP 0, TAG 06, TYPE 04, PARAM 08,
+  DATA 0x4000) → **AUCUN ack en 5 s** → Halted (fail-closed). Rien d'autre envoyé à 0x08. Cause inconnue.
