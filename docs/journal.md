@@ -2103,3 +2103,14 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - 1er run `allow_xart=1 allow_xart_save_ack=1` = classe neuve pour ce pilote → go d'Albert.
 - Correctif (demande de la coordination) : après ouverture de 0x13, messages des autres EP annoncés et annonces 0xFD
   journalisés et ignorés (comme le harnais m1n1), plus de Halted pour eux ; ligne « sbio annoncé » à l'annonce de 0x08.
+
+## 2026-11-22 18:38 — Albert + Claude (session ALARM) — J4 étape 7 : xART servi nativement, **sbio et sks annoncés**
+- Go d'Albert (session ALARM). Reboot propre (alias `sep`, `sepfw` réservé), puis `pending/j4_xart_run.sh` :
+  sep_native allow_boot=1 allow_xart=1 allow_xart_save_ack=1 + sepd (store neuf vide, UUID 4c494e55580000…).
+- Logs bruts : `logs/20261122-183847_j4-xart-native/{kernel.log,sepd.log}`.
+- Vu : boot SEPOS OK (7 EP) ; ouverture CNTL 0x13 OK ; requêtes servies : 0x0e, 0x13 (UUID), FETCH maître → ABSENT,
+  puis **12 SAVE acquittés** (maître t2 ×…, lockers ×4), un 0x07 acquitté. Aucun Halt, 0 message ignoré.
+- **Annonces 0xFD après scellement : sbio (EP 0x08), skdl (0x17), sse (0x0c), scrd (0x0a), puis sks (0x12)** —
+  = même résultat que le run m1n1 `native_persist`, cette fois depuis Linux natif.
+- Store `/var/lib/sepd` : master_2.bin (420 o) + 4 locker_save_*.bin. Compteur scellé avancé de 12 (attendu).
+- Suite : J3, ouverture de sbio (EP 0x08) et poignée 0x73 — demander d'abord la liste protocole vérifiée à c9.
