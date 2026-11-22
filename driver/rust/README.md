@@ -30,12 +30,21 @@ Les tests de rejeu reprennent les mêmes références que `driver/tests/*.py` et
 (2026-11-22) : 6122 mots GT sur 23 traces sans exception, init de 57 commandes 23/23, 39 images / 468 tranches CRC,
 30 paires 0x13 reproduites mot pour mot, coffre 12/12 (CRC et réécriture à l'octet près).
 
-## Module noyau Rust : pas encore possible sur ALARM (relevé 2026-11-22)
-Le noyau `7.2.12-3-1-ARCH` a `CONFIG_RUST=y`, mais :
-1. le paquet d'en-têtes (`/lib/modules/$(uname -r)/build/rust/`) ne contient **pas** les artefacts Rust du noyau
-   (`libkernel.rmeta`, etc.) : un module Rust hors arbre ne peut pas être compilé contre lui ;
-2. le noyau est compilé avec `rustc 1.99.1` et `bindgen 0.73.2` ; le système a `rustc 1.98.1`. Il faut exactement la
-   même version.
-Pour y arriver : récupérer les sources linux-asahi de cette version avec la même `.config`, installer rustc 1.99.1
-(rustup), compiler la cible `rust/`, puis le module contre cet arbre. Ce module touchera au SEP : son premier
-chargement = go d'Albert (CLAUDE.md).
+## Modules noyau Rust hors arbre (`kmod/`, `build.sh`)
+Le paquet d'en-têtes d'ALARM ne contient pas les artefacts Rust du noyau (`libkernel.rmeta`…), et le noyau exige
+exactement son rustc. Mise en place (faite le 2026-11-22, `~/kbuild/`, rien d'installé dans le système) :
+1. sources du tag AsahiLinux `asahi-7.2.12-3` (archive GitHub) dans `~/kbuild/src/linux-asahi-7.2.12-3` ;
+2. `.config`, `localversion.10-pkgrel`, `Module.symvers` et `vmlinux` copiés depuis `/lib/modules/$(uname -r)/build`
+   (config identique après `olddefconfig`, `kernelrelease` = `7.2.12-3-1-ARCH`) ;
+3. `rustup toolchain install 1.99.1 --component rust-src` et `cargo install bindgen-cli --version 0.73.2
+   --root ~/kbuild/tools` ;
+4. correctif local de l'arbre : `tools/include/linux/types.h` ne définit pas `__u128`, alors que les en-têtes
+   système (`asm/sigcontext.h`) s'en servent, ce qui casse `resolve_btfids`. On ajoute la même typedef que
+   `/usr/include/linux/types.h` ;
+5. `make modules_prepare` (15 s), puis `./build.sh`.
+`kmod/sep_hello.rs` = module de contrôle de la chaîne : il n'accède à aucun matériel. vermagic identique au noyau,
+tous ses symboles présents. Gros acquis : l'arbre fournit `kernel::soc::apple::{mailbox, rtkit}` en Rust (ce que
+`drivers/soc/apple/sep.rs` utilise). En revanche, il n'y a pas de liaison Rust SPI : le capteur restera en C ou
+passera par une petite couche de liaison. `CONFIG_APPLE_SEP=y` (intégré au noyau) : un pilote SEP étendu
+remplacera `sep.rs` dans un noyau custom, ou se liera via un nœud DT distinct. Tout module qui parle au SEP :
+premier chargement = go d'Albert (CLAUDE.md).
