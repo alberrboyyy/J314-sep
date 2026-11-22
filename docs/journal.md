@@ -2135,3 +2135,7 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   locker = les 16 premiers octets de B au SAVE (le nom de fichier concorde).
 - sbio : xART calme 2 s, puis 1er CNTL d'ouverture `> 0x0000400008040600` (EP 0, TAG 06, TYPE 04, PARAM 08,
   DATA 0x4000) → **AUCUN ack en 5 s** → Halted (fail-closed). Rien d'autre envoyé à 0x08. Cause inconnue.
+- 19:04 (J3 bis, reboot) : sepd sert aussi les lockers. Le SEP redemande le locker 407e94c4… deux fois → SERVI
+  (106 o, PARAM 0x6a) ; 0 SAVE, aucune autre requête. sbio annoncé (0x1d puis 0xFD [1,1,1,1]). Ouverture CNTL 0x08,
+  même 1er message `> 0x0000400008040600` → **toujours aucun ack en 5 s** → Halted. Logs :
+  `logs/20261122-190438_j3b-sbio-lockers/`. L'hypothèse « lockers manquants » ne suffit pas.
