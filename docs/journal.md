@@ -2538,3 +2538,12 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   J7c = VIVANT (le module refuse `allow_sks` avec `allow_sbio_relay=1`). Script neuf → go d'Albert.
 - `pending/j5_sensor_run.sh` : garde-fou chaîné réécrit (motif périmé « gated SKS » retiré ; chaîné exige aussi SBIO_OPEN=1).
 - Doc : `messages.md` (ligne FETCH locker vérifiée), `gigalocker.md` (point ouvert tranché pour les SAVE), `xart_native_policy.md`.
+
+## 2026-11-23 00:29 — Albert + Claude (session ALARM) — J7c : boot chaîné SANS ouvrir skdl/sks/scrd → sbio VIVANT quand même
+- Go d'Albert (power-cycle, `sudo pending/j7c_chained_no_ks_open.sh /var/lib/sepd-run-20261122-230441`). Logs bruts :
+  `logs/20261123-002908_j7c-chained-no-ks-open/`. Nouveau sepd (défaut sans UUID, `6ad1992f…`), insmod = J3d (sans allow_sks).
+- VU : sepd.log = J7b (4 lockers sans UUID ×2, op 0x07 TAG 0x09, **0 SAVE** ; store toujours identique à sa copie d'avant J7b).
+  dmesg : `EP 0x12 = 'sks'` annoncé (non ouvert), aucun CNTL vers 0x17/0x12/0x0a, table 12 EP, 0 ignoré, pas de Halted,
+  **VERDICT sbio : VIVANT** (B8 +0x00=1 +0x14=0x73).
+- ⇒ (n=1, hypothèse) les ouvertures skdl/sks/scrd ne sont **pas nécessaires** : servir correctement les lockers suffit à
+  armer sbio sur boot chaîné. Le nouveau sepd par défaut reproduit J7b sur matériel. **J8 (chaîné + init capteur) débloqué.**
