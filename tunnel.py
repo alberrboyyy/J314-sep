@@ -19,7 +19,13 @@ Usage : ./tunnel.py            (relais par defaut 10.0.200.5, ports 4000/4001)
 import os, pty, select, socket, termios, tty, time, threading, sys
 
 RELAY = os.environ.get("TUNNEL_RELAY", "10.0.200.5")
-LINKS = {"/tmp/m1n1": 4000, "/tmp/m1n1-console": 4001}
+# Ports surchargeables (ex. appli Android "USB Serial Telnet Server" sur 2323, une seule interface).
+# TUNNEL_CONSOLE=0 => on ne connecte QUE le proxy (les scripts natifs n'utilisent pas la console if02).
+_PROXY_PORT = int(os.environ.get("TUNNEL_PROXY_PORT", "4000"))
+_CONSOLE_PORT = int(os.environ.get("TUNNEL_CONSOLE_PORT", "4001"))
+LINKS = {"/tmp/m1n1": _PROXY_PORT}
+if os.environ.get("TUNNEL_CONSOLE", "1") == "1":
+    LINKS["/tmp/m1n1-console"] = _CONSOLE_PORT
 
 
 def make_pty(link):
