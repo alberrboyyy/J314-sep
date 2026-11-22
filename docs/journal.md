@@ -2458,3 +2458,26 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Binaire `~/kbuild/j5/sep_native.ko` sha256 `ff799c113945ee18bc511dfd567e6b40ced12f36400a75249702b15f13dcfe55`
   (ancien → `.v6` = `07d59c0e…e88e`). `pending/j7a_sks_open_chained.sh STORE` (vérifie la sha256 ; STORE chaîné non vide,
   ex. `/var/lib/sepd-run-20261122-230441`). **Classe neuve → 1er run = go d'Albert.** Rien chargé, rien envoyé.
+
+## 2026-11-22 23:43 — Albert + Claude (session ALARM) — J7a : sks toujours pas annoncé en boot chaîné ; skdl ouvert seul = muet ; sbio MUET
+- Go d'Albert (power-cycle, `sudo pending/j7a_sks_open_chained.sh /var/lib/sepd-run-20261122-230441`). Logs bruts :
+  `logs/20261122-234333_j7a-sks-open-chained/` (`kernel.log`, `sepd.log`, `store.txt`). Binaire sha256 `ff799c11…fe55`.
+- VU : boot IMG4 OK, store chaîné servi (master t2 437 o SERVED, t1 ABSENT), 0x1d sbio/skdl/sse/sks/scrd acquittés,
+  CNTL 0x08 précoce (4 acks), puis CNTL 0x17 skdl (A 0xfffa4000 / B 0xfffa0000, 0x4000, **4 acks**) → skdl ouvert.
+- VU : le SEP ne demande que le locker `407e94c4…` **deux fois** (TAG 0x05/0x06, A 106 o), puis **plus aucun mot 0x13**.
+- VU : **pas d'annonce 0xFD de 0x12 'sks'** en 30 s (table finale : 11 EP, sans sks ; scrd 0x0a, lui, est en FD) →
+  sks et scrd non ouverts (verdict « NON PRÊT », rien envoyé). Écoute passive 10 s : skdl 0 mot, B skdl 0 octet non nul.
+- VU : `> 0x08 TAG 0xfc TYPE 0x73` → **MUET** (0 mot, B8 vide). Pas de Halted, pas de SAVE.
+- Bilan plan §4 exp. 1 : (a) **non** — sks pas annoncé en chaîné même avec skdl ouvert tôt et 30 s d'attente (chaîné natif
+  n=4 : J3, J3b, J3d, J7a) ; (b) non testable pour sks ; l'ouverture de skdl seule ne réveille pas sbio ; (c) skdl muet.
+- VU, relecture c12 (`traces/20261108-032454_c12-boot-ho/sep.log` L124-202) : **macOS aussi** reçoit deux FETCH du même
+  locker (TAG 0x05/0x06, réponses identiques PARAM 0x82 DATA 0x10a) → le doublon n'est pas un signe de refus. Mais macOS
+  enchaîne ensuite TAG 0x07/0x08 (autre locker), 0x09 (0x07 absent), 0x0a-0x0f…, puis FD sks ; nous : rien après la 2e réponse.
+- INTERPRÉTÉ (hypothèse) : le SEP rejette le locker servi. Suspect n°1 : **l'emballage** — sepd sert le B du SAVE tel quel
+  (UUID 16 o en tête, `sepd/src/lib.rs` Store::load), alors qu'un A FETCH gigalocker macOS capturé commence directement
+  par la charge, sans UUID (`gigalocker.md`, « Point ENCORE ouvert », snew-reel seq133). Autres causes possibles : anti-rejeu
+  (état scellé périmé au boot suivant), ou DATA octet1. Reverse du handler op 0x05/0x06 (kext) demandé pour trancher.
+- VU, relecture `logs/*/sepd.log` des 4 boots chaînés natifs : réponse au FETCH du locker 407e… = **ABSENT** (J3 18:56,
+  `PARAM 0 DATA 0x100`, A 0 o) ou **servi tel quel** (J3b, J3d, J7a : `PARAM 0x6a DATA 0x100`, A 106 o) → **comportement
+  du SEP identique** dans les deux cas : 2e FETCH du même UUID, puis silence, ni SAVE ni locker suivant. ⇒ notre locker servi
+  fait **le même effet qu'un locker absent** (hypothèse : il est rejeté ; emballage ou anti-rejeu, non tranché).
