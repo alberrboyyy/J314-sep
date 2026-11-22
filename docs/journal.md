@@ -14,6 +14,14 @@ Format :
 
 ---
 
+## 2026-11-22 01:05 — Albert (lance) + Claude (Opus 4.8) — 🎯 sbio VIVANT : répond au 0x73 exactement comme macOS, via le stream 0 (la route native tient jusqu'au capteur)
+- Trace : traces/<...>_native_sbio (B8 dumpé dans OUT/sbio_probe_B.bin) ; store SÉPARÉ xart_store_sbio/ (xart_store_linux/ préservé). Script : pending/sep_native_sbio.sh (relu par Claude avant lancement ; SELFTEST vert). Proxy rattrapé par catcher v2 (t+15s).
+- Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio.sh` (Albert lance). Cold-boot. PHASE 1 = flux PERSIST reproduit à l'identique (12 SAVE : 8 xART + 4 locker ; idle ; sbio+sks annoncés) = **stabilisation reproduite n=2**. PHASE 2 = sonde sbio.
+- Vu (faits bruts) : après idle, ouverture sbio OK (4 CNTL acquittés), A8 (IOVA 0x54000) mappé dans le stream **[0] seulement**, envoi `EP=0x08 TAG=0xfc TYPE=0x73`. Le SEP a RÉPONDU : `< EP=0x08 TAG=0x04 TYPE=0x00` puis `< EP=0x08 TAG=0xfc TYPE=0x73` ; **B8 = gt_packet +0x00=1, +0x14=0x73** (= réponse de référence macOS c12, octet pour octet). Faute DART : FLAG=0 avant ET après le 0x73 (aucune faute neuve ; le sid=10/WRITE du baseline = bits rémanents non flaggués).
+- Interprété : **sbio est VIVANT sous la route native**, pas seulement annoncé — réponse IDENTIQUE à macOS. Il lit son OOL via le **stream 0 normal** (pas besoin du stream 15) → ça TRANCHE la question « canal vs état » de `voie_sbio.md §5/§6` : le silence de la voie C venait de l'**ÉTAT** (sbio pas armé car xART non scellé légitimement), **PAS** du canal DART. Confirme la thèse de `route_native.md`.
+- RÉSERVE (pas encore vérifié) : n=1 pour la SONDE elle-même (reproduire n≥3 pour « vérifié »). « sbio vivant » ≠ « Touch ID marche » : reste la suite d'init sbio (clé capteur SPI…), un vrai **match**, le trousseau **sks (0x12)**, et l'**enrôlement sous Linux** (gabarits macOS non transférables → enrôlement propre, doigt = session humaine).
+- Incidents : warning bénin `Permission denied` (catch nœud brut avant droits udev, cf. entrée 00:46). Compteur anti-rejeu avancé de +12 (dans xart_store_sbio). Linux intact ; filet DFU + alarm_p5.img prêts. Rien poussé.
+
 ## 2026-11-22 00:46 — Albert (lance) + Claude (Opus 4.8) — 🎯 ROUTE NATIVE CONFIRMÉE : le SEP scelle un état frais pour Linux, SE STABILISE, et arme sbio + sks
 - Trace : traces/20261122-004526_native_persist (log complet). Store scellé : xart_store_linux/ (master_2.bin 420o + glsave_0..3.bin 106/56/613/385o). Proxy rattrapé en local par catcher v2 ; check lecture seule traces/20261122-004523_proxy_check.
 - Fait :

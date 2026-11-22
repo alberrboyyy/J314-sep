@@ -6,7 +6,11 @@
 
 **CATCH PROXY : RÉGLÉ.** `tools/catch_lib.sh` v2 (nœud brut `/dev/ttyACM*` + baseline anti-fantôme + vérif produit USB) rattrape le proxy en local au 1er coup (t+13s). Warning bénin `Permission denied` sur l'ouverture du nœud brut avant droits udev → le chainload prend le relais ; à durcir par un retry d'ouverture ~50 ms (non bloquant).
 
-**PROCHAIN PAS (préparé, PAS encore lancé) :** sonde **sbio « annoncé vs vivant »** — greffer la mécanique `0x73` (poignée de main, SANS doigt) de `sep_xart_replay.sh` (MODE PROBE_SBIO, l.58-77/309-334) sur le flux natif de PERSIST, dans un store FRAIS SÉPARÉ (ne pas polluer `xart_store_linux/`). Puis : sonde sks, test inter-boot (resservir le store → le SEP reconnaît-il son état sans re-sceller ?), puis enrôlement (doigt = session humaine). **Mac EN PROXY en fin de séance** (USB local, PC branché).
+**FAIT CETTE NUIT (après le bandeau ci-dessus) — 🎯 sbio VIVANT :** `pending/sep_native_sbio.sh` (persist + sonde `0x73`, relu par Claude, SELFTEST vert) → après stabilisation, sbio répond au `0x73` **exactement comme macOS** (B8 +0x00=1/+0x14=0x73 ; `< EP=0x08 TAG=0xfc TYPE=0x73`), via le **stream 0 normal** → ça TRANCHE `voie_sbio` §5/§6 : c'était l'**ÉTAT** (sbio pas armé), PAS le canal DART. **Reproduit n=2** (stabilisation n=3). Journal 2026-11-22 01:05. Traces `20261122-010801/012059_native_sbio`.
+
+**PROCHAIN PAS :** (a) [option] 1 run de plus → sbio n≥3 « vérifié » formel ; (b) **le vrai chantier suivant = la suite d'init sbio APRÈS le 0x73** (ce que macOS envoie ensuite → clé capteur SPI → un vrai **match**) : à cartographier d'abord (décompil/trace de la séquence sbio post-0x73) puis greffer sur le flux natif ; (c) **sks (0x12)** — protocole DER déjà cartographié (`kext_sepmanager.md §15`), mais écriture 0x12 = ligne rouge ; (d) **enrôlement sous Linux** (doigt = session humaine). **Mac EN PROXY en fin de séance** (USB local). ⚠️ **le reboot logiciel via proxy FIGE le PMU** → power-cycle PHYSIQUE obligatoire entre runs (vérifié cette nuit).
+
+**AUDIT GITHUB (fait cette nuit) :** repo techniquement propre (0 secret, 0 binaire Apple suivi, 0 code Apple copié ; `macos/`,`m1n1/`,`xart_store_*/` gitignorés). SEUL point : email/nom/Apple ID + IDs Mac (serial/ECID/MAC) sont dans `traces/20261108-162919_adt/` + ~30 `hv_uart.log` + l'historique git → Albert a jugé « pg » (déjà publics ailleurs). Pour publier proprement il faudrait filter-repo + LICENSE + peser le risque social Asahi (repo 100% IA). Décision = Albert.
 
 ---
 

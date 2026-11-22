@@ -1,0 +1,48 @@
+TTY> Heap limit: 0x1000f8f0000 (128 MiB)
+Fetching ADT (0x0007C000 bytes)...
+démarrage du SEP par m1n1 (séquence publique, routine)...
+BOOT OK
+xarm (0x13) annoncé : 0x00:cntl, 0x0e:hdcp, 0x10:xars, 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x18:stac
+tampons prêts (A sid=0, B sid=0). store: maîtres=[], gl=0.
+=== PERSIST : on ACQUITTE + STOCKE les SAVE (écriture), budget 48, idle 25s ===
+  fw-boot TAG=0x02 -> ack
+  os-uuid -> UUID Linux
+  FETCH-maître TAG=0x03 DATA=0x00000100 -> ABSENT maître t2
+  FETCH-maître TAG=0x04 DATA=0x00000000 -> ABSENT maître t1
+  annonce-EP ('sbi') -> ack 0x16
+  annonce-EP ('skd') -> ack 0x16
+  annonce-EP ('sse') -> ack 0x16
+  annonce-EP ('sks') -> ack 0x16
+  annonce-EP ('scr') -> ack 0x16
+  SAVE-xART TAG=0x05 -> ACK + STOCKÉ maître t2 (127o) [SAVE #1/48]
+  SAVE-locker TAG=0x06 -> ACK + STOCKÉ gigalocker brut #0 (106o) [SAVE #2/48]
+  SAVE-xART TAG=0x07 -> ACK + STOCKÉ maître t2 (127o) [SAVE #3/48]
+  SAVE-xART TAG=0x08 -> ACK + STOCKÉ maître t2 (225o) [SAVE #4/48]
+  SAVE-locker TAG=0x09 -> ACK + STOCKÉ gigalocker brut #1 (56o) [SAVE #5/48]
+  SAVE-xART TAG=0x0a -> ACK + STOCKÉ maître t2 (225o) [SAVE #6/48]
+  SAVE-xART TAG=0x0b -> ACK + STOCKÉ maître t2 (323o) [SAVE #7/48]
+  SAVE-locker TAG=0x0c -> ACK + STOCKÉ gigalocker brut #2 (613o) [SAVE #8/48]
+  SAVE-xART TAG=0x0d -> ACK + STOCKÉ maître t2 (323o) [SAVE #9/48]
+  absent(SEP) TAG=0x0e -> ack
+  SAVE-xART TAG=0x0f -> ACK + STOCKÉ maître t2 (420o) [SAVE #10/48]
+  SAVE-locker TAG=0x10 -> ACK + STOCKÉ gigalocker brut #3 (385o) [SAVE #11/48]
+  SAVE-xART TAG=0x11 -> ACK + STOCKÉ maître t2 (420o) [SAVE #12/48]
+--- bilan : FETCH-maître×2, SAVE-xART×8, SAVE-locker×4, absent(SEP)×1, fw-boot×1, os-uuid×1, annonce-EP×5
+--- verdict flux : idle (idle = le SEP s'est stabilisé après les SAVE ; sinon boucle/arrêt)
+endpoints finaux : 0x00:cntl, 0x08:sbio, 0x0a:scrd, 0x0c:sse , 0x0e:hdcp, 0x10:xars, 0x12:sks , 0x13:xarm, 0x14:hibe, 0x15:pnon, 0x17:skdl, 0x18:stac
+store après run : maîtres=[2], gl=0, gl_bruts=4 (dans /home/albert/Desktop/sep-touchid/xart_store_sbio)
+>>> sbio annoncé ? OUI ; SAVE acquittés : 12.
+=== SONDE sbio (0x73, sans doigt, une seule commande) ===
+  CNTL A8 taille (ouverture sbio) : acquitté
+  CNTL A8 adresse (ouverture sbio) : acquitté
+  CNTL B8 taille (ouverture sbio) : acquitté
+  CNTL B8 adresse (ouverture sbio) : acquitté
+  A8 (IOVA 0x54000) mappé dans les streams : [0]
+  0x73 écrit dans A8 (depuis 000300_08_A.bin). Envoi de la commande...
+  [DART-faute avant 0x73 (baseline)] ERROR=0x0a000400 FLAG=0 sid=10 causes=WRITE ADDR=0x3cab9bc7
+  SEP> EP=0x08 TAG=0x04 TYPE=0x00 PARAM=0x00 DATA=0x00000000
+  SEP> EP=0x08 TAG=0xfc TYPE=0x73 PARAM=0x00 DATA=0x00000000
+  [DART-faute après 0x73] ERROR=0x0a000400 FLAG=0 sid=10 causes=WRITE ADDR=0x3dab8bcf
+  >>> AUCUNE faute DART neuve après le 0x73 (FLAG reste 0). Le silence ne vient donc PAS d'une traduction DART fautée latchée ici. Réserve : une faute peut n'être pas latchée, ou le DMA de l'OOL sbio peut ne pas passer par ce dart (hypothèse, à ne pas affirmer).
+  B8 : 2 octets non nuls ; tête=0100000000000000000000000000000000000000730000000000000000000000
+>>> SONDE sbio : sbio a RÉPONDU au 0x73 (gt_packet B8 +0x14=0x73 et/ou message EP 0x08). sbio est VIVANT sous m1n1, pas seulement annoncé. Résultat majeur — à reproduire (n>=3) et à comparer à la réponse macOS c12 (B +0x00=1, +0x14=0x73). NE PAS conclure 'Touch ID marche' : il reste toute la séquence d'init (clé capteur, etc.) puis un vrai match.

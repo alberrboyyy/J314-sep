@@ -672,3 +672,200 @@ le mot mailbox 0x12 ne porte qu'un compteur de transaction + la longueur (cohér
 TYPE=compteur). Conséquence pratique : **un driver Linux devrait produire le même DER** (schéma à extraire), pas juste un opcode.
 Les `aks_system_key_get_public/sign/collection` passent `x0 = -1` (sentinelle « pas de ref_key »). Mapping fin op↔DER↔TAG fil
 (0x2f/0x41/0x18) = gros travail restant, et de toute façon tout envoi 0x12 reste **ligne rouge** (Albert).
+
+## 15. SKS / EP 0x12 — protocole de messages (2026-11-22, Claude — source: kext)
+
+Décompilation ciblée de `com.apple.driver.AppleSEPKeyStore` dans `macos/kernel.macho` (classe `AppleKeyStore` +
+couche libaks intégrée au kext). **Protocole uniquement, aucune clé/secret.** Ceci complète §14/§14b : §14 posait
+l'architecture AKS, §15 donne le **schéma DER exact** (les tags de champs), l'**enveloppe de requête**, la **séquence
+d'init** et le **gating**, tous lus dans le binaire. Notation : **VU** = lu dans le désassemblage/les symboles ;
+**hypothèse** = interprété. Tout est `source: kext`.
+
+### 15.1 Chemin logiciel et symboles clés (VU)
+
+- `AppleKeyStore::sep_deliver_msg` (`0x99453f8`) = thunk de **réception** : charge le singleton endpoint SKS
+  (`globals 0xb881000+0x81b8`, le même qu'en §14) et fait un tail-call sur sa **méthode virtuelle `+0x1e8`**, en
+  enregistrant comme callback gated `AppleKeyStore::sep_deliver_msg_gated` (`0x994f360`).
+- `AppleKeyStore::sep_deliver_msg_gated` (`0x994f360`) = traitement réel d'une réponse/notif SKS sur la workloop
+  gated. Contient la machine à état « strikes/timeout » (chaînes `sks timeout strike %d`, `sks response after %d
+  strikes`, `manually picked up response`, `no sks endpoint to send to`) et met à jour l'état device en cache
+  (`kext_msg_cache_device_state` / `msg_cache_device_state`).
+- `_kern_perform_operation` (`0x9955030`) = **dispatcher d'envoi** unique. `__aks_operation` (`0x9941a64`) est son
+  seul appelant ; lui-même est appelé par tous les wrappers `aks_ref_key_*` / `aks_system_key_*`.
+- Endpoint : ouvert par `AppleKeyStore::sep_endpoint` (`0x9950684`) sous le nom **`"sep-endpoint,sks"`** (chaîne VU),
+  callback de livraison `sep_action` (`0x9950bd0`) posé via `AppleSEPDeviceService::initEndpoint`. Tailles OOL
+  bornées par `getSendOolMinPages/getSendOolMaxPages/getReceiveOolMinPages/getReceiveOolMaxPages` + `getSepPageSize`
+  (symboles VU) → requête et réponse passent par mémoire **OOL** paginée.
+
+### 15.2 Enveloppe de requête côté kernel (VU — `_kern_perform_operation`)
+
+Le dispatcher construit une structure sur la pile puis la soumet à l'endpoint SKS (`[globals+0x81b8]`, vmethod
+`+0x1e8`, callback `0x9954fe8`). Disposition lue dans le binaire :
+
+| offset | taille | contenu |
+|---|---|---|
+| +0x00 | 8 | pointeur de contexte/base (`[globals+0x4b0]+0xe0` + base d'alloc) |
+| +0x08 | 4 (w) | **ref_key handle** (arg `x0` du wrapper AKS ; `-1` = pas de ref_key → clé système) |
+| +0x0c | 4 (w) | **constante `3`** (= version/type de requête ; VU immédiat `mov w9,#3`) |
+| +0x10 | 8 | pointeur **buffer DER des paramètres** (arg1) |
+| +0x18 | 4 (w) | longueur du buffer DER (arg2) |
+| +0x20 | 8 | pointeur buffer de sortie (réponse) |
+| +0x28 | 8 | pointeur longueur de sortie |
+
+Conséquence (confirme §14b, VU) : **l'« opération » n'est PAS un petit opcode dans le mot mailbox**. Le premier
+argument est le **handle de ref_key** (entier 32 bits, ou `-1`). L'opération réelle et tous les arguments sont dans
+le **buffer DER** (OOL). L'objet endpoint (classe de `AppleSEPManager`, hors de ce kext) marshale cette structure
+en message mailbox 0x12 + OOL ; c'est là qu'est produit le mot mailbox `> t n 0 0xLLLL0000` vu en trace (TYPE =
+compteur de transaction, DATA = longueur) — **non ré-observé dans ce kext** (reste cohérent avec `messages.md`).
+
+### 15.3 Schéma DER des paramètres (VU — table `___der_key_*`)
+
+Le buffer OOL est un **dictionnaire encodé DER** (style SecDER/CoreFoundation : `SEQUENCE` de paires
+`{clé, valeur}` ; itéré par `_der_dict_iterate` / `_der_dict_find_value` / `_der_dict_get_number`, VU). Chaque **clé
+est une `UTF8String` DER** (tag `0x0c`, longueur, puis un **code court ASCII**). Les codes exacts sont lus dans la
+table de constantes `___der_key_*` du kext (`0x74a1c40…`). Champs (nom Apple → code fil) :
+
+| champ (nom symbole) | code DER | rôle (hypothèse d'après le nom) |
+|---|---|---|
+| op | `o` | **sélecteur d'opération** (valeur = un des codes 15.4) |
+| ref_key | `rk` | handle/blob de clé scellée |
+| keybag_class | `bc` | classe de protection (A/B/C/D…) |
+| data | `d` | données d'entrée |
+| auth_data | `ad` | données d'authentification |
+| protected_data | `pd` | données protégées |
+| external_data | `ed` | données externes |
+| tag | `tag` | tag applicatif |
+| acm_handle | `acmh` | handle ACM (Access Control Manager / contexte LAContext) |
+| access_groups | `ag` | groupes d'accès keychain |
+| salt | `salt` | sel |
+| flags | `f` | drapeaux |
+| id | `id` | identifiant |
+| public_key | `pub` | clé publique (sortie/entrée) |
+| type (key type) | `kt` | type de clé |
+| version (key version) | `kv` | version de clé |
+| uuid | `kid` | uuid de clé |
+| dst_keybag_handle | `dbh` | keybag de destination (transcrypt) |
+| config_max_unlock_attempts | `mua` | config |
+| options | `rko` | options ref_key |
+| raw_output | `ro` | sortie brute |
+| test_flags | `tf` | drapeaux de test |
+| shared_info / shared_info2 | `si` / `si2` | ECIES shared info |
+| transcode_shared_info / _2 | `tsi` / `tsi2` | shared info de transcodage |
+| ecdh_iv / ecdh_seed | `ecdhi` / `ecdhs` | IV / seed ECDH |
+| transcode_ecdh_seed | `tecdhs` | seed ECDH de transcodage |
+| persona_uuid | `prsn` | persona |
+| config_capabilities | `cap` | capacités |
+| system_key_type | `skt` | clés système |
+| sub_key_type | `srkt` | — |
+| pka_flags | `spka` | — |
+| system_key_client_seed | `skcs` | — |
+| system_key_generation | `skg` | — |
+| system_key_operation | `sko` | — |
+| system_key_options | `skos` | — |
+| system_key_no_img4 | `skni` | — |
+| gid_ref_key_options | `grko` | — |
+| remote_session_signing_key_type | `rskt` | session distante |
+| remote_session_signing_key_certificate | `rsct` | session distante |
+
+**État renvoyé** (réponse / notif de changement d'état du keybag), mêmes conventions DER :
+
+| champ | code | rôle (hypothèse) |
+|---|---|---|
+| state_state | `ss` | état global |
+| state_lock_state | `sls` | **verrou keybag** (clé du gating bio ; cf. `messages.md`, lockState 0x0015) |
+| state_backoff / _other | `sb` / `sbo` | temporisation anti-brute-force |
+| state_failed_attempts / _other | `sfa` / `sfao` | tentatives ratées |
+| state_generation_state | `sgs` | génération |
+| state_assertion_set | `sas` | assertions de lock |
+| state_grace_period_enabled | `sgpe` | période de grâce |
+| state_recovery_countdown | `srcd` | compte à rebours récupération |
+| state_refcount | `refc` | — |
+| state_reserved | `sr` | — |
+
+Les paramètres sont bâtis par `aks_params_*` puis sérialisés (`aks_params_get_der` / `__params_get_der_key`, VU),
+la réponse décodée par `_der_decode_*` ; `_ref_key_op_der_to_enum` (VU) convertit le code `o` reçu en énum interne.
+
+### 15.4 Sélecteurs d'opération = valeur du champ `o` (VU — `___der_key_op_*`)
+
+Valeurs possibles du champ `o` (code DER lu au symbole correspondant) :
+
+| opération (symbole) | code `o` |
+|---|---|
+| create | `oc` |
+| create_with_encrypt | `ocwe` |
+| create_with_wrap | `ocww` |
+| delete | `odel` |
+| encrypt | `oe` |
+| decrypt | `od` |
+| sign | `osgn` |
+| wrap | `ow` |
+| unwrap | `ouw` |
+| compute_key | `ock` |
+| attest | `oa` |
+| transcrypt (rewrap) | `orwk` |
+| validate_key | `ovk` |
+| set_key_class | `oskc` |
+| ecies_encrypt / decrypt / transcode | `oece` / `oecd` / `oect` |
+| enable_test_keys | `etk` |
+| sik_collection / sik_attest / get_sik_status | `osc` / `osa` / `ogss` |
+| gid_attest | `oga` |
+| system_key_attest / collect / get_public / operate / sign | `oska` / `oskc2` / `oskgp` / `osko` / `osks` |
+
+(Codes littéraux présents à l'adresse de chaque constante `___der_key_op_*` ; aucun secret, juste des étiquettes
+de protocole.)
+
+### 15.5 Séquence d'init de l'EP 0x12 (VU)
+
+1. `AppleKeyStore::sep()` (`0x9950560`) crée/obtient l'`AppleSEPDeviceService`, puis `sep_endpoint()` (`0x9950684`)
+   **ouvre l'endpoint `"sep-endpoint,sks"`** et pose le callback de livraison `sep_action`. Il interroge les tailles
+   OOL (send/receive min/max pages, page size) → dimensionne les tampons.
+2. `init_sep_endpoint()` (`0x9950dbc`) fait une **négociation de version d'en-tête IPC** : appelle
+   `__ipc_get_capabilities` (`0x99671c4`) avec un gabarit (template à `0x74a1f30`). Chaînes VU :
+   `negotiated to ipc header theirs:v%llu, ours:v%u -> negotiated:v%llu`, et en échec
+   `failed to negotiate, defaulting to v1`. La version négociée est **plafonnée à 2** (`v1`/`v2`) puis stockée par
+   `_msg_header_set_negotiated_version` (`0x9967c90` → global `0xb881448`).
+3. Un **multiplicateur de timeout SEP** est lu/loggé (`SEP timeout multiplier = %u`).
+4. `sepinit_gated()` (`0x9950ff0`) enveloppe ces étapes sur la workloop gated ; en échec total →
+   `Failed to initialize SEP`.
+
+Hypothèse : l'AP « parle » donc d'abord en négociant la version d'en-tête IPC (handshake de capacités) **avant**
+tout `aks_*` ; un chemin TDM parallèle existe (`tdm_negotiate_msg_capabilities`, `tdm_deliver_msg_gated`,
+`TDM: negotiated to ipc header …`) pour les notifications hors-bande.
+
+### 15.6 Gating (VU)
+
+- **SEP non démarré** : si le SEP n'est pas booté, la requête est rejetée — chaîne VU
+  `SEP is not booted. AKS request is not processed`.
+- **Validation de réponse** : `Received response has invalid size (%llx)` et `Received payload is too big (%llx)`
+  (bornes de taille sur l'OOL reçu, VU) ; `unexpected version %d` si l'en-tête IPC reçu a une version hors plage.
+- **Timeout/retries** : série de « strikes » avant d'abandonner (`sks timeout strike`, `sks response after %d
+  strikes`, `manually picked up response`), et `sks request timeout (%d strikes)` (assert).
+- **Verrou keybag** : l'état renvoyé porte `sls` (state_lock_state). **Non tranché ici (= D2 ouvert)** : savoir si
+  le SEP *refuse* une opération (ex. `match`/déchiffrement) tant que le keybag est verrouillé, ou si macOS
+  s'abstient seulement, n'est **pas** déterminable depuis ce kext — il faudrait une écriture 0x12 (ligne rouge
+  Albert). Reste `hypothèse`.
+
+### 15.7 Vocabulaire d'opérations keystore (VU — noms de méthodes `AppleKeyStore`)
+
+Surface d'opérations de plus haut niveau qui produisent in fine des requêtes AKS/DER ou des messages endpoint
+(noms de symboles, VU) : `create_keybag`, `load_keybag`, `unload_keybag`, `copy_keybag`, `copy_keybag_uuid`,
+`set_device_keybag`, `set_volume_keybag`, `set_backup_keybag`, `invalidate_keybag`, `change_lock_state`,
+`verify_password`, `change_password`, `unlock_the_device`, `generation`, `stash_create/load/commit/enable/persist/
+escrow/destroy`, `new_key`, `unwrap_data`, `backup_data`, `perform_operation`, `get_device_state`,
+`get_configuration` / `set_configuration`, `notify_keys_available`, `notify_change_device_state`. Ce sont les
+candidats « verrouiller/déverrouiller le keybag, créer/charger/utiliser une clé » demandés.
+
+### 15.8 Points ouverts (honnête)
+
+1. **Mot mailbox 0x12 exact** : TYPE=compteur / DATA=longueur vient des traces (`messages.md`), **pas ré-dérivé**
+   dans ce kext (l'encodage est dans la classe endpoint d'`AppleSEPManager`, méthode `+0x1e8` du singleton
+   `globals+0x81b8`) — à décompiler côté `AppleSEPManager` pour le confirmer octet par octet.
+2. **Structure DER conteneur** : « dictionnaire DER de paires UTF8String→valeur » est fortement étayé
+   (`_der_dict_*`, tag `0x0c`), mais le **wrapping externe exact** (SEQUENCE racine, ordre des champs, types des
+   valeurs : INTEGER/OCTET STRING/BOOLEAN) n'a pas été tracé champ par champ — `aks_params_set_number/set_data` +
+   `aks_params_get_der` restent à décompiler pour le gabarit précis.
+3. **Mapping op `o` → TAG fil** (0x2f/0x41/0x18 observés en trace) : non établi (le TAG fil est posé par l'endpoint,
+   pas par la couche DER).
+4. **D2 (refus sous verrou)** : non tranchable sans écriture 0x12 (ligne rouge).
+5. **Négociation** : gabarit `__ipc_get_capabilities` (`0x74a1f30`) non décodé octet par octet ; seul le résultat
+   (v1/v2, plafond 2) est VU.
