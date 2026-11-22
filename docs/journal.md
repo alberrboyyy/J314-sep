@@ -2304,3 +2304,26 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   a2b40c01…b076), `calib_0x5b.bin` d5a6117d…ddda. `build.sh CLIPPY=1` 0 avertissement ; sep-proto 31+17, sbiod 1+10,
   sepd tests verts, clippy 0.
 - 1er run J5c (params, puis calib) = go d'Albert (classe neuve ; 0x5b jamais rejoué). Incidents : aucun.
+
+## 2026-11-22 21:33 — Albert + Claude (session ALARM) — J5c (UPTO=params) : patch rechargé (n=2) + paramètres capteur appliqués, états = macOS
+- Lancé par Albert après power-cycle : `sudo pending/j5c_params_run.sh` (UPTO=params, allow_sbio_params=1, store neuf).
+  Logs bruts : `logs/20261122-213301_j5c-params/`.
+- VU : seal frais (12 SAVE), sbio VIVANT ; relais 0x17→0x5f ; **patch chargé à nouveau** (état `…2901007c…`, IRQ à
+  t+43 ms, comme 20:43) ⇒ chargement du patch reproduit, **n=2**.
+- VU, params : 0x5d (4→55 o) → trame 0x55 → état `80200010 00000000 0021000c 52330016` ; 0x5c (4→55) → même état ;
+  0x6a 0→0 (aucune trame) ; 0x31 (0→64) → trame 0x55 73 o → état `…07 0021008c 4b…` → réponse 0x75 (75 o) → 0x32
+  (64→18 o, n° de série module ASCII « F5821140AFFQ57PA… ») ; 0x01 (0→0) ; 0x1f (0→2 : `05 05`) ; 2e 0x31/0x32 idem.
+  Chaque état post-trame = celui de macOS (contrôle sbiod). VERDICT sbiod : params appliqués, rc=0. Capteur éteint.
+- Statut : n=1 pour les params. Suite : `UPTO=calib` (0x5b rejeu + 0x63) = 1er envoi 0x5b → go d'Albert.
+
+## 2026-11-22 21:41 — Albert + Claude (session ALARM) — 🎯 J5c (UPTO=calib) : capteur INITIALISÉ ET CALIBRÉ en Linux natif (1re passe)
+- Go d'Albert (power-cycle, `sudo UPTO=calib pending/j5c_params_run.sh`, allow_sbio_params=2, store neuf). Logs bruts :
+  `logs/20261122-214118_j5d-calib/`.
+- VU : seal frais, sbio VIVANT ; relais 0x17→0x5f ; **patch chargé (n=3)** ; params 0x5d/0x5c/0x6a/0x31-0x32×2/0x01/0x1f
+  avec états = macOS (**n=2**) ; puis **0x5b setCalibration** : 64665 o rejoués (blob c12), 4 fragments AP→SEP, poignée
+  `> fc` → `< fe 0` → `> fd` → `< fe 1` → `> fd` → `< fe 2` → `> fd` → `< fc` (= macOS 23/23), réponse 0 o = acquitté ;
+  **0x63** → 28 o `03000000 00ac6041 00000000 00000000 09000000 03000000 03000000` = **identique à macOS**.
+  VERDICT sbiod : « capteur initialisé et calibré (1re passe ; 0x5b acquitté, 0x63 = référence macOS) ». Aucun Halt.
+- ⇒ toute la 1re passe d'init macOS (0x73 → 0x63) tourne en Linux natif, sans macOS ni m1n1. Statut : calibration n=1.
+- Ouvert : macOS enchaîne ensuite 0x19 (reset capteur) + 2e passe (0x17→0x5f patch 28878 o, 0x6f, …) avant d'être
+  « prêt pour un doigt » : nécessaire ou pas pour un match/enrôlement ? → à cartographier (protocole d'abord) avant J6.
