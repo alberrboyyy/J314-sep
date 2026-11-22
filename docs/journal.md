@@ -2517,3 +2517,12 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Prédiction : (1) sepd : master t2 SERVED 437 o, t1 ABSENT ; FETCH 407e…(90 o) ×2, e01e…(597 o) ×2, op 0x07, 2438…(369 o)
   ×2, 9133…(40 o) ×2 ; **0 SAVE** ; (2) dmesg : `découverte : EP 0x12 = 'sks'` tailles 0x02010201, skdl/sks/scrd ouverts
   (4 acks chacun), table 12 EP ; (3) `VERDICT sbio : VIVANT` (B8 +0x00=1 +0x14=0x73). Tout écart = n=2 non obtenu, à analyser.
+
+## 2026-11-23 00:10 — Albert + Claude (session ALARM) — J7b n=2 : prédiction CONFIRMÉE point par point → VÉRIFIÉ
+- Logs bruts : `logs/20261123-001026_j7b-sks-open-chained-nouuid/`. Même script, mêmes binaires, même store.
+- VU = prédiction : master t2 SERVED 437 o / t1 ABSENT ; 407e…(90) ×2, e01e…(597) ×2, op 0x07 (TAG 0x09), 2438…(369) ×2,
+  9133…(40) ×2 ; **0 SAVE** (store toujours identique à sa copie d'avant J7b, `cmp`) ; `EP 0x12 = 'sks'` tailles 0x02010201 ;
+  skdl/sks/scrd ouverts (4 acks chacun) ; table 12 EP, 0 ignoré, pas de Halted ; `VERDICT sbio : VIVANT` (B8 +0x00=1 +0x14=0x73).
+- Seul écart, bénin : skdl ouvert avec « 2 requête(s) 0x13 en attente » (n=1 : 0) = entrelacement des FETCH, sans effet.
+- ⇒ **VÉRIFIÉ (n=2, prédiction écrite avant)** : sur boot chaîné natif, servir les lockers SANS UUID (A = B[16..] du SAVE)
+  → le SEP accepte l'état scellé rechargé (0 re-scellement), annonce sks et sbio répond au 0x73.

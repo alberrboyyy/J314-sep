@@ -162,3 +162,11 @@ prouve qu'un hôte non macOS soit accepté par le SEP : ce n'est vérifiable que
   la voie-C venait de l'**ÉTAT** (sbio non armé car xART non scellé légitimement), **pas** du canal DART. Traces `20261122-004526_native_persist`,
   `20261122-010801/012059/013535_native_sbio` ; code relu `pending/sep_native_{persist,sbio}.sh`. RÉSERVE : « sbio vivant » ≠ « match » ;
   la suite (init capteur SPI en lockstep, blobs, **match = doigt = session humaine**, D2 keybag) reste ouverte — carte : `docs/sbio_sequence.md`.
+
+## Mise à jour 2026-11-23 (Claude, session ALARM) — boot CHAÎNÉ natif
+- **FETCH locker (op 0x05) : A = B[16..] du SAVE-locker (op 0x06), sans l'UUID ; longueur `PARAM | DATA[octet0]<<8` recalculée** :
+  `vérifié` (matériel, n=2 : J7b 2026-11-23 00:02 et 00:10, prédiction écrite avant le 2e run, journal). Servi AVEC l'UUID
+  (J3b/J3d/J7a) = même effet qu'ABSENT (J3) : le SEP s'arrête après le 1er locker. Kext op 0x05/0x06 non relu (confirmation possible côté PC).
+- **Boot chaîné natif complet** (master servi + 4 lockers sans UUID, 0 SAVE) → `sks` (0x12) annoncé en 0xFD, skdl/sks/scrd
+  ouverts sans RPC, **sbio VIVANT au 0x73** : `vérifié` (n=2). Réfute « sbio gated derrière l'init SKS sur boot chaîné ».
+  Non testé : chaîné sans ouvrir skdl/sks/scrd ; init capteur complète sur chaîné ; enrôlement.

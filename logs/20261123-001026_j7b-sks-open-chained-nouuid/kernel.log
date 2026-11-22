@@ -1,0 +1,245 @@
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: loading out-of-tree module taints kernel.
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: sepfw = /reserved-memory/sep-firmware [mem 0x10004848000-0x10004df7fff], phandle 0x127 ; manifestes présents
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: mboxes = 0x35 -> /soc/mbox@396408000
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: iommus = 0x36 -> /soc/iommu@3952c0000
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: power-domains = 0x37 -> /soc/power-management@28e580000/power-controller@c00
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: stream id DART = 0
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: phandle 0x131 donné (en mémoire) à /soc/sep@396400000
+Nov 23 00:10:26 alarm kernel: sep_native_ovl: overlay appliqué, ret=0 id=1
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: trouvé : sepfw phys 0x10004848000 taille 0x5b0000, local-policy-manifest 0xb7b o, iboot-manifest 0x15cc o
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: shmem 0x30000 o allouée, IOVA 0xfffc0000 (magic panique [67, 73, 78, 80])
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: OOL 0x13 alloués : A IOVA 0xfffb8000, B IOVA 0xfffb0000
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: OOL 0x08 alloués : A8 IOVA 0xfffac000, B8 IOVA 0xfffa8000
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: OOL 'skdl' alloués : A IOVA 0xfffa4000, B IOVA 0xfffa0000, 0x4000 o chacun
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: OOL 'sks' alloués : A IOVA 0xfff98000, B IOVA 0xfff90000, 0x8000 o chacun
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: OOL 'scrd' alloués : A IOVA 0xfff8c000, B IOVA 0xfff88000, 0x4000 o chacun
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: mailbox 'mbox' prise (réception active, rien envoyé)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: allow_boot=1 : séquence de boot m1n1 (GET_STATUS/TZ0/GET_STATUS/IMG4+SET_SHMEM)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: > GET_STATUS : 0x00000000000200ff
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: GET_STATUS #1 : TAG 0x00 TYPE 0x66 DATA 0x1 (OK)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: > BOOT_TZ0 : 0x00000000000500ff
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: BOOT_TZ0 ack 0x69 : TAG 0x00 TYPE 0x69 DATA 0x0 (OK)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: BOOT_TZ0 ack 0xD2 : TAG 0x00 TYPE 0xd2 DATA 0x2 (OK)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: > GET_STATUS : 0x00000000000200ff
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: GET_STATUS #2 : TAG 0x00 TYPE 0x66 DATA 0x2 (OK)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: firmware mappé : phys 0x10004848000 taille 0x5b0000 → IOVA 0xff800000
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: > BOOT_IMG4 : 0x000ff800000600ff
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: > SET_SHMEM : 0x000fffc0001800fe
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: BOOT_IMG4 ack 0x6A : TAG 0x00 TYPE 0x6a DATA 0x0 (OK)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: firmware démappé après 0x6A (comme m1n1)
+Nov 23 00:10:26 alarm kernel: sep_native soc:sep-native: SEPOS lancé
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x14 = 'hibe'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x14 tailles 0x01010101
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x18 = 'stac'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x18 tailles 0x02020202
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x00 = 'cntl'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x00 tailles 0x00000000
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x10 = 'xars'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x10 tailles 0x02020202
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x13 = 'xarm'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x13 tailles 0x02020202
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: xarm < seq 1 TAG 0x02 TYPE 0x0e PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x15 = 'pnon'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x15 tailles 0x05050707
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x0d (rien envoyé)
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x29 (rien envoyé)
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0e = 'hdcp'
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0e tailles 0x01010101
+Nov 23 00:10:27 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x10 (rien envoyé)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: ouverture 0x13 : A IOVA 0xfffb8000, B IOVA 0xfffb0000, 0x8000 o chacun
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL SECMODE : 0x0000000000140100
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0x3
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL A taille : 0x0000800013040200
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x8000
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL A adresse : 0x000fffb813020300
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfffb8
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL B taille : 0x0000800013050400
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x8000
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL B adresse : 0x000fffb013030500
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfffb0
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: 0x13 ouvert ; requêtes en attente : 1
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: /dev/sep_native prêt (lancer sepd) ; ACK des SAVE : AUTORISÉ
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: /dev/sep_native ouvert (1 requête(s) en attente)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010000000213
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 1 TYPE 0x00 PARAM 0x00 DATA 0x00000100 (A 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 2 TAG 0x01 TYPE 0x13 PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000000000113
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 2 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (A 16 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 3 TAG 0x03 TYPE 0x00 PARAM 0x00 DATA 0x00000100 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00000101b5000313
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 3 TYPE 0x00 PARAM 0xb5 DATA 0x00000101 (A 437 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 4 TAG 0x04 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000011000413
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 4 TYPE 0x00 PARAM 0x11 DATA 0x00000000 (A 17 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 5 TAG 0x00 TYPE 0x1d PARAM 0x6f DATA 0x00736269 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073620000160013
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 5 TYPE 0x16 PARAM 0x00 DATA 0x00736200 (A 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'sbio' acquittée (déclencheur de l'ouverture précoce)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x08 = 'sbio'
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: sbio annoncé (EP 0x08) ; ouverture quand le xART sera calme
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x08 tailles 0x01010101
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: sbio : ouverture PRÉCOCE (ack 0x1d 'sbio' envoyé) (0 requête(s) 0x13 en attente) ; 0x08 : A8 IOVA 0xfffac000, B8 IOVA 0xfffa8000, 0x4000 o chacun
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL A8 taille : 0x0000400008040600
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x06 DATA 0x4000
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL A8 adresse : 0x000fffac08020700
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x07 DATA 0xfffac
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL B8 taille : 0x0000400008050800
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x08 DATA 0x4000
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL B8 adresse : 0x000fffa808030100
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0xfffa8
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: 0x08 ouvert ; mots sbio reçus jusqu'ici : 0
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 6 TAG 0x00 TYPE 0x1d PARAM 0x6c DATA 0x00736b64 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x17 = 'skdl'
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x17 tailles 0x01010101
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 7 TAG 0x00 TYPE 0x1d PARAM 0x20 DATA 0x00737365 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0c = 'sse'
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0c tailles 0x01010101
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 8 TAG 0x00 TYPE 0x1d PARAM 0x20 DATA 0x00736b73 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00736b0000160013
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 6 TYPE 0x16 PARAM 0x00 DATA 0x00736b00 (A 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'skdl' acquittée
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: keystore : ouverture de 'skdl' (EP 0x17) : A IOVA 0xfffa4000, B IOVA 0xfffa0000, 0x4000 o chacun ; 2 requête(s) 0x13 en attente
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL A17 taille : 0x0000400017040200
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073730000160013
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 7 TYPE 0x16 PARAM 0x00 DATA 0x00737300 (A 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00736b0000160013
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 8 TYPE 0x16 PARAM 0x00 DATA 0x00736b00 (A 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'sks' acquittée
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x4000
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 9 TAG 0x00 TYPE 0x1d PARAM 0x64 DATA 0x00736372 (B 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0a = 'scrd'
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0a tailles 0x01010101
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL A17 adresse : 0x000fffa417020300
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfffa4
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL B17 taille : 0x0000400017050400
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x4000
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > CNTL B17 adresse : 0x000fffa017030500
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 10 TAG 0x05 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfffa0
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073630000160013
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 9 TYPE 0x16 PARAM 0x00 DATA 0x00736300 (A 0 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'scrd' acquittée
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: keystore : 'skdl' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : 0
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x000001005a000513
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 10 TYPE 0x00 PARAM 0x5a DATA 0x00000100 (A 90 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 11 TAG 0x06 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x000001005a000613
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm > seq 11 TYPE 0x00 PARAM 0x5a DATA 0x00000100 (A 90 o)
+Nov 23 00:10:29 alarm kernel: sep_native soc:sep-native: xarm < seq 12 TAG 0x07 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010255000713
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 12 TYPE 0x00 PARAM 0x55 DATA 0x00000102 (A 597 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm < seq 13 TAG 0x08 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010255000813
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 13 TYPE 0x00 PARAM 0x55 DATA 0x00000102 (A 597 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm < seq 14 TAG 0x09 TYPE 0x07 PARAM 0x10 DATA 0x00000000 (B 0 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000000000913
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 14 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (A 0 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm < seq 15 TAG 0x0a TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010171000a13
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 15 TYPE 0x00 PARAM 0x71 DATA 0x00000101 (A 369 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm < seq 16 TAG 0x0b TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010171000b13
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 16 TYPE 0x00 PARAM 0x71 DATA 0x00000101 (A 369 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: découverte : EP 0x12 = 'sks'
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: découverte : EP 0x12 tailles 0x02010201
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: keystore : ouverture de 'sks' (EP 0x12) : A IOVA 0xfff98000, B IOVA 0xfff90000, 0x8000 o chacun ; 0 requête(s) 0x13 en attente
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL A12 taille : 0x0000800012040600
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x06 DATA 0x8000
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL A12 adresse : 0x000fff9812020700
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x07 DATA 0xfff98
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL B12 taille : 0x0000800012050800
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x08 DATA 0x8000
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL B12 adresse : 0x000fff9012030100
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0xfff90
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: keystore : 'sks' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : 0
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: keystore : ouverture de 'scrd' (EP 0x0a) : A IOVA 0xfff8c000, B IOVA 0xfff88000, 0x4000 o chacun ; 0 requête(s) 0x13 en attente
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL A0a taille : 0x000040000a040200
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x4000
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL A0a adresse : 0x000fff8c0a020300
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfff8c
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL B0a taille : 0x000040000a050400
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x4000
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > CNTL B0a adresse : 0x000fff880a030500
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfff88
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: keystore : 'scrd' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : 0
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: keystore : écoute passive 10000 ms (rien envoyé à 0x17/0x12/0x0a) ; ouverts skdl true sks true scrd true
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm < seq 17 TAG 0x0c TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010028000c13
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 17 TYPE 0x00 PARAM 0x28 DATA 0x00000100 (A 40 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm < seq 18 TAG 0x0d TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010028000d13
+Nov 23 00:10:30 alarm kernel: sep_native soc:sep-native: xarm > seq 18 TYPE 0x00 PARAM 0x28 DATA 0x00000100 (A 40 o)
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: B keystore en fin d'écoute : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x000 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x010 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x020 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x030 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x040 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x050 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x060 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   skdl+0x070 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: B keystore en fin d'écoute : 0 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x000 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x010 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x020 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x030 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x040 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x050 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x060 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   sks+0x070 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: B keystore en fin d'écoute : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x000 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x010 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x020 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x030 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x040 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x050 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x060 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   scrd+0x070 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: VERDICT keystore : skdl OUVERT sks OUVERT scrd OUVERT ; mots reçus pendant/avant l'écoute : skdl 0 sks 0 scrd 0 ; puis 0x73
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: sbio : xART calme (2000 ms sans trafic 0x13, aucune requête en attente) ; envoi du 0x73
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: B8 avant le 0x73 : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: > sbio 0x73 (poignée) : 0x000000000073fc08
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: sbio < TAG 0x04 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (notification TAG 0x02-0x04, après le 0x73) : 0x0000000000000408
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x73 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000073fc08
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native: B8 après un mot sbio : 2 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x0 offset 0x0 opcode 0x73 fragment 0x0
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000073 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:40 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native: B8 en fin d'écoute : 2 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x0 offset 0x0 opcode 0x73 fragment 0x0
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000073 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native: VERDICT sbio : VIVANT (B8 +0x00=0x01 +0x14=0x73 ; 2 mot(s) 0x08 après le 0x73 ; TAG 0xfc TYPE 0x73 ou TAG 0x04 : oui)
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native: keystore (bilan) : ouverts skdl true sks true scrd true ; mots reçus skdl 0 sks 0 scrd 0
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native: table de découverte : 12 EP (état Running, 0 message(s) ignoré(s))
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x14 'hibe' pages [1, 1, 1, 1]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x18 'stac' pages [2, 2, 2, 2]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x00 'cntl' pages [0, 0, 0, 0]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x10 'xars' pages [2, 2, 2, 2]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x13 'xarm' pages [2, 2, 2, 2]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x15 'pnon' pages [7, 7, 5, 5]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x0e 'hdcp' pages [1, 1, 1, 1]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x08 'sbio' pages [1, 1, 1, 1]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x17 'skdl' pages [1, 1, 1, 1]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x0c 'sse' pages [1, 1, 1, 1]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x0a 'scrd' pages [1, 1, 1, 1]
+Nov 23 00:10:46 alarm kernel: sep_native soc:sep-native:   EP 0x12 'sks' pages [1, 2, 1, 2]
