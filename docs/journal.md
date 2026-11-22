@@ -2547,3 +2547,12 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   **VERDICT sbio : VIVANT** (B8 +0x00=1 +0x14=0x73).
 - ⇒ (n=1, hypothèse) les ouvertures skdl/sks/scrd ne sont **pas nécessaires** : servir correctement les lockers suffit à
   armer sbio sur boot chaîné. Le nouveau sepd par défaut reproduit J7b sur matériel. **J8 (chaîné + init capteur) débloqué.**
+
+## 2026-11-23 00:30 — Albert + Claude (session ALARM) — 🎯 J8 : init capteur COMPLÈTE sur boot CHAÎNÉ (sans re-scellement)
+- Go d'Albert (power-cycle, `sudo pending/j8_chained_sensor.sh /var/lib/sepd-run-20261122-230441`). Logs bruts :
+  `logs/20261123-002956_j8-chained-sensor/` (copie de `/var/log/j5-20261123-002956`).
+- VU : store servi sans UUID, **0 SAVE** (store toujours identique à sa copie d'avant J7b) ; sbio VIVANT ; patch chargé
+  (0x29 à t+43 ms) ; params + calib 0x5b, 0x63 = macOS ; 2e passe : patch n°2 chargé (t+55 ms), 0x63 ×2 = macOS ;
+  « VERDICT : 2e passe terminée, capteur au repos final de macOS ». sbiod rc=0.
+- ⇒ (n=1) toute l'init capteur fonctionne sur un état scellé RECHARGÉ : plus besoin de seal frais. Un enrôlement futur
+  ne serait plus effacé au boot suivant. Reste : enrôlement (jeton du 0x03), match.
