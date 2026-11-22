@@ -7,6 +7,9 @@
 //! So the driver cannot relay a faithful enroll/match today (D2 + these two blobs). The only `verified` piece is the
 //! 0x09 verdict (`docs/verification_status.md`, `match_info_t`): `parse_verdict` is what the driver will read when a
 //! real match becomes reachable. Everything else here is a reference table used by the replay tests.
+//! Exception (J6a, E-ENROLL-START, decided by Albert): ONE experimental 0x03 with a fixed 68-byte all-zero
+//! `enroll_indata_v2_t` lives in `sbio_gate` (`ENROLL_INDATA_MIN`, kernel `allow_sbio_bio=1`). It is a probe, not a
+//! faithful enroll: `ENROLL_START.payload` stays `Unknown` here.
 use crate::le_u32;
 
 pub const EP_SBIO: u8 = 0x08;

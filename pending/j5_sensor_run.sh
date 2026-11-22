@@ -19,7 +19,9 @@
 #
 # Variables (défauts = run J5 v2 inchangé) : SBIO_PARAMS (0) = paramètre allow_sbio_params de sep_native (1 = params,
 #   2 = params + calibration, 3 = en plus la 2e passe macOS, cf. docs/j5_params_protocol.md) ; SBIOD_ARGS ("") =
-#   arguments ajoutés à `sbiod run` (--upto params|calib|pass2 --calib FICHIER). Utilisés par pending/j5c_params_run.sh ; ne pas les poser à la main.
+#   arguments ajoutés à `sbiod run` (--upto params|calib|pass2|enroll-start --calib FICHIER) ; SBIO_BIO (0) = paramètre
+#   allow_sbio_bio de sep_native (1 = E-ENROLL-START : UN 0x03 après la 2e passe puis écoute seule ; exige SBIO_PARAMS=3).
+#   Utilisés par pending/j5c_params_run.sh et pending/j6a_enroll_start.sh ; ne pas les poser à la main.
 # Usage (root, après un reboot normal avec alias sep) : pending/j5_sensor_run.sh [STORE]
 #   STORE défaut = dossier NEUF /var/lib/sepd-run-<horodatage> (scellement frais : seul cas où l'ouverture TARDIVE de
 #   sbio est éprouvée, J3 19:20). SBIO_OPEN=0 par défaut ici (ouverture tardive éprouvée) ; SBIO_OPEN=1 = précoce.
@@ -33,7 +35,9 @@ J5=${J5:-/home/albert/kbuild/j5}
 SBIO_OPEN=${SBIO_OPEN:-0}
 SBIO_PARAMS=${SBIO_PARAMS:-0}
 SBIOD_ARGS=${SBIOD_ARGS:-}
+SBIO_BIO=${SBIO_BIO:-0}
 case "$SBIO_PARAMS" in 0|1|2|3) ;; *) echo "STOP : SBIO_PARAMS=$SBIO_PARAMS (0 à 3)" >&2; exit 1;; esac
+case "$SBIO_BIO" in 0) ;; 1) [ "$SBIO_PARAMS" = 3 ] || { echo "STOP : SBIO_BIO=1 exige SBIO_PARAMS=3" >&2; exit 1; };; *) echo "STOP : SBIO_BIO=$SBIO_BIO (0 ou 1)" >&2; exit 1;; esac
 TS=$(date +%Y%m%d-%H%M%S)
 STORE=${1:-/var/lib/sepd-run-$TS}
 OUT=/var/log/j5-$TS
@@ -51,6 +55,10 @@ PARAMS_ARG=   # absent si 0 : le script reste utilisable avec le module J5 v2 (s
 if [ "$SBIO_PARAMS" != 0 ]; then
   PARAMS_ARG="allow_sbio_params=$SBIO_PARAMS"
   modinfo -F parm "$J5/sep_native.ko" | grep -q "^allow_sbio_params:" || die "sep_native.ko sans allow_sbio_params (module J5c ?)"
+fi
+if [ "$SBIO_BIO" != 0 ]; then   # absent si 0 : rien ne change pour J5 / J5c
+  modinfo -F parm "$J5/sep_native.ko" | grep -q "^allow_sbio_bio:.*1 = after the 2nd 0x63" || die "sep_native.ko sans allow_sbio_bio=1 E-ENROLL-START (module J6a ?)"
+  PARAMS_ARG="$PARAMS_ARG allow_sbio_bio=$SBIO_BIO"
 fi
 mkdir -p "$OUT" /etc/sepd "$STORE"
 [ -s /etc/sepd/os_uuid ] || echo 4c494e55580000000000000000000000 > /etc/sepd/os_uuid
@@ -96,7 +104,7 @@ trap cleanup EXIT
 cp "$J5/sep-native.dtbo" /lib/firmware/
 insmod "$J5/sep_native_ovl.ko"
 # insmod reste en fond : le probe attend sbio, l'ouvre, envoie le 0x73, écoute 6 s, puis crée /dev/sep_sbio si VIVANT.
-# shellcheck disable=SC2086 # PARAMS_ARG vide ou un seul mot
+# shellcheck disable=SC2086 # PARAMS_ARG vide, un ou deux mots sans espace
 insmod "$J5/sep_native.ko" allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 allow_sbio_relay=1 sbio_open="$SBIO_OPEN" $PARAMS_ARG &
 INSMOD=$!
 for i in $(seq 1 300); do [ -e /dev/sep_native ] && break; sleep 0.1; done

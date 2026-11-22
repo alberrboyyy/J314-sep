@@ -29,8 +29,9 @@ pub const SBIO_OOL_SIZE: usize = 0x4000;
 pub const MAX_REPLY: usize = 0x10000;
 /// Largest number of SEP -> AP fragments of one reply (MAX_FRAGS of the proven scripts is 16; 0x10000 needs 5).
 pub const MAX_FRAGS: usize = 8;
-/// Largest single-chunk command payload.
-pub const MAX_CMD: usize = 0x40;
+/// Largest single-chunk command payload: 0x40 for the init relay, 0x44 for the ONE 0x03 of E-ENROLL-START (68-byte
+/// `enroll_indata_v2_t`, `docs/sbio_enroll.md` §4). Every step still has its EXACT length checked by `check_cmd`.
+pub const MAX_CMD: usize = ENROLL_INDATA_LEN;
 /// Calibration blob of 0x5b (c12 `000335/337/339/341_08_A.bin`, identical in 9/9 boots with OOL): length, CRC-32
 /// (checked by the kernel), first bytes. Its sha256 (`d5a6117d…ddda`) is checked by sbiod.
 pub const CALIB_LEN: usize = 0xfc99;
@@ -131,6 +132,75 @@ pub const LIMIT_PATCH: usize = 6;
 pub const LIMIT_PARAMS: usize = 15;
 pub const LIMIT_CALIB: usize = 17;
 pub const LIMIT_PASS2: usize = 34;
+
+// --- E-ENROLL-START (J6a, kernel parameter allow_sbio_bio=1), docs/j6_enroll_match_protocol.md §6 ----------------
+/// commandStartEnroll (`source: kext`, `docs/sbio_enroll.md` §4: `sepTransact(0x03, enroll_indata_v2_t, 0x44, out 0)`).
+pub const OP_ENROLL_START: u8 = 0x03;
+/// sizeof(enroll_indata_v2_t) = 0x44 (VU kext: `inLen = 0x44`).
+pub const ENROLL_INDATA_LEN: usize = 0x44;
+/// The `enroll_indata_v2_t` sent: 68 ZERO bytes. Its content is NOT known (no capture of an enrolment exists, the
+/// producer biometrickitd is not reversed). VU kext: the kext reads the first u32 and keeps its bit 0 as a flag, and
+/// forwards the 68 bytes unchanged; no default value, no template, no other field read. All-zero = no field set,
+/// no invented value (the earlier `u32[0] = 1` proposal guessed the meaning of that bit: dropped). HYPOTHESIS that the
+/// SEP answers a zero struct at all.
+pub const ENROLL_INDATA_MIN: [u8; ENROLL_INDATA_LEN] = [0; ENROLL_INDATA_LEN];
+/// The one bio step: admitted once, right after the last step of the 2nd pass (`LIMIT_PASS2`), only at bio level 1.
+/// Reply bounds (0, 0) = what the kext expects (out 0); the kernel never checks them for this step: whatever the SEP
+/// answers is captured raw (B8 snapshot), nothing is ever asked or answered after it.
+pub static ENROLL_START: Step = Step {
+    op: OP_ENROLL_START,
+    name: "startEnroll",
+    cmd_len: ENROLL_INDATA_LEN,
+    cmd_fixed: Some(&ENROLL_INDATA_MIN),
+    frag_in: false,
+    reply_min: 0,
+    reply_max: 0,
+};
+/// Highest value of `allow_sbio_bio` (0 = nothing, 1 = E-ENROLL-START).
+pub const BIO_LEVEL_MAX: u32 = 1;
+
+/// Gate of one relay command with the bio level: at `next == LIMIT_PASS2` (2nd pass finished, kernel level 3) and
+/// `bio == 1`, ONLY the 0x03 with `ENROLL_INDATA_MIN`; everywhere else `check_cmd`. After the 0x03 (`next >
+/// LIMIT_PASS2`) nothing is admitted at all.
+pub fn check_next(next: usize, limit: usize, bio: u32, op: u8, payload: &[u8]) -> Result<&'static Step> {
+    if bio > BIO_LEVEL_MAX {
+        return Err(Error::Unexpected("sbio relay: allow_sbio_bio out of range"));
+    }
+    if bio == 1 && limit == LIMIT_PASS2 && next == LIMIT_PASS2 {
+        let s = &ENROLL_START;
+        if op != s.op {
+            return Err(Error::Unexpected("sbio relay: after the 2nd pass only 0x03 (E-ENROLL-START) is admitted"));
+        }
+        if payload.len() != s.cmd_len || s.cmd_fixed.is_some_and(|f| f != payload) {
+            return Err(Error::Unexpected("sbio relay: 0x03 payload is not the fixed enroll_indata_v2_t"));
+        }
+        return Ok(s);
+    }
+    check_cmd(next, limit, op, payload)
+}
+
+/// Bytes of B8 captured for a raw bio answer / spontaneous word: header + chunk when the gt header is sane (at least
+/// `SNAP_MIN`), else `SNAP_RAW` bytes. Never more than B8.
+pub const SNAP_MIN: usize = 0x40;
+pub const SNAP_RAW: usize = 0x100;
+pub fn snapshot_len(hdr: &[u8]) -> usize {
+    let n = match OolHeader::parse(hdr) {
+        Some(h) if h.valid == 1 && (h.len as usize) <= OOL_MAX_CHUNK => (OOL_HDR + h.len as usize).max(SNAP_MIN),
+        _ => SNAP_RAW,
+    };
+    n.min(SBIO_OOL_SIZE)
+}
+
+/// True if the raw answer to 0x03 is the plain empty ack the kext expects: `< fc TYPE 0x03 PARAM 0 DATA 0` and B8 =
+/// gt header { 1, total 0, offset 0, opcode 0x03, len 0 } (same shape as the empty acks of 0x17 / 0x16 / 0x18).
+pub fn is_plain_ack(tag: u8, ty: u8, param: u8, data: u32, b8: &[u8]) -> bool {
+    let h = OolHeader::parse(b8);
+    tag == crate::gt::TAG_FC
+        && ty == OP_ENROLL_START
+        && param == 0
+        && data == 0
+        && h.is_some_and(|h| h.valid == 1 && h.total == 0 && h.offset == 0 && h.ty == u32::from(OP_ENROLL_START) && h.len == 0)
+}
 
 /// Steps admitted for `allow_sbio_params` = 0 (up to 0x5f), 1 (up to the 2nd 0x32), 2 (up to 0x63), 3 (then 0x19 and
 /// the 2nd pass, up to its 2nd 0x63).
@@ -252,6 +322,11 @@ pub const EVT_MAX: usize = EVT_HDR + MAX_REPLY;
 pub const KIND_REPLY: u8 = 1;
 /// Unsolicited sbio word TAG 0x01-0x04 (no payload).
 pub const KIND_NOTIFY: u8 = 2;
+/// Raw answer to the 0x03 of E-ENROLL-START: word = the first non-notification sbio word after `> fc 0x03`, payload
+/// = B8 snapshot (gt header INCLUDED, `snapshot_len`), never interpreted by the kernel.
+pub const KIND_BIO_REPLY: u8 = 3;
+/// Listening after the 0x03: any non-notification sbio word (never answered), payload = B8 snapshot (header included).
+pub const KIND_SPONT: u8 = 4;
 
 pub const fn is_notification(tag: u8) -> bool {
     matches!(tag, 0x01..=0x04)
@@ -422,6 +497,42 @@ mod tests {
         // 0x15 must return exactly 40 bytes.
         let k = OolHeader { valid: 1, total: 0x20, offset: 0, ty: 0x15, len: 0x20 }.to_bytes();
         assert!(check_fragment(&RELAY_SEQUENCE[1], &k, 0, None, 0).is_err());
+    }
+
+    #[test]
+    fn enroll_start_gate() {
+        let z = [0u8; ENROLL_INDATA_LEN];
+        // Only at bio level 1, only right after the 2nd pass, only the fixed 68 zero bytes, only once.
+        assert!(check_next(LIMIT_PASS2, LIMIT_PASS2, 1, 0x03, &z).is_ok());
+        assert!(check_next(LIMIT_PASS2, LIMIT_PASS2, 0, 0x03, &z).is_err());
+        assert!(check_next(LIMIT_PASS2, LIMIT_PASS2, 2, 0x03, &z).is_err());
+        assert!(check_next(LIMIT_CALIB, LIMIT_CALIB, 1, 0x03, &z).is_err());
+        assert!(check_next(LIMIT_PASS2 - 1, LIMIT_PASS2, 1, 0x03, &z).is_err());
+        assert!(check_next(LIMIT_PASS2 + 1, LIMIT_PASS2, 1, 0x03, &z).is_err());
+        let mut one = z;
+        one[0] = 1;
+        assert!(check_next(LIMIT_PASS2, LIMIT_PASS2, 1, 0x03, &one).is_err());
+        assert!(check_next(LIMIT_PASS2, LIMIT_PASS2, 1, 0x03, &z[..0x40]).is_err());
+        for op in [0x06u8, 0x08, 0x09, 0x12, 0x1e, 0x23, 0x65, 0x6d, 0x7c] {
+            assert!(check_next(LIMIT_PASS2, LIMIT_PASS2, 1, op, &[]).is_err(), "{op:#x}");
+        }
+        // Below the bio step, the same gate as check_cmd.
+        assert!(check_next(0, LIMIT_PASS2, 1, 0x17, &[0; 0x10]).is_ok());
+        assert!(check_next(33, LIMIT_PASS2, 1, 0x63, &[]).is_ok());
+        // The packet of the 0x03 fits one chunk: header + 68 zero bytes.
+        let mut a = [0u8; OOL_HDR + MAX_CMD];
+        assert_eq!(build_packet(0x03, &z, &mut a).unwrap(), OOL_HDR + 0x44);
+        let h = OolHeader::parse(&a).unwrap();
+        assert_eq!((h.valid, h.total, h.offset, h.ty, h.len), (1, 0x44, 0, 3, 0x44));
+        // Plain ack shape, snapshot lengths.
+        let ack = OolHeader { valid: 1, total: 0, offset: 0, ty: 3, len: 0 }.to_bytes();
+        assert!(is_plain_ack(0xfc, 3, 0, 0, &ack));
+        assert!(!is_plain_ack(0xfc, 3, 0, 0x10000, &ack));
+        let four = OolHeader { valid: 1, total: 4, offset: 0, ty: 3, len: 4 }.to_bytes();
+        assert!(!is_plain_ack(0xfc, 3, 0, 0, &four));
+        assert_eq!((snapshot_len(&ack), snapshot_len(&[0u8; OOL_HDR])), (SNAP_MIN, SNAP_RAW));
+        let big = OolHeader { valid: 1, total: 0xc98, offset: 0, ty: 8, len: 0xc98 }.to_bytes();
+        assert_eq!(snapshot_len(&big), OOL_HDR + 0xc98);
     }
 
     #[test]

@@ -6,16 +6,21 @@
 //! - J5c (docs/j5_params_protocol.md): 0x5d..0x63 against c12 (A8 = macOS, 0x5b fragments = macOS A8), a fake sensor
 //!   that only accepts 0x55 frames with the right CRC and status reads after its IRQ, and every fail-closed stop;
 //! - J5c pass 2 (docs/j5_params_protocol.md §8): 0x19 .. 0x63 ×2 against c12 seq 345-382 (A8 = macOS), a fake sensor
-//!   that is power cycled and answers the C18-C20 statuses, the macOS SPI order, and every fail-closed stop.
+//!   that is power cycled and answers the C18-C20 statuses, the macOS SPI order, and every fail-closed stop;
+//! - J6a E-ENROLL-START: after the 2nd pass, ONE 0x03 (kernel gate `check_next`, 68 zero bytes), its raw answer, then
+//!   the listening: nothing more to the SEP, ONE status read per rise of the ready pin, SEP words logged.
 use sbiod::{
-    calib_from_c12, check_calib, check_patch, run, success, Mesa, Sensor, Sep, Upto, Verdict, CAL_INFO_REF, KX_SESSION,
-    PATCH_INPUT, PARAMS_INPUT, SERIAL_J314C,
+    calib_from_c12, check_calib, check_patch, run, success, Mesa, RawWord, SepEvent, Sensor, Sep, StartReply, Upto,
+    Verdict, CAL_INFO_REF, KX_SESSION, LISTEN_MS, PATCH_INPUT, PARAMS_INPUT, PROMPTS, SERIAL_J314C,
 };
+use std::cell::Cell;
+use std::rc::Rc;
 use sep_proto::crc::crc16_arc;
 use sep_proto::gt::OOL_HDR;
+use sep_proto::gt::OolHeader;
 use sep_proto::sbio_gate::{
-    build_packet, check_cmd, check_fragment, cmd_frags, fragment_header, LIMIT_CALIB, LIMIT_PARAMS, LIMIT_PASS2,
-    LIMIT_PATCH, PATCH2_LEN, RELAY_SEQUENCE, SBIO_OOL_SIZE,
+    build_packet, check_cmd, check_fragment, check_next, cmd_frags, fragment_header, ENROLL_INDATA_LEN, LIMIT_CALIB,
+    LIMIT_PARAMS, LIMIT_PASS2, LIMIT_PATCH, PATCH2_LEN, RELAY_SEQUENCE, SBIO_OOL_SIZE,
 };
 use sep_proto::sensor::{IDENTITY_J314C, ST_AFTER_PARAMS, ST_IDENTITY_READY, ST_POWER_ON, ST_SERIAL_READY};
 use std::path::PathBuf;
@@ -229,6 +234,32 @@ struct FakeSep {
     sent: Vec<(u8, Vec<u8>)>,
     /// Replace the reply of step `i` (fault injection).
     patch: Option<(usize, Vec<u8>)>,
+    /// Kernel `allow_sbio_bio` (0 = the 0x03 is refused, as the kernel would: Halted there).
+    bio: u32,
+    /// Raw answer to the 0x03; payloads of the 0x03 received.
+    start_reply: Option<StartReply>,
+    bio_sent: Vec<Vec<u8>>,
+    /// Events of the listening, keyed by the index of the `listen` call; number of calls.
+    events: Vec<(u64, SepEvent)>,
+    listen_calls: u64,
+    /// Set when the 0x03 is sent (the fake sensor starts its finger clock there).
+    started: Rc<Cell<bool>>,
+}
+
+fn fake_sep(limit: usize, patch: Option<(usize, Vec<u8>)>) -> Option<FakeSep> {
+    Some(FakeSep {
+        replies: c12_replies()?,
+        next: 0,
+        limit,
+        sent: vec![],
+        patch,
+        bio: 0,
+        start_reply: None,
+        bio_sent: vec![],
+        events: vec![],
+        listen_calls: 0,
+        started: Rc::default(),
+    })
 }
 
 impl Sep for FakeSep {
@@ -244,6 +275,19 @@ impl Sep for FakeSep {
             }
         }
         Ok(reassemble_step(i, &self.replies[i].1))
+    }
+    fn bio_start(&mut self, payload: &[u8]) -> Result<StartReply, String> {
+        // Same gate as the kernel.
+        check_next(self.next, self.limit, self.bio, 0x03, payload).map_err(|e| e.to_string())?;
+        self.next += 1;
+        self.bio_sent.push(payload.to_vec());
+        self.started.set(true);
+        Ok(self.start_reply.clone().unwrap_or(StartReply::Silence))
+    }
+    fn listen(&mut self, _ms: u64) -> Result<Option<SepEvent>, String> {
+        let k = self.listen_calls;
+        self.listen_calls += 1;
+        Ok(self.events.iter().position(|(at, _)| *at == k).map(|i| self.events.remove(i).1))
     }
 }
 
@@ -281,7 +325,16 @@ struct FakeSensor {
     /// Patch blocks received; fault injection: refuse block n (1-based).
     blocks: usize,
     refuse_block: Option<usize>,
+    /// E-ENROLL-START: shared with the fake SEP (true once the 0x03 is sent); fake time and frame count at the first
+    /// `ready()` after it; finger landings (ms after that), each raising the pin until the next status read.
+    started: Rc<Cell<bool>>,
+    listen_t0: Option<u64>,
+    frames_at_listen: usize,
+    fingers: Vec<u64>,
 }
+
+/// Status body of a finger on the sensor (C20 `sio.log`: answer ready, 0x7200 pending).
+const ST_FINGER: [u8; 9] = [0x07, 0x00, 0x21, 0x00, 0x8e, 0x00, 0x72, 0x00, 0x00];
 
 fn relay_answer(op: u8, n: usize, total: usize) -> Vec<u8> {
     let mut r = vec![0x80, op | 0x80, 0, total as u8, 0, 0, 0, 0, op];
@@ -400,6 +453,16 @@ impl Sensor for FakeSensor {
         Ok(out)
     }
     fn ready(&mut self) -> Option<bool> {
+        if self.started.get() && self.listen_t0.is_none() {
+            (self.listen_t0, self.frames_at_listen) = (Some(self.t), self.frames.len());
+        }
+        if let Some(t0) = self.listen_t0 {
+            if let Some(i) = self.fingers.iter().position(|&f| self.t >= t0 + f) {
+                self.fingers.remove(i);
+                self.irq_at = Some(self.t);
+                self.st_param = Some(ST_FINGER);
+            }
+        }
         Some(self.irq_at.is_some_and(|at| self.t >= at))
     }
     fn sleep_ms(&mut self, ms: u64) {
@@ -412,7 +475,7 @@ impl Sensor for FakeSensor {
 }
 
 fn run_with(upto: Upto, limit: usize, s: FakeSensor, patch: Option<(usize, Vec<u8>)>) -> Option<(Verdict, FakeSep, FakeSensor)> {
-    let mut sep = FakeSep { replies: c12_replies()?, next: 0, limit, sent: vec![], patch };
+    let mut sep = fake_sep(limit, patch)?;
     let mut s = s;
     let cal = calib()?;
     let mut log = |l: &str| eprintln!("{l}");
@@ -555,7 +618,7 @@ fn j5c_fail_closed() {
 fn j5c_wrong_calibration_file_sends_nothing() {
     let Some(mut cal) = calib() else { return };
     cal[5] ^= 1;
-    let mut sep = FakeSep { replies: c12_replies().unwrap(), next: 0, limit: LIMIT_CALIB, sent: vec![], patch: None };
+    let mut sep = fake_sep(LIMIT_CALIB, None).unwrap();
     let mut s = ok_sensor();
     let mut log = |l: &str| eprintln!("{l}");
     let v = run(&mut sep, &mut Mesa { s: &mut s, log: &mut log }, Upto::Calib, Some(&cal));
@@ -695,7 +758,10 @@ fn pass2_fail_closed() {
 
 #[test]
 fn pass2_needs_the_calibration_file() {
-    let mut sep = FakeSep { replies: vec![], next: 0, limit: LIMIT_PASS2, sent: vec![], patch: None };
+    let mut sep = FakeSep { replies: vec![], ..fake_sep(LIMIT_PASS2, None).unwrap_or_else(|| FakeSep {
+        replies: vec![], next: 0, limit: LIMIT_PASS2, sent: vec![], patch: None, bio: 0, start_reply: None,
+        bio_sent: vec![], events: vec![], listen_calls: 0, started: Rc::default(),
+    }) };
     let mut s = ok_sensor();
     let mut log = |l: &str| eprintln!("{l}");
     let v = run(&mut sep, &mut Mesa { s: &mut s, log: &mut log }, Upto::Pass2, None);
@@ -714,4 +780,106 @@ fn pass2_patch_is_pushed_like_the_first() {
     assert_eq!(kind(&s.frames[i - 1]), "st");
     assert_eq!(kind(&s.frames[i + 1]), "st");
     assert_eq!(kind(&s.frames[i + 2]), "55/40");
+}
+
+// --- J6a E-ENROLL-START ---------------------------------------------------------------------------------------
+
+fn word(tag: u8, ty: u8, data: u32, b8: Vec<u8>) -> RawWord {
+    RawWord { tag, ty, param: 0, data, b8 }
+}
+
+fn gt(op: u8, total: u32, payload: &[u8]) -> Vec<u8> {
+    let mut b = OolHeader { valid: 1, total, offset: 0, ty: u32::from(op), len: payload.len() as u32 }.to_bytes().to_vec();
+    b.extend_from_slice(payload);
+    b.resize(b.len().max(0x40), 0);
+    b
+}
+
+fn run_enroll(
+    bio: u32,
+    reply: Option<StartReply>,
+    events: Vec<(u64, SepEvent)>,
+    fingers: Vec<u64>,
+    patch: Option<(usize, Vec<u8>)>,
+) -> Option<(Verdict, FakeSep, FakeSensor)> {
+    let mut sep = fake_sep(LIMIT_PASS2, patch)?;
+    (sep.bio, sep.start_reply, sep.events) = (bio, reply, events);
+    let mut s = FakeSensor { started: sep.started.clone(), fingers, ..ok_sensor() };
+    let cal = calib()?;
+    let mut log = |l: &str| {
+        if !l.starts_with("  B8") {
+            eprintln!("{l}")
+        }
+    };
+    let v = run(&mut sep, &mut Mesa { s: &mut s, log: &mut log }, Upto::EnrollStart, Some(&cal));
+    Some((v, sep, s))
+}
+
+#[test]
+fn enroll_start_one_0x03_then_listen_only() {
+    let ack = StartReply::Answer(word(0xfc, 0x03, 0, gt(0x03, 0, &[])));
+    let spont = word(0xfc, 0x08, 0, gt(0x08, 0xc98, &[1, 2, 3, 4]));
+    let note = word(0x01, 0x08, 0x0208, vec![]);
+    let ev = vec![(100, SepEvent::Spont(spont)), (200, SepEvent::Notify(note))];
+    let Some((v, sep, s)) = run_enroll(1, Some(ack), ev, vec![6_000, 26_000], None) else {
+        return eprintln!("c12 absent: skipped");
+    };
+    let Verdict::EnrollStart { ref answer, ref spont, irqs, reads, ref halted } = v else { panic!("{v:?}") };
+    assert!(answer.starts_with("ACK vide"), "{answer}");
+    assert_eq!((spont.len(), irqs, reads, halted.clone()), (2, 2, 2, None));
+    assert!(spont[0].contains("TYPE 0x08") && spont[1].contains("notif"));
+    assert!(success(Upto::EnrollStart, &v));
+    assert!(v.line().contains("E-ENROLL-START") && v.line().contains("ACK"));
+    // SEP side: the whole 2nd pass, then exactly ONE 0x03 of 68 zero bytes; nothing else ever.
+    let ops: Vec<u8> = sep.sent.iter().map(|c| c.0).collect();
+    assert_eq!(ops, sep_proto::daemon::INIT_SEQUENCE[1..35]);
+    assert_eq!(sep.bio_sent, vec![vec![0u8; ENROLL_INDATA_LEN]]);
+    assert_eq!(sep.next, LIMIT_PASS2 + 1);
+    // Sensor side during the listening: ONE status read per finger IRQ, nothing else, never powered off (the 2nd-pass
+    // power cycle only), the image never requested (no 0x13).
+    let k: Vec<String> = s.frames[s.frames_at_listen..].iter().map(|f| kind(f)).collect();
+    assert_eq!(k, ["st", "st"]);
+    assert_eq!(s.power_offs, 1);
+    assert!(s.t - s.listen_t0.unwrap() >= LISTEN_MS);
+    assert_eq!(PROMPTS[0], (5_000, "POSEZ LE DOIGT"));
+}
+
+#[test]
+fn enroll_start_silence_and_raw_answers_are_reported() {
+    // Silence: listening anyway, the verdict says so.
+    let Some((v, sep, s)) = run_enroll(1, Some(StartReply::Silence), vec![], vec![], None) else { return };
+    assert!(matches!(v, Verdict::EnrollStart { ref answer, .. } if answer.starts_with("SILENCE")), "{v:?}");
+    assert_eq!(sep.bio_sent.len(), 1);
+    assert_eq!(s.frames.len(), s.frames_at_listen, "aucune SPI sans IRQ");
+    // A reply with a payload (e.g. an error code) is reported raw, not taken for an ack.
+    let r = StartReply::Answer(word(0xfc, 0x03, 0, gt(0x03, 4, &[0x2c, 0x02, 0, 0xe0])));
+    let (v, _, _) = run_enroll(1, Some(r), vec![], vec![], None).unwrap();
+    assert!(matches!(v, Verdict::EnrollStart { ref answer, .. } if answer.contains("NON CONFORME") && answer.contains("2c0200e0")), "{v:?}");
+    // Another TYPE / TAG first: reported raw.
+    let r = StartReply::Answer(word(0xfe, 0x03, 0x10000, gt(0x03, 0, &[])));
+    let (v, _, _) = run_enroll(1, Some(r), vec![], vec![], None).unwrap();
+    assert!(matches!(v, Verdict::EnrollStart { ref answer, .. } if answer.contains("NON CONFORME") && answer.contains("TAG 0xfe")), "{v:?}");
+}
+
+#[test]
+fn enroll_start_fail_closed() {
+    let ack = || Some(StartReply::Answer(word(0xfc, 0x03, 0, gt(0x03, 0, &[]))));
+    // Kernel bio level 0: the 0x03 is refused, nothing listened, nothing more on SPI.
+    let Some((v, sep, s)) = run_enroll(0, ack(), vec![], vec![1_000], None) else { return };
+    assert!(matches!(v, Verdict::Stopped(ref e) if e.contains("0x03")), "{v:?}");
+    assert!(sep.bio_sent.is_empty());
+    assert_eq!((sep.listen_calls, s.listen_t0), (0, None));
+    // 2nd-pass 0x63 not the macOS one: no 0x03 at all.
+    let (v, sep, _) = run_enroll(1, ack(), vec![], vec![], Some((33, vec![0; 0x1c]))).unwrap();
+    assert_eq!(v, Verdict::Pass2Done { info_ref: false });
+    assert!(sep.bio_sent.is_empty());
+    // Halted during the listening: stops, reported, not a success.
+    let (v, sep, _) = run_enroll(1, ack(), vec![(50, SepEvent::Halted("read : EIO".into()))], vec![], None).unwrap();
+    assert!(matches!(v, Verdict::EnrollStart { halted: Some(ref h), .. } if h.contains("EIO")), "{v:?}");
+    assert!(!success(Upto::EnrollStart, &v));
+    assert_eq!(sep.listen_calls, 51);
+    // The pin held high across many polls is ONE rise, ONE read.
+    let (v, _, s) = run_enroll(1, ack(), vec![], vec![10_000], None).unwrap();
+    assert!(matches!(v, Verdict::EnrollStart { irqs: 1, reads: 1, .. }), "{v:?}");
+    assert_eq!(s.frames.len() - s.frames_at_listen, 1);
 }

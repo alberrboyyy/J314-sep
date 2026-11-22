@@ -2,12 +2,13 @@
 //! (gpio0 = `39b028000.pinctrl`). ioctl numbers and struct layouts are the Linux uapi ones (`linux/spi/spidev.h`,
 //! `linux/gpio.h` v2), checked against the headers with a C program on the PC (sizes 32 / 592 / 68 / 16).
 //! Nothing here is used by the offline tests.
-use crate::{Sensor, Sep};
-use sep_proto::sbio_gate::{self, EvtHdr, CMD_MAX, EVT_MAX, KIND_NOTIFY, KIND_REPLY};
+use crate::{RawWord, SepEvent, Sensor, Sep, StartReply};
+use sep_proto::sbio_gate::{self, EvtHdr, CMD_MAX, EVT_MAX, KIND_BIO_REPLY, KIND_NOTIFY, KIND_REPLY, KIND_SPONT, OP_ENROLL_START};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 extern "C" {
@@ -217,23 +218,97 @@ impl Sensor for HwSensor<'_> {
 
 /// `/dev/sep_sbio`: one command record per write (the kernel blocks until the reply is complete), then events
 /// are read until the reply; notifications (TAG 0x01-0x04) are logged and skipped.
+/// E-ENROLL-START: during the listening a thread does the blocking reads and hands each event record over a channel
+/// (`listen` waits on it with a timeout). It is started after the 0x03 answer, when no command can be in flight anymore.
 pub struct SepDev<'a> {
     pub f: File,
     pub log: &'a mut dyn FnMut(&str),
+    pub rx: Option<Receiver<Result<Vec<u8>, String>>>,
+}
+
+fn raw(h: &EvtHdr, p: &[u8]) -> RawWord {
+    RawWord { tag: h.tag, ty: h.ty, param: h.param, data: h.data, b8: p.to_vec() }
+}
+
+impl SepDev<'_> {
+    fn read_evt(&mut self, buf: &mut [u8]) -> Result<usize, String> {
+        loop {
+            match self.f.read(buf) {
+                Ok(k) => return Ok(k),
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(format!("read : {e} (EIO = sep_native Halted, voir dmesg)")),
+            }
+        }
+    }
 }
 
 impl Sep for SepDev<'_> {
+    fn bio_start(&mut self, payload: &[u8]) -> Result<StartReply, String> {
+        let mut rec = vec![0u8; CMD_MAX];
+        let n = sbio_gate::encode_cmd(OP_ENROLL_START, payload, &mut rec).map_err(|e| e.to_string())?;
+        match self.f.write_all(&rec[..n]) {
+            Ok(()) => {}
+            // ETIMEDOUT = the kernel saw no word in 6 s and went on listening (no Halted).
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => return Ok(StartReply::Silence),
+            Err(e) => return Err(format!("write 0x03 : {e} (EIO/EINVAL = sep_native Halted, voir dmesg)")),
+        }
+        let mut buf = vec![0u8; EVT_MAX];
+        loop {
+            let k = self.read_evt(&mut buf)?;
+            let (h, p) = EvtHdr::decode(&buf[..k]).map_err(|e| format!("événement illisible : {e}"))?;
+            match h.kind {
+                KIND_NOTIFY => (self.log)(&format!(
+                    "SEP notification TAG {:#04x} TYPE {:#04x} PARAM {:#04x} DATA {:#010x}",
+                    h.tag, h.ty, h.param, h.data
+                )),
+                KIND_BIO_REPLY => return Ok(StartReply::Answer(raw(&h, p))),
+                _ => return Err(format!("événement inattendu kind {} TYPE {:#04x} (réponse brute au 0x03 attendue)", h.kind, h.ty)),
+            }
+        }
+    }
+
+    fn listen(&mut self, ms: u64) -> Result<Option<SepEvent>, String> {
+        if self.rx.is_none() {
+            let mut f = self.f.try_clone().map_err(|e| format!("écoute : dup de /dev/sep_sbio : {e}"))?;
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let mut buf = vec![0u8; EVT_MAX];
+                loop {
+                    let r = match f.read(&mut buf) {
+                        Ok(k) => Ok(buf[..k].to_vec()),
+                        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                        Err(e) => Err(format!("read : {e} (EIO = sep_native Halted, voir dmesg)")),
+                    };
+                    let end = r.is_err();
+                    if tx.send(r).is_err() || end {
+                        return;
+                    }
+                }
+            });
+            self.rx = Some(rx);
+        }
+        let Some(rx) = self.rx.as_ref() else { return Ok(None) };
+        let rec = match rx.recv_timeout(Duration::from_millis(ms)) {
+            Ok(Ok(rec)) => rec,
+            Ok(Err(e)) => return Ok(Some(SepEvent::Halted(e))),
+            Err(RecvTimeoutError::Timeout) => return Ok(None),
+            Err(RecvTimeoutError::Disconnected) => return Ok(Some(SepEvent::Halted("fil de lecture terminé".into()))),
+        };
+        let (h, p) = EvtHdr::decode(&rec).map_err(|e| format!("événement illisible : {e}"))?;
+        Ok(Some(match h.kind {
+            KIND_NOTIFY => SepEvent::Notify(raw(&h, p)),
+            KIND_SPONT => SepEvent::Spont(raw(&h, p)),
+            k => SepEvent::Halted(format!("événement inattendu kind {k} pendant l'écoute")),
+        }))
+    }
+
     fn cmd(&mut self, op: u8, payload: &[u8]) -> Result<Vec<u8>, String> {
         let mut rec = vec![0u8; CMD_MAX];
         let n = sbio_gate::encode_cmd(op, payload, &mut rec).map_err(|e| e.to_string())?;
         self.f.write_all(&rec[..n]).map_err(|e| format!("write : {e} (EIO/EINVAL = sep_native Halted, voir dmesg)"))?;
         let mut buf = vec![0u8; EVT_MAX];
         loop {
-            let k = match self.f.read(&mut buf) {
-                Ok(k) => k,
-                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-                Err(e) => return Err(format!("read : {e} (EIO = sep_native Halted, voir dmesg)")),
-            };
+            let k = self.read_evt(&mut buf)?;
             let (h, p) = EvtHdr::decode(&buf[..k]).map_err(|e| format!("événement illisible : {e}"))?;
             match h.kind {
                 KIND_NOTIFY => (self.log)(&format!(

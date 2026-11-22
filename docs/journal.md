@@ -2396,3 +2396,31 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `259e7d5f…149b`). Rien chargé, rien envoyé au SEP, aucun doigt.
 - Suite : trancher E-enroll-start (go d'Albert) AVANT toute session humaine J6 ; si le SEP exige le keybag, l'ouverture
   de l'EP 0x12 (SKS, protocole DER, kext §15) devient le prochain chantier.
+
+## 2026-11-22 — agent driver (session ALARM, Opus 5.5) — J6a E-ENROLL-START « avec doigt » préparé (code + compile), RIEN lancé
+- Décision d'Albert (relayée par l'orchestrateur) : tenter l'entrée en enrôlement sous Linux, doigt prêt, en parallèle du
+  reverse de biometrickitd. Code + compilation seulement : aucun insmod, aucun /dev/sep*, spidev, gpio, sudo.
+- **Contenu du 0x03 choisi : 68 octets TOUS À ZÉRO** (`sbio_gate::ENROLL_INDATA_MIN`). Seuls faits kext (`docs/sbio_enroll.md`
+  §4) : longueur 0x44 (VU), le kext lit le u32 +0x00 et garde son bit 0 comme drapeau (VU, sens inconnu), transmet le
+  reste tel quel ; **aucun gabarit, aucune valeur par défaut** dans le kext. La proposition antérieure `u32[0]=1` devinait
+  le sens de ce bit → abandonnée ; zéro = aucun octet inventé, mais l'acceptation d'une structure nulle est une hypothèse.
+  Pas de nouvelle lecture du binaire (kernel.macho absent de cette machine).
+- Noyau `sep_native` : `allow_sbio_bio` n'est plus un butoir ; **1** (exige `allow_sbio_params=3`) admet, à l'étape
+  `LIMIT_PASS2` seulement, UN `0x03` à charge fixe (`sbio_gate::check_next`), puis **écoute** : la 1re réponse (quel que
+  soit TAG/TYPE/DATA) est remise brute (mot + instantané de B8, `KIND_BIO_REPLY`), silence 6 s → `ETIMEDOUT` SANS Halted,
+  puis tout mot sbio non-notification → file `KIND_SPONT` (8 × B8, préallouée), jamais répondu, jamais de Halted ; toute
+  commande en écoute → `EPERM`, rien envoyé. Valeur > 1 ou sans niveau 3 → probe refusé. `MAX_CMD` 0x40 → 0x44 (longueurs
+  exactes toujours contrôlées par pas).
+- `sbiod --upto enroll-start` : pass2 inchangé ; si les deux 0x63 = macOS, capteur laissé allumé, 0x03, classement de la
+  réponse (ACK vide / non conforme avec mot + B8 hex / SILENCE), puis 90 s d'écoute (fil de lecture + canal) : mots sbio
+  et notifications avec dump B8, IRQ gpio195, UNE lecture d'état par montée (300 max, image jamais lue), invites
+  POSEZ/RETIREZ/REPOSEZ à 5, 15, 25 … 85 s. Rien d'autre envoyé (ni 0x06/0x23/0x09/0x65, jamais 0x12).
+- `pending/j6a_enroll_start.sh` (en-tête but/risque/résultat ; 1er run = go d'Albert) ; `pending/j5_sensor_run.sh` :
+  variable `SBIO_BIO` (défaut 0 = inchangé).
+- Tests : sep-proto 36 unit (+ `enroll_start_gate`) + 19 verts ; sbiod 18 replay verts (dont 3 E-ENROLL-START : un seul
+  0x03 de 68 zéros après la 2e passe, une lecture d'état par IRQ, silence / réponse non conforme rapportées, niveau 0 →
+  rien, 0x63 ≠ macOS → pas de 0x03, Halted en écoute → pas un succès). `build.sh` et `CLIPPY=1` : 0 avertissement ; clippy
+  sbiod/sep-proto : 0.
+- Binaires `~/kbuild/j5` (anciens → `.v5`) : `sep_native.ko` sha256
+  `07d59c0ee78c9471f4b73bc6c241b8bef61b3cb644685ff5f586f825a399e88e` (`.v5` = `627d2977…d4aa`), `sbiod` sha256
+  `29ed5e7cde1dd20dd45a0a80aa32013933df38a7de8276807def8e014b395a7c` (`.v5` = `f9fff14d…91df`).

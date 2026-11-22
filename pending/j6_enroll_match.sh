@@ -16,6 +16,8 @@
 #       NEUVE (entrée en mode enrôlement), 1er run = « go » d'Albert ; power-cycle = Albert.
 # RÉSULTAT ATTENDU : impression du blocage et de l'expérience à valider ; code de sortie 2 (non exécutable).
 # PRÉPARÉ PAR : agent driver (session ALARM), 2026-11-22. JAMAIS LANCÉ (et non lançable en l'état).
+# NOTE 2026-11-22 : l'expérience E-enroll-start est désormais codée à part (variante avec doigt) :
+#       pending/j6a_enroll_start.sh (noyau allow_sbio_bio=1). Ce garde-fou reste non exécutable (enroll/match complets).
 set -euo pipefail
 cat <<'TXT'
 J6 (enrôlement + match Touch ID natif) est BLOQUÉ — voir docs/j6_enroll_match_protocol.md.

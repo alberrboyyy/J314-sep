@@ -18,6 +18,14 @@
 //!    same push), 0x5d, 0x5c, 0x6a (68 bytes → frame 0x4d), 0x6f (77 bytes → frame 0x56), ONE 0x31/0x32 pair (same
 //!    module serial), 0x01, 0x1f, 0x63 twice (macOS answer both times). STOP there: the rest state of macOS before its
 //!    first use of the sensor (macOS goes on with 0x7c / 0x6b / 0x79 / 0x6d: never sent).
+//! 8. `Upto::EnrollStart` (J6a, E-ENROLL-START, kernel `allow_sbio_bio=1`; only after 7 gave the macOS 0x63 twice; the
+//!    sensor stays powered): ONE sbio 0x03 commandStartEnroll with the fixed 68 zero bytes `ENROLL_INDATA_MIN` (content
+//!    unknown, docs/j6_enroll_match_protocol.md §4.1), its raw answer logged (word + B8 hex), then `LISTEN_MS` of
+//!    LISTENING ONLY: every sbio word of the SEP (notification or not, B8 hex), every rise of the ready pin gpio0 195
+//!    and ONE status read per rise (macOS pattern), with the finger prompts of `PROMPTS`. NOTHING is sent to the SEP
+//!    after the 0x03 (no answer to any request: no SEP->AP request has an answer established in
+//!    docs/j6_enroll_match_protocol.md; the image relay 0x65 is an AP command of the capture, never asked by the
+//!    SEP), and nothing on SPI but those status reads (the image is never read).
 //!
 //! Source of every step: `pending/sep_native_sbio3.sh` .. `sep_native_sbio11.sh` (hardware-proven under m1n1 up to
 //! the push; the push itself never loaded the patch under m1n1: FIFO through the tunnel, 2.2 s), `docs/sbio_session.md`
@@ -27,7 +35,7 @@ pub mod hw;
 pub mod sha256;
 
 use sep_proto::gt::OOL_HDR;
-use sep_proto::sbio_gate::{self, CALIB_LEN, RELAY_SEQUENCE};
+use sep_proto::sbio_gate::{self, CALIB_LEN, ENROLL_INDATA_MIN, RELAY_SEQUENCE};
 use sep_proto::sensor::{self, CMD_IDENTITY, CMD_STATUS, CMD_WAKE, IDENTITY_J314C, PATCH_LOADED, PATCH_PRELUDE};
 use std::fmt::Write as _;
 
@@ -81,9 +89,67 @@ pub const WAKE_IRQ_MS: u64 = 100;
 pub const P6A_LEN: usize = 0x44;
 pub const P6F_LEN: usize = 0x4d;
 
+/// E-ENROLL-START: how long the AP listens after the 0x03 answer (or silence).
+pub const LISTEN_MS: u64 = 90_000;
+/// Polling step of the listening loop (SEP events and ready pin).
+pub const LISTEN_POLL_MS: u64 = 2;
+/// At most this many status reads during the listening (one per rise of the ready pin).
+pub const LISTEN_MAX_READS: usize = 300;
+/// Finger prompts, in ms after the start of the listening (5 s, then every 10 s).
+pub const PROMPTS: [(u64, &str); 9] = [
+    (5_000, "POSEZ LE DOIGT"),
+    (15_000, "RETIREZ LE DOIGT"),
+    (25_000, "REPOSEZ LE DOIGT"),
+    (35_000, "RETIREZ LE DOIGT"),
+    (45_000, "REPOSEZ LE DOIGT"),
+    (55_000, "RETIREZ LE DOIGT"),
+    (65_000, "REPOSEZ LE DOIGT"),
+    (75_000, "RETIREZ LE DOIGT"),
+    (85_000, "REPOSEZ LE DOIGT"),
+];
+
+/// A raw sbio word handed over by the kernel (never answered).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawWord {
+    pub tag: u8,
+    pub ty: u8,
+    pub param: u8,
+    pub data: u32,
+    /// B8 snapshot, gt header included (empty for notifications).
+    pub b8: Vec<u8>,
+}
+
+/// Answer of the kernel to the 0x03 of E-ENROLL-START.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StartReply {
+    /// First non-notification sbio word after `> fc 0x03`, whatever it is.
+    Answer(RawWord),
+    /// No word in 6 s (the kernel is listening anyway).
+    Silence,
+}
+
+/// One event of the listening.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SepEvent {
+    /// TAG 0x01-0x04.
+    Notify(RawWord),
+    /// Any other sbio word.
+    Spont(RawWord),
+    /// The kernel stopped (Halted / device error): no more events.
+    Halted(String),
+}
+
 /// The SEP side: one whitelisted sbio command, its complete (reassembled) reply.
 pub trait Sep {
     fn cmd(&mut self, op: u8, payload: &[u8]) -> Result<Vec<u8>, String>;
+    /// E-ENROLL-START: the ONE 0x03 (the kernel gate admits nothing else at that point).
+    fn bio_start(&mut self, _payload: &[u8]) -> Result<StartReply, String> {
+        Err("bio_start non pris en charge".into())
+    }
+    /// Next event within `ms` (None = nothing in that time). Never sends anything.
+    fn listen(&mut self, _ms: u64) -> Result<Option<SepEvent>, String> {
+        Err("écoute non prise en charge".into())
+    }
 }
 
 /// The sensor side. `xfer` = one SPI message of one transfer (tx; full duplex read of `tx.len()` if `rx`).
@@ -121,6 +187,8 @@ pub enum Upto {
     Calib,
     /// Then the 2nd pass, 0x19 .. 0x63 ×2 (kernel level 3), with the calibration file.
     Pass2,
+    /// Then ONE 0x03 (E-ENROLL-START, kernel `allow_sbio_bio=1`) and the listening, sensor kept powered.
+    EnrollStart,
 }
 
 /// Final result of a run.
@@ -139,6 +207,10 @@ pub enum Verdict {
     Refused { st8: Option<u8> },
     /// Ready pin never rose after the block, byte 1 never 0x29.
     NoIrq { st8: Option<u8> },
+    /// `Upto::EnrollStart`: the 0x03 was sent; `answer` = its classification, `spont` = one line per sbio word of the
+    /// listening (notifications included), `irqs` / `reads` = rises of the ready pin and status reads, `halted` = why
+    /// the listening ended early (kernel Halted / device error).
+    EnrollStart { answer: String, spont: Vec<String>, irqs: usize, reads: usize, halted: Option<String> },
     /// Stopped (fail-closed) before or during the push, with the reason.
     Stopped(String),
 }
@@ -163,6 +235,12 @@ impl Verdict {
             Verdict::Pass2Done { info_ref: false } => {
                 "VERDICT : 2e passe déroulée mais 0x63 ≠ référence macOS (2e 0x63 non envoyé ; rien après)".into()
             }
+            Verdict::EnrollStart { answer, spont, irqs, reads, halted } => format!(
+                "VERDICT : E-ENROLL-START : réponse au 0x03 = {answer} ; écoute : {} mot(s) sbio{} ; IRQ 195 : {irqs} montée(s), {reads} lecture(s) d'état{}",
+                spont.len(),
+                if spont.is_empty() { String::new() } else { format!(" [{}]", spont.join(" | ")) },
+                halted.as_ref().map_or(String::new(), |h| format!(" ; ÉCOUTE INTERROMPUE : {h}"))
+            ),
             Verdict::Stopped(why) => format!("VERDICT : arrêt (fail-closed) : {why}"),
         }
     }
@@ -651,14 +729,144 @@ pub fn pass2<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, calib: &[u8], s1
     Ok(Verdict::Pass2Done { info_ref: true })
 }
 
+/// Hex dump of a B8 snapshot, 16 bytes per line (blobs are never interpreted).
+fn dump(log: &mut dyn FnMut(&str), what: &str, b: &[u8]) {
+    log(&format!("{what} : {} o", b.len()));
+    for (i, c) in b.chunks(16).enumerate() {
+        log(&format!("  {what} +{:#06x} : {}", i * 16, hex(c)));
+    }
+}
+
+/// gt header of a B8 snapshot, for the log.
+fn gt_head(b: &[u8]) -> String {
+    match sep_proto::gt::OolHeader::parse(b) {
+        Some(h) => format!(
+            "gt version {:#x} total {:#x} offset {:#x} opcode {:#x} long {:#x}",
+            h.valid, h.total, h.offset, h.ty, h.len
+        ),
+        None => "gt illisible (B8 < 0x1c o)".into(),
+    }
+}
+
+fn word_line(w: &RawWord) -> String {
+    format!("TAG {:#04x} TYPE {:#04x} PARAM {:#04x} DATA {:#010x}", w.tag, w.ty, w.param, w.data)
+}
+
+/// Classification of the 0x03 answer (logged; the run goes on to the listening in every case).
+pub fn classify_start(r: &StartReply) -> String {
+    match r {
+        StartReply::Silence => "SILENCE (aucun mot sbio en 6 s)".into(),
+        StartReply::Answer(w) if sbio_gate::is_plain_ack(w.tag, w.ty, w.param, w.data, &w.b8) => {
+            format!("ACK vide ({}, B8 {})", word_line(w), gt_head(&w.b8))
+        }
+        StartReply::Answer(w) => {
+            let payload = sep_proto::gt::OolHeader::parse(&w.b8).map_or(String::new(), |h| {
+                let n = (h.len as usize).min(w.b8.len().saturating_sub(OOL_HDR));
+                format!(", charge {}", short(&w.b8[OOL_HDR..OOL_HDR + n]))
+            });
+            format!("RÉPONSE NON CONFORME à un ack vide ({}, B8 {}{payload})", word_line(w), gt_head(&w.b8))
+        }
+    }
+}
+
+/// Step 8 (E-ENROLL-START), after a 2nd pass with the macOS 0x63 twice; sensor powered, at the macOS rest state.
+/// ONE 0x03, then `LISTEN_MS` of listening: nothing is ever sent to the SEP again, the only SPI traffic is ONE status
+/// read per rise of the ready pin (at most `LISTEN_MAX_READS`).
+pub fn enroll_start<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>) -> Verdict {
+    (m.log)(&format!(
+        "E-ENROLL-START : SEP> 0x03 commandStartEnroll, enroll_indata_v2_t {} o = {} (TOUT À ZÉRO : contenu réel inconnu, hypothèse)",
+        ENROLL_INDATA_MIN.len(),
+        hex(&ENROLL_INDATA_MIN)
+    ));
+    let reply = match sep.bio_start(&ENROLL_INDATA_MIN) {
+        Ok(r) => r,
+        Err(e) => return Verdict::Stopped(format!("0x03 : {e}")),
+    };
+    let answer = classify_start(&reply);
+    (m.log)(&format!("SEP< 0x03 : {answer}"));
+    if let StartReply::Answer(w) = &reply {
+        dump(m.log, "B8 réponse 0x03", &w.b8);
+    }
+    (m.log)(&format!(
+        "ÉCOUTE {} s : rien n'est envoyé au SEP ; état capteur lu seulement quand l'IRQ 195 monte. Ne posez RIEN avant « POSEZ LE DOIGT ».",
+        LISTEN_MS / 1000
+    ));
+    let t0 = m.s.now_ms();
+    let mut last = m.s.ready();
+    (m.log)(&format!("IRQ 195 au début de l'écoute : {}", pin(last)));
+    if last.is_none() {
+        (m.log)("broche prête indisponible : aucune lecture d'état pendant l'écoute");
+    }
+    let (mut next_prompt, mut irqs, mut reads) = (0usize, 0usize, 0usize);
+    let mut spont = Vec::new();
+    let mut halted = None;
+    loop {
+        let t = m.s.now_ms() - t0;
+        if t >= LISTEN_MS {
+            break;
+        }
+        while next_prompt < PROMPTS.len() && t >= PROMPTS[next_prompt].0 {
+            (m.log)(&format!(">>>>>>>>>> t={} s : {} <<<<<<<<<<", PROMPTS[next_prompt].0 / 1000, PROMPTS[next_prompt].1));
+            next_prompt += 1;
+        }
+        let p = m.s.ready();
+        if p == Some(true) && last != Some(true) {
+            irqs += 1;
+            if reads < LISTEN_MAX_READS {
+                reads += 1;
+                match m.status_raw() {
+                    Ok(Some(b)) => {
+                        let pend = Mesa::<S>::pending(&Some(b));
+                        let extra = if pend > 0 {
+                            format!(" ; réponse en attente {pend:#x} o (NON lue : aucun relais autorisé)")
+                        } else {
+                            String::new()
+                        };
+                        (m.log)(&format!("t={t} ms IRQ 195 montée n°{irqs} : état {} (octet d'état {:#04x}){extra}", hex(&b), b[7]));
+                    }
+                    Ok(None) => (m.log)(&format!("t={t} ms IRQ 195 montée n°{irqs} : état non reconnu (en-tête ≠ 80 20 00 10)")),
+                    Err(e) => (m.log)(&format!("t={t} ms IRQ 195 montée n°{irqs} : lecture d'état en erreur : {e}")),
+                }
+            } else {
+                (m.log)(&format!("t={t} ms IRQ 195 montée n°{irqs} : plafond de {LISTEN_MAX_READS} lectures atteint, pas de lecture"));
+            }
+            last = m.s.ready();
+        } else {
+            if p != last {
+                (m.log)(&format!("t={t} ms IRQ 195 : {}", pin(p)));
+            }
+            last = p;
+        }
+        match sep.listen(LISTEN_POLL_MS) {
+            Ok(None) => {}
+            Ok(Some(SepEvent::Notify(w))) => {
+                (m.log)(&format!("t={t} ms SEP< notification {} (non répondue)", word_line(&w)));
+                spont.push(format!("t={t}ms notif {}", word_line(&w)));
+            }
+            Ok(Some(SepEvent::Spont(w))) => {
+                (m.log)(&format!("t={t} ms SEP< MOT SPONTANÉ {} ; B8 {} — NON répondu (aucune réponse établie)", word_line(&w), gt_head(&w.b8)));
+                dump(m.log, "B8 spontané", &w.b8);
+                spont.push(format!("t={t}ms {} ({})", word_line(&w), gt_head(&w.b8)));
+            }
+            Ok(Some(SepEvent::Halted(h))) | Err(h) => {
+                (m.log)(&format!("t={t} ms écoute interrompue : {h}"));
+                halted = Some(h);
+                break;
+            }
+        }
+    }
+    (m.log)(">>>>>>>>>> FIN DE L'ÉCOUTE : RETIREZ LE DOIGT <<<<<<<<<<");
+    Verdict::EnrollStart { answer, spont, irqs, reads, halted }
+}
+
 /// Whole J5 run (the caller powers the sensor on before and off after, in every path). `calib` is required (and
 /// checked first) for `Upto::Calib`; the later steps run only after a loaded patch.
 pub fn run<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, upto: Upto, calib: Option<&[u8]>) -> Verdict {
-    if matches!(upto, Upto::Calib | Upto::Pass2) {
+    if matches!(upto, Upto::Calib | Upto::Pass2 | Upto::EnrollStart) {
         match calib.map(check_calib) {
             Some(Ok(())) => {}
             Some(Err(e)) => return Verdict::Stopped(e),
-            None => return Verdict::Stopped("--upto calib|pass2 sans fichier de calibration".into()),
+            None => return Verdict::Stopped("--upto calib|pass2|enroll-start sans fichier de calibration".into()),
         }
     }
     let calib = if upto == Upto::Patch { None } else { calib };
@@ -687,7 +895,12 @@ pub fn run<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, upto: Upto, calib:
         return v;
     }
     (m.log)(&v.line());
-    pass2(sep, m, c, &s1).unwrap_or_else(|e| Verdict::Stopped(format!("2e passe : {e}")))
+    let v = pass2(sep, m, c, &s1).unwrap_or_else(|e| Verdict::Stopped(format!("2e passe : {e}")));
+    if upto == Upto::Pass2 || v != (Verdict::Pass2Done { info_ref: true }) {
+        return v;
+    }
+    (m.log)(&v.line());
+    enroll_start(sep, m)
 }
 
 /// True when `v` is the verdict a run up to `upto` aims at.
@@ -697,6 +910,8 @@ pub fn success(upto: Upto, v: &Verdict) -> bool {
         Upto::Params => *v == Verdict::ParamsDone,
         Upto::Calib => *v == Verdict::Calibrated { info_ref: true },
         Upto::Pass2 => *v == Verdict::Pass2Done { info_ref: true },
+        // The experiment went through: 0x03 sent, its answer recorded (whatever it is), listening complete.
+        Upto::EnrollStart => matches!(v, Verdict::EnrollStart { halted: None, .. }),
     }
 }
 

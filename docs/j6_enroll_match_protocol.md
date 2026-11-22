@@ -213,3 +213,10 @@ qu'un probe sans doigt révèle à moindre coût.
   n'a pas validé l'expérience.
 </content>
 </invoke>
+
+### 7.1 Mise à jour 2026-11-22 : E-ENROLL-START codée (J6a), variante « avec doigt »
+Décision d'Albert : tenter quand même. `allow_sbio_bio=1` (exige `allow_sbio_params=3`) admet UN `0x03` à charge fixe
+**68 octets à zéro** (`sbio_gate::ENROLL_INDATA_MIN` : longueur VU kext ; u32 +0x00 lu par le kext, bit 0 = drapeau de
+sens inconnu → laissé à 0 ; +0x04..+0x43 jamais lus par le kext, aucune valeur par défaut connue → 0 ; acceptation par
+le SEP = hypothèse), puis écoute 90 s sans aucune réponse (aucune requête SEP→AP n'a de réponse établie ici ; 0x65 est
+une commande AP). Script : `pending/j6a_enroll_start.sh`. Jamais lancé.

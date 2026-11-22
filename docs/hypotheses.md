@@ -1397,8 +1397,9 @@ Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n
 - Limite : scrutation à 20 ms, une impulsion plus courte est invisible.
 
 ## EXPÉRIENCE — E-ENROLL-START (J6) : le SEP accepte-t-il d'entrer en mode enrôlement SANS keybag ? (2026-11-22, agent driver ; source: kext + trace)
-- Statut : PROPOSÉE, non exécutable en l'état (code dédié absent ; le noyau refuse `allow_sbio_bio`). 1er run = « go »
-  d'Albert quand elle sera codée et validée par l'orchestrateur/sceptique. Protocole complet : `docs/j6_enroll_match_protocol.md`.
+- Statut : CODÉE (2026-11-22, variante « avec doigt » décidée par Albert) : `pending/j6a_enroll_start.sh`, noyau
+  `allow_sbio_bio=1`, `sbiod --upto enroll-start`. JAMAIS LANCÉE ; 1er run = « go » d'Albert. Charge du 0x03 retenue :
+  **68 octets à zéro** (pas `u32[0]=1` : le sens du bit 0 est inconnu). Protocole complet : `docs/j6_enroll_match_protocol.md`.
 - Problème : J6 (enrôlement puis match) est bloqué par D2 (ni keybag ni gabarit nativement ; EP 0x12 SKS jamais ouvert),
   par le contenu inconnu de `enroll_indata_v2_t` (0x03, 68 o) et du 0x06 (0xa7 o, nonce par verrouillage). On ne peut donc
   pas émettre un enroll/match fidèle. Avant d'investir dans le reverse de biometrickitd, on veut savoir si l'EP 0x12 est
@@ -1421,3 +1422,10 @@ Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n
   5. Le script s'arrête à « ENRÔLEMENT TERMINÉ » (`enrollment_info_t +0xbfe ≠ 0`) et sauvegarde l'export catacomb (0x6c)
      dans un fichier ; ce fichier devra être re-servi en 0x6d au boot suivant pour qu'un match soit possible.
   6. Si le script dit « REFUS … » : lever le doigt, ne pas insister, noter le code. Power-cycle = Albert.
+- **EXPÉRIENCE HUMAINE — J6a (`pending/j6a_enroll_start.sh`), consignes courtes :**
+  1. Reboot normal, puis lancer le script en root. Doigt prêt, **ne rien poser** pendant la 2e passe (~1 min).
+  2. Après la ligne « ÉCOUTE 90 s », suivre les lignes `>>>>> … <<<<<` : POSEZ à 5 s, RETIREZ à 15 s, REPOSEZ à 25 s,
+     puis alternance toutes les 10 s ; doigt à plat, bien couvrir le capteur, tenir jusqu'à la consigne suivante.
+  3. À « FIN DE L'ÉCOUTE » : retirer le doigt. Lire la ligne `VERDICT : E-ENROLL-START`. Ctrl-C pour arrêter sepd.
+  4. Quelle que soit la réponse (ACK, refus, silence, Halted) : ne pas relancer ; power-cycle (Albert) avant tout autre run.
+  5. Journaux : `/var/log/j5-<horodatage>/` (run.log, sbiod.log, kernel.log).
