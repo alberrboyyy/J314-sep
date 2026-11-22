@@ -128,6 +128,102 @@ Points VU :
 
 ---
 
+## 3b. (2026-11-22, reverseur — source: kext) — « verify LoadPatch » : cadrage exact, confirmation du chargement, et pourquoi le capteur refuse
+
+Décompilation de la **couche SPI du capteur** (`com.apple.driver.AppleBiometricSensor`, classe `AppleMesa` +
+contrôleur `com.apple.driver.AppleSPIMC`, classe `AppleSPIMCController`). Objectif : trancher le MUR « le capteur
+reçoit les octets mais n'active pas le patch » (état reste `60 00 00 08`, n'atteint jamais `29…7c`). **Transport /
+protocole uniquement. Aucune clé, aucun secret extrait. Reproduit dans le binaire = `source: kext`, PAS `vérifié`.**
+
+### Chaîne d'appel (VU, symboles + adresses)
+
+- `AppleMesa::loadPatch(uchar* fwBuffer, u64 fwLen)` — `0xfffffe00091c94ec`. **Pousse le bloc patch brut** via
+  `AppleSPIBiometricSensor::transferData(void* tx, u64 txLen, void* rx=0, u64 rxLen=0, bool=1)` — `0xfffffe00091bb9e8`
+  (variante pointeur-brut) → la variante IOMD `transferData(...)` `0xfffffe00091bb4e8` délègue au contrôleur SPI à
+  `this+0x90`, slot vtable `+0x898`. Le contrôleur construit un `AppleARMSPICommand` et appelle
+  `AppleSPIMCController::executeSPICommand` — `0xfffffe00099c9aac`, qui choisit **DMA** (`_executeSPICommandDMA`
+  `0xfffffe00099ca3a8`, vtable `+0x8f8`) si `this+0xd0` (drapeau DMA) est armé **et** que la commande porte des
+  `IOMemoryDescriptor` ; sinon **PIO/FIFO** (`_executeSPICommandPIO` `0xfffffe00099caf44`, vtable `+0x900`). Le
+  bloc 22 Ko part donc par **un seul `IODMAEventSource::startDMACommand`** (TX `_spiTxDMAES`=this+0x148,
+  dir 2=out ; RX `_spiRxDMAES`=this+0x150, dir 1=in), CS maintenu par `_setCS(1)`/`_setCS(0)` autour du burst
+  (registre `0xc` bit 1 pour le CS interne, ou GPIO `function-spi_cs%d` pour le CS externe). (VU.)
+
+### Q1 — Cadrage exact (prélude 0x60 + bloc). Pas de trailer AP, pas de champ longueur-patch
+
+- **Le prélude `80 60 00 07 00 00 00` est une commande À PART** : opcode capteur `kCMDSetupPatchEnable` dans
+  `AppleMesa::_handleCMD` (`0xfffffe00091ca744` : log « Setup Patch Enable on the sensor »). Construction du mot :
+  `w8=0x6080` puis `movk w8,#0x700,lsl16` → **`0x07006080`** écrit en u32 à `buf+0x10` = octets **`80 60 00 07`**
+  (petit-boutiste) ; longueur d'émission **= 7** (`mov w2,#7`). Soit `80`=marqueur write, `60`=cmd SetupPatchEnable,
+  `00 07`=**taille TOTALE de la trame (7, gros-boutiste)**, `00 00 00`=bourrage de l'en-tête 7 o. **Il n'y a AUCUN
+  champ « longueur du patch » dans le prélude** → on ne code donc rien de faux de ce côté ; `00 07` = la taille du
+  prélude lui-même, pas celle du bloc. (VU.)
+- **Le bloc est poussé brut, sans en-tête ni trailer ajoutés par l'AP.** `AppleMesa::loadPatch` vérifie
+  `fwBuffer != null`, `fwLen > 0`, puis appelle `transferData(tx=fwBuffer, txLen=fwLen, rx=0)` — **un seul transfert,
+  exactement `fwLen` octets, rien avant, rien après** (log « sent patch to sensor »). Aucun CRC/MAC ajouté côté AP.
+  Le bloc est donc **auto-décrit** : ses 2 premiers octets (`8c 56` = 0x568c = **total−2**) sont sa longueur interne,
+  et tout CRC/MAC éventuel est **à l'intérieur** du bloc (fourni par le SEP), jamais émis en trame SPI distincte —
+  cohérent avec C19 qui ne montre aucun trailer SPI. (VU : loadPatch ; recoupé trace C19.)
+
+### Q4 — Comment macOS CONFIRME le chargement : état capteur, octet[1] == 0x29 (le marqueur `29…7c`)
+
+- Décisif. Dans `AppleMesa::handleStateMachine` (`0xfffffe00091ccad8`), le cas **« patch load done interrupt »**
+  (`0xfffffe00091cd744`) : `ldrb w8,[x19,#0x161]` puis **`cmp w8,#0x29 ; b.ne → « patch load failed. Something is
+  wrong.. »`** (`0xfffffe00091cdb08`, err `0xe00002c9`). `this+0x161` = **octet 1 (0-indexé) de l'état capteur
+  mis en cache** (`this+0x160`=octet 0, `this+0x161`=octet 1 ; cf. logs « status 0x%x, sensor status 0x%x »).
+  C'est **exactement** l'octet qui vaut `0x29` dans l'état `00 29 01 00 7c …` (sensor_hw l.115). Si `==0x29` : succès,
+  macOS lit la **version du patch** (octet `this+0x168` + un bit de `this+0x162`), pose la propriété `patch-version`,
+  et marque l'état chargé. Donc **le critère de succès VU = octet[1] de l'état == 0x29** (notre `60` = refus/non-chargé).
+  (VU.)
+
+### Q2 — Entre le bloc et l'état « chargé » : AUCUNE commande verify/activate ; attente d'INTERRUPTION
+
+- `AppleMesa::loadPatch` **n'émet aucune autre trame SPI** après le bloc : il pose `_lastCmd(this+0x154)=0x19`,
+  un drapeau `this+0x158=1`, **arme un chien de garde de ~500 ms** (`this+0x2f8`, `setTimeout(0x1f4)` slot `+0x1f0`
+  puis armement `+0x170`) et **retourne**. La suite est **pilotée par interruption** : le capteur lève son IRQ
+  (gpio0 195), l'AP relit l'état, et `handleStateMachine` traite le cas « patch load done interrupt » (Q4). **Il n'y
+  a donc PAS de commande intermédiaire « verify/commit/activate ».** (VU.) → Corrobore la trace C19 (pas de trame
+  entre le bloc et l'état `29…7c`). Le « verify » est donc **implicite** : le capteur s'auto-vérifie et signale par
+  son état + l'IRQ.
+
+### Q3 / (C) — Lien patch ↔ clé de session
+
+- **L'AP est un relais pur** : `loadPatch` recopie le bloc du SEP **sans le toucher** (aucune clé côté AP). Le bloc
+  porte l'enveloppe `3a` + compteur 8 o (sensor_hw §enveloppe), **frais à chaque boot** → il est **produit et
+  authentifié par le SEP**, lié à la session (key exchange `0x15/0x16`, trame `0x72`) et au **compteur de séquence**
+  (`0x42`→`0x73`→`0x18`) qui précèdent obligatoirement le `0x5f` (ordre VU §2). **Conséquence protocolaire :** un
+  capteur dont la session/compteur ne correspond pas à ce que le SEP a emballé **rejetterait** le patch. **MAIS** le
+  chiffrement/MAC lui-même est dans le **firmware capteur + SEP**, PAS dans ce kext : la **liaison session→patch est
+  déduite de l'architecture** (enveloppe + relais opaque + ordre d'init), elle n'est **pas lisible octet-à-octet** ici.
+  (Déduit, pas VU au niveau crypto.)
+
+### (A) — Contrainte de TIMING / transfert contigu : ce que le binaire dit, et ce qu'il ne tranche pas
+
+- **VU** : macOS envoie le bloc en **un seul `transferData` → un seul burst DMA SIO** (canaux liés à l'ADT, abstraits
+  par `IODMAEventSource`), CS tenu de bout en bout par `_setCS`. C'est un **choix de conception** (DMA, pas FIFO) et le
+  seul chien de garde côté AP est le **timeout global de 500 ms** sur l'IRQ « patch load done » (ci-dessus) — **pas**
+  un timeout inter-octet.
+- **INDÉCIDABLE depuis le kext** : le kext ne contient **aucune** mention d'une « fenêtre de réception » ou d'un
+  **timeout inter-octet côté capteur**. Si une telle contrainte existe, elle est **dans le firmware du capteur**
+  (hors binaire macOS). Le kext **n'établit donc pas** que des trous d'horloge FIFO font échouer le patch ; il montre
+  seulement que macOS, lui, ne laisse jamais de trou (DMA d'un coup).
+- **Interprétation (à flaguer)** : notre symptôme — l'état reste `60 00 00 08` (prélude pris, bloc jamais « complété »)
+  et **aucune** IRQ « patch load done » ne semble survenir — colle **mieux** avec une réception jamais satisfaite
+  (timeout/gaps capteur) qu'avec un **rejet crypto** : un rejet crypto passerait normalement par le chemin
+  « patch load done interrupt » **avec** octet[1] ≠ 0x29 (branche « patch load failed » qui EXISTE), donc produirait
+  un changement d'état, pas un gel à `60 00 00 08`. **Ce raisonnement est une interprétation**, le kext ne la prouve pas.
+
+### Conséquence actionnable (pour sbio)
+
+- Le problème **n'est pas** le cadrage (prélude 7 o + bloc brut auto-décrit, sans trailer : VU, on fait déjà bon) ni
+  une commande verify manquante (il n'y en a pas : VU). Les deux pistes résiduelles, **non départageables par le
+  binaire**, sont : (C) session/compteur non alignés (le SEP a emballé contre un état que le capteur live n'a pas) —
+  **déduit** ; (A) le capteur exige le bloc en **flux continu rapide** et nos ~2,3 s FIFO avec trous le font
+  abandonner — **plausible, indécidable ici**. Si (A), la solution est **pousser le bloc vite** (DMA SIO côté m1n1,
+  ou un gros burst sans aller-retours tunnel), pas « réparer » le FIFO. Le test qui tranche : rejouer en **un burst
+  rapide CS-tenu** et observer l'état capteur + l'IRQ 195.
+
+---
+
 ## 4. VERDICT FIFO vs DMA pour les gros blobs (déterminant sbio5)
 
 **Deux blobs « gros » dans la préparation, deux conclusions opposées :**

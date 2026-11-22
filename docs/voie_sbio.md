@@ -185,6 +185,140 @@ test décisif de l'état est un **script `pending/` risqué, lancé par Albert**
 
 ---
 
+## 8. Push DMA SIO — faisabilité depuis le proxyclient m1n1 (2026-11-22, tracer — LECTURE SEULE)
+
+Question posée : peut-on, depuis un script du repo utilisant l'API m1n1 proxyclient, émettre vers le capteur
+Mesa un **transfert SPI DMA contigu** d'environ 22 Ko sur spi2 (CS maintenu, comme macOS), au lieu du FIFO
+scruté qui met ~2,2 s et que le capteur refuse (état reste `0x60`, n'atteint jamais `0x29`) ? Rien n'a été
+envoyé au Mac ; aucun fichier sous `m1n1/` n'a été modifié (lecture seule, cf. `regles-m1n1-et-macos`). Garde-fou
+upstream `m1n1/CLAUDE.md` respecté : lecture OK, zéro écriture dans leur code, rien poussé vers Asahi.
+
+Convention : **VU** = lu dans `m1n1/` ou les traces ; **DÉDUIT** = raisonnement d'architecture.
+
+### 8.1 VU — ce que le proxyclient a DÉJÀ (côté « préparer un buffer »)
+
+- **Allouer un buffer physique contigu en RAM Mac** : `p.memalign(align, size)` / `u.heap.memalign(...)`
+  (`m1n1/proxyclient/m1n1/proxy.py:1071`, `proxyutils.py:545`). Écriture en masse : `p.iface.writemem(pa, data)`.
+- **Programmer un DART en écriture** : `DART.from_adt(u, "/arm-io/dart-sio")` puis `dart.iomap(stream, pa, size)`
+  (alloc IOVA + mappe) ou `iomap_at(stream, iova, pa, size)`, et `dart.iowrite(stream, iova, data)`
+  (`m1n1/proxyclient/m1n1/hw/dart.py:70-77,55-68` ; moteur `hw/dart8020.py:113` `iomap_at`, PTE `dart,t6000`).
+  C'est l'exact motif utilisé par le driver audio ADMAC : `u.heap.memalign(...)` + `self.dart.iomap(dart_stream, phys, size)`
+  (`m1n1/proxyclient/m1n1/hw/admac.py:387-391`). Donc **(a) allouer un buffer + le mapper dans `dart-sio`
+  est FAISABLE** avec l'API existante.
+- **Lire le bloc de contrôle et les descripteurs SIO** : `SepDartReader` (`hv/trace_sep_filtered.py:237-335`,
+  **lecture seule**) ; et l'observateur `hv/trace_sep_spi_dma.py` sait déjà traduire `dart-sio` et extraire le
+  descripteur (`+0x40 + DATA*0xc`, pointeur à `+8`, taille à `+0x10`) et les buffers des canaux 0x18/0x19.
+
+### 8.2 VU — ce que le proxyclient N'A PAS (côté « armer le DMA »)
+
+- **Aucun driver du coprocesseur SIO.** `ls m1n1/proxyclient/m1n1/fw/` : `afk` (epic, rbep), `asc` (base, crash,
+  mgmt, oslog, syslog…), `aop`, `dcp`, `isp`… **pas de module `sio`**, et rien dans `fw/afk` n'est câblé à
+  `/arm-io/sio`. La classe `ASCBaseEndpoint.send()` existe (`fw/asc/base.py:49`) mais il n'y a **aucun endpoint
+  SIO instancié/possédé** par le proxyclient.
+- **Le seul code SIO côté proxyclient est un OBSERVATEUR.** `hv/trace_mesa.py` et `hv/trace_sep_spi_dma.py`
+  écoutent la boîte aux lettres ASC de `/arm-io/sio` en SYNC/ASYNC et **lisent** la mémoire via `dart-sio`
+  (lecture seule). Ils décodent les types de message SIO — `2`=Start, `3`=Setup, `5`=Config, `6`=SetupIO,
+  `0x65`=Ack, `0x68`=CompleteIO (`trace_mesa.py:85-162`) — et les canaux **0x18 (TX) / 0x19 (RX)**. Mais ils
+  n'**écrivent jamais** un message dans l'INBOX. Ils observent un SIO **déjà démarré par macOS**.
+- **`m1n1/src/sio.c` ne démarre PAS le SIO.** Il ne fait que **préparer les données de firmware SIO** (tunables
+  `asio-ascwrap-tunables`, `dmashim` clés `SSPI`/`SUAR`/`SAUD`/`ADMA`/`AAUD`, `device-type` `dSPI`/`dUAR`/…,
+  `map-range`, panic buffer) depuis l'ADT, pour les **passer au système invité** lors du hand-off hyperviseur
+  (`sio_setup_fwdata`, `src/sio.c:148-229`). Ce sont les blobs que le **pilote SIO de l'OS invité** consomme —
+  m1n1 ne boote ni ne pilote le coprocesseur lui-même.
+
+### 8.3 DÉDUIT — qui fait tourner le SIO, et pourquoi ça change tout
+
+- **Sous hyperviseur AVEC macOS** (le contexte des captures C17-C19) : c'est **macOS (AppleSIO)** qui a booté le
+  coprocesseur SIO et qui **possède** sa boîte aux lettres. Le tracer peut observer sans risque ; **écrire** dans
+  l'INBOX SIO depuis le proxyclient entrerait en collision avec l'état du firmware SIO de l'invité (séquences,
+  descripteurs, tags) — ce n'est ni sûr ni « observe-only », et de toute façon **macOS n'est pas présent** sur la
+  route native sbio.
+- **Route native sbio (SEPOS seul, PAS de macOS)** — notre contexte réel : **personne ne boote le SIO.** Le FIFO
+  scruté marche justement parce qu'il n'exige aucun coprocesseur (`mesa_hello` l'a prouvé, `sensor_hw.md` §essai).
+  Mais le chemin **DMA SIO est mort** tant que le coprocesseur n'est pas amené à la vie. Or le proxyclient **n'a
+  aucun code** pour ce bring-up RTKit (charger le firmware/les params `sio.c`-style, démarrer l'ASC, établir les
+  endpoints, séquence Start/Setup/Config). Il faudrait **écrire un driver SIO complet, à partir de zéro**.
+
+### 8.4 Réponses aux questions précises
+
+1. **Buffer contigu + mapping DART : OUI** (8.1). **Armer spi2 en DMA via un descripteur SIO : NON** — aucun
+   moyen existant ; il faut **piloter le coprocesseur SIO par sa mailbox ASC**, ce qui suppose d'abord de le
+   **booter** (RTKit). Cette brique n'existe pas dans le proxyclient.
+2. **`trace_sep_spi_dma.py` révèle-t-il les registres/descripteurs à ÉCRIRE pour ÉMETTRE ?** **Partiellement.** Il
+   donne le **dernier maillon** : layout du descripteur dans le bloc de contrôle (`+0x40 + DATA*0xc`, ptr `+8`,
+   taille `+0x10`), les types de message (2/3/5/6/0x68) et les canaux (0x18 TX). Il **ne révèle PAS** le bring-up
+   à froid : chargement firmware SIO, paramètres exacts des messages `Setup` (TYPE 3 : PARAM 1 = IOVA du bloc de
+   contrôle `<<12`, PARAM 2 = taille, PARAM 0xd/0xe = région capteur — tout cela **observé** mais **non rejouable
+   en émission** sans l'état d'un SIO démarré). Il observe un SIO déjà vivant, pas comment le réveiller.
+3. **DART de spi2** : oui, il faut une entrée de traduction dans **`dart-sio`** pour que l'IOVA du descripteur et
+   du buffer pointent notre RAM. L'API existe (`dart.iomap`/`iomap_at`/`iowrite`, 8.1). (Nuance : sous hv+macOS,
+   programmer `dart-sio` percuterait l'usage invité ; en natif on en serait propriétaire.)
+
+### 8.5 VERDICT — BLOQUÉ avec l'outillage actuel (brique manquante = un driver SIO)
+
+**Push DMA SIO reproductible depuis le proxyclient = BLOQUÉ en l'état.** Les briques « préparer » (alloc buffer,
+map `dart-sio`, écrire la RAM) **existent** ; la brique « armer/piloter le DMA » **n'existe pas** : il n'y a aucun
+driver du coprocesseur SIO dans le proxyclient, et en route native personne ne l'a démarré. Rendre cette voie
+praticable = **écrire un pilote SIO RTKit complet** (bring-up + boîte aux lettres Start/Setup/Config/SetupIO,
+canal 0x18, descripteur) — gros chantier, et qui toucherait du code côté AP (zone à cadrer vis-à-vis des règles
+m1n1 : un **payload du repo** chargé via le proxy, PAS une modif de `m1n1/`).
+
+- **ADMAC n'est PAS une alternative** : c'est un **autre** contrôleur (`hw/admac.py`), câblé à l'audio (MCA/
+  speaker/aop, `experiments/*`, `tools/admac_stream.py`), stream DART 2 par défaut. L'ADT rattache spi2 au **SIO**
+  (dma-channels 0x18/0x19, clé `SSPI` du `dmashim`), pas à l'ADMA. On ne peut donc pas détourner l'ADMAC vers spi2.
+- **Alternative sans DMA, à garder en tête (DÉDUIT, non chiffré)** : le mur FIFO n'est pas la mécanique FIFO
+  elle-même mais **les allers-retours tunnel UART par remplissage de 16 o**. Un **payload AP exécuté localement**
+  (via `p.call()` d'un petit blob du repo qui boucle remplir-FIFO/attendre-vide sans repasser par le tunnel,
+  CS tenu par `SHIFTCFG.OVERRIDE_CS`/`PINCFG.KEEP_CS`) rapprocherait du « burst rapide ». Mais **(a)** CS tenu sur
+  22 Ko en FIFO reste non prouvé (`sbio_session.md` §4), **(b)** écrire ce blob AP est la même zone grise que le
+  driver SIO. À évaluer comme repli si le driver SIO est jugé trop lourd.
+
+### 8.6 Étapes concrètes d'un futur `pending/sep_native_sbio_dma.sh` (si on décide d'écrire le driver SIO)
+
+Niveau registres/API, dans l'hypothèse d'un SIO à booter en route native (**à faire relire + lancer par Albert ;
+c'est du neuf → `pending/` avec en-tête but/risque/résultat, et « go » d'Albert**) :
+
+1. **Bring-up SIO (brique MANQUANTE)** : instancier l'ASC `/arm-io/sio`, charger les params firmware façon
+   `src/sio.c` (`sio_setup_fwdata` : tunables, dmashim `SSPI`, device-type `dSPI`, map-range), démarrer le
+   coprocesseur (RTKit), attendre l'endpoint applicatif (0x20). **Rien de tout ça n'existe — à écrire.**
+2. **DART** : `dart = DART.from_adt(u, "/arm-io/dart-sio")` ; mapper (i) le **bloc de contrôle** et (ii) le
+   **buffer patch** (~22 Ko) : `iova = dart.iomap(sid, pa, size)` ; invalider le stream.
+3. **Buffer** : `pa = p.memalign(0x4000, len)` ; `p.iface.writemem(pa, bloc_patch_du_SEP)` (les octets viennent du
+   SEP, relais — **non rejouables**, à relayer vivants, cf. `sbio_session.md` §5).
+4. **Descripteur + Setup** : écrire dans le bloc de contrôle à `+0x40 + DATA*0xc` : pointeur IOVA `+8`, taille
+   `+0x10` ; envoyer les messages mailbox `Setup` (TYPE 3 : PARAM 1 = ctrl_iova`>>12`, PARAM 2 = taille), `Config`
+   (TYPE 5), puis **`SetupIO` (TYPE 6) sur canal 0x18** avec DATA = index du descripteur.
+5. **spi2** : régler CFG `0x40042` (mode DMA) au lieu de `0x40002` (FIFO), CLKDIV 3, SHIFTCFG `0x80c07`
+   (valeurs VU `sensor_hw.md` §transport) ; CS maintenu (le contrôleur le tient en DMA). Précéder du prélude
+   `80 60 00 07` (commande à part, 7 o, `sbio_session.md` §3b Q1).
+6. **Fin** : attendre `CompleteIO` (TYPE 0x68) côté SIO, puis **acquitter par l'ÉTAT capteur** (octet[1]==`0x29`,
+   `sbio_session.md` §3b Q4), pas de read-back. Surveiller l'IRQ gpio0 195.
+
+### 8.7 Risques (si ce script voit le jour)
+
+- **Sûreté SEP** : aucune écriture 0x12/0x13/gigalocker/IMG4 ici — c'est du **transport SPI vers le capteur**, pas
+  une écriture SEP. Mais c'est une **classe JAMAIS testée** (1er run d'un script neuf + bring-up SIO) → ligne rouge
+  « écriture classe neuve » : **go d'Albert obligatoire**, fail-closed, filet DFU/`alarm_p5.img`.
+- **DART** : un mauvais mapping `dart-sio` (IOVA/alignement 16 Ko) fait fauter le SIO ; vérifier via le registre
+  d'erreur DART (`hw/dart8020.py` `R_ERROR`) avant/après.
+- **CS / alignement / taille** : le bloc est **auto-décrit** (2 premiers octets = longueur interne,
+  `sbio_session.md` §3b) ; pousser **exactement `fwLen`** octets, rien avant/après ; alignement page 16 Ko du buffer.
+- **Collision invité** : ne JAMAIS tenter ce bring-up si un SIO est déjà vivant (hv+macOS) — réservé à la route
+  native SEPOS-seul.
+- **Incertitude de fond** : même réussi, le mur peut être (C) session/compteur non alignés et pas (A) le timing
+  (`sbio_session.md` §3b (A)/(C) : indécidable depuis le binaire). Le DMA ne tranche que l'hypothèse (A).
+
+### Sources (section 8)
+- Code m1n1 (lecture seule) : `proxyclient/m1n1/hw/dart.py` (55-77), `hw/dart8020.py` (113 `iomap_at`),
+  `hw/admac.py` (367-396), `hw/spi.py` (R_CFG, R_SHIFTCFG, R_PINCFG), `fw/asc/base.py` (49 `send`),
+  `proxy.py:1071`/`proxyutils.py:545` (`memalign`), `src/sio.c` (148-229 `sio_setup_fwdata`),
+  `hv/trace_mesa.py` (85-162 types/canaux SIO), `hv/trace_sep_spi_dma.py` (layout descripteur),
+  `hv/trace_sep_filtered.py` (237-335 `SepDartReader`). `ls fw/` (pas de module `sio`).
+- Docs : `sensor_hw.md` (§transport : CFG 0x40042/0x40002, canaux 0x18/0x19, descripteur) ;
+  `sbio_session.md` §3b (chaîne kext DMA, prélude, critère 0x29), §4 (verdict FIFO vs DMA), §5 (rejouabilité).
+
+---
+
 ### Sources
 - Traces : `20261118-082622`, `…085250`, `…075343` (SERVE_GL + PROBE_SBIO, B8 nul ×3) ;
   `20261108-032454_c12-boot-ho/sep.log` (L107-136, L318-322) ; `20261111-013303_c24-xart-ool/sep.log`

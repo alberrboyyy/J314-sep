@@ -94,10 +94,15 @@ passer aux tâches hors hardware (analyse, outillage).
   (macOS l'acquitte, snew-reel TAG=0x0b) et documentée — l'arrêt « prudent » s'est déclenché sur un message connu et bénin,
   coûtant un run. La règle « inconnu → stop » reste bonne ; c'est la liste des « connus » qu'il faut bâtir exhaustivement.
 
-## Exception : 2e Linux de test (accord d'Albert)
+## Exception : Linux sur le Mac (accord d'Albert ; SEP OUVERT le 2026-11-22 ; plus de Linux de test → partition PRINCIPALE)
 
-- Sur le Linux de test `root@10.0.200.4` (partition Asahi d'Albert, jetable) uniquement : l'agent peut y agir en root, via `tools/linux_ssh.sh` seulement, pour compiler et charger les modules de `driver/linux/`.
-- Interdit même là : partitionner, toucher à m1n1, à la boot policy ou à macOS, et envoyer quoi que ce soit au SEP (0x12, 0x13, 0x10, 0x15, gigalockers, IMG4).
+- Le Linux de test jetable `root@10.0.200.4` **n'existe plus** (2026-11-22) → on travaille sur la **partition Linux PRINCIPALE d'Albert** (ALARM). ⚠️ **Elle n'est PAS jetable** : priorité « ne pas perdre Linux ». Albert fait un **snapshot** (protège les FICHIERS, PAS un brick SEP/boot). L'agent agit en root via `tools/linux_ssh.sh` (ou un agent Claude lancé localement sur le Mac), pour compiler/charger les modules de `driver/linux/`.
+- **SEP désormais AUTORISÉ depuis ce Linux (ouvert par Albert le 2026-11-22 ; cible = pilote natif sans tether).** L'agent peut faire parler le SEP depuis Linux — boot SEPOS (IMG4/sepfw = ex-« étape 6 »), EP 0x08 (sbio), 0x12 (SKS), 0x13 (xART), 0x10/0x15, gigalockers, et le DMA capteur via apple-sio — avec la **MÊME discipline que les écritures SEP sous m1n1** :
+  - **fail-closed** à la 1re incohérence ; **filet AVANT toute écriture SEP** = image disque OS (`alarm_p5.img`) + backup perso d'Albert (données depuis ~lundi) + DFU. (Albert 2026-11-22 : macOS **sacrifiable** — les écritures xART/enrôlement cassent probablement le Touch ID macOS + FileVault, récupérable DFU + ré-enrôlement, ACCEPTÉ, ne pas redemander pour ça.)
+  - **tout 1er run d'une classe neuve OU d'un script neuf = « go » d'Albert** (cf. règle lancement SEP) ; les re-runs d'un script déjà éprouvé = autonomes.
+  - **power-cycle physique = toujours Albert.**
+  - **JAMAIS** le Secure Element « Stockholm » en direct (brick définitif).
+- **Toujours interdit même là :** partitionner, `dd`, `bputil`/`kmutil`/`csrutil`/`nvram`, toucher à **m1n1** (install/upgrade), à la **boot policy** ou à **macOS** ; rien vers Asahi ; aucun matériel Apple leaké.
 
 ## Écriture dans docs/guide/
 - Lire docs/guide/STYLE.md avant toute modification du guide.
