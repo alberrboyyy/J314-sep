@@ -21,5 +21,13 @@ vivant**, rien d'autre.
 
 Pièges : n'enchaîner ni 0x17, ni 0x15, ni 0x16 (c'est J5, lié à la session et au SPI du capteur). Le premier run de ce
 chemin dans sep_native demande le go d'Albert.
-Question ouverte avant le prochain boot : le store xART n'est plus vide (master_2 + lockers). Faut-il le servir (voie
-« persist ») ou repartir d'un store neuf ? À trancher avec c9.
+## Store xART au prochain boot : verdicts de c9 (2026-11-22)
+- (a) Servir le master stocké : **hypothèse**, jamais vérifiée. C'est le pari du chaînage d'un reboot à l'autre. Si
+  le SEP juge le master périmé (compteur scellé avancé), il re-scelle.
+- (b) Store neuf à chaque boot : **vérifié** (c'est ce qu'a fait J4), mais c'est une impasse. Le compteur avance de
+  12 à chaque boot (usure inconnue), et surtout l'enrôlement est perdu à chaque boot.
+- (c) Servir un locker (FETCH 0x05) : même forme que le master, **sans** le préfixe de 0x11 octets (forme vérifiée).
+  L'indexation par UUID (offset de l'UUID dans le blob du SAVE) reste une **hypothèse**.
+- **Décision pour le run J3 : servir `/var/lib/sepd` (option a)**, avec `allow_xart_save_ack=1` pour encaisser un
+  éventuel re-scellement. Lecture du résultat : s'il n'y a pas de nouvelle rafale de SAVE, le chaînage marche et la
+  persistance est viable ; s'il y a environ 12 SAVE, le master est rejeté (mur du dual-boot).
