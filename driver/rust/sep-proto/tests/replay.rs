@@ -441,3 +441,121 @@ fn step7_responder_reproduces_snew() {
     assert!(acks > 8 && fetches > 5);
     println!("[step7] {} 0x13 pairs reproduced exactly ({acks} acks, {fetches} FETCH); {kinds:?}", pairs.len());
 }
+
+// ---- J7a: keystore endpoints (skdl 0x17, sks 0x12, scrd 0x0a) ---------------------------------------
+const C1: &str = "20261107-033436";
+const C3: &str = "20261107-035930";
+
+/// sks transport (`docs/sks_native_plan.md` §1): TYPE = global transaction counter of the boot (+1 per request,
+/// mod 256, unwrapped: no gap, no duplicate, only local reorderings), every reply = request TAG | 0x80 with the same
+/// TYPE, and TAG = operation (one request length per TAG for the frequent TAGs).
+#[test]
+fn j7a_sks_transport_c1_c3_c12() {
+    use sep_proto::ks_gate::{classify, sks_fields, KsKind, EP_SKS};
+    for (p, nreq) in [(C1, 579), (C3, 1955), (C12, 90)] {
+        let t = tr!(p);
+        let req: Vec<&Msg> = t.msgs.iter().filter(|m| m.w.ep == EP_SKS && m.dir == Dir::ToSep).collect();
+        assert_eq!(req.len(), nreq, "{p}");
+        // unwrap the 8-bit counter
+        let (mut base, mut prev, mut un) = (0i64, None::<i64>, Vec::new());
+        for m in &req {
+            let t8 = i64::from(m.w.ty);
+            let v = match prev {
+                Some(pv) if pv - t8 > 128 => { base += 256; base + t8 }
+                Some(pv) if t8 - pv > 128 => base - 256 + t8,
+                _ => base + t8,
+            };
+            prev = Some(t8);
+            un.push(v);
+        }
+        let mut s = un.clone();
+        s.sort();
+        assert_eq!(s, (1..=nreq as i64).collect::<Vec<_>>(), "{p}: TYPE = 1..n, no gap, no duplicate");
+        assert!(un.iter().zip(&s).all(|(a, b)| (a - b).abs() <= 9), "{p}: only local reorderings");
+        assert!(req.iter().all(|m| m.w.param == 0 && m.w.data & 0xffff == 0), "{p}: PARAM 0, DATA = len << 16");
+        // pairing: every reply has the TAG|0x80 of the last request with the same TYPE
+        let mut paired = 0;
+        for (i, m) in t.msgs.iter().enumerate() {
+            if m.w.ep != EP_SKS || m.dir != Dir::ToAp || classify(&m.w) != KsKind::SksReply {
+                continue;
+            }
+            let q = t.msgs[..i].iter().rev().find(|q| q.w.ep == EP_SKS && q.dir == Dir::ToSep && q.w.ty == m.w.ty).unwrap();
+            assert_eq!(q.w.tag | 0x80, m.w.tag, "{p}");
+            paired += 1;
+        }
+        assert_eq!(paired, nreq, "{p}: one reply per request");
+        // TAG = operation: TAGs 0x19 / 0x04 / 0x45 / 0x32 always have the same request length
+        let mut lens: BTreeMap<u8, BTreeSet<u32>> = BTreeMap::new();
+        for m in &req {
+            let (op, _, len, _) = sks_fields(&m.w);
+            lens.entry(op).or_default().insert(len);
+        }
+        for (tag, len) in [(0x19u8, 0x68u32), (0x04, 0x6c), (0x32, 0x94)] {
+            assert_eq!(lens[&tag], BTreeSet::from([len]), "{p} TAG {tag:#x}");
+        }
+        if p != C12 {
+            assert_eq!(lens[&0x45], BTreeSet::from([0x98]), "{p}");
+        }
+        println!("[j7a] {p}: {nreq} sks requests, TYPE 1..{nreq} (mod 256), {paired} replies TAG|0x80, {} TAGs", lens.len());
+    }
+}
+
+/// CNTL openings of skdl / sks / scrd in c12 and c1 = `ks_gate::open_steps` (order 04/02/05/03, A = B = FD size),
+/// in the order skdl, sks, scrd, and no word is ever sent to them before their opening.
+#[test]
+fn j7a_keystore_cntl_opens_c1_c12() {
+    use sep_proto::ks_gate::{check_pages, open_steps, KS_EPS};
+    for p in [C1, C12] {
+        let t = tr!(p);
+        let tab = DiscoveryTable::from_msgs(&t.msgs).unwrap();
+        let mut first_open = Vec::new();
+        for e in &KS_EPS {
+            assert_eq!(tab.by_ep[&e.ep].name, e.name, "{p}");
+            check_pages(e, tab.by_ep[&e.ep].sizes_raw.unwrap()).unwrap();
+            let words: Vec<(usize, &Msg)> = t
+                .msgs
+                .iter()
+                .enumerate()
+                .filter(|(_, m)| m.w.ep == 0 && m.dir == Dir::ToSep && m.w.param == e.ep && (2..=5).contains(&m.w.ty))
+                .collect();
+            assert_eq!(words.len(), 4, "{p} EP {:#x}: one opening", e.ep);
+            let (a, b) = (words[1].1.w.data, words[3].1.w.data);
+            let want = open_steps(e, a, b);
+            for (k, (_, m)) in words.iter().enumerate() {
+                assert_eq!((m.w.ty, m.w.param, m.w.data), want[k], "{p} EP {:#x} step {k}", e.ep);
+            }
+            let first_to_ep = t.msgs.iter().position(|m| m.w.ep == e.ep && m.dir == Dir::ToSep);
+            if let Some(f) = first_to_ep {
+                assert!(f > words[3].0, "{p} EP {:#x}: nothing sent before the opening", e.ep);
+            }
+            first_open.push(words[0].0);
+        }
+        assert!(first_open.windows(2).all(|w| w[0] < w[1]), "{p}: order skdl, sks, scrd");
+        println!("[j7a] {p}: skdl/sks/scrd opened in that order, 04/02/05/03, sizes 0x4000/0x8000/0x4000");
+    }
+}
+
+/// skdl / scrd words of c12 (what macOS sends, for the plan): skdl only `TAG 0xfc TYPE 0x01` then `TYPE 0x06`, DATA 0;
+/// the reply to 0x01 comes only after the FD announce of sks.
+#[test]
+fn j7a_skdl_scrd_c12() {
+    let t = tr!(C12);
+    let skdl: Vec<&Msg> = t.msgs.iter().filter(|m| m.w.ep == 0x17).collect();
+    let got: Vec<(Dir, u8, u8, u8, u32)> = skdl.iter().map(|m| (m.dir, m.w.tag, m.w.ty, m.w.param, m.w.data)).collect();
+    assert_eq!(
+        got,
+        vec![
+            (Dir::ToSep, 0xfc, 0x01, 0, 0),
+            (Dir::ToAp, 0xfc, 0x01, 0, 0),
+            (Dir::ToSep, 0xfc, 0x06, 0, 0),
+            (Dir::ToAp, 0xfc, 0x06, 0, 0)
+        ]
+    );
+    let sks_fd = t.msgs.iter().position(|m| m.w.ep == 0xfd && m.w.ty == 0 && m.w.param == 0x12).unwrap();
+    let skdl_rep = t.msgs.iter().position(|m| m.w.ep == 0x17 && m.dir == Dir::ToAp).unwrap();
+    let skdl_req = t.msgs.iter().position(|m| m.w.ep == 0x17 && m.dir == Dir::ToSep).unwrap();
+    assert!(skdl_req < sks_fd && sks_fd < skdl_rep);
+    let scrd: Vec<&Msg> = t.msgs.iter().filter(|m| m.w.ep == 0x0a).collect();
+    assert!(scrd.iter().all(|m| m.w.tag == 0x01 && m.w.data == 0));
+    println!("[j7a] c12: skdl 4 words (fc 01/06, DATA 0), scrd {} words all TAG 0x01 DATA 0", scrd.len());
+}

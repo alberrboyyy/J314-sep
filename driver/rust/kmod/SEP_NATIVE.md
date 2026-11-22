@@ -120,6 +120,18 @@ précoce (`sbio_open=1`) et le niveau 3 (2e passe, point 12) : **compilés et te
    `0x01` (vide → vide), `0x1f` (vide → 2 o), `0x63` (vide → 28 o) deux fois. Rien après (macOS enchaîne 0x7c, 0x6b,
    0x79, 0x6d : jamais admis). Pas de 0x5b dans la 2e passe. Toute autre taille → Halted.
 
+13. **J7a, ouverture des EP keystore sans contenu (`allow_sks=1`)** — `docs/sks_native_plan.md` §4-5. Après le CNTL
+   0x08 précoce : pour skdl (0x17), sks (0x12), scrd (0x0a), dans cet ordre (c1, c12), attente ≤ 30 s de l'annonce FD au
+   bon numéro, des tailles FD (`01010101` / `02010201` / `01010101`) et de l'ack de son 0x1d (`submit_reply`) ; puis 4 CNTL
+   `04/02/05/03` (0x4000 / 0x8000 / 0x4000, tampons DMA dédiés alloués au probe), chacun attendant son ack. La porte
+   d'envoi n'admet un CNTL PARAM 0x17/0x12/0x0a que pour l'EP en cours d'ouverture et exactement le mot suivant
+   (`sep-proto::ks_gate::OpenGate`) ; **tout mot vers les EP 0x17/0x12/0x0a est refusé** (pas de ping skdl : OOL jamais
+   capturé ; pas de RPC sks : DER jamais capturé). Le 1er EP pas prêt arrête les ouvertures (« VERDICT <ep> : NON PRÊT »),
+   puis écoute passive 10 s : mots `keystore < …` journalisés (128 lignes), dumps de B (4 par EP + fin), jamais de réponse
+   ni de Halted ; « VERDICT keystore », puis le 0x73 de J3d. Annoncé ailleurs / tailles inattendues → arrêt, pas de 0x73.
+   Porte CNTL resserrée au passage (toutes valeurs) : SECMODE et tampons PARAM 0x13 seulement avant la fin de l'ouverture
+   de 0x13, pong PARAM 0 DATA 0 ; avant, tout TYPE de la liste passait quel que soit PARAM (aucun chemin ne l'exploitait).
+
 ## Paramètres (u32, défaut 0 sauf `sbio_open`, absents de sysfs : figés au chargement)
 
 | Paramètre | Effet |
@@ -131,7 +143,7 @@ précoce (`sbio_open=1`) et le niveau 3 (2e passe, point 12) : **compilés et te
 | `sbio_open` | **défaut 1** = ouverture PRÉCOCE de sbio (point 9) ; 0 = TARDIVE (point 8, éprouvée après scellement frais). Autre valeur → EINVAL. Sans effet si `allow_sbio=0`. |
 | `allow_sbio_relay` | 1 = relais J5 (point 10) : `/dev/sep_sbio` après un 0x73 VIVANT. Exige `allow_sbio=1` (sinon EINVAL). |
 | `allow_sbio_params` | J5c (points 11-12) : 0 = rien après 0x5f ; 1 = 0x5d … 2e 0x32 ; 2 = en plus 0x5b (calibration) et 0x63 ; 3 = en plus 0x19 et la 2e passe jusqu'au 2e 0x63 (⚠️ classe neuve : 0x19 + 2e session capteur). Exige `allow_sbio_relay=1`. |
-| `allow_sks` | **non implémenté** : toute valeur ≠ 0 fait échouer le probe (EINVAL). |
+| `allow_sks` | J7a (point 13) : 1 = après l'ouverture précoce de 0x08, ouverture CNTL SEULE de skdl 0x17, sks 0x12, scrd 0x0a puis écoute passive 10 s, puis le 0x73. Exige `allow_sbio=1 sbio_open=1 allow_sbio_relay=0` ; valeur > 1 → EINVAL. ⚠️ classe neuve. |
 
 ## États
 

@@ -2437,3 +2437,24 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   enroll_indata nul invalide, (b) gating keybag/SKS (D2), (c) précondition d'état manquante (0x7c ? acmContext ?).
   Non tranché. Lecture du code d'erreur : aucune (B8 vide). → à éclairer par le reverse de biometrickitd/BiometricKit
   (contenu réel du 0x03/0x06) et du traitement des réponses TAG 0xff dans AppleMesaSEPDriver (kext).
+
+## 2026-11-22 — agent driver (session ALARM, Opus 5.5) — SKS : transport résolu, plan gradué, J7a (ouverture 0x17/0x12/0x0a sans contenu) codée, RIEN lancé
+- Sources : traces c1/c3/c8/c9/c11/c12 (`sep.log`, EP 0x12/0x17/0x0a, sans OOL), journaux natifs `logs/20261122-*`,
+  `kext_sepmanager.md` §13-15. Comptage reproductible : `sep-proto/tests/replay.rs` `j7a_*` (3 tests). Doc : `docs/sks_native_plan.md`.
+- VU, TAG/TYPE 0x12 : TYPE déroulé = 1..n sans trou ni doublon (c1 579, c3 1955, c8 1390, c12 90), seules permutations
+  locales (≤ 9) ; réponses TAG|0x80 même TYPE 579/579, 1955/1955, 90/90 ; longueur stable par TAG (0x19 = 0x68 ×1128).
+  ⇒ TYPE = compteur global, TAG = opération (`messages.md` juste, `sks_sequence_c12.md` §2 corrigé). Les 13 premières
+  requêtes et réponses sont identiques sur 6 boots. Recoupé par la décompilation PC (`source: kext`, non vérifié, §1.4 du plan :
+  0x4d get_capabilities…).
+- VU, nouveau : en boot CHAÎNÉ natif (J3, J3b, J3d, n=3) **sks n'est jamais annoncé en 0xFD** (0x1d 'sks ' acquitté, puis
+  rien en ~8 s ; le SEP ne demande que le locker 407e… ×2) ; en seal frais natif il l'est toujours (n=8). Interprété : blocage
+  peut-être en amont de SKS (lockers / skdl). Le ping skdl de c12 (`> 0x17 TAG 0xfc TYPE 0x01/0x06`) a un cadre GT dont l'OOL
+  n'a jamais été capturé → NON envoyé.
+- Code : `sep-proto::ks_gate` (porte `OpenGate` des 4 CNTL, classement des mots reçus) ; `sep_native` `allow_sks=1` (exige
+  `allow_sbio=1 sbio_open=1 allow_sbio_relay=0`) : après le CNTL 0x08 précoce, CNTL seul de skdl/sks/scrd (0x4000/0x8000/0x4000)
+  chacun une fois annoncé au bon numéro + tailles FD + 0x1d acquitté (30 s max), écoute passive 10 s, puis 0x73. Aucun mot vers
+  les EP 0x17/0x12/0x0a (porte). Porte CNTL resserrée (SECMODE/PARAM 0x13 avant ouverture de 0x13 seulement, pong PARAM 0).
+- Tests : sep-proto 40 unit + 22 replay verts, clippy 0 ; `build.sh` et `CLIPPY=1` 0 avertissement.
+- Binaire `~/kbuild/j5/sep_native.ko` sha256 `ff799c113945ee18bc511dfd567e6b40ced12f36400a75249702b15f13dcfe55`
+  (ancien → `.v6` = `07d59c0e…e88e`). `pending/j7a_sks_open_chained.sh STORE` (vérifie la sha256 ; STORE chaîné non vide,
+  ex. `/var/lib/sepd-run-20261122-230441`). **Classe neuve → 1er run = go d'Albert.** Rien chargé, rien envoyé.

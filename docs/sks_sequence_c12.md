@@ -16,7 +16,10 @@ Après l'annonce `0x1d` de sbio (et l'ouverture **tôt** du CNTL 0x08, cf. Track
 4. sks atteint ~TYPE 0x17/0x18/0x19 + scrd → **ALORS** `> 0x08 TYPE 0x73` et sbio répond (TAG 0x04 puis TAG 0xfc TYPE 0x73).
 
 ## 2. SKS (EP 0x12) — motif RPC (AppleKeyStore, cf. kext_sepmanager.md §14b/§15)
-- Requête `>` : `TAG=<t>`, **`TYPE`=opcode SÉQUENTIEL** (0x01, 0x02, 0x03, … il INCRÉMENTE à chaque appel), `PARAM=0x00`,
+- ⚠️ **Corrigé (2026-11-22, `sks_native_plan.md` §1.3)** : `TYPE` n'est PAS un opcode mais le **compteur de transaction**
+  global au boot (mod 256, 1..n sans trou sur c1/c3/c8/c12) ; l'**opération = le TAG** (longueur stable par TAG). Les « opcodes
+  0x01→0x19 » ci-dessous = les 25 premières transactions.
+- Requête `>` : `TAG=<t>`, `TYPE`=compteur (0x01, 0x02, 0x03, … il INCRÉMENTE à chaque appel), `PARAM=0x00`,
   `DATA = <longueur_req> << 16` (ex. `0x00640000` = requête 0x64 o). Le DER est dans l'**OOL A** (pas dans le mot).
 - Réponse `<` : **`TAG = TAG_req | 0x80`** (0x4d→0xcd, 0x19→0x99, 0x48→0xc8, 0x04→0x84…), même `TYPE`, `PARAM`=statut
   (0x00=OK ; 0xff/0xfe/0xfd/0xfb = codes/fin/pas-de-données), `DATA = <longueur_resp> << 16`. DER de réponse dans l'**OOL B**.

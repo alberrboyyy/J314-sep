@@ -23,6 +23,7 @@ pub mod crc;
 pub mod daemon;
 pub mod discovery;
 pub mod gt;
+pub mod ks_gate;
 pub mod sbio_gate;
 pub mod sensor;
 pub mod word;

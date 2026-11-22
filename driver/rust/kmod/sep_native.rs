@@ -27,6 +27,12 @@
 //! (gt_packet capturé sous macOS, embarqué à la compilation), écoute 6 s, dump de B8 et verdict VIVANT/MUET
 //! (`docs/j3_sbio_open.md`). Rien d'autre n'est jamais envoyé à 0x08 ; rien n'est jamais envoyé à 0x12 (sks).
 //!
+//! Avec `allow_sks=1` (J7a, exige `allow_sbio=1 sbio_open=1 allow_sbio_relay=0`, `docs/sks_native_plan.md` §4) : après
+//! l'ouverture précoce de 0x08, ouverture CNTL SEULE de skdl (0x17, A=B=0x4000), sks (0x12, A=B=0x8000) et scrd (0x0a,
+//! A=B=0x4000), dans cet ordre (c12), chacun seulement une fois annoncé en 0xFD au bon numéro avec les tailles attendues
+//! ET son annonce 0x1d acquittée ; puis écoute passive 10 s (mots journalisés, dumps de B, jamais de réponse), puis le
+//! 0x73. **Aucun mot n'est jamais envoyé AUX EP 0x17/0x12/0x0a** (porte d'envoi) : ni ping skdl, ni RPC sks.
+//!
 //! Avec `allow_sbio_bio=1` (exige `allow_sbio_params=3`) : E-ENROLL-START (J6a, `docs/j6_enroll_match_protocol.md`
 //! §6) — après la dernière étape de la 2e passe (2e 0x63), UN seul `0x03` commandStartEnroll, charge FIXE de 68 octets
 //! à zéro (`sbio_gate::ENROLL_INDATA_MIN`, contenu réel inconnu), puis ÉCOUTE seule : la réponse au 0x03 (quelle
@@ -70,6 +76,9 @@ mod gt;
 #[path = "../sep-proto/src/sbio_gate.rs"]
 #[allow(dead_code, unreachable_pub)]
 mod sbio_gate;
+#[path = "../sep-proto/src/ks_gate.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod ks_gate;
 
 kernel::module_platform_driver! {
     type: drv::SepNative,
@@ -108,7 +117,7 @@ kernel::module_platform_driver! {
         },
         allow_sks: u32 {
             default: 0,
-            description: "NOT IMPLEMENTED: any value other than 0 makes probe fail",
+            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC)",
         },
         allow_sbio_bio: u32 {
             default: 0,
@@ -120,6 +129,7 @@ kernel::module_platform_driver! {
 mod drv {
     use crate::discovery::{self, EpInfo};
     use crate::gt::{self, CounterChecker, OOL_HDR};
+    use crate::ks_gate::{self, OpenGate, KS_EPS, KS_SCRD, KS_SKDL, KS_SKS};
     use crate::sbio_gate::{self, EvtHdr, Step, EVT_HDR, EVT_MAX, KIND_BIO_REPLY, KIND_NOTIFY, KIND_REPLY, KIND_SPONT, MAX_REPLY};
     use crate::word::{Dir, Msg, Word};
     use crate::xart::{is_save, EP_XART, OP_EP_ANNOUNCE, OP_FWBOOT};
@@ -203,14 +213,27 @@ mod drv {
     const CNTL_PING: u8 = 0x11;
     const CNTL_PONG: u8 = 0x12;
     const CNTL_SECMODE: u8 = 0x14;
-    /// Seuls TYPE que le pilote envoie sur l'EP 0x00 après le boot.
-    const CNTL_TX_TYPES: [u8; 6] = [CNTL_SECMODE, CNTL_SET_A_SIZE, CNTL_SET_A_IOVA, CNTL_SET_B_SIZE, CNTL_SET_B_IOVA, CNTL_PONG];
     /// Délai par ack CNTL (5 s, comme le harnais).
     const CNTL_ACK_TIMEOUT_MS: u32 = 5000;
     /// EP sbio : rien ne lui est envoyé, sauf avec allow_sbio=1 l'ouverture CNTL (PARAM 0x08) et UN 0x73.
     const EP_SBIO: u8 = 0x08;
-    /// EP auquel ce pilote n'envoie jamais rien (défense en profondeur ; aucun chemin n'y mène).
-    const EP_SKS: u8 = 0x12;
+    /// EP auxquels ce pilote n'envoie jamais rien (défense en profondeur ; aucun chemin n'y mène). Avec allow_sks=1,
+    /// seul le CNTL (EP 0x00) PARAM 0x17/0x12/0x0a est admis, et seulement les 4 mots d'ouverture (`ks_gate::OpenGate`).
+    const EP_SKS: u8 = ks_gate::EP_SKS;
+    const EP_SKDL: u8 = ks_gate::EP_SKDL;
+    const EP_SCRD: u8 = ks_gate::EP_SCRD;
+
+    // --- J7a (allow_sks=1), `docs/sks_native_plan.md` §4 -----------------------------------------------------
+    /// Attente, pour chaque EP keystore, de son annonce 0xFD (+ tailles) et de l'ack de son annonce 0x1d. c12 : sks
+    /// annoncé 0,36 s après skdl ; seal frais natif : après le dernier SAVE (~2 s). Au-delà : EP non ouvert, ni lui ni
+    /// les suivants ; le 0x73 part quand même (pas de Halted).
+    const KS_WAIT_MS: i64 = 30_000;
+    /// Écoute passive après la dernière ouverture, avant le 0x73.
+    const KS_LISTEN_MS: i64 = 10_000;
+    /// Dumps de B par EP keystore après un nouveau mot (en plus du dump de fin).
+    const KS_DUMP_LIMIT: u32 = 4;
+    /// Lignes de journal des mots keystore reçus (compte gardé au-delà).
+    const KS_LOG_LIMIT: u32 = 128;
 
     // --- sbio (allow_sbio=1), `docs/j3_sbio_open.md` (vérifié c9) et `pending/sep_native_sbio.sh` -----------
     /// Taille de A8 et de B8 (comme macOS et le harnais m1n1).
@@ -295,9 +318,9 @@ mod drv {
         *crate::module_parameters::allow_sbio_bio.value()
     }
 
-    /// Paramètres d'écriture prévus par le design mais non implémentés dans cette version.
-    fn unimplemented_params() -> [(&'static str, u32); 1] {
-        [("allow_sks", *crate::module_parameters::allow_sks.value())]
+    /// J7a : 0 ou 1 (autre valeur refusée au probe ; exige allow_sbio=1, sbio_open=1, allow_sbio_relay=0).
+    fn param_allow_sks() -> u32 {
+        *crate::module_parameters::allow_sks.value()
     }
 
     /// Raison lisible d'une erreur de `sep-proto`.
@@ -489,6 +512,17 @@ mod drv {
         /// L'ack (TYPE 0x16) de l'annonce 0x1d 'sbio' a été envoyé au SEP (déclencheur de l'ouverture précoce).
         sbio_ack_sent: bool,
         relay: Relay,
+        // --- J7a (allow_sks=1), indices de `KS_EPS` (skdl, sks, scrd) ---
+        /// L'ack (TYPE 0x16) de l'annonce 0x1d de cet EP a été envoyé.
+        ks_acked: [bool; 3],
+        /// Ouverture en cours (EP) et porte de ses 4 mots CNTL ; `None` / fermée hors ouverture.
+        ks_opening: Option<u8>,
+        ks_gate: OpenGate,
+        /// 4 acks CNTL reçus.
+        ks_open: [bool; 3],
+        /// Mots reçus sur l'EP (tout état).
+        ks_rx: [u32; 3],
+        ks_logged: u32,
     }
 
     impl Core {
@@ -519,6 +553,12 @@ mod drv {
                 sbio_rx_after: 0,
                 sbio_alive_msg: false,
                 sbio_ack_sent: false,
+                ks_acked: [false; 3],
+                ks_opening: None,
+                ks_gate: OpenGate::closed(),
+                ks_open: [false; 3],
+                ks_rx: [0; 3],
+                ks_logged: 0,
                 relay: Relay {
                     next: 0,
                     txn: None,
@@ -593,6 +633,9 @@ mod drv {
         ool: Option<(Ool, Ool)>,
         /// Tampons A8/B8 de l'EP 0x08 (0x4000 chacun, distincts de ceux de 0x13), alloués seulement si allow_sbio=1.
         sbio_ool: Option<(Ool, Ool)>,
+        /// Tampons A/B de skdl, sks, scrd (indices de `KS_EPS`, tailles `KsEp::size`), alloués seulement si
+        /// allow_sks=1. A n'est jamais écrit (rien n'est envoyé à ces EP) ; B est seulement lu (dumps).
+        ks_ool: Option<[(Ool, Ool); 3]>,
         fw: FwRegion,
         ring: Ring,
         /// Un seul ouvreur de /dev/sep_native.
@@ -756,6 +799,14 @@ mod drv {
                 (EP_SBIO, _) if param_allow_sbio() && core.xart_open && core.ep_by_name(b"sbio") == Some(EP_SBIO) => {
                     self.on_sbio(core, w, raw)
                 }
+                // allow_sks=1 : mot de skdl/sks/scrd (annoncé au numéro attendu) → journal + compte, jamais de réponse
+                // ni de Halted (J7a = écoute passive).
+                (ep, _) if param_allow_sks() != 0
+                    && core.xart_open
+                    && ks_gate::ks_index(ep).is_some_and(|i| core.ep_by_name(&KS_EPS[i].name) == Some(ep)) =>
+                {
+                    self.on_keystore(core, w, raw)
+                }
                 // Une fois 0x13 ouvert : message sur un AUTRE EP annoncé (sbio, sks, xars, pnon, hibe, stac, hdcp…)
                 // → journalisé et ignoré, sans réponse ni Halted, comme le harnais m1n1 (un Halted au milieu des
                 // SAVE laisserait le xART à moitié scellé). Restent Halted : EP 0x00 inconnu, EP jamais annoncé.
@@ -775,6 +826,28 @@ mod drv {
             } else if core.ignored == IGNORED_LOG_LIMIT + 1 {
                 dev_info!(self.dev, "ignorés : journal coupé au-delà de {} messages (compte gardé)\n", IGNORED_LOG_LIMIT);
             }
+        }
+
+        /// Mot reçu sur skdl/sks/scrd (allow_sks=1) : journalisé (étiquette `ks_gate::classify`), compté. Jamais de
+        /// réponse, jamais de Halted ; le fil du probe dumpe B après un nouveau mot (borné).
+        fn on_keystore(&self, core: &mut Core, w: Word, raw: u64) {
+            let Some(i) = ks_gate::ks_index(w.ep) else { return };
+            core.ks_rx[i] = core.ks_rx[i].saturating_add(1);
+            core.ks_logged = core.ks_logged.saturating_add(1);
+            if core.ks_logged <= KS_LOG_LIMIT {
+                let (op, txn, len, flag) = ks_gate::sks_fields(&w);
+                dev_info!(
+                    self.dev,
+                    "keystore < EP {:#04x} '{}' TAG {:#04x} TYPE {:#04x} PARAM {:#04x} DATA {:#010x} ({} ; {} ; champs sks op {:#04x} txn {:#04x} len {:#x} flag {:#x}) : {:#018x}\n",
+                    w.ep, KS_EPS[i].name_str(), w.tag, w.ty, w.param, w.data,
+                    ks_gate::kind_label(ks_gate::classify(&w)),
+                    if core.ks_open[i] { "EP ouvert" } else { "EP PAS ENCORE ouvert" },
+                    op, txn, len, flag, raw
+                );
+            } else if core.ks_logged == KS_LOG_LIMIT + 1 {
+                dev_info!(self.dev, "keystore : journal coupé au-delà de {} mots (compte gardé)\n", KS_LOG_LIMIT);
+            }
+            self.cv.notify_all();
         }
 
         /// Mot reçu sur sbio (allow_sbio=1) : journalisé, compté. Avant le relais : jamais de réponse, jamais de
@@ -1067,6 +1140,8 @@ mod drv {
             let allowed = core.state == State::Running
                 && param_allow_xart()
                 && w.ep != EP_SKS
+                && w.ep != EP_SKDL
+                && w.ep != EP_SCRD
                 && match w.ep {
                     // CNTL PARAM 0x08 (tampons de sbio) : seulement pendant l'ouverture de sbio, TYPE 0x02-0x05.
                     discovery::EP_CNTL if w.param == EP_SBIO => {
@@ -1074,7 +1149,23 @@ mod drv {
                             && core.sbio == SbioPhase::Opening
                             && matches!(w.ty, CNTL_SET_A_IOVA | CNTL_SET_B_IOVA | CNTL_SET_A_SIZE | CNTL_SET_B_SIZE)
                     }
-                    discovery::EP_CNTL => CNTL_TX_TYPES.contains(&w.ty),
+                    // CNTL PARAM 0x17/0x12/0x0a (J7a) : seulement l'EP en cours d'ouverture, et exactement le mot suivant
+                    // des 4 de `ks_gate::open_steps` (TYPE, PARAM, DATA = taille ou IOVA de NOS tampons), une fois chacun.
+                    discovery::EP_CNTL if ks_gate::ks_index(w.param).is_some() => {
+                        param_allow_sks() == 1
+                            && core.ks_opening == Some(w.param)
+                            && core.ks_gate.admit(w.ty, w.param, w.data)
+                    }
+                    // Autres CNTL : SECMODE (PARAM 0, DATA 0) et tampons PARAM 0x13 seulement avant la fin de
+                    // l'ouverture de 0x13 ; 0x12 (pong) PARAM 0 DATA 0.
+                    discovery::EP_CNTL => match w.ty {
+                        CNTL_SECMODE => w.param == 0 && w.data == 0 && !core.xart_open,
+                        CNTL_SET_A_IOVA | CNTL_SET_B_IOVA | CNTL_SET_A_SIZE | CNTL_SET_B_SIZE => {
+                            w.param == EP_XART && !core.xart_open
+                        }
+                        CNTL_PONG => w.param == 0 && w.data == 0,
+                        _ => false,
+                    },
                     // sbio : phase Open → exactement `TAG 0xfc TYPE 0x73 PARAM 0 DATA 0`, une seule fois (→ HelloSent) ;
                     // phase Relay → `> fc` de la commande en vol (DATA 0, une fois), `> fe` demandé (DATA nfd << 16), ou
                     // pour la seule étape `frag_in` (0x5b) `> fd` du fragment suivant après un `< fe` (DATA k << 16).
@@ -1268,8 +1359,15 @@ mod drv {
             }
             core.sbio = SbioPhase::Open;
             dev_info!(self.dev, "0x08 ouvert ; mots sbio reçus jusqu'ici : {}\n", core.sbio_rx);
+            // J7a : skdl, sks, scrd ouverts (CNTL seul) puis écoute passive, AVANT le 0x73. Erreur → pas de 0x73.
+            let quiet_start = if param_allow_sks() == 1 {
+                self.run_keystore(&mut core)?;
+                Instant::<Monotonic>::now()
+            } else {
+                start
+            };
             if early {
-                self.sbio_wait(&mut core, start, true)?;
+                self.sbio_wait(&mut core, quiet_start, true)?;
                 dev_info!(self.dev, "sbio : xART calme ({} ms sans trafic 0x13, aucune requête en attente) ; envoi du 0x73\n", SBIO_QUIET_MS);
             }
             // 3. Poignée 0x73 : A8 = gt_packet capturé, relu avant l'envoi.
@@ -1312,6 +1410,14 @@ mod drv {
                 if alive { "VIVANT" } else { "MUET" },
                 b0, b14, core.sbio_rx_after, if core.sbio_alive_msg { "oui" } else { "non" }
             );
+            if param_allow_sks() == 1 {
+                dev_info!(
+                    self.dev,
+                    "keystore (bilan) : ouverts skdl {} sks {} scrd {} ; mots reçus skdl {} sks {} scrd {}\n",
+                    core.ks_open[KS_SKDL], core.ks_open[KS_SKS], core.ks_open[KS_SCRD],
+                    core.ks_rx[KS_SKDL], core.ks_rx[KS_SKS], core.ks_rx[KS_SCRD]
+                );
+            }
             if alive && param_allow_relay() && core.state == State::Running {
                 let bio_tail = if param_sbio_bio() != 0 { ", puis UN 0x03 (E-ENROLL-START) et écoute seule" } else { "" };
                 core.sbio = SbioPhase::Relay;
@@ -1324,6 +1430,143 @@ mod drv {
                 );
             }
             Ok(alive && core.sbio == SbioPhase::Relay)
+        }
+
+        /// J7a : attend que l'EP `i` de `KS_EPS` soit annoncé en 0xFD AU NUMÉRO attendu, avec ses tailles (TYPE 1), et que
+        /// son annonce 0x1d soit acquittée. `Ok(true)` = prêt ; `Ok(false)` = pas vu en KS_WAIT_MS (rien envoyé, pas de
+        /// Halted). Annoncé ailleurs ou tailles inattendues → `Err` (fail-closed : plus rien de keystore, pas de 0x73).
+        fn ks_wait(&self, core: &mut MutexGuard<'_, Core>, i: usize) -> Result<bool> {
+            let e = &KS_EPS[i];
+            let t0 = Instant::<Monotonic>::now();
+            loop {
+                if core.state != State::Running {
+                    return Err(EIO);
+                }
+                match core.ep_by_name(&e.name) {
+                    Some(ep) if ep != e.ep => {
+                        dev_err!(self.dev, "keystore : '{}' annoncé en {:#04x} et non en {:#04x} : arrêt (rien envoyé)\n", e.name_str(), ep, e.ep);
+                        return Err(ENODEV);
+                    }
+                    Some(_) => {
+                        let sizes = core.ep_index(e.ep).and_then(|k| core.eps[k].as_ref()).and_then(|x| x.sizes_raw);
+                        if let Some(raw) = sizes {
+                            if ks_gate::check_pages(e, raw).is_err() {
+                                dev_err!(self.dev, "keystore : '{}' tailles 0xFD {:#010x} ≠ attendues {:?} : arrêt (rien envoyé)\n", e.name_str(), raw, e.pages);
+                                return Err(EINVAL);
+                            }
+                            if core.ks_acked[i] {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                    None => {}
+                }
+                if t0.elapsed().as_millis() >= KS_WAIT_MS {
+                    let fd = core.ep_by_name(&e.name).is_some();
+                    dev_info!(
+                        self.dev,
+                        "VERDICT {} : NON PRÊT en {} ms (annonce 0xFD : {} ; ack 0x1d : {}) ; {} non ouvert(s), rien envoyé\n",
+                        e.name_str(), KS_WAIT_MS, if fd { "oui" } else { "NON" }, if core.ks_acked[i] { "oui" } else { "non" },
+                        if i + 1 < KS_EPS.len() { "lui et les suivants" } else { "lui" }
+                    );
+                    return Ok(false);
+                }
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_err!(self.dev, "signal pendant l'attente de '{}' : arrêt (rien envoyé)\n", e.name_str());
+                    return Err(EINTR);
+                }
+            }
+        }
+
+        /// J7a (`docs/sks_native_plan.md` §4, expérience 1) : ouvre skdl, puis sks, puis scrd (ordre de c12) par le
+        /// CNTL SEULEMENT (4 mots chacun, porte `OpenGate`), chacun une fois prêt (`ks_wait`) ; le premier EP pas prêt
+        /// arrête les ouvertures (les suivants ne sont pas ouverts). Puis écoute passive KS_LISTEN_MS (dumps de B après
+        /// un nouveau mot, bornés, puis en fin). Aucun mot n'est envoyé AUX EP keystore. Ack CNTL absent → Halted.
+        fn run_keystore(&self, core: &mut MutexGuard<'_, Core>) -> Result {
+            let Some(bufs) = self.ks_ool.as_ref() else { return Err(EINVAL) };
+            for i in [KS_SKDL, KS_SKS, KS_SCRD] {
+                let e = &KS_EPS[i];
+                if !self.ks_wait(core, i)? {
+                    break;
+                }
+                let (a, b) = &bufs[i];
+                let (Some(ia), Some(ib)) = (iova_page(a.dma_handle()), iova_page(b.dma_handle())) else {
+                    dev_err!(self.dev, "keystore : IOVA de '{}' inutilisables : arrêt (rien envoyé)\n", e.name_str());
+                    return Err(EINVAL);
+                };
+                if a.len() != e.size as usize || b.len() != e.size as usize {
+                    return Err(EINVAL);
+                }
+                dev_info!(
+                    self.dev,
+                    "keystore : ouverture de '{}' (EP {:#04x}) : A IOVA {:#x}, B IOVA {:#x}, {:#x} o chacun ; {} requête(s) 0x13 en attente\n",
+                    e.name_str(), e.ep, a.dma_handle(), b.dma_handle(), e.size, core.n_pend
+                );
+                let w = ks_gate::open_steps(e, ia, ib);
+                let label: [&'static str; 4] = match i {
+                    KS_SKDL => ["CNTL A17 taille", "CNTL A17 adresse", "CNTL B17 taille", "CNTL B17 adresse"],
+                    KS_SKS => ["CNTL A12 taille", "CNTL A12 adresse", "CNTL B12 taille", "CNTL B12 adresse"],
+                    _ => ["CNTL A0a taille", "CNTL A0a adresse", "CNTL B0a taille", "CNTL B0a adresse"],
+                };
+                let steps: [(u8, u8, u32, &'static str); 4] = [
+                    (w[0].0, w[0].1, w[0].2, label[0]),
+                    (w[1].0, w[1].1, w[1].2, label[1]),
+                    (w[2].0, w[2].1, w[2].2, label[2]),
+                    (w[3].0, w[3].1, w[3].2, label[3]),
+                ];
+                core.ks_gate = OpenGate::new(e, ia, ib);
+                core.ks_opening = Some(e.ep);
+                dma_wmb();
+                let r = self.cntl_steps(core, &steps, "pas d'ack CNTL à l'ouverture d'un EP keystore", "signal reçu pendant l'ouverture d'un EP keystore");
+                core.ks_opening = None;
+                let done = core.ks_gate.done();
+                core.ks_gate = OpenGate::closed();
+                r?;
+                if !done {
+                    self.halt(core, "ouverture keystore incomplète (bug)", None);
+                    return Err(EIO);
+                }
+                core.ks_open[i] = true;
+                dev_info!(self.dev, "keystore : '{}' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : {}\n", e.name_str(), core.ks_rx[i]);
+            }
+            dev_info!(
+                self.dev,
+                "keystore : écoute passive {} ms (rien envoyé à 0x17/0x12/0x0a) ; ouverts skdl {} sks {} scrd {}\n",
+                KS_LISTEN_MS, core.ks_open[KS_SKDL], core.ks_open[KS_SKS], core.ks_open[KS_SCRD]
+            );
+            let t0 = Instant::<Monotonic>::now();
+            let mut seen = core.ks_rx;
+            let mut dumps = [0u32; 3];
+            while t0.elapsed().as_millis() < KS_LISTEN_MS && core.state == State::Running {
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_warn!(self.dev, "signal pendant l'écoute keystore : écoute écourtée, pas de 0x73\n");
+                    return Err(EINTR);
+                }
+                for i in 0..KS_EPS.len() {
+                    if core.ks_rx[i] != seen[i] && dumps[i] < KS_DUMP_LIMIT {
+                        seen[i] = core.ks_rx[i];
+                        dumps[i] += 1;
+                        self.dump_ool(&bufs[i].1, "B keystore après un mot", KS_EPS[i].name_str());
+                    }
+                }
+            }
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            for (i, e) in KS_EPS.iter().enumerate() {
+                if core.ks_open[i] {
+                    self.dump_ool(&bufs[i].1, "B keystore en fin d'écoute", e.name_str());
+                }
+            }
+            dev_info!(
+                self.dev,
+                "VERDICT keystore : skdl {} sks {} scrd {} ; mots reçus pendant/avant l'écoute : skdl {} sks {} scrd {} ; puis 0x73\n",
+                if core.ks_open[KS_SKDL] { "OUVERT" } else { "non ouvert" },
+                if core.ks_open[KS_SKS] { "OUVERT" } else { "non ouvert" },
+                if core.ks_open[KS_SCRD] { "OUVERT" } else { "non ouvert" },
+                core.ks_rx[KS_SKDL], core.ks_rx[KS_SKS], core.ks_rx[KS_SCRD]
+            );
+            Ok(())
         }
 
         /// Une commande du relais (`write` de /dev/sep_sbio, contexte processus) : contrôle (ordre, longueur exacte,
@@ -1511,9 +1754,17 @@ mod drv {
         /// Journalise les `SBIO_DUMP_LEN` premiers octets de B8 (mots u32 petit-boutistes), l'en-tête gt_packet et le
         /// nombre d'octets non nuls ; renvoie (B8[0x00], B8[0x14]).
         fn dump_b8(&self, b8: &Ool, label: &'static str) -> (u8, u8) {
+            self.dump_ool(b8, label, "B8")
+        }
+
+        /// Dump d'un tampon OOL (≥ SBIO_DUMP_LEN octets) : octets non nuls, champs gt_packet, 0x80 premiers octets.
+        fn dump_ool(&self, b8: &Ool, label: &str, prefix: &str) -> (u8, u8) {
             let mut buf = [0u8; SBIO_DUMP_LEN];
             dma_rmb();
-            // SAFETY: `b8` est une allocation cohérente de SBIO_OOL_SIZE >= SBIO_DUMP_LEN octets, vivante (tenue par
+            if b8.len() < SBIO_DUMP_LEN {
+                return (0, 0);
+            }
+            // SAFETY: `b8` est une allocation cohérente d'au moins SBIO_DUMP_LEN octets (contrôlé ci-dessus), vivante (tenue par
             // `self`). Le SEP peut l'écrire en même temps : lecture octet par octet en volatile (instantané sans
             // garantie de cohérence, journal seulement).
             let nz = unsafe {
@@ -1530,7 +1781,7 @@ mod drv {
                 label, nz, b8.len(), u(0), u(4), u(8), u(0x14), u(0x18)
             );
             for o in (0..SBIO_DUMP_LEN).step_by(16) {
-                dev_info!(self.dev, "  B8+{:#05x} : {:08x} {:08x} {:08x} {:08x}\n", o, u(o), u(o + 4), u(o + 8), u(o + 12));
+                dev_info!(self.dev, "  {}+{:#05x} : {:08x} {:08x} {:08x} {:08x}\n", prefix, o, u(o), u(o + 4), u(o + 8), u(o + 12));
             }
             (buf[0], buf[0x14])
         }
@@ -1580,6 +1831,16 @@ mod drv {
             core.pend_remove(i);
             if core.b_owner == Some(h.seq) {
                 core.b_owner = None;
+            }
+            if req.ty == OP_EP_ANNOUNCE {
+                let name = ks_gate::announce_name(&req);
+                if let Some(i) = KS_EPS.iter().position(|e| e.name == name) {
+                    core.ks_acked[i] = true;
+                    if param_allow_sks() != 0 {
+                        dev_info!(self.dev, "annonce 0x1d '{}' acquittée\n", KS_EPS[i].name_str());
+                        self.cv.notify_all();
+                    }
+                }
             }
             if req.ty == OP_EP_ANNOUNCE && req.param == SBIO_ANNOUNCE_PARAM && req.data & 0x00FF_FFFF == SBIO_ANNOUNCE_DATA {
                 core.sbio_ack_sent = true;
@@ -2157,6 +2418,18 @@ mod drv {
         } else {
             None
         };
+        let ks_ool = if param_allow_sks() == 1 {
+            let alloc = |i: usize| -> Result<(Ool, Ool)> {
+                let n = KS_EPS[i].size as usize;
+                let a = dma::Coherent::<u8>::zeroed_slice(dev, n, GFP_KERNEL)?;
+                let b = dma::Coherent::<u8>::zeroed_slice(dev, n, GFP_KERNEL)?;
+                dev_info!(dev, "OOL '{}' alloués : A IOVA {:#x}, B IOVA {:#x}, {:#x} o chacun\n", KS_EPS[i].name_str(), a.dma_handle(), b.dma_handle(), n);
+                Ok((a, b))
+            };
+            Some([alloc(KS_SKDL)?, alloc(KS_SKS)?, alloc(KS_SCRD)?])
+        } else {
+            None
+        };
         let bsnap = KVec::with_capacity(if ool.is_some() { OOL_SIZE } else { 0 }, GFP_KERNEL)?;
         let relay_buf = KVec::with_capacity(if param_allow_relay() { MAX_REPLY } else { 0 }, GFP_KERNEL)?;
         // File de l'écoute E-ENROLL-START (SPONT_LEN × B8), seulement si allow_sbio_bio=1 ; remplie de zéros ici
@@ -2171,6 +2444,7 @@ mod drv {
                 shmem,
                 ool,
                 sbio_ool,
+                ks_ool,
                 fw,
                 ring: Ring::new(),
                 opened: Atomic::new(0),
@@ -2236,11 +2510,11 @@ mod drv {
             pdev: &'bound platform::Device<device::Core<'_>>,
             _info: Option<&'bound Self::IdInfo>,
         ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
-            for (name, v) in unimplemented_params() {
-                if v != 0 {
-                    dev_err!(pdev, "{}={} : non implémenté dans cette version, refus\n", name, v);
-                    return Err(EINVAL);
-                }
+            if param_allow_sks() > 1
+                || (param_allow_sks() == 1 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
+            {
+                dev_err!(pdev, "allow_sks vaut 0 ou 1 ; allow_sks=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
+                return Err(EINVAL);
             }
             if (param_allow_xart() && param_allow_boot() == 0)
                 || (param_allow_save_ack() && !param_allow_xart())
