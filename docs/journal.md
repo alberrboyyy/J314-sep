@@ -14,6 +14,24 @@ Format :
 
 ---
 
+## 2026-11-22 — Claude (agent driver, session ALARM) — J5 compilé : relais sbio noyau (/dev/sep_sbio) + sbiod (spidev/gpio) ; ouverture précoce `sbio_open`
+- Trace : — (compilation et tests hors ligne seulement ; rien chargé, aucun accès matériel).
+- Fait : `sep_native.rs` : paramètres `allow_sbio_relay` (défaut 0) et `sbio_open` (défaut 1 = précoce, 0 = tardive) ;
+  ouverture précoce de sbio dès l'ack de l'annonce 0x1d 'sbio' (entrelacée avec le xART, acks CNTL par TAG, Halted si
+  absent), 0x73 toujours après 2 s de calme ; relais typé `/dev/sep_sbio` (liste blanche ordonnée 0x17 0x15 0x16 0x42
+  0x18 0x5f, longueurs exactes, gt_packet construit par le noyau, réassemblage fe/fd contrôlé, notifications TAG 0x01-0x04
+  remontées). `sep-proto/src/sbio_gate.rs` (porte partagée), `sensor.rs` (trames relais, prélude, octet 0x29). Nouveau
+  démon `driver/rust/sbiod` (spidev + gpio cdev v2, séquence 1→4, VERDICT). Scripts `pending/j5_sensor_run.sh`,
+  `pending/j3_chained_run.sh` ; `j3_sbio_run.sh` passe `sbio_open=0`. Doc `driver/rust/kmod/SEP_NATIVE.md` points 9-10.
+- Vu (hors ligne) : les gt_packets construits par la porte = octet pour octet les A8 de c12 (000300..000313) ; les B8 de
+  c12 passent la porte, patch réassemblé 0x568e o ; run complet contre faux SEP/capteur OK. Phandles de
+  `mesa-spi2-overlay.dts` (0x13, 0x31, 0x48) relus sur le DT vivant d'ALARM : inchangés. gpio0 = `gpiochip4`
+  (sous `39b028000.pinctrl`, à côté de proxys `gpiolib_shared`) sur ce boot. `build.sh CLIPPY=1` : 0 avertissement ;
+  cargo test/clippy verts (sep-proto, sepd, sbiod).
+- Interprété : rien de neuf sur le protocole. Le push en PIO noyau (≈22 ms nominal à 8 MHz, IRQ par demi-FIFO) reste
+  l'inconnue de J5 ; l'ouverture précoce reste à éprouver (j3_chained_run.sh).
+- Incidents : aucun.
+
 ## 2026-11-22 (reprise, bloc autonome) — Règle SEP-depuis-Linux OUVERTE + roadmap + paquet de mission agent-Mac
 - Trace : — (travail doc/code, aucun hardware ; Mac laissé en proxy, inutilisé).
 - Fait : (1) Albert a autorisé l'ouverture de la ligne rouge + « étape 6 » → **CLAUDE.md « Exception 2e Linux de test » RÉÉCRITE** : SEP désormais autorisé depuis le Linux de test (sbio/SKS/xART/IMG4/DMA capteur) avec la MÊME discipline qu'en m1n1 (fail-closed, DFU+alarm_p5, 1er run classe/script neuf = go Albert, power-cycle = Albert, jamais Stockholm direct ; toujours interdit : disques/boot/m1n1/partition/macOS). (2) `documentaliste` a rendu `docs/linux_roadmap.md` (J0→J6, écarts à coder, lignes rouges par jalon). (3) Écrit `driver/linux/MISSION_AGENT_MAC.md` (paquet de mission auto-suffisant pour l'agent Claude qu'Albert lancera côté Mac sous Linux) + `driver/linux/env_probe.sh` (sonde T1 lecture seule : spi2/spi-apple, **sio/dart-sio/apple-sio = point décisif**, sep présence, gpio).

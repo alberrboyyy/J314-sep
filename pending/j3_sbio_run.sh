@@ -29,7 +29,9 @@ fi
 cp $J/sep-native.dtbo /lib/firmware/
 insmod $J/sep_native_ovl.ko
 # insmod reste en arrière-plan : le probe attend sbio (≤ 120 s), l'ouvre, envoie le 0x73, écoute 6 s.
-insmod $J/sep_native.ko allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 &
+# Module J5+ : sbio_open vaut 1 (précoce) par défaut ; ce script garde l'ouverture TARDIVE éprouvée (J3 19:20).
+OPEN=$(modinfo -F parm $J/sep_native.ko | grep -q "^sbio_open:" && echo sbio_open=0 || true)
+insmod $J/sep_native.ko allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 $OPEN &
 for i in $(seq 1 300); do [ -e /dev/sep_native ] && break; sleep 0.1; done
 [ -e /dev/sep_native ] || { echo "/dev/sep_native absent après 30 s"; journalctl -k -b --no-pager | grep sep_native | tail -20; exit 1; }
 echo "verdict : journalctl -k -b | grep -E 'sbio|VERDICT|HALTED'"

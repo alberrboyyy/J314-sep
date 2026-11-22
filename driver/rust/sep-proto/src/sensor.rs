@@ -21,6 +21,40 @@ pub const IDENTITY_J314C: [u8; 27] = [
     0xc7, 0x6e, 0x03, 0x02, 0x00, 0xd8, 0x75, 0x76,
 ];
 
+/// Identity bytes holding the sensor serial sent with sbio 0x17 (c12 template 000303_08_A.bin payload = these 16
+/// bytes; proven under m1n1 by sbio3..sbio11).
+pub const SERIAL_RANGE: core::ops::Range<usize> = 9..25;
+pub const SERIAL_LEN: usize = 16;
+/// Status request: 7-byte command padded with 16 zeros, 0x17 bytes read; the status body starts at byte 7.
+pub const STATUS_XFER_LEN: usize = 0x17;
+pub const STATUS_HEAD: [u8; 4] = [0x80, 0x20, 0x00, 0x10];
+/// Opcodes of the relay frames (no CRC; VU C19: 0x72 = 7 + 40 = 0x2f, 0x73 = 7 + 64 = 0x47).
+pub const OP_KEY_EXCHANGE: u8 = 0x72;
+pub const OP_SEQ_COUNTER: u8 = 0x73;
+/// Offset of the opaque payload in the sensor reply of a relay frame (SPI_RESP_OFF of sbio4..11, proven: the SEP
+/// acked 0x16 and 0x18 with it).
+pub const RELAY_RESP_OFF: usize = 9;
+/// Prelude of the patch push (VU C19, sbio7..11), sent alone, then the raw block in ONE transfer.
+pub const PATCH_PRELUDE: [u8; 7] = [0x80, 0x60, 0x00, 0x07, 0x00, 0x00, 0x00];
+/// Status byte 1 (frame byte 8) after the patch block: 0x29 = loaded (kext `cmp #0x29`, sbio_session.md §3b and
+/// C19 `00 29 01 00 7c`); 0x60 = no patch.
+pub const PATCH_LOADED: u8 = 0x29;
+pub const PATCH_NONE: u8 = 0x60;
+
+/// Relay frame `80 op 00 TT 00 00 00 + blob`, TT = total length (7 + blob). Written into `out`, returns its length.
+/// Only totals < 0x100 are built: there the two readings of the header (u16 BE at 2 in the scripts, u32 LE at 3 in
+/// `parse_frame`) give the same bytes; a longer frame is refused (never needed by 0x72 / 0x73).
+pub fn build_relay_frame(op: u8, blob: &[u8], out: &mut [u8]) -> Result<usize> {
+    let n = HEADER_LEN + blob.len();
+    if n >= 0x100 {
+        return Err(Error::Unexpected("relay frame too long"));
+    }
+    let o = out.get_mut(..n).ok_or(Error::Short)?;
+    o[..HEADER_LEN].copy_from_slice(&[MAGIC, op, 0, n as u8, 0, 0, 0]);
+    o[HEADER_LEN..].copy_from_slice(blob);
+    Ok(n)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Frame<'a> {
     pub op: u8,
@@ -62,6 +96,10 @@ impl Status<'_> {
     /// Hypothesis (kext): 7 = data available.
     pub fn state_byte(&self) -> Option<u8> {
         self.frame.raw.get(7).copied()
+    }
+    /// Status byte 1 (frame byte 8): 0x29 after a loaded patch, 0x60 without (see `PATCH_LOADED`).
+    pub fn patch_byte(&self) -> Option<u8> {
+        self.frame.raw.get(8).copied()
     }
     /// Hypothesis (kext).
     pub fn avail_u32(&self) -> Option<u32> {
@@ -139,6 +177,19 @@ mod tests {
         assert_eq!(u32::from_le_bytes([r[7], r[8], r[9], r[10]]), 0x7200);
         // Same request as mesa_probe for the 0x1b-byte identity (verified on hardware).
         assert_eq!(build_read_request(0x1b), [0x80, 0x13, 0, 0x0b, 0, 0, 0, 0x1b, 0, 0, 0]);
+    }
+
+    #[test]
+    fn relay_frames() {
+        let mut b = [0u8; 0x80];
+        let n = build_relay_frame(OP_KEY_EXCHANGE, &[0xaa; 40], &mut b).unwrap();
+        assert_eq!((n, &b[..7]), (0x2f, &[0x80, 0x72, 0, 0x2f, 0, 0, 0][..]));
+        let n = build_relay_frame(OP_SEQ_COUNTER, &[0xbb; 64], &mut b).unwrap();
+        assert_eq!((n, &b[..7]), (0x47, &[0x80, 0x73, 0, 0x47, 0, 0, 0][..]));
+        assert!(build_relay_frame(0x72, &[0; 0xf9], &mut [0u8; 0x200]).is_err());
+        assert_eq!(&IDENTITY_J314C[SERIAL_RANGE], &[0x02, 0x19, 0xc0, 0x5c, 0x0f, 0xd2, 0xaa, 0x34, 0x9a, 0x81, 0xc7, 0x6e, 0x03, 0x02, 0x00, 0xd8]);
+        let st = [0x80, 0x20, 0, 0x10, 0, 0, 0, 0, 0x29, 1, 0, 0x7c, 0x52, 0x33, 0, 0x16];
+        assert_eq!(parse_status(&st).unwrap().patch_byte(), Some(PATCH_LOADED));
     }
 
     #[test]

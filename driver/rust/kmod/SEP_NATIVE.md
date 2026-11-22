@@ -3,7 +3,9 @@
 Fichiers : `sep_native.rs` (ce dossier), `driver/linux/sep_native_ovl.c` + `driver/linux/sep-native-overlay.dts`.
 Conception : `docs/driver_rust_design.md` (§2 option (b), §3.1-3.6). Boot (`allow_boot=1`) **éprouvé sur matériel
 le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **éprouvé sur matériel le 2026-11-22** (J4,
-`logs/20261122-183847_j4-xart-native/`). Ouverture de sbio + poignée 0x73 (`allow_sbio`, J3) : **compilé, jamais chargé.**
+`logs/20261122-183847_j4-xart-native/`). Ouverture de sbio + poignée 0x73 (`allow_sbio`, J3, ouverture tardive) : **éprouvée sur matériel le 2026-11-22 après un
+scellement frais** (`logs/20261122-192013_j3c-sbio-fresh/`, VIVANT). Ouverture précoce (`sbio_open=1`) et relais J5
+(`allow_sbio_relay`, `/dev/sep_sbio`, `sbiod`) : **compilés et testés hors ligne, jamais chargés.**
 
 ## Ce que ça fait
 
@@ -67,7 +69,33 @@ le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **éprouvé s
    journalisé `sbio < …` (128 lignes au plus, compte gardé), **sans réponse ni `Halted`**. Le dump de B8 n'est pas
    exposé à l'espace utilisateur (dmesg seulement).
 
-## Paramètres (u32, défaut 0, absents de sysfs : figés au chargement)
+9. **Ouverture précoce (`sbio_open=1`, défaut), à la demande de l'orchestrateur PC (comparaison avec c12 chaîné)** :
+   en boot chaîné (master servi depuis le store), l'ouverture tardive n'est jamais acquittée (n=2, orchestrateur PC).
+   macOS (c12 L119-L136) ouvre ~35 ms après son ack `> 0x13 TYPE 0x16 DATA 0x00736200` de l'annonce
+   `< 0x13 TYPE 0x1d PARAM 0x6f DATA 0x00736269` ('sbio'), pendant que les FETCH locker continuent. Ici : dès que sepd a
+   fait envoyer cet ack (`submit_reply` reconnaît TYPE 0x1d, PARAM 0x6f, DATA & 0xFFFFFF = 0x736269, et réveille le fil
+   du probe) ET que `sbio` est dans la table en 0x08, les 4 CNTL PARAM 0x08 partent sans attendre le calme. Pendant
+   l'attente des acks (condvar, verrou rendu), le work continue de mettre en file les requêtes 0x13 et sepd d'y répondre ;
+   les acks CNTL sont appariés par TAG (`cntl_wait`), un ack d'un autre TAG → Halted. Ack absent en 5 s → Halted
+   (comme l'ouverture tardive). Le 0x73 part ensuite seulement quand le xART est calme (règle des 2 s du point 8),
+   délai total 120 s depuis l'ouverture de 0x13 (au-delà : pas de 0x73, pas de Halted). macOS met TAG 8 aux 4 CNTL,
+   on garde le TAG tournant 1..8 (celui de l'ouverture tardive éprouvée). Différence non testée sur matériel.
+10. **Relais J5 (`allow_sbio_relay=1`)** : si le verdict du 0x73 est VIVANT, phase `Relay` et création de
+   `/dev/sep_sbio` (root 0600, un seul ouvreur). Liste blanche **dans l'ordre, une fois chacune** (`sep-proto
+   sbio_gate::RELAY_SEQUENCE`), avec longueur de charge EXACTE et bornes de la réponse :
+   `0x17` (16 o → 0), `0x15` (4 o → 40), `0x16` (40 o → 0), `0x42` (0 → 64), `0x18` (64 o → 0), `0x5f` (2 o → 2..0x10000).
+   Rien après 0x5f. Le noyau construit le gt_packet (en-tête 0x1c `1, total, 0, 0, 0, op, len` + charge, reste de A8 à
+   zéro : octet pour octet les A8 de c12, test `sbiod/tests/replay.rs`), relit `+0x00` et `+0x14`, envoie
+   `> EP 0x08 TAG 0xfc TYPE op PARAM 0 DATA 0`. Réponse : `< TAG 0xfc TYPE op` (1er fragment) puis, tant que
+   `offset + long < total`, `> TAG 0xfe TYPE op DATA nfd << 16` (A8 inchangé) et `< TAG 0xfd` ; chaque mot passe la règle
+   du compteur GT (`gt::CounterChecker`) et chaque en-tête de B8 `sbio_gate::check_fragment` (version 1, opcode, total
+   stable et borné, fragments dans l'ordre, ≤ 0x3fe4 o, ≤ 8 fragments) ; le fragment est copié de B8 dans un tampon
+   préalloué de 0x10000 o. Pas de fragmentation AP→SEP (toutes les charges ≤ 64 o, plus long → refus). 6 s par réponse.
+   **Halted** : commande hors liste / hors ordre / mauvaise longueur, mot GT hors transaction ou de mauvais TAG/TYPE,
+   compteur faux, en-tête refusé, délai, signal pendant une transaction. Notifications TAG 0x01-0x04 : file de 16
+   événements pour le démon (pleine → perdue et comptée, pas de Halted). Autre TAG sur 0x08 pendant le relais → Halted.
+
+## Paramètres (u32, défaut 0 sauf `sbio_open`, absents de sysfs : figés au chargement)
 
 | Paramètre | Effet |
 |---|---|
@@ -75,6 +103,8 @@ le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **éprouvé s
 | `allow_xart` | 1 = ouverture de 0x13 et `/dev/sep_native` (réponses 0x0e, 0x13, FETCH servi/ABSENT, 0x07, 0x1d). Exige `allow_boot=1` (sinon EINVAL). |
 | `allow_xart_save_ack` | 1 = le démon peut acquitter les SAVE (⚠️ le compteur scellé avance). 0 = un SAVE → `Halted`. Exige `allow_xart=1`. |
 | `allow_sbio` | 1 = J3 (point 8) : ouverture de 0x08 et UNE poignée 0x73 quand le xART est calme. Exige `allow_xart=1` (sinon EINVAL). En pratique il faut aussi `allow_xart_save_ack=1` : sbio n'est annoncé qu'après le scellement. |
+| `sbio_open` | **défaut 1** = ouverture PRÉCOCE de sbio (point 9) ; 0 = TARDIVE (point 8, éprouvée après scellement frais). Autre valeur → EINVAL. Sans effet si `allow_sbio=0`. |
+| `allow_sbio_relay` | 1 = relais J5 (point 10) : `/dev/sep_sbio` après un 0x73 VIVANT. Exige `allow_sbio=1` (sinon EINVAL). |
 | `allow_sks` | **non implémenté** : toute valeur ≠ 0 fait échouer le probe (EINVAL). |
 
 ## États
@@ -116,6 +146,49 @@ N'existe qu'après l'ouverture réussie de 0x13 ; root 0600 ; un seul ouvreur (E
 - Écart au design §3.5 : pas d'ioctl (`GET_STATE`, `XART_LOAD_STORE`…) ; l'état se lit dans `dmesg`. Le noyau ne
   précharge pas le store : chaque FETCH fait l'aller-retour vers le démon (le harnais tolérait la latence USB).
 
+## Interface `/dev/sep_sbio` (allow_sbio_relay=1)
+
+Enregistrements petit-boutistes de `sep-proto::sbio_gate` (noyau et démon partagent le code), magic `SBR1` :
+- `write` : `+0 u32 magic | +4 op | +5..8 0 | +8 u32 len` + charge (≤ 64 o). **Bloque** jusqu'à la réponse complète
+  (réassemblée) ; EBUSY si la réponse précédente n'a pas été lue (lockstep strict) ; refus → Halted.
+- `read` (tampon ≥ 16 + 0x10000 o) : bloque jusqu'à un événement : d'abord les notifications (`kind 2`, mot seul), puis
+  la réponse (`kind 1`, mot final + charge réassemblée). `+0 magic | +4 kind | +5 tag | +6 type | +7 param |
+  +8 u32 data | +12 u32 len`. EIO une fois Halted.
+
+## Démon `driver/rust/sbiod` (J5)
+
+`sbiod preflight` (côté capteur, sysfs seulement) / `sbiod run [--dev /dev/sep_sbio] [--log F]` / `sbiod power-off`.
+`run` : alimentation gpio0 196 (bas 40 ms, haut, 60 ms, comme `mesa_power_on`), identité (0x78, 0x10, 0x70, 0x10, 0x13,
+lecture 0x1b ; doit être l'identité connue, série [9..25] = celle du gabarit c12), 0x17, 0x15 → trame `80 72 00 2f 00 00 00`
++ 40 o → réponse (attendue 0x33 o) → 40 o @ 9 → 0x16, 0x42 → `80 73 00 47 00 00 00` + 64 o → 64 o @ 9 → 0x18, 0x5f →
+contrôle préfixe u16 = longueur − 2 → état, prélude `80 60 00 07 00 00 00` seul, **bloc en un seul SPI_IOC_MESSAGE**, puis
+1,5 s de scrutation (broche 195 + état toutes les 50 ms ; octet 1 lu seulement si l'en-tête est `80 20 00 10`).
+Ligne finale : `VERDICT : patch chargé (0x29 …)` / `patch refusé` (broche montée, jamais 0x29) / `IRQ absente` /
+`arrêt (fail-closed) : …`. Capteur éteint dans tous les chemins (garde `Drop` + `trap` du script). Chaque échange est
+journalisé (longueur + 16 premiers octets), rien n'est interprété. Tous les délais = ceux de `mesa_transport.h` et des
+scripts sbio4..11 (10 ms entre échanges, 50 sondages d'état pour la longueur en attente).
+
+Capteur depuis l'espace utilisateur (le noyau ne parle pas au capteur) — commandes du script :
+```
+cp mesa-spi2.dtbo /lib/firmware/ && insmod mesa_ovl.ko          # nœud spi2 + enfant biosensor@0 (aucun pilote lié)
+D=/sys/bus/spi/devices/spiN.0     # celui dont of_node finit par spi@39b108000/biosensor@0
+echo spidev > $D/driver_override  # pas de variante d'overlay : driver_override sur l'enfant existant
+modprobe spidev bufsiz=65536      # défaut 4096 < 22158 (bloc du patch) ; bufsiz se fixe au chargement
+[ -e $D/driver ] || echo spiN.0 > /sys/bus/spi/drivers/spidev/bind
+echo on > $D/../power/control     # contrôleur spi2 gardé actif (comme pm_runtime_resume_and_get de mesa_acquire)
+```
+GPIO : `/dev/gpiochipN` dont le device sysfs est directement sous `39b028000.pinctrl` (pas les `gpiolib_shared.proxy.*`),
+label contrôlé par `GPIO_GET_CHIPINFO_IOCTL` ; ligne 196 en sortie (valeur initiale 0), ligne 195 en entrée (si refusée :
+pauses fixes seulement). SPI : mode 1 (CPHA), 8 bits, 8 MHz, relus après réglage ; un échange = un message d'un transfert
+(CS par message, comme `mesa_xfer`). Le push passe par le PIO de `spi-apple` (FIFO 16, IRQ toutes les 8 octets à 8 MHz :
+pas de scrutation) : c'est la « voie 0 » de `docs/dma_spi2_design.md` §3.4, jamais essayée.
+
+Tests (`cargo test --offline`, `sbiod/tests/replay.rs` sur c12) : gt_packets construits = A8 de macOS (7 commandes,
+0x73 compris) ; réponses B8 de c12 acceptées par la porte, patch 0x5f réassemblé en 0x568e o (2 fragments, préfixe
+`8c 56`), fragment hors ordre refusé ; run complet contre un faux SEP (réponses c12 + porte d'ordre/longueur du noyau) et
+un faux capteur : trames 0x72/0x73 = en-tête C19 + blob du SEP tel quel, réponses capteur @ 9 rendues au SEP telles
+quelles, prélude seul puis bloc entier en un transfert ; verdicts « chargé » et « refusé ».
+
 ## Démon `driver/rust/sepd`
 
 `sepd [--store DIR] [--os-uuid-file FICHIER] [--dev /dev/sep_native]` (défauts `/var/lib/sepd`,
@@ -156,9 +229,23 @@ fuit volontairement mailbox, shmem et mapping firmware, et tout nouveau probe es
 | Mapping fw BIDIRECTIONAL (comme m1n1 : PTE sans protection), et non TO_DEVICE comme `sep.rs` | choix déduit |
 | Barrière `dmb oshst` (dma_wmb) avant IMG4/SET_SHMEM | déduit (comme `rtkit.c`), design Q9 |
 | Liste des messages connus après boot | traces C1 (19/19) et SEP-BOOT 2026-11-09 ; hypothèse |
+| Relais 0x17/0x15/0x16/0x42/0x18/0x5f (forme gt_packet, fe/fd, offset 9, trames 0x72/0x73, prélude 0x60) | éprouvé sous m1n1 (sbio3..11) jusqu'à la réception du patch ; **jamais exécuté par ce pilote** |
+| Push du patch par le PIO noyau → 0x29 | **inconnu** (sous m1n1 en FIFO via tunnel : jamais 0x29) ; c'est l'expérience J5 |
+| Ouverture précoce de sbio (après l'ack 0x1d 'sbio') | vue sous macOS (c12) ; **jamais exécutée** ; nécessaire en boot chaîné selon l'orchestrateur PC (n=2) |
+| En-tête de trame capteur au-delà de 0xff o (u16 BE en 2 ou u32 LE en 3) | non tranché, non utilisé (trames relais < 0x100 o) |
 
 Différences avec m1n1, côté AP seulement : TAG 0 comme m1n1 (macOS met 1) ; le firmware est mappé juste avant
 IMG4 et non avant le 1er GET_STATUS (le SEP ne voit l'IOVA qu'avec IMG4).
+
+## Tests J5 et J3 chaîné, plus tard (1er run de chacun = go d'Albert)
+
+- `pending/j5_sensor_run.sh [STORE]` : depuis un reboot ; capteur préparé AVANT le SEP (overlay, spidev bufsiz, preflight :
+  un échec n'envoie rien au SEP) ; puis sep_native `allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1
+  allow_sbio_relay=1 sbio_open=$SBIO_OPEN` (défaut 0 ici : seule ouverture éprouvée en scellement frais), sepd en fond,
+  sbiod dès `/dev/sep_sbio`. Fichiers dans `$J5` (défaut `~/kbuild/j5`, à préparer : voir l'en-tête du script).
+- `pending/j3_chained_run.sh STORE` (store non vide obligatoire) : `sbio_open=1 allow_sbio_relay=0` ; ouverture précoce +
+  0x73 sur boot chaîné. Décide la persistance de l'enrôlement.
+- `pending/j3_sbio_run.sh` passe `sbio_open=0` au module J5 (garde l'ouverture tardive éprouvée).
 
 ## Test de J3 (sbio), plus tard
 

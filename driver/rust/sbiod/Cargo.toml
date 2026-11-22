@@ -1,0 +1,10 @@
+[package]
+name = "sbiod"
+version = "0.1.0"
+edition = "2021"
+description = "Userspace sbio relay (J5) for sep_native: sensor over spidev + gpio cdev, SEP over /dev/sep_sbio; up to the 0x5f patch push."
+license = "GPL-2.0-or-later OR MIT"
+publish = false
+
+[dependencies]
+sep-proto = { path = "../sep-proto" }

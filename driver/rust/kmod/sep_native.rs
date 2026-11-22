@@ -40,6 +40,8 @@
 mod common;
 // `crate::{Error, Result}` utilisés par les modules de sep-proto (et seulement par eux).
 use common::{Error, Result};
+// `crate::le_u32` utilisé par `gt` et `sbio_gate`.
+use common::le_u32;
 
 #[path = "../sep-proto/src/discovery.rs"]
 #[allow(dead_code, unreachable_pub)]
@@ -56,6 +58,12 @@ mod xart;
 #[path = "../sep-proto/src/xart_gate.rs"]
 #[allow(dead_code, unreachable_pub)]
 mod xart_gate;
+#[path = "../sep-proto/src/gt.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod gt;
+#[path = "../sep-proto/src/sbio_gate.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod sbio_gate;
 
 kernel::module_platform_driver! {
     type: drv::SepNative,
@@ -80,6 +88,14 @@ kernel::module_platform_driver! {
             default: 0,
             description: "1 = once xART is sealed and quiet, open EP 0x08 (sbio) and send ONE 0x73 hello (needs allow_xart=1)",
         },
+        allow_sbio_relay: u32 {
+            default: 0,
+            description: "1 = after a live 0x73, /dev/sep_sbio relays 0x17,0x15,0x16,0x42,0x18,0x5f in that order, once each (needs allow_sbio=1)",
+        },
+        sbio_open: u32 {
+            default: 1,
+            description: "sbio CNTL open: 1 (default) = early, right after the 0x1d 'sbio' announce is acked, as macOS; 0 = late, after 2 s of xART quiet",
+        },
         allow_sks: u32 {
             default: 0,
             description: "NOT IMPLEMENTED: any value other than 0 makes probe fail",
@@ -89,8 +105,10 @@ kernel::module_platform_driver! {
 
 mod drv {
     use crate::discovery::{self, EpInfo};
-    use crate::word::Word;
-    use crate::xart::{is_save, EP_XART, OP_FWBOOT};
+    use crate::gt::{self, CounterChecker, OOL_HDR};
+    use crate::sbio_gate::{self, EvtHdr, Step, EVT_HDR, EVT_MAX, KIND_NOTIFY, KIND_REPLY, MAX_REPLY};
+    use crate::word::{Dir, Msg, Word};
+    use crate::xart::{is_save, EP_XART, OP_EP_ANNOUNCE, OP_FWBOOT};
     use crate::xart_gate::{check_reply, request_b_len, AWrite, RecHdr, MAX_SAVES, OOL_SIZE, REC_HDR, REC_MAX};
     use kernel::time::{Instant, Monotonic};
     use kernel::{
@@ -206,6 +224,14 @@ mod drv {
     const SBIO_DUMP_LEN: usize = 0x80;
     const SBIO_DUMP_LIMIT: u32 = 4;
     const SBIO_LOG_LIMIT: u32 = 128;
+    /// Annonce 0x1d de sbio sur 0x13 : DATA = 'sbi' (24 bits bas), PARAM = 'o' (c12 : `TYPE 0x1d PARAM 0x6f DATA
+    /// 0x00736269`). Ouverture précoce (sbio_open=1) dès que son ack (TYPE 0x16) est envoyé, comme macOS (~35 ms).
+    const SBIO_ANNOUNCE_DATA: u32 = 0x0073_6269;
+    const SBIO_ANNOUNCE_PARAM: u8 = 0x6f;
+    /// Relais (allow_sbio_relay=1) : délai maximal par réponse GT du SEP (6 s, l'écoute des scripts sbio3..11).
+    const RELAY_REPLY_TIMEOUT_MS: u32 = 6000;
+    /// Notifications sbio (TAG 0x01-0x04) gardées pour /dev/sep_sbio ; au-delà, perdues et comptées (pas de Halted).
+    const NOTE_LEN: usize = 16;
     /// Requêtes 0x13 en attente de réponse (snew-reel : 6 au plus en même temps).
     const PEND_LEN: usize = 16;
 
@@ -231,6 +257,12 @@ mod drv {
     }
     fn param_allow_sbio() -> bool {
         *crate::module_parameters::allow_sbio.value() != 0
+    }
+    fn param_allow_relay() -> bool {
+        *crate::module_parameters::allow_sbio_relay.value() != 0
+    }
+    fn param_sbio_open() -> u32 {
+        *crate::module_parameters::sbio_open.value()
     }
 
     /// Paramètres d'écriture prévus par le design mais non implémentés dans cette version.
@@ -313,14 +345,47 @@ mod drv {
         Halted,
     }
 
-    /// Avancement de sbio (allow_sbio=1). Seul `Opening` admet les CNTL PARAM 0x08, seul `Open` admet le 0x73.
+    /// Avancement de sbio (allow_sbio=1). Seul `Opening` admet les CNTL PARAM 0x08, seul `Open` admet le 0x73,
+    /// seul `Relay` admet les commandes du relais (une transaction à la fois, `sbio_gate::RELAY_SEQUENCE`).
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     enum SbioPhase {
         Off,
         Opening,
         Open,
-        /// 0x73 envoyé (une seule fois) ; plus rien n'est admis vers 0x08.
+        /// 0x73 envoyé (une seule fois) ; sans allow_sbio_relay, plus rien n'est admis vers 0x08.
         HelloSent,
+        /// allow_sbio_relay=1 et sbio VIVANT : /dev/sep_sbio sert le relais.
+        Relay,
+    }
+
+    /// Commande du relais en vol (une seule à la fois).
+    struct Txn {
+        step: &'static Step,
+        /// `> fc` envoyé.
+        sent: bool,
+        /// Fragment reçu, réponse incomplète : le fil d'écriture doit envoyer `> fe`.
+        want_more: bool,
+        done: bool,
+        total: Option<usize>,
+        got: usize,
+        nfrag: usize,
+        /// Nombre de `< fd` reçus dans ce transfert (compteur du prochain `> fe`).
+        nfd: u16,
+        last: Word,
+    }
+
+    /// État du relais sbio (allow_sbio_relay=1).
+    struct Relay {
+        /// Indice de la prochaine étape admise dans `RELAY_SEQUENCE`.
+        next: usize,
+        txn: Option<Txn>,
+        counter: CounterChecker,
+        /// Réponse réassemblée (préallouée à MAX_REPLY au probe) ; `reply` = mot final, en attente de lecture.
+        buf: KVec<u8>,
+        reply: Option<Word>,
+        notes: [Word; NOTE_LEN],
+        n_notes: usize,
+        notes_dropped: u32,
     }
 
     /// Requête 0x13 reçue, pas encore acquittée.
@@ -370,10 +435,13 @@ mod drv {
         sbio_rx_after: u32,
         /// Reçu après le 0x73 : TAG 0xfc TYPE 0x73, ou TAG 0x04.
         sbio_alive_msg: bool,
+        /// L'ack (TYPE 0x16) de l'annonce 0x1d 'sbio' a été envoyé au SEP (déclencheur de l'ouverture précoce).
+        sbio_ack_sent: bool,
+        relay: Relay,
     }
 
     impl Core {
-        fn new(bsnap: KVec<u8>) -> Self {
+        fn new(bsnap: KVec<u8>, relay_buf: KVec<u8>) -> Self {
             Core {
                 state: State::Idle,
                 halt_reason: "",
@@ -399,7 +467,23 @@ mod drv {
                 sbio_rx: 0,
                 sbio_rx_after: 0,
                 sbio_alive_msg: false,
+                sbio_ack_sent: false,
+                relay: Relay {
+                    next: 0,
+                    txn: None,
+                    counter: CounterChecker::new(),
+                    buf: relay_buf,
+                    reply: None,
+                    notes: [Word::new(0, 0, 0, 0, 0); NOTE_LEN],
+                    n_notes: 0,
+                    notes_dropped: 0,
+                },
             }
+        }
+
+        /// xART calme : aucune requête 0x13 en attente, aucun ack CNTL attendu, aucun mot 0x13 depuis 2 s.
+        fn xart_quiet(&self) -> bool {
+            self.n_pend == 0 && self.cntl_wait.is_none() && self.xart_last.is_none_or(|t| t.elapsed().as_millis() >= SBIO_QUIET_MS)
         }
 
         fn pend_index(&self, seq: u32) -> Option<usize> {
@@ -454,6 +538,8 @@ mod drv {
         ring: Ring,
         /// Un seul ouvreur de /dev/sep_native.
         opened: Atomic<u32>,
+        /// Un seul ouvreur de /dev/sep_sbio.
+        sbio_opened: Atomic<u32>,
         #[pin]
         core: Mutex<Core>,
         /// Seule mailbox d'envoi. Verrou pris APRÈS `core` (jamais l'inverse). La mailbox tient une référence sur
@@ -632,10 +718,11 @@ mod drv {
             }
         }
 
-        /// Mot reçu sur sbio (allow_sbio=1) : journalisé, compté ; jamais de réponse, jamais de Halted.
+        /// Mot reçu sur sbio (allow_sbio=1) : journalisé, compté. Avant le relais : jamais de réponse, jamais de
+        /// Halted. En phase `Relay` : remis à `on_relay` (notification → événement ; réponse GT → transaction).
         fn on_sbio(&self, core: &mut Core, w: Word, raw: u64) {
             core.sbio_rx = core.sbio_rx.saturating_add(1);
-            let after = core.sbio == SbioPhase::HelloSent;
+            let after = matches!(core.sbio, SbioPhase::HelloSent | SbioPhase::Relay);
             if after {
                 core.sbio_rx_after = core.sbio_rx_after.saturating_add(1);
                 if (w.tag == GT_TAG_CMD && w.ty == SBIO_OP_HELLO) || w.tag == SBIO_TAG_ALIVE {
@@ -657,6 +744,94 @@ mod drv {
             } else if core.sbio_rx == SBIO_LOG_LIMIT + 1 {
                 dev_info!(self.dev, "sbio : journal coupé au-delà de {} mots (compte gardé)\n", SBIO_LOG_LIMIT);
             }
+            if core.sbio == SbioPhase::Relay {
+                self.on_relay(core, w, raw);
+            }
+        }
+
+        /// Relais (work, `core` verrouillé). Notification TAG 0x01-0x04 → file d'événements (pleine : perdue et
+        /// comptée, pas de Halted). Réponse GT de la commande en vol → contrôle (compteur GT, en-tête de B8 par
+        /// `sbio_gate::check_fragment`), copie du fragment, puis `done` ou `want_more`. Tout autre mot → Halted.
+        fn on_relay(&self, core: &mut Core, w: Word, raw: u64) {
+            if sbio_gate::is_notification(w.tag) {
+                let r = &mut core.relay;
+                if r.n_notes < NOTE_LEN {
+                    r.notes[r.n_notes] = w;
+                    r.n_notes += 1;
+                } else {
+                    r.notes_dropped = r.notes_dropped.saturating_add(1);
+                    dev_warn!(self.dev, "sbio : notification perdue (file pleine, {} perdue(s)) : {:#018x}\n", r.notes_dropped, raw);
+                }
+                return;
+            }
+            let expected = core.relay.txn.as_ref().is_some_and(|t| {
+                t.sent && !t.want_more && !t.done && w.ty == t.step.op
+                    && ((t.nfrag == 0 && w.tag == GT_TAG_CMD) || (t.nfrag > 0 && w.tag == gt::TAG_FD))
+            });
+            if !expected {
+                return self.halt(core, "sbio : mot inattendu pendant le relais (hors transaction, TAG/TYPE)", Some(raw));
+            }
+            if let Err(f) = core.relay.counter.check(&Msg::new(0, Dir::ToAp, w)) {
+                dev_err!(self.dev, "sbio : compteur GT faux : {:?}\n", f);
+                return self.halt(core, "sbio : règle du compteur GT violée", Some(raw));
+            }
+            let Some((_, b8)) = self.sbio_ool.as_ref() else {
+                return self.halt(core, "sbio : B8 absent", Some(raw));
+            };
+            let mut hdr = [0u8; OOL_HDR];
+            dma_rmb();
+            // SAFETY: `b8` est une allocation cohérente de SBIO_OOL_SIZE >= OOL_HDR octets, vivante (tenue par `self`).
+            // Le SEP a écrit B8 avant d'envoyer ce mot et ne le réécrit qu'après notre `> fe` (protocole GT).
+            unsafe {
+                let src = b8.as_ptr().cast::<u8>();
+                for (i, x) in hdr.iter_mut().enumerate() {
+                    *x = core::ptr::read_volatile(src.add(i));
+                }
+            }
+            let Some(t) = core.relay.txn.as_ref() else { return };
+            let f = match sbio_gate::check_fragment(t.step, &hdr, t.got, t.total, t.nfrag) {
+                Ok(f) => f,
+                Err(e) => {
+                    dev_err!(self.dev, "sbio : en-tête B8 refusé : {:02x?}\n", hdr);
+                    return self.halt(core, why(&e), Some(raw));
+                }
+            };
+            let end = f.offset + f.len;
+            if OOL_HDR + f.len > b8.len() {
+                return self.halt(core, "sbio : fragment au-delà de B8", Some(raw));
+            }
+            // `end <= total <= MAX_REPLY = capacité préallouée` : pas d'allocation ici.
+            let grown = end <= core.relay.buf.capacity() && core.relay.buf.resize(end, 0, GFP_KERNEL).is_ok();
+            if !grown {
+                return self.halt(core, "sbio : tampon de réponse trop petit", Some(raw));
+            }
+            let buf = &mut core.relay.buf;
+            // SAFETY: `b8` vivant, `OOL_HDR + f.len <= b8.len()` (contrôlé ci-dessus) ; `buf` a `end` octets et
+            // `offset + len == end`. Lecture octet par octet en volatile (mémoire DMA).
+            unsafe {
+                let src = b8.as_ptr().cast::<u8>().add(OOL_HDR);
+                for i in 0..f.len {
+                    buf[f.offset + i] = core::ptr::read_volatile(src.add(i));
+                }
+            }
+            let Some(t) = core.relay.txn.as_mut() else { return };
+            t.total = Some(f.total);
+            t.got = end;
+            t.nfrag += 1;
+            t.last = w;
+            if w.tag == gt::TAG_FD {
+                t.nfd = t.nfd.wrapping_add(1);
+            }
+            if end == f.total {
+                t.done = true;
+            } else {
+                t.want_more = true;
+            }
+            dev_info!(
+                self.dev,
+                "sbio relais < {} TAG {:#04x} fragment {} : total {:#x} offset {:#x} long {:#x} ({})\n",
+                t.step.name, w.tag, t.nfrag, f.total, f.offset, f.len, if t.done { "complet" } else { "suite demandée" }
+            );
         }
 
         /// Requête du SEP sur `xarm`. Sans allow_xart : seule la 1re (0x0e) est admise, journalisée sans réponse.
@@ -730,16 +905,28 @@ mod drv {
                             && matches!(w.ty, CNTL_SET_A_IOVA | CNTL_SET_B_IOVA | CNTL_SET_A_SIZE | CNTL_SET_B_SIZE)
                     }
                     discovery::EP_CNTL => CNTL_TX_TYPES.contains(&w.ty),
-                    // sbio : exactement `TAG 0xfc TYPE 0x73 PARAM 0 DATA 0`, une seule fois (phase Open → HelloSent).
-                    EP_SBIO => {
-                        let ok = param_allow_sbio()
-                            && core.sbio == SbioPhase::Open
-                            && (w.tag, w.ty, w.param, w.data) == (GT_TAG_CMD, SBIO_OP_HELLO, 0, 0);
-                        if ok {
-                            core.sbio = SbioPhase::HelloSent;
+                    // sbio : phase Open → exactement `TAG 0xfc TYPE 0x73 PARAM 0 DATA 0`, une seule fois (→ HelloSent) ;
+                    // phase Relay → `> fc` de la commande en vol (DATA 0, une fois) ou `> fe` demandé (DATA nfd << 16).
+                    EP_SBIO if param_allow_sbio() => match core.sbio {
+                        SbioPhase::Open => {
+                            let ok = (w.tag, w.ty, w.param, w.data) == (GT_TAG_CMD, SBIO_OP_HELLO, 0, 0);
+                            if ok {
+                                core.sbio = SbioPhase::HelloSent;
+                            }
+                            ok
                         }
-                        ok
-                    }
+                        SbioPhase::Relay => {
+                            param_allow_relay()
+                                && core.relay.txn.as_ref().is_some_and(|t| {
+                                    w.ty == t.step.op
+                                        && w.param == 0
+                                        && ((w.tag == GT_TAG_CMD && w.data == 0 && !t.sent)
+                                            || (w.tag == gt::TAG_FE && t.want_more && w.data == u32::from(t.nfd) << 16))
+                                })
+                        }
+                        _ => false,
+                    },
+                    EP_SBIO => false,
                     ep => core.xarm == Some(ep) && core.xart_open,
                 };
             if !allowed {
@@ -832,51 +1019,61 @@ mod drv {
             Ok(())
         }
 
-        /// J3 (`docs/j3_sbio_open.md`) : attend `sbio` annoncé en 0x08 et le xART calme, ouvre 0x08 (A8/B8 par le
-        /// CNTL, sans 2e SECMODE), envoie UNE poignée 0x73, écoute 6 s, dumpe B8, donne le verdict VIVANT/MUET.
-        /// Avant le 1er CNTL de sbio, un échec (délai, signal, sbio ailleurs qu'en 0x08) n'envoie rien et ne met pas
-        /// en Halted (le service xART continue). Ensuite, toute incohérence → Halted.
-        fn run_sbio(&self) -> Result {
-            let Some((a8, b8)) = self.sbio_ool.as_ref() else { return Err(EINVAL) };
-            let (Some(ia), Some(ib)) = (iova_page(a8.dma_handle()), iova_page(b8.dma_handle())) else {
-                dev_err!(self.dev, "IOVA A8/B8 inutilisables : sbio non ouvert (rien envoyé)\n");
-                return Err(EINVAL);
-            };
-            let start = Instant::<Monotonic>::now();
-            let mut core = self.core.lock();
-            // 1. sbio annoncé en 0x08, xART calme.
+        /// Attend `sbio` annoncé en 0x08 et, selon `quiet`, le xART calme (true) ou l'ack de l'annonce 0x1d 'sbio'
+        /// (false, ouverture précoce). Délai compté depuis `start` (SBIO_WAIT_MAX_MS). Échec : rien n'est envoyé à
+        /// 0x08 par cette attente, pas de Halted (le service xART continue). Le verrou est rendu pendant l'attente
+        /// (condvar) : le work et sepd continuent de servir 0x13.
+        fn sbio_wait(&self, core: &mut MutexGuard<'_, Core>, start: Instant<Monotonic>, quiet: bool) -> Result {
             loop {
                 if core.state != State::Running {
                     return Err(EIO);
                 }
                 match core.ep_by_name(b"sbio") {
-                    Some(EP_SBIO) => {
-                        let quiet = core.n_pend == 0
-                            && core.cntl_wait.is_none()
-                            && core.xart_last.is_none_or(|t| t.elapsed().as_millis() >= SBIO_QUIET_MS);
-                        if quiet {
-                            break;
-                        }
-                    }
+                    Some(EP_SBIO) if (quiet && core.xart_quiet()) || (!quiet && core.sbio_ack_sent) => return Ok(()),
+                    Some(EP_SBIO) | None => {}
                     Some(ep) => {
                         dev_err!(self.dev, "sbio annoncé en {:#04x} et non en 0x08 : rien envoyé à sbio\n", ep);
                         return Err(ENODEV);
                     }
-                    None => {}
                 }
                 if start.elapsed().as_millis() >= SBIO_WAIT_MAX_MS {
-                    dev_err!(self.dev, "sbio non annoncé ou xART pas calme après {} ms : rien envoyé à sbio\n", SBIO_WAIT_MAX_MS);
+                    dev_err!(
+                        self.dev,
+                        "sbio : {} pas vu après {} ms : rien de plus envoyé à sbio\n",
+                        if quiet { "xART calme" } else { "ack de l'annonce 0x1d 'sbio'" }, SBIO_WAIT_MAX_MS
+                    );
                     return Err(ETIMEDOUT);
                 }
-                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(&mut core, msecs_to_jiffies(SBIO_POLL_MS)) {
-                    dev_err!(self.dev, "signal avant l'ouverture de sbio : rien envoyé à sbio\n");
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_err!(self.dev, "signal pendant l'attente de sbio : rien de plus envoyé à sbio\n");
                     return Err(EINTR);
                 }
             }
+        }
+
+        /// J3 (`docs/j3_sbio_open.md`) : ouvre 0x08 (A8/B8 par le CNTL, sans 2e SECMODE), puis envoie UNE poignée
+        /// 0x73, écoute 6 s, dumpe B8, donne le verdict VIVANT/MUET (renvoyé : true = VIVANT).
+        /// Ouverture : `sbio_open=1` (précoce, défaut) dès l'ack de l'annonce 0x1d 'sbio', comme macOS, pendant que le
+        /// xART continue (les requêtes 0x13 sont toujours mises en file pour sepd pendant l'attente des acks CNTL,
+        /// appariés par TAG) ; `sbio_open=0` (tardive) quand le xART est calme. Le 0x73 part dans les deux cas une
+        /// fois le xART calme. Avant le 1er CNTL de sbio, un échec n'envoie rien et ne met pas en Halted. Un ack CNTL
+        /// absent → Halted (cntl_steps). Après l'ouverture, un échec d'attente du calme n'envoie pas le 0x73.
+        fn run_sbio(&self) -> Result<bool> {
+            let Some((a8, b8)) = self.sbio_ool.as_ref() else { return Err(EINVAL) };
+            let (Some(ia), Some(ib)) = (iova_page(a8.dma_handle()), iova_page(b8.dma_handle())) else {
+                dev_err!(self.dev, "IOVA A8/B8 inutilisables : sbio non ouvert (rien envoyé)\n");
+                return Err(EINVAL);
+            };
+            let early = param_sbio_open() == 1;
+            let start = Instant::<Monotonic>::now();
+            let mut core = self.core.lock();
+            // 1. Déclencheur de l'ouverture.
+            self.sbio_wait(&mut core, start, !early)?;
             dev_info!(
                 self.dev,
-                "sbio : xART calme ({} ms sans trafic 0x13, aucune requête en attente) ; ouverture 0x08 : A8 IOVA {:#x}, B8 IOVA {:#x}, {:#x} o chacun\n",
-                SBIO_QUIET_MS, a8.dma_handle(), b8.dma_handle(), SBIO_OOL_SIZE
+                "sbio : ouverture {} ({} requête(s) 0x13 en attente) ; 0x08 : A8 IOVA {:#x}, B8 IOVA {:#x}, {:#x} o chacun\n",
+                if early { "PRÉCOCE (ack 0x1d 'sbio' envoyé)" } else { "TARDIVE (xART calme depuis 2 s)" },
+                core.n_pend, a8.dma_handle(), b8.dma_handle(), SBIO_OOL_SIZE
             );
             // 2. Ouverture : 4 CNTL PARAM 0x08, pas de SECMODE (global, déjà envoyé pour 0x13).
             let size = SBIO_OOL_SIZE as u32;
@@ -891,10 +1088,14 @@ mod drv {
             let r = self.cntl_steps(&mut core, &steps, "pas d'ack CNTL à l'ouverture de 0x08", "signal reçu pendant l'ouverture de 0x08");
             if r.is_err() {
                 core.sbio = SbioPhase::Off;
-                return r;
+                return r.map(|()| false);
             }
             core.sbio = SbioPhase::Open;
             dev_info!(self.dev, "0x08 ouvert ; mots sbio reçus jusqu'ici : {}\n", core.sbio_rx);
+            if early {
+                self.sbio_wait(&mut core, start, true)?;
+                dev_info!(self.dev, "sbio : xART calme ({} ms sans trafic 0x13, aucune requête en attente) ; envoi du 0x73\n", SBIO_QUIET_MS);
+            }
             // 3. Poignée 0x73 : A8 = gt_packet capturé, relu avant l'envoi.
             // SAFETY: `a8` est une allocation cohérente de `a8.len()` (= SBIO_OOL_SIZE) octets, vivante (tenue par
             // `self`) ; `SBIO_HELLO.len() <= SBIO_OOL_SIZE` (assertion de compilation). Le SEP ne lit A8 qu'après
@@ -928,12 +1129,120 @@ mod drv {
                 }
             }
             let (b0, b14) = self.dump_b8(b8, "B8 en fin d'écoute");
-            let b_ok = b0 == 1 && b14 == SBIO_OP_HELLO;
+            let alive = (b0 == 1 && b14 == SBIO_OP_HELLO) || core.sbio_alive_msg;
             dev_info!(
                 self.dev,
                 "VERDICT sbio : {} (B8 +0x00={:#04x} +0x14={:#04x} ; {} mot(s) 0x08 après le 0x73 ; TAG 0xfc TYPE 0x73 ou TAG 0x04 : {})\n",
-                if b_ok || core.sbio_alive_msg { "VIVANT" } else { "MUET" },
+                if alive { "VIVANT" } else { "MUET" },
                 b0, b14, core.sbio_rx_after, if core.sbio_alive_msg { "oui" } else { "non" }
+            );
+            if alive && param_allow_relay() && core.state == State::Running {
+                core.sbio = SbioPhase::Relay;
+                core.relay.counter = CounterChecker::new();
+                dev_info!(self.dev, "sbio : relais ouvert (allow_sbio_relay=1) ; étapes admises dans l'ordre : 0x17 0x15 0x16 0x42 0x18 0x5f\n");
+            }
+            Ok(alive && core.sbio == SbioPhase::Relay)
+        }
+
+        /// Une commande du relais (`write` de /dev/sep_sbio, contexte processus) : contrôle (ordre, longueur exacte),
+        /// gt_packet dans A8, `> fc`, puis attente des fragments (`> fe` demandés par le work), 6 s par réponse.
+        /// Toute incohérence, délai ou signal → Halted (le SEP attend une suite qu'on ne donnera pas).
+        fn relay_cmd(&self, op: u8, payload: &[u8]) -> Result {
+            let mut core = self.core.lock();
+            if core.state != State::Running || core.sbio != SbioPhase::Relay {
+                return Err(EIO);
+            }
+            if core.relay.txn.is_some() || core.relay.reply.is_some() {
+                // Réponse précédente pas encore lue : le relais est strictement en lockstep.
+                return Err(EBUSY);
+            }
+            let step = match sbio_gate::check_cmd(core.relay.next, op, payload.len()) {
+                Ok(s) => s,
+                Err(e) => {
+                    dev_err!(self.dev, "sbio relais : commande {:#04x} ({} o) refusée à l'étape {}\n", op, payload.len(), core.relay.next);
+                    self.halt(&mut core, why(&e), None);
+                    return Err(EINVAL);
+                }
+            };
+            let Some((a8, _)) = self.sbio_ool.as_ref() else { return Err(EIO) };
+            let mut pkt = [0u8; OOL_HDR + sbio_gate::MAX_CMD];
+            let n = match sbio_gate::build_packet(op, payload, &mut pkt) {
+                Ok(n) => n,
+                Err(e) => {
+                    self.halt(&mut core, why(&e), None);
+                    return Err(EINVAL);
+                }
+            };
+            // SAFETY: `a8` est une allocation cohérente de SBIO_OOL_SIZE octets, vivante (tenue par `self`) ;
+            // `n <= OOL_HDR + MAX_CMD < SBIO_OOL_SIZE`. Le SEP ne lit A8 qu'après le `> fc` envoyé ci-dessous et
+            // aucune transaction n'est en vol (contrôlé ci-dessus) ; seul ce fil écrit A8, sous `core`.
+            let (v0, o14) = unsafe {
+                let dst = a8.as_mut_ptr().cast::<u8>();
+                core::ptr::write_bytes(dst, 0, a8.len());
+                core::ptr::copy_nonoverlapping(pkt.as_ptr(), dst, n);
+                (core::ptr::read_volatile(dst), core::ptr::read_volatile(dst.add(0x14)))
+            };
+            if v0 != 1 || o14 != op {
+                self.halt(&mut core, "A8 relu : pas le gt_packet de la commande", None);
+                return Err(EIO);
+            }
+            let w = Word::new(EP_SBIO, GT_TAG_CMD, op, 0, 0);
+            if core.relay.counter.check(&Msg::new(0, Dir::ToSep, w)).is_err() {
+                self.halt(&mut core, "sbio : compteur GT faux à l'envoi", None);
+                return Err(EIO);
+            }
+            core.relay.buf.clear();
+            core.relay.txn = Some(Txn {
+                step, sent: false, want_more: false, done: false, total: None, got: 0, nfrag: 0, nfd: 0, last: w,
+            });
+            dev_info!(self.dev, "sbio relais > {} ({:#04x}) : charge {} o, tête {:02x?}\n", step.name, op, payload.len(), &payload[..payload.len().min(8)]);
+            dma_wmb();
+            self.send_running(&mut core, w, "sbio relais (fc)")?;
+            if let Some(t) = core.relay.txn.as_mut() {
+                t.sent = true;
+            }
+            let mut left = msecs_to_jiffies(RELAY_REPLY_TIMEOUT_MS);
+            loop {
+                if core.state == State::Halted {
+                    return Err(EIO);
+                }
+                let Some(t) = core.relay.txn.as_ref() else { return Err(EIO) };
+                if t.done {
+                    break;
+                }
+                if t.want_more {
+                    let more = Word::new(EP_SBIO, gt::TAG_FE, op, 0, u32::from(t.nfd) << 16);
+                    if core.relay.counter.check(&Msg::new(0, Dir::ToSep, more)).is_err() {
+                        self.halt(&mut core, "sbio : compteur GT faux au > fe", None);
+                        return Err(EIO);
+                    }
+                    // A8 inchangé (c12 seq 315 : A identique).
+                    self.send_running(&mut core, more, "sbio relais (fe, fragment suivant)")?;
+                    if let Some(t) = core.relay.txn.as_mut() {
+                        t.want_more = false;
+                    }
+                    left = msecs_to_jiffies(RELAY_REPLY_TIMEOUT_MS);
+                    continue;
+                }
+                match self.cv.wait_interruptible_timeout(&mut core, left) {
+                    CondVarTimeoutResult::Woken { jiffies } => left = jiffies,
+                    CondVarTimeoutResult::Timeout => {
+                        self.halt(&mut core, "sbio : pas de réponse GT en 6 s", None);
+                        return Err(ETIMEDOUT);
+                    }
+                    CondVarTimeoutResult::Signal { .. } => {
+                        self.halt(&mut core, "sbio : signal pendant une transaction du relais", None);
+                        return Err(EINTR);
+                    }
+                }
+            }
+            let Some(t) = core.relay.txn.take() else { return Err(EIO) };
+            core.relay.next += 1;
+            core.relay.reply = Some(t.last);
+            dev_info!(
+                self.dev,
+                "sbio relais : {} ({:#04x}) terminé, réponse {} o en {} fragment(s), tête {:02x?}\n",
+                step.name, op, t.got, t.nfrag, &core.relay.buf[..t.got.min(8)]
             );
             Ok(())
         }
@@ -1010,6 +1319,12 @@ mod drv {
             core.pend_remove(i);
             if core.b_owner == Some(h.seq) {
                 core.b_owner = None;
+            }
+            if req.ty == OP_EP_ANNOUNCE && req.param == SBIO_ANNOUNCE_PARAM && req.data & 0x00FF_FFFF == SBIO_ANNOUNCE_DATA {
+                core.sbio_ack_sent = true;
+                dev_info!(self.dev, "annonce 0x1d 'sbio' acquittée (déclencheur de l'ouverture précoce)\n");
+                // Réveille run_sbio tout de suite (ouverture précoce ~ms après l'ack, comme macOS ~35 ms).
+                self.cv.notify_all();
             }
             if is_save(req.ty) {
                 core.nsave += 1;
@@ -1397,6 +1712,116 @@ mod drv {
         Ok(())
     }
 
+    // --- /dev/sep_sbio (allow_sbio_relay=1) ----------------------------------------------------------------
+    // write : UNE commande `sbio_gate` (MAGIC, opcode, longueur, charge) ; bloque jusqu'à la réponse complète
+    //         (réassemblée) ; contrôlée par `check_cmd` (liste, ordre, longueur exacte). Refus/délai → Halted.
+    // read  : bloque jusqu'à un événement : notification TAG 0x01-0x04 (d'abord) ou la réponse de la dernière
+    //         commande. Tampon >= EVT_MAX exigé. EIO une fois Halted. Un seul ouvreur (EBUSY).
+    // N'existe qu'après « VERDICT sbio : VIVANT » avec allow_sbio_relay=1. Jamais de mot brut.
+
+    /// Type de l'interface de relais (aucune donnée propre : tout est dans `SepData`).
+    struct SbioFile;
+
+    #[pin_data]
+    struct SbioDev {
+        #[pin]
+        reg: MiscDeviceRegistration<SbioFile>,
+        data: Arc<SepData>,
+    }
+
+    #[vtable]
+    impl MiscDevice for SbioFile {
+        type Ptr = Arc<SepData>;
+
+        fn open(_file: &File, misc: &MiscDeviceRegistration<SbioFile>) -> Result<Arc<SepData>> {
+            // SAFETY: le seul `MiscDeviceRegistration<SbioFile>` enregistré est le champ `reg` d'un `SbioDev`
+            // épinglé dans un `KBox` oublié (`core::mem::forget`) : jamais libéré, `container_of` reste valide.
+            let x: &SbioDev = unsafe { &*kernel::container_of!(core::ptr::from_ref(misc).cast_mut(), SbioDev, reg) };
+            let d = &x.data;
+            if d.sbio_opened.cmpxchg(0, 1, Full).is_err() {
+                return Err(EBUSY);
+            }
+            dev_info!(d.dev, "/dev/sep_sbio ouvert (étape suivante {})\n", d.core.lock().relay.next);
+            Ok(d.clone())
+        }
+
+        fn release(device: Arc<SepData>, _file: &File) {
+            device.sbio_opened.store(0, Release);
+        }
+
+        fn read_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterDest<'_>) -> Result<usize> {
+            let me = kiocb.file();
+            if iov.len() < EVT_MAX {
+                return Err(EINVAL);
+            }
+            let mut core = me.core.lock();
+            loop {
+                if core.state == State::Halted {
+                    return Err(EIO);
+                }
+                if core.relay.n_notes > 0 {
+                    let w = core.relay.notes[0];
+                    let n = core.relay.n_notes;
+                    core.relay.notes.copy_within(1..n, 0);
+                    core.relay.n_notes -= 1;
+                    let h = EvtHdr { kind: KIND_NOTIFY, tag: w.tag, ty: w.ty, param: w.param, data: w.data, len: 0 }.encode();
+                    if iov.copy_to_iter(&h) != EVT_HDR {
+                        return Err(EFAULT);
+                    }
+                    return Ok(EVT_HDR);
+                }
+                if let Some(w) = core.relay.reply {
+                    let b: &[u8] = &core.relay.buf;
+                    let h = EvtHdr { kind: KIND_REPLY, tag: w.tag, ty: w.ty, param: w.param, data: w.data, len: b.len() as u32 }.encode();
+                    if iov.copy_to_iter(&h) != EVT_HDR || iov.copy_to_iter(b) != b.len() {
+                        return Err(EFAULT);
+                    }
+                    let total = EVT_HDR + b.len();
+                    core.relay.reply = None;
+                    return Ok(total);
+                }
+                if me.cv.wait_interruptible(&mut core) {
+                    return Err(ERESTARTSYS);
+                }
+            }
+        }
+
+        fn write_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterSource<'_>) -> Result<usize> {
+            let me = kiocb.file();
+            let n = iov.len();
+            if !(sbio_gate::CMD_HDR..=sbio_gate::CMD_MAX).contains(&n) {
+                return Err(EINVAL);
+            }
+            let mut buf = KVec::with_capacity(n, GFP_KERNEL)?;
+            if iov.copy_from_iter_vec(&mut buf, GFP_KERNEL)? != n {
+                return Err(EFAULT);
+            }
+            let (op, payload) = match sbio_gate::decode_cmd(&buf) {
+                Ok(x) => x,
+                Err(e) => {
+                    let mut core = me.core.lock();
+                    me.halt(&mut core, why(&e), None);
+                    return Err(EINVAL);
+                }
+            };
+            me.relay_cmd(op, payload)?;
+            Ok(n)
+        }
+    }
+
+    fn register_sbio_dev(data: &Arc<SepData>) -> Result {
+        let reg = KBox::pin_init(
+            try_pin_init!(SbioDev {
+                reg <- MiscDeviceRegistration::register(MiscDeviceOptions { name: c_str!("sep_sbio") }),
+                data: data.clone(),
+            }),
+            GFP_KERNEL,
+        )?;
+        // Jamais libéré (cf. `SbioDev`) : `open` s'appuie dessus.
+        core::mem::forget(reg);
+        Ok(())
+    }
+
     // --- pilote ---------------------------------------------------------------------------------------------
     pub(crate) struct SepNative {
         data: Arc<SepData>,
@@ -1457,6 +1882,7 @@ mod drv {
             None
         };
         let bsnap = KVec::with_capacity(if ool.is_some() { OOL_SIZE } else { 0 }, GFP_KERNEL)?;
+        let relay_buf = KVec::with_capacity(if param_allow_relay() { MAX_REPLY } else { 0 }, GFP_KERNEL)?;
 
         let data = Arc::pin_init(
             try_pin_init!(SepData {
@@ -1467,7 +1893,8 @@ mod drv {
                 fw,
                 ring: Ring::new(),
                 opened: Atomic::new(0),
-                core <- new_mutex!(Core::new(bsnap)),
+                sbio_opened: Atomic::new(0),
+                core <- new_mutex!(Core::new(bsnap, relay_buf)),
                 tx <- new_mutex!(None),
                 cv <- new_condvar!(),
                 work <- new_work!("SepData::work"),
@@ -1498,8 +1925,13 @@ mod drv {
                                 );
                                 // Le probe (insmod) attend ici la fin de J3 ; sepd sert le xART en parallèle.
                                 if param_allow_sbio() {
-                                    if let Err(e) = data.run_sbio() {
-                                        dev_err!(dev, "sbio : arrêt {:?} (état {:?})\n", e, data.state());
+                                    match data.run_sbio() {
+                                        Ok(true) => match register_sbio_dev(&data) {
+                                            Ok(()) => dev_info!(dev, "/dev/sep_sbio prêt (lancer sbiod)\n"),
+                                            Err(e) => dev_err!(dev, "/dev/sep_sbio non créé : {:?} (rien de plus envoyé à sbio)\n", e),
+                                        },
+                                        Ok(false) => {}
+                                        Err(e) => dev_err!(dev, "sbio : arrêt {:?} (état {:?})\n", e, data.state()),
                                     }
                                 }
                             }
@@ -1532,8 +1964,13 @@ mod drv {
             if (param_allow_xart() && param_allow_boot() == 0)
                 || (param_allow_save_ack() && !param_allow_xart())
                 || (param_allow_sbio() && !param_allow_xart())
+                || (param_allow_relay() && !param_allow_sbio())
+                || param_sbio_open() > 1
             {
-                dev_err!(pdev, "allow_xart exige allow_boot=1, allow_xart_save_ack et allow_sbio exigent allow_xart=1 : refus\n");
+                dev_err!(
+                    pdev,
+                    "allow_xart exige allow_boot=1, allow_xart_save_ack et allow_sbio exigent allow_xart=1, allow_sbio_relay exige allow_sbio=1, sbio_open vaut 0 ou 1 : refus\n"
+                );
                 return Err(EINVAL);
             }
             if TOUCHED.load(Acquire) != 0 {
