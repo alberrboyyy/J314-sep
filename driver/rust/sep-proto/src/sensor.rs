@@ -41,6 +41,51 @@ pub const PATCH_PRELUDE: [u8; 7] = [0x80, 0x60, 0x00, 0x07, 0x00, 0x00, 0x00];
 pub const PATCH_LOADED: u8 = 0x29;
 pub const PATCH_NONE: u8 = 0x60;
 
+/// Encrypted sensor command (sbio 0x5d / 0x5c / 0x31 in the 1st pass): `80 55 <total BE16> 00 00 00` + SEP blob +
+/// CRC-16/ARC of header + blob, little-endian; total = 7 + len + 2 (VU C19, 4 frames recomputed; sbio9;
+/// docs/j5_params_protocol.md §2).
+pub const OP_PARAMS: u8 = 0x55;
+pub const PARAM_CRC_LEN: usize = 2;
+/// Sensor answer to the 0x31 frame: `80 d4 00 4b 00000000 75` + 64 bytes + CRC16 (VU C18-C20, 2 per boot).
+pub const OP_SERIAL_ANSWER: u8 = 0x75;
+pub const SERIAL_ANSWER_LEN: usize = 0x4b;
+pub const SERIAL_ANSWER_HEAD: [u8; 9] = [0x80, 0xd4, 0x00, 0x4b, 0, 0, 0, 0, OP_SERIAL_ANSWER];
+/// Status bodies (9 bytes after `80 20 00 10 00 00 00`) read by macOS after each frame, C18/C19/C20 3/3 identical.
+pub const ST_AFTER_PARAMS: [u8; 9] = [0x00, 0x00, 0x21, 0x00, 0x0c, 0x52, 0x33, 0x00, 0x16];
+pub const ST_SERIAL_READY: [u8; 9] = [0x07, 0x00, 0x21, 0x00, 0x8c, 0x4b, 0x00, 0x00, 0x00];
+/// Status byte 0 (frame byte 7) when an answer is pending; only then do bytes 5-6 hold its length (at rest they read
+/// `52 33`).
+pub const ST_ANSWER_READY: u8 = 0x07;
+
+/// Frame 0x55 carrying `blob` (+ CRC). Totals < 0x100 only (all frames of the 1st pass: 0x40, 0x49).
+pub fn build_param_frame(blob: &[u8], out: &mut [u8]) -> Result<usize> {
+    let n = HEADER_LEN + blob.len() + PARAM_CRC_LEN;
+    if n >= 0x100 {
+        return Err(Error::Unexpected("param frame too long"));
+    }
+    let o = out.get_mut(..n).ok_or(Error::Short)?;
+    o[..HEADER_LEN].copy_from_slice(&[MAGIC, OP_PARAMS, 0, n as u8, 0, 0, 0]);
+    o[HEADER_LEN..n - PARAM_CRC_LEN].copy_from_slice(blob);
+    let c = crc16_arc(&o[..n - PARAM_CRC_LEN]);
+    o[n - PARAM_CRC_LEN..].copy_from_slice(&c.to_le_bytes());
+    Ok(n)
+}
+
+/// The 64-byte payload of the sensor answer to a 0x31 frame, after checking its exact shape and CRC.
+pub fn serial_answer_payload(r: &[u8]) -> Result<&[u8]> {
+    if r.len() != SERIAL_ANSWER_LEN {
+        return Err(Error::Unexpected("0x75 answer: length is not 0x4b"));
+    }
+    if r[..9] != SERIAL_ANSWER_HEAD {
+        return Err(Error::Unexpected("0x75 answer: header is not 80 d4 00 4b 00000000 75"));
+    }
+    let n = r.len() - PARAM_CRC_LEN;
+    if le_u16(r, n)? != crc16_arc(&r[..n]) {
+        return Err(Error::Unexpected("0x75 answer: CRC16 mismatch"));
+    }
+    Ok(&r[RELAY_RESP_OFF..n])
+}
+
 /// Relay frame `80 op 00 TT 00 00 00 + blob`, TT = total length (7 + blob). Written into `out`, returns its length.
 /// Only totals < 0x100 are built: there the two readings of the header (u16 BE at 2 in the scripts, u32 LE at 3 in
 /// `parse_frame`) give the same bytes; a longer frame is refused (never needed by 0x72 / 0x73).
@@ -190,6 +235,28 @@ mod tests {
         assert_eq!(&IDENTITY_J314C[SERIAL_RANGE], &[0x02, 0x19, 0xc0, 0x5c, 0x0f, 0xd2, 0xaa, 0x34, 0x9a, 0x81, 0xc7, 0x6e, 0x03, 0x02, 0x00, 0xd8]);
         let st = [0x80, 0x20, 0, 0x10, 0, 0, 0, 0, 0x29, 1, 0, 0x7c, 0x52, 0x33, 0, 0x16];
         assert_eq!(parse_status(&st).unwrap().patch_byte(), Some(PATCH_LOADED));
+    }
+
+    /// Frames and answers of the macOS capture C19 (`analysis/sio_dialog.py … --sep --full`, sio.log seq 774/792/808).
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn param_frames_c19() {
+        let h = |s: &str| (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect::<alloc::vec::Vec<u8>>();
+        let f5d = h("805500400000003a0000000000001e572d5946f00000174c07d774f7122921bd098849d431eaab2a7a1b8604710a8bab6724333fda700166ca6c00f3a41d0017");
+        let f31 = h("805500490000003a0000000000001e572d5946f200002069474d093c068973e1478dc1564ac68f74586fd8369e48f53db3ddd733c2a05138876e87a892b9f39c0fa224a8ad8a12959a");
+        for f in [&f5d, &f31] {
+            let mut b = [0u8; 0x100];
+            let n = build_param_frame(&f[7..f.len() - 2], &mut b).unwrap();
+            assert_eq!(&b[..n], &f[..]);
+        }
+        assert_eq!((f5d.len(), f31.len()), (0x40, 0x49));
+        let a = h("80d4004b00000000753a8000000000001e572d5946f00000201c14945eba10d2cb015fa8282f9b8d65c4aa2b3fb576d34b5160f0a730fbb638beb44a91fc608015df4e3640e8fb5281df7e");
+        assert_eq!(serial_answer_payload(&a).unwrap(), &a[9..73]);
+        let mut bad = a.clone();
+        bad[20] ^= 1;
+        assert!(serial_answer_payload(&bad).is_err());
+        assert!(serial_answer_payload(&a[..74]).is_err());
+        assert!(build_param_frame(&[0; 0xf7], &mut [0u8; 0x200]).is_err());
     }
 
     #[test]

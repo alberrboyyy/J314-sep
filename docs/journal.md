@@ -2280,3 +2280,27 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `vérifié` (le sceptique tranche) ; l'hypothèse « débit » est sans objet pour le chargement (PIO 29 ms suffit).
 - Suite (J5 étape 2) : params 0x5d/0x5c/0x55 (+CRC16) et calibration 0x5b — liste blanche à étendre (après 0x5f,
   rien n'est autorisé aujourd'hui) ; protocole vérifié à demander d'abord (session PC).
+
+## 2026-11-22 — Claude (agent driver, session ALARM) — J5c préparé : params + n° série module + calibration 0x5b (compilé, rien lancé)
+- Trace : relecture seule de c12 (`traces/20261108-032454_c12-boot-ho`, sep.log L352-406 + OOL 000317-000344), C17-C20
+  (`spi2.log`, `sio.log`), et des OOL des 9 boots c5…c20. Aucun accès matériel, aucun insmod.
+- Fait : `docs/j5_params_protocol.md` (protocole d'abord) ; `analysis/spi2_gpio_timeline.py --params` (mots EP 0x08
+  intercalés) ; `sep-proto` : `RELAY_SEQUENCE` étendue à 17 étapes (0x17 … 0x63, niveaux 6/15/17), charges fixes,
+  0x5b seul fragmenté AP→SEP (blob capturé, CRC-32), trame 0x55 + CRC16, contrôle de la réponse 0x75 ; `sep_native.rs` :
+  paramètre `allow_sbio_params` (0 défaut / 1 / 2), envoi fragmenté `> fc`/`< fe`/`> fd` borné à 0x5b ; `sbiod` :
+  `--upto patch|params|calib`, `--calib`, `calib-prepare`, sha256 ; `pending/j5c_params_run.sh` (+ 2 variables dans
+  `j5_sensor_run.sh`, défauts inchangés).
+- Vu (macOS, `source: trace`) : tailles identiques 9/9 boots (0x5d/0x5c 4 → 0x37, 0x6a 0 → 0, 0x31 0 → 0x40, 0x32 0x40 →
+  0x12, 0x01 0 → 0, 0x1f 0 → `05 05`, 0x5b 0xfc99 → 0, 0x63 0 → 0x1c constant) ; **deux** paires 0x31/0x32 (la liste de
+  l'orchestrateur n'en avait qu'une) ; trame 0x55 = 7 + blob + CRC-16/ARC(en-tête + blob) petit-boutiste, compté dans la
+  longueur (recalculé sur 4 trames C19) ; réponse 0x75 avec CRC de même règle ; motif C17 : trame → IRQ 195 → UNE lecture
+  d'état, jamais de lecture après la réponse 0x75 ; états après 0x5d/0x5c/0x31 identiques C18-C20 ; mots de 0x5b
+  identiques 23/23 captures ; blob 0x5b identique 9/9 (sha256 d5a6117d…), il contient le n° de série capteur (offset 91)
+  et le n° de série module rendu par 0x32 (offset 889).
+- Interprété : la longueur en attente (octets 5-6 de l'état) n'a de sens qu'avec l'octet d'état 07 ; `Mesa::relay`
+  corrigé en conséquence (sans effet sur J5 v2). « Prêt pour un doigt » après la seule 1re passe = hypothèse : macOS
+  coupe le capteur et refait l'init juste après 0x63.
+- Builds : `~/kbuild/j5/sep_native.ko` 891c5f96…2e9a (ancien → `.v2` aaa62234…4f03), `sbiod` 56996c18…3c34 (ancien → `.v2`
+  a2b40c01…b076), `calib_0x5b.bin` d5a6117d…ddda. `build.sh CLIPPY=1` 0 avertissement ; sep-proto 31+17, sbiod 1+10,
+  sepd tests verts, clippy 0.
+- 1er run J5c (params, puis calib) = go d'Albert (classe neuve ; 0x5b jamais rejoué). Incidents : aucun.

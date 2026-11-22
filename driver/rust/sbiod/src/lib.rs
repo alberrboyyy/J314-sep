@@ -4,15 +4,23 @@
 //! 2. 0x15 → 40 opaque bytes → SPI frame 0x72 → 51-byte reply → 40 bytes @ 9 → 0x16 → ack;
 //! 3. 0x42 → 64 opaque bytes → SPI frame 0x73 → 75-byte reply → 64 bytes @ 9 → 0x18 → ack;
 //! 4. 0x5f → patch block (reassembled by the kernel) → SPI prelude `80 60 00 07 00 00 00` then the block in ONE
-//!    transfer, with the macOS status read between them → ready pin → status byte 1 == 0x29 (loaded). STOP there (no 0x5d/0x5c/0x6a/0x5b).
+//!    transfer, with the macOS status read between them → ready pin → status byte 1 == 0x29 (loaded). STOP there
+//!    with `Upto::Patch` (default);
+//! 5. `Upto::Params` (only if loaded): 0x5d, 0x5c → 55 bytes → SPI frame 0x55 (+ CRC16) → ready pin → ONE status read;
+//!    0x6a (empty, no SPI); 0x31 → 64 bytes → frame 0x55 → pin → status (0x4b pending) → 0x75 answer (CRC16) →
+//!    64 bytes @ 9 → 0x32 → 18 bytes; 0x01; 0x1f; 0x31/0x32 again (docs/j5_params_protocol.md §1-3);
+//! 6. `Upto::Calib`: 0x5b with the captured calibration file (sha256, sensor serial at [91..107], module serial at
+//!    [889..907] == the 0x32 answer), fragmented by the kernel; 0x63 → 28 bytes, compared with macOS. STOP (no 0x19).
 //!
 //! Source of every step: `pending/sep_native_sbio3.sh` .. `sep_native_sbio11.sh` (hardware-proven under m1n1 up to
 //! the push; the push itself never loaded the patch under m1n1: FIFO through the tunnel, 2.2 s), `docs/sbio_session.md`
 //! (§3b success criterion), `docs/sensor_hw.md`, `driver/linux/mesa_transport.h`. Crypto blobs are never interpreted.
 //! The hardware is behind the `Sep` and `Sensor` traits: `main.rs` binds them to the devices, the tests to captures.
 pub mod hw;
+pub mod sha256;
 
-use sep_proto::sbio_gate::{self, RELAY_SEQUENCE};
+use sep_proto::gt::OOL_HDR;
+use sep_proto::sbio_gate::{self, CALIB_LEN, RELAY_SEQUENCE};
 use sep_proto::sensor::{self, CMD_IDENTITY, CMD_STATUS, CMD_WAKE, IDENTITY_J314C, PATCH_LOADED, PATCH_PRELUDE};
 use std::fmt::Write as _;
 
@@ -31,6 +39,26 @@ pub const LATE_READ_MS: u64 = 500;
 /// Expected pending lengths of the relay replies (VU C19), logged when they differ (the extraction decides).
 pub const KX_PENDING: usize = 0x33;
 pub const CNT_PENDING: usize = 0x4b;
+/// Before each 0x55 frame the ready pin must be low (status of the previous step read) within this delay.
+pub const PIN_LOW_MS: u64 = 20;
+/// Ready pin after a 0x55 frame (macOS C17: 0.3-9.6 ms).
+pub const PARAM_IRQ_MS: u64 = 200;
+/// 0x5d / 0x5c payload (c12 `000317/000319_08_A.bin`, 9/9 boots).
+pub const PARAMS_INPUT: [u8; 4] = [0, 0, 0, 0];
+/// 0x1f answer, 9/9 boots (c12 `000330_08_B.bin`).
+pub const MATCH_POLICY_REF: [u8; 2] = [5, 5];
+/// 0x63 answer after the calibration, 9/9 boots (c12 `000344_08_B.bin`).
+pub const CAL_INFO_REF: [u8; 0x1c] = [
+    0x03, 0, 0, 0, 0x00, 0xac, 0x60, 0x41, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0, 0, 0, 0x03, 0, 0, 0, 0x03, 0, 0, 0,
+];
+/// Calibration blob (c12 `000335/337/339/341_08_A.bin` payloads, 9/9 boots): sha256, where it holds the sensor serial
+/// (identity [9..25]) and the module serial (0x32 answer). Found by byte search, structure not decoded.
+pub const CALIB_SHA256: &str = "d5a6117dc8b5482320ab4d86c94148f190a7b08530c6235735636b9abd23ddda";
+pub const CALIB_SERIAL_AT: usize = 91;
+pub const CALIB_MODULE_AT: usize = 889;
+pub const MODULE_SERIAL_LEN: usize = 0x12;
+/// c12 A8 files of the 0x5b fragments, in order.
+pub const CALIB_C12_FILES: [&str; 4] = ["000335_08_A.bin", "000337_08_A.bin", "000339_08_A.bin", "000341_08_A.bin"];
 /// Serial of this machine's sensor (c12 template `000303_08_A.bin` payload, identical in every run since).
 pub const SERIAL_J314C: [u8; 16] =
     [0x02, 0x19, 0xc0, 0x5c, 0x0f, 0xd2, 0xaa, 0x34, 0x9a, 0x81, 0xc7, 0x6e, 0x03, 0x02, 0x00, 0xd8];
@@ -64,9 +92,24 @@ pub fn short(b: &[u8]) -> String {
     format!("{} o : {}{}", b.len(), hex(&b[..b.len().min(16)]), if b.len() > 16 { "…" } else { "" })
 }
 
+/// How far a run goes (the kernel level `allow_sbio_params` must allow it).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Upto {
+    /// Up to the patch (J5 v2).
+    Patch,
+    /// Then 0x5d .. second 0x32 (kernel level 1).
+    Params,
+    /// Then 0x5b + 0x63 (kernel level 2), with the calibration file.
+    Calib,
+}
+
 /// Final result of a run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
+    /// `Upto::Params`: every step of 0x5d .. 0x32 passed its check.
+    ParamsDone,
+    /// `Upto::Calib`: 0x5b acked; `info_ref` = the 0x63 answer is the macOS one.
+    Calibrated { info_ref: bool },
     /// Status byte 1 == 0x29 after the block.
     Loaded { t_ms: u64, irq_seen: bool },
     /// Ready pin rose after the block but byte 1 never became 0x29 (sensor finished receiving and refused?).
@@ -86,6 +129,13 @@ impl Verdict {
             }
             Verdict::Refused { st8 } => format!("VERDICT : patch refusé (IRQ 195 montée, octet 1 = {}, jamais 0x29)", b(st8)),
             Verdict::NoIrq { st8 } => format!("VERDICT : IRQ absente (IRQ 195 jamais montée, octet 1 = {}, jamais 0x29)", b(st8)),
+            Verdict::ParamsDone => "VERDICT : patch chargé + paramètres 0x5d/0x5c/0x6a + n° de série module (0x31/0x32 ×2) + 0x01/0x1f appliqués, états = macOS".into(),
+            Verdict::Calibrated { info_ref: true } => {
+                "VERDICT : capteur initialisé et calibré (1re passe ; 0x5b acquitté, 0x63 = référence macOS)".into()
+            }
+            Verdict::Calibrated { info_ref: false } => {
+                "VERDICT : 0x5b acquitté mais 0x63 ≠ référence macOS (calibration douteuse ; rien envoyé après)".into()
+            }
             Verdict::Stopped(why) => format!("VERDICT : arrêt (fail-closed) : {why}"),
         }
     }
@@ -141,8 +191,10 @@ impl<S: Sensor> Mesa<'_, S> {
         Ok(Some(b))
     }
 
+    /// Length of the pending answer: bytes 12-13 of the body, ONLY when the state byte (body[7]) is 0x07 (at rest those
+    /// bytes read `52 33`, docs/j5_params_protocol.md §3).
     fn pending(st: &Option<[u8; 16]>) -> usize {
-        st.map_or(0, |b| b[12] as usize | (b[13] as usize) << 8)
+        st.filter(|b| b[7] == sensor::ST_ANSWER_READY).map_or(0, |b| b[12] as usize | (b[13] as usize) << 8)
     }
 
     /// Wait until the ready pin reads `level` (1 ms polling), at most `ms`. Returns the last reading.
@@ -169,7 +221,7 @@ impl<S: Sensor> Mesa<'_, S> {
     }
 
     /// Read a pending answer of `n` bytes: request 0x13, then `n` bytes full duplex.
-    fn read_pending(&mut self, what: &str, n: usize) -> Result<Vec<u8>, String> {
+    pub fn read_pending(&mut self, what: &str, n: usize) -> Result<Vec<u8>, String> {
         let n32 = u32::try_from(n).map_err(|_| "longueur en attente hors u32")?;
         self.x(&format!("demande 0x13 ({what})"), &sensor::build_read_request(n32), false)?;
         self.x(&format!("lecture ({what})"), &vec![0u8; n], true)
@@ -218,6 +270,34 @@ impl<S: Sensor> Mesa<'_, S> {
     }
 }
 
+impl<S: Sensor> Mesa<'_, S> {
+    /// One 0x55 frame as macOS (C17 `spi2_gpio_timeline.py --params`): ready pin low first (previous status read),
+    /// the frame alone (no pause), wait for the ready pin, then ONE status read, which must be `want` exactly.
+    pub fn param_frame(&mut self, what: &str, blob: &[u8], want: &[u8; 9]) -> Result<[u8; 16], String> {
+        let low = self.wait_pin(false, PIN_LOW_MS);
+        if low != Some(false) {
+            return Err(format!("{what} : IRQ 195 {} avant la trame (état précédent non acquitté) : trame non envoyée", pin(low)));
+        }
+        let mut f = [0u8; 0x100];
+        let n = sensor::build_param_frame(blob, &mut f).map_err(|e| format!("{what} : {e}"))?;
+        self.s.xfer(&f[..n], false).map_err(|e| format!("SPI trame 0x55 ({what}) : {e}"))?;
+        (self.log)(&format!("SPI> trame 0x55 ({what}) {} (CRC {})", short(&f[..n]), hex(&f[n - 2..n])));
+        let t = self.s.now_ms();
+        let up = self.wait_pin(true, PARAM_IRQ_MS);
+        (self.log)(&format!("IRQ 195 après la trame ({what}) : {} (t+{} ms)", pin(up), self.s.now_ms() - t));
+        if up != Some(true) {
+            return Err(format!("{what} : IRQ 195 jamais montée en {PARAM_IRQ_MS} ms après la trame (aucune lecture faite)"));
+        }
+        let st = self.status_raw()?.ok_or_else(|| format!("{what} : état non reconnu (en-tête ≠ 80 20 00 10)"))?;
+        (self.log)(&format!("état après la trame ({what}) : {}", hex(&st)));
+        if st[7..16] != want[..] {
+            return Err(format!("{what} : état {} ≠ macOS {}", hex(&st[7..16]), hex(want)));
+        }
+        self.s.sleep_ms(GAP_MS);
+        Ok(st)
+    }
+}
+
 fn extract(resp: &[u8], len: usize, what: &str) -> Result<Vec<u8>, String> {
     let off = sensor::RELAY_RESP_OFF;
     resp.get(off..off + len).map(<[u8]>::to_vec).ok_or_else(|| format!("{what} : réponse capteur {} o, trop courte pour {len} o @ {off}", resp.len()))
@@ -239,13 +319,54 @@ fn sep_cmd(sep: &mut dyn Sep, log: &mut dyn FnMut(&str), op: u8, payload: &[u8])
     Ok(r)
 }
 
-/// Steps 1-3 (SEP + sensor relay) and the patch fetch. Returns the patch block.
-pub fn session<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>) -> Result<Vec<u8>, String> {
+/// Checks of the calibration file that need no hardware: length, sha256, head (the kernel checks length, head and
+/// CRC-32 again).
+pub fn check_calib(blob: &[u8]) -> Result<(), String> {
+    if blob.len() != CALIB_LEN {
+        return Err(format!("calibration : {} o ({CALIB_LEN} attendus)", blob.len()));
+    }
+    let h = hex(&sha256::sha256(blob));
+    if h != CALIB_SHA256 {
+        return Err(format!("calibration : sha256 {h} ≠ {CALIB_SHA256} (blob capturé c12)"));
+    }
+    if blob[CALIB_SERIAL_AT..CALIB_SERIAL_AT + sensor::SERIAL_LEN] != SERIAL_J314C {
+        return Err("calibration : n° de série capteur absent à l'offset 91".into());
+    }
+    Ok(())
+}
+
+/// The calibration blob from the four c12 A8 files of 0x5b (each gt header checked: version 1, op 0x5b, total
+/// 0xfc99, offsets contiguous), then `check_calib`.
+pub fn calib_from_c12(dir: &std::path::Path) -> Result<Vec<u8>, String> {
+    let mut blob = Vec::with_capacity(CALIB_LEN);
+    for f in CALIB_C12_FILES {
+        let p = dir.join(f);
+        let b = std::fs::read(&p).map_err(|e| format!("{} : {e}", p.display()))?;
+        let h = sep_proto::gt::OolHeader::parse(&b).ok_or_else(|| format!("{f} : en-tête court"))?;
+        let len = h.len as usize;
+        if h.valid != 1 || h.ty != 0x5b || h.total as usize != CALIB_LEN || h.offset as usize != blob.len() || OOL_HDR + len > b.len() {
+            return Err(format!("{f} : en-tête gt inattendu {h:?}"));
+        }
+        blob.extend_from_slice(&b[OOL_HDR..OOL_HDR + len]);
+    }
+    check_calib(&blob)?;
+    Ok(blob)
+}
+
+/// Steps 1-3 (SEP + sensor relay) and the patch fetch. Returns the patch block. With a calibration blob, the live
+/// sensor serial must be the one it holds (checked before the first command to the SEP).
+pub fn session<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, calib: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let id = m.identity()?;
     let serial = &id[sensor::SERIAL_RANGE];
     (m.log)(&format!("identité OK, n° de série {}", hex(serial)));
     if serial != SERIAL_J314C {
         return Err("n° de série != gabarit c12 : 0x17 non envoyé".into());
+    }
+    if let Some(c) = calib {
+        if c.get(CALIB_SERIAL_AT..CALIB_SERIAL_AT + sensor::SERIAL_LEN) != Some(serial) {
+            return Err("n° de série capteur ≠ celui du blob de calibration : rien envoyé au SEP".into());
+        }
+        (m.log)("n° de série capteur = celui du blob de calibration (offset 91)");
     }
     let r = sep_cmd(sep, m.log, 0x17, serial)?;
     if !r.is_empty() {
@@ -337,11 +458,110 @@ fn pin(p: Option<bool>) -> &'static str {
     }
 }
 
-/// Whole J5 run (the caller powers the sensor on before and off after, in every path).
-pub fn run<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>) -> Verdict {
-    match session(sep, m) {
-        Ok(p) => push_patch(m, &p).unwrap_or_else(|e| Verdict::Stopped(format!("push : {e}"))),
-        Err(e) => Verdict::Stopped(e),
+fn expect_len(op: u8, r: &[u8], n: usize) -> Result<(), String> {
+    if r.len() != n {
+        return Err(format!("{op:#04x} : réponse de {} o ({n} attendus)", r.len()));
+    }
+    Ok(())
+}
+
+/// 0x31 → frame 0x55 → 0x75 answer → 0x32. Returns the 18-byte module serial the SEP answers.
+fn module_serial<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, n: u8) -> Result<Vec<u8>, String> {
+    let what = format!("0x31 n°{n}");
+    let blob = sep_cmd(sep, m.log, 0x31, &[])?;
+    expect_len(0x31, &blob, 0x40)?;
+    let st = m.param_frame(&what, &blob, &sensor::ST_SERIAL_READY)?;
+    let pending = Mesa::<S>::pending(&Some(st));
+    if pending != sensor::SERIAL_ANSWER_LEN {
+        return Err(format!("{what} : réponse en attente {pending:#x} (0x4b attendu)"));
+    }
+    let resp = m.read_pending(&format!("réponse 0x75 ({what})"), pending)?;
+    let back = sensor::serial_answer_payload(&resp).map_err(|e| format!("{what} : {e}"))?.to_vec();
+    let serial = sep_cmd(sep, m.log, 0x32, &back)?;
+    expect_len(0x32, &serial, MODULE_SERIAL_LEN)?;
+    Ok(serial)
+}
+
+/// Step 5 (docs/j5_params_protocol.md §1, §6), only after a loaded patch. Returns the module serial.
+pub fn params<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, calib: Option<&[u8]>) -> Result<Vec<u8>, String> {
+    for op in [0x5d, 0x5c] {
+        let blob = sep_cmd(sep, m.log, op, &PARAMS_INPUT)?;
+        expect_len(op, &blob, 0x37)?;
+        m.param_frame(&format!("{op:#04x}"), &blob, &sensor::ST_AFTER_PARAMS)?;
+    }
+    let r = sep_cmd(sep, m.log, 0x6a, &[])?;
+    expect_len(0x6a, &r, 0)?;
+    let s1 = module_serial(sep, m, 1)?;
+    if let Some(c) = calib {
+        if c[CALIB_MODULE_AT..CALIB_MODULE_AT + MODULE_SERIAL_LEN] != s1[..] {
+            return Err("0x32 : n° de série module ≠ celui du blob de calibration (offset 889) : arrêt avant 0x01".into());
+        }
+        (m.log)("0x32 : n° de série module = celui du blob de calibration (offset 889)");
+    }
+    let r = sep_cmd(sep, m.log, 0x01, &[])?;
+    expect_len(0x01, &r, 0)?;
+    let r = sep_cmd(sep, m.log, 0x1f, &[])?;
+    if r != MATCH_POLICY_REF {
+        return Err(format!("0x1f : réponse {} ≠ macOS {}", hex(&r), hex(&MATCH_POLICY_REF)));
+    }
+    let s2 = module_serial(sep, m, 2)?;
+    if s2 != s1 {
+        return Err("0x32 n°2 : n° de série module différent du n°1".into());
+    }
+    Ok(s1)
+}
+
+/// Step 6: 0x5b (whole blob; the kernel fragments it) then 0x63. Nothing on SPI.
+pub fn calibrate(sep: &mut dyn Sep, log: &mut dyn FnMut(&str), blob: &[u8]) -> Result<Verdict, String> {
+    check_calib(blob)?;
+    let r = sep_cmd(sep, log, 0x5b, blob)?;
+    expect_len(0x5b, &r, 0)?;
+    let info = sep_cmd(sep, log, 0x63, &[])?;
+    expect_len(0x63, &info, 0x1c)?;
+    let same = info[..] == CAL_INFO_REF[..];
+    log(&format!("0x63 : {} ({})", hex(&info), if same { "= macOS" } else { "≠ macOS" }));
+    Ok(Verdict::Calibrated { info_ref: same })
+}
+
+/// Whole J5 run (the caller powers the sensor on before and off after, in every path). `calib` is required (and
+/// checked first) for `Upto::Calib`; the later steps run only after a loaded patch.
+pub fn run<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, upto: Upto, calib: Option<&[u8]>) -> Verdict {
+    if upto == Upto::Calib {
+        match calib.map(check_calib) {
+            Some(Ok(())) => {}
+            Some(Err(e)) => return Verdict::Stopped(e),
+            None => return Verdict::Stopped("--upto calib sans fichier de calibration".into()),
+        }
+    }
+    let calib = if upto == Upto::Patch { None } else { calib };
+    let loaded = match session(sep, m, calib) {
+        Ok(p) => match push_patch(m, &p) {
+            Ok(v) => v,
+            Err(e) => return Verdict::Stopped(format!("push : {e}")),
+        },
+        Err(e) => return Verdict::Stopped(e),
+    };
+    if upto == Upto::Patch || !matches!(loaded, Verdict::Loaded { .. }) {
+        return loaded;
+    }
+    (m.log)(&loaded.line());
+    // macOS reads nothing between the "loaded" status and the 0x5d frame (C17): the pin must be low already.
+    if let Err(e) = params(sep, m, calib) {
+        return Verdict::Stopped(format!("paramètres : {e}"));
+    }
+    if upto == Upto::Params {
+        return Verdict::ParamsDone;
+    }
+    let Some(c) = calib else { return Verdict::Stopped("calibration absente".into()) };
+    calibrate(sep, m.log, c).unwrap_or_else(|e| Verdict::Stopped(format!("calibration : {e}")))
+}
+
+/// True when `v` is the verdict a run up to `upto` aims at.
+pub fn success(upto: Upto, v: &Verdict) -> bool {
+    match upto {
+        Upto::Patch => matches!(v, Verdict::Loaded { .. }),
+        Upto::Params => *v == Verdict::ParamsDone,
+        Upto::Calib => *v == Verdict::Calibrated { info_ref: true },
     }
 }
 

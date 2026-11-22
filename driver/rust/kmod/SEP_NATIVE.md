@@ -4,8 +4,9 @@ Fichiers : `sep_native.rs` (ce dossier), `driver/linux/sep_native_ovl.c` + `driv
 Conception : `docs/driver_rust_design.md` (§2 option (b), §3.1-3.6). Boot (`allow_boot=1`) **éprouvé sur matériel
 le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **éprouvé sur matériel le 2026-11-22** (J4,
 `logs/20261122-183847_j4-xart-native/`). Ouverture de sbio + poignée 0x73 (`allow_sbio`, J3, ouverture tardive) : **éprouvée sur matériel le 2026-11-22 après un
-scellement frais** (`logs/20261122-192013_j3c-sbio-fresh/`, VIVANT). Ouverture précoce (`sbio_open=1`) et relais J5
-(`allow_sbio_relay`, `/dev/sep_sbio`, `sbiod`) : **compilés et testés hors ligne, jamais chargés.**
+scellement frais** (`logs/20261122-192013_j3c-sbio-fresh/`, VIVANT). Relais J5 (`allow_sbio_relay`, `/dev/sep_sbio`, `sbiod`) :
+**exécuté le 2026-11-22** (v2, patch chargé, `logs/20261122-204249_j5b-patch-loaded/`). Ouverture précoce (`sbio_open=1`)
+et J5c (`allow_sbio_params`, point 11) : **compilés et testés hors ligne, jamais chargés.**
 
 ## Ce que ça fait
 
@@ -94,6 +95,21 @@ scellement frais** (`logs/20261122-192013_j3c-sbio-fresh/`, VIVANT). Ouverture p
    **Halted** : commande hors liste / hors ordre / mauvaise longueur, mot GT hors transaction ou de mauvais TAG/TYPE,
    compteur faux, en-tête refusé, délai, signal pendant une transaction. Notifications TAG 0x01-0x04 : file de 16
    événements pour le démon (pleine → perdue et comptée, pas de Halted). Autre TAG sur 0x08 pendant le relais → Halted.
+   Charges fixes contrôlées en plus de la longueur (J5c) : 0x15 = `01 00 00 00`, 0x5f = `02 00`.
+11. **J5c, après le patch (`allow_sbio_params`, défaut 0 = rien après 0x5f)** — `docs/j5_params_protocol.md`,
+   séquence de la 1re passe macOS (c12 seq 317-344, tailles identiques sur 9 boots) :
+   - niveau 1 : `0x5d` (`00 00 00 00` → 55 o), `0x5c` (idem), `0x6a` (vide → vide), `0x31` (vide → 64 o), `0x32` (64 o →
+     18 o), `0x01` (vide → vide), `0x1f` (vide → 2 o), `0x31`, `0x32` (2e paire) ;
+   - niveau 2 : en plus `0x5b` (setCalibrationData) puis `0x63` (vide → 28 o). Rien après 0x63.
+   **0x5b est la seule commande fragmentée AP→SEP** (`Step::frag_in`) : charge = exactement 0xfc99 o, en-tête
+   `03 00 00 00 30 82 fc 91`, CRC-32 `0x6f98a221` (le blob capturé, sinon Halted avant tout envoi) ; 4 fragments
+   (0x3fe4 ×3 + 0x3ced), chacun écrit dans A8 (en-tête `1, 0xfc99, offset, 0, 0, 0x5b, len` + morceau, reste à zéro,
+   +0x00/+0x08/+0x14 relus) : `> fc DATA 0` (fragment 0), puis pour k = 1..3 : `< fe DATA (k-1) << 16` → `> fd DATA k << 16`
+   (fragment k) ; enfin `< fc DATA 0` avec un en-tête B8 de réponse vide (total 0). Mots = c12 L388-402 (23/23
+   captures). Un `< fc` avant le dernier fragment, un `< fe` après, un compteur faux → Halted. B8 au moment des `< fe`
+   n'est pas contrôlé (c12 : tout à zéro, origine inconnue), seulement journalisé. La porte d'envoi n'admet `> fd` que
+   pour l'étape `frag_in`, après un `< fe`, avec DATA = nombre de fragments déjà envoyés << 16.
+   `allow_sbio_params` ≠ 0 exige `allow_sbio_relay=1` ; valeur > 2 → EINVAL.
 
 ## Paramètres (u32, défaut 0 sauf `sbio_open`, absents de sysfs : figés au chargement)
 
@@ -105,6 +121,7 @@ scellement frais** (`logs/20261122-192013_j3c-sbio-fresh/`, VIVANT). Ouverture p
 | `allow_sbio` | 1 = J3 (point 8) : ouverture de 0x08 et UNE poignée 0x73 quand le xART est calme. Exige `allow_xart=1` (sinon EINVAL). En pratique il faut aussi `allow_xart_save_ack=1` : sbio n'est annoncé qu'après le scellement. |
 | `sbio_open` | **défaut 1** = ouverture PRÉCOCE de sbio (point 9) ; 0 = TARDIVE (point 8, éprouvée après scellement frais). Autre valeur → EINVAL. Sans effet si `allow_sbio=0`. |
 | `allow_sbio_relay` | 1 = relais J5 (point 10) : `/dev/sep_sbio` après un 0x73 VIVANT. Exige `allow_sbio=1` (sinon EINVAL). |
+| `allow_sbio_params` | J5c (point 11) : 0 = rien après 0x5f ; 1 = 0x5d … 2e 0x32 ; 2 = en plus 0x5b (⚠️ écriture SEP de classe neuve : calibration) et 0x63. Exige `allow_sbio_relay=1`. |
 | `allow_sks` | **non implémenté** : toute valeur ≠ 0 fait échouer le probe (EINVAL). |
 
 ## États
@@ -149,7 +166,7 @@ N'existe qu'après l'ouverture réussie de 0x13 ; root 0600 ; un seul ouvreur (E
 ## Interface `/dev/sep_sbio` (allow_sbio_relay=1)
 
 Enregistrements petit-boutistes de `sep-proto::sbio_gate` (noyau et démon partagent le code), magic `SBR1` :
-- `write` : `+0 u32 magic | +4 op | +5..8 0 | +8 u32 len` + charge (≤ 64 o). **Bloque** jusqu'à la réponse complète
+- `write` : `+0 u32 magic | +4 op | +5..8 0 | +8 u32 len` + charge (≤ 64 o, ou les 0xfc99 o de 0x5b). **Bloque** jusqu'à la réponse complète
   (réassemblée) ; EBUSY si la réponse précédente n'a pas été lue (lockstep strict) ; refus → Halted.
 - `read` (tampon ≥ 16 + 0x10000 o) : bloque jusqu'à un événement : d'abord les notifications (`kind 2`, mot seul), puis
   la réponse (`kind 1`, mot final + charge réassemblée). `+0 magic | +4 kind | +5 tag | +6 type | +7 param |
@@ -182,6 +199,14 @@ label contrôlé par `GPIO_GET_CHIPINFO_IOCTL` ; ligne 196 en sortie (valeur ini
 pauses fixes seulement). SPI : mode 1 (CPHA), 8 bits, 8 MHz, relus après réglage ; un échange = un message d'un transfert
 (CS par message, comme `mesa_xfer`). Le push passe par le PIO de `spi-apple` (FIFO 16, IRQ toutes les 8 octets à 8 MHz :
 pas de scrutation) : c'est la « voie 0 » de `docs/dma_spi2_design.md` §3.4, jamais essayée.
+
+J5c (`--upto params|calib`, seulement si le patch est chargé ; `docs/j5_params_protocol.md` §6) : avant chaque trame
+0x55 la broche 195 doit être basse (≤ 20 ms), trame seule, attente de la broche haute (≤ 200 ms), UNE lecture d'état qui
+doit valoir celle de macOS (`00 00 21 00 0c 52 33 00 16` après 0x5d/0x5c, `07 00 21 00 8c 4b 00 00 00` après 0x31) ;
+réponse 0x75 : en-tête `80 d4 00 4b 00000000 75` et CRC16 ; 0x32 = 18 o = n° de série module du blob ; 0x1f = `05 05` ;
+0x63 comparé à macOS. Fichier `--calib` contrôlé avant toute ouverture (64665 o, sha256, n° de série capteur à
+l'offset 91). La longueur en attente n'est plus lue qu'avec l'octet d'état 0x07 (au repos les mêmes octets valent `52 33`).
+`sbiod calib-prepare --from DIR --out F` refait le blob depuis les 4 A8 de c12 (en-têtes contrôlés).
 
 Tests (`cargo test --offline`, `sbiod/tests/replay.rs` sur c12) : gt_packets construits = A8 de macOS (7 commandes,
 0x73 compris) ; réponses B8 de c12 acceptées par la porte, patch 0x5f réassemblé en 0x568e o (2 fragments, préfixe
@@ -229,7 +254,8 @@ fuit volontairement mailbox, shmem et mapping firmware, et tout nouveau probe es
 | Barrière `dmb oshst` (dma_wmb) avant IMG4/SET_SHMEM | déduit (comme `rtkit.c`), design Q9 |
 | Liste des messages connus après boot | traces C1 (19/19) et SEP-BOOT 2026-11-09 ; hypothèse |
 | Relais 0x17/0x15/0x16/0x42/0x18/0x5f (forme gt_packet, fe/fd, offset 9, trames 0x72/0x73, prélude 0x60) | éprouvé sous m1n1 (sbio3..11) jusqu'à la réception du patch ; **jamais exécuté par ce pilote** |
-| Push du patch par le PIO noyau → 0x29 | **inconnu** (sous m1n1 en FIFO via tunnel : jamais 0x29) ; c'est l'expérience J5 |
+| Push du patch par le PIO noyau → 0x29 | **obtenu une fois** (J5 v2, 2026-11-22 20:43, n=1) |
+| J5c : 0x5d … 0x63, trames 0x55 + CRC16, 0x5b fragmenté AP→SEP | vu sous macOS (c12, C17-C20) ; **jamais exécuté** (sbio8/9 sous m1n1 : capteur sans patch, sans valeur) |
 | Ouverture précoce de sbio (après l'ack 0x1d 'sbio') | vue sous macOS (c12) ; **jamais exécutée** ; nécessaire en boot chaîné selon l'orchestrateur PC (n=2) |
 | En-tête de trame capteur au-delà de 0xff o (u16 BE en 2 ou u32 LE en 3) | non tranché, non utilisé (trames relais < 0x100 o) |
 
@@ -237,6 +263,10 @@ Différences avec m1n1, côté AP seulement : TAG 0 comme m1n1 (macOS met 1) ; l
 IMG4 et non avant le 1er GET_STATUS (le SEP ne voit l'IOVA qu'avec IMG4).
 
 ## Tests J5 et J3 chaîné, plus tard (1er run de chacun = go d'Albert)
+
+- `UPTO=params|calib pending/j5c_params_run.sh [STORE]` (J5c, jamais lancé) : prépare `$J5/calib_0x5b.bin` (`sbiod
+  calib-prepare` depuis c12, sha256 revérifiée), puis `j5_sensor_run.sh` avec `allow_sbio_params=1|2` et
+  `sbiod run --upto params|calib [--calib …]`. Conseil : `params` d'abord.
 
 - `pending/j5_sensor_run.sh [STORE]` : depuis un reboot ; capteur préparé AVANT le SEP (overlay, spidev bufsiz, preflight :
   un échec n'envoie rien au SEP) ; puis sep_native `allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1

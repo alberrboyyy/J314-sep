@@ -1,18 +1,22 @@
 //! Gate of the sbio relay (EP 0x08) and record format of `/dev/sep_sbio`. No allocation, no `std`: this file is
 //! also included as is by the kernel module (`kmod/sep_native.rs`), which checks every command userspace submits
-//! (opcode, ORDER, exact payload length) and every fragment the SEP returns BEFORE acting on it. The relay daemon
-//! (`driver/rust/sbiod`) builds its commands with the same constants, so both sides agree by construction.
+//! (opcode, ORDER, exact payload length, fixed payloads) and every fragment the SEP returns BEFORE acting on it. The
+//! relay daemon (`driver/rust/sbiod`) builds its commands with the same constants, so both sides agree by construction.
 //!
-//! Protocol (`docs/sbio_session.md`, `docs/sbio_keyexchange.md`; hardware-proven under m1n1 by
-//! `pending/sep_native_sbio3.sh` .. `sep_native_sbio11.sh`; macOS capture c12, seq 300-316):
+//! Protocol (`docs/sbio_session.md`, `docs/sbio_keyexchange.md`, `docs/j5_params_protocol.md`; 0x17..0x5f
+//! hardware-proven under m1n1 by `pending/sep_native_sbio3.sh` .. `sep_native_sbio11.sh` and natively by J5 v2;
+//! 0x5d..0x63 = macOS captures only, c12 seq 317-344, identical sizes in 9/9 boots):
 //! - command: buffer A8 = gt_packet `OolHeader { valid 1, total = len, offset 0, TYPE = op, len }` + payload, zero
-//!   padded; then `> EP 0x08 TAG 0xfc TYPE op PARAM 0 DATA 0`. The c12 templates `000303..000313_08_A.bin` are exactly
-//!   this (checked by `tests/sbio_relay.rs`), so the kernel builds the packet from (op, payload), no template.
+//!   padded; then `> EP 0x08 TAG 0xfc TYPE op PARAM 0 DATA 0`. The c12 templates `000303..000343_08_A.bin` are exactly
+//!   this (checked by `sbiod/tests/replay.rs`), so the kernel builds the packet from (op, payload), no template.
 //! - reply: `< TAG 0xfc TYPE op`, B8 = gt_packet of the reply (first fragment). If `offset + len < total`, the AP asks
 //!   for the next fragment with `> TAG 0xfe TYPE op DATA nfd << 16` (A8 unchanged) and the SEP answers `< TAG 0xfd`
 //!   (DATA = (nfd + 1) << 16): c12 seq 313-316 and sbio6/7/11 (0x5f, 22158 bytes in 2 fragments).
-//! - AP -> SEP fragmentation (`> fc` then `> fd`) is NOT needed by this version: every whitelisted payload is
-//!   <= 64 bytes, a longer one is refused.
+//! - AP -> SEP fragmentation, ONLY for the step marked `frag_in` (0x5b, calibration, 0xfc99 bytes): A8 = fragment k
+//!   (`OolHeader { 1, total, offset = k * 0x3fe4, 0x5b, len }`), `> fc DATA 0` for k = 0, then after each `< fe DATA
+//!   (k - 1) << 16` from the SEP, `> fd DATA k << 16`; the SEP closes with `< fc DATA 0` (empty reply). c12 L388-402,
+//!   same words in 23/23 captures. Every other payload is <= 64 bytes, in one chunk.
+use crate::crc::crc32;
 use crate::gt::{OolHeader, OOL_HDR, OOL_MAX_CHUNK};
 use crate::{Error, Result};
 
@@ -24,46 +28,127 @@ pub const SBIO_OOL_SIZE: usize = 0x4000;
 pub const MAX_REPLY: usize = 0x10000;
 /// Largest number of SEP -> AP fragments of one reply (MAX_FRAGS of the proven scripts is 16; 0x10000 needs 5).
 pub const MAX_FRAGS: usize = 8;
-/// Largest command payload of this version.
+/// Largest single-chunk command payload.
 pub const MAX_CMD: usize = 0x40;
+/// Calibration blob of 0x5b (c12 `000335/337/339/341_08_A.bin`, identical in 9/9 boots with OOL): length, CRC-32
+/// (checked by the kernel), first bytes. Its sha256 (`d5a6117d…ddda`) is checked by sbiod.
+pub const CALIB_LEN: usize = 0xfc99;
+pub const CALIB_CRC32: u32 = 0x6f98_a221;
+pub const CALIB_HEAD: [u8; 8] = [0x03, 0x00, 0x00, 0x00, 0x30, 0x82, 0xfc, 0x91];
+/// Fragments of the calibration (0x3fe4 × 3 + 0x3ced, c12).
+pub const CALIB_FRAGS: usize = CALIB_LEN.div_ceil(OOL_MAX_CHUNK);
+/// Largest command payload of any kind (the calibration).
+pub const MAX_CMD_IN: usize = CALIB_LEN;
 
-/// One relayed step: opcode, exact payload length the AP sends, bounds of the reply total the SEP returns.
+/// One relayed step: opcode, exact payload length the AP sends (and its bytes when they are fixed), bounds of the
+/// reply total the SEP returns, and whether the command goes AP -> SEP in fragments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Step {
     pub op: u8,
     pub name: &'static str,
     pub cmd_len: usize,
+    /// Exact payload (constant in every capture), None = opaque (relayed).
+    pub cmd_fixed: Option<&'static [u8]>,
+    /// AP -> SEP fragmentation (only 0x5b).
+    pub frag_in: bool,
     pub reply_min: usize,
     pub reply_max: usize,
 }
 
-/// The whitelist of this version, IN ORDER (c12 seq 303-316, run by sbio3..sbio11 under m1n1). Each step is
-/// admitted once, in this order, after the 0x73 hello (done by the kernel itself). Nothing after 0x5f.
-pub const RELAY_SEQUENCE: [Step; 6] = [
+const fn step(op: u8, name: &'static str, cmd_len: usize, cmd_fixed: Option<&'static [u8]>, reply: (usize, usize)) -> Step {
+    Step { op, name, cmd_len, cmd_fixed, frag_in: false, reply_min: reply.0, reply_max: reply.1 }
+}
+
+/// The whitelist, IN ORDER (c12 seq 303-344 = 1st pass of the macOS init). Each step is admitted once, in this
+/// order, after the 0x73 hello (done by the kernel itself), up to the limit chosen at load time (`limit`).
+/// Nothing after 0x63 (no 0x19 / 2nd pass, no 0x6c / 0x6d, nothing about enrolment or match).
+pub const RELAY_SEQUENCE: [Step; 17] = [
     // prepareSession: sensor serial (16 bytes, identity frame [9..25]) -> empty ack.
-    Step { op: 0x17, name: "prepareSession", cmd_len: 0x10, reply_min: 0, reply_max: 0 },
+    step(0x17, "prepareSession", 0x10, None, (0, 0)),
     // performKeyExchange (sessionType = 1, `01 00 00 00`) -> 40 opaque bytes for SPI frame 0x72.
-    Step { op: 0x15, name: "keyExchange", cmd_len: 4, reply_min: 0x28, reply_max: 0x28 },
+    step(0x15, "keyExchange", 4, Some(&[1, 0, 0, 0]), (0x28, 0x28)),
     // 40 bytes of the sensor reply -> empty ack.
-    Step { op: 0x16, name: "keyExchange2", cmd_len: 0x28, reply_min: 0, reply_max: 0 },
+    step(0x16, "keyExchange2", 0x28, None, (0, 0)),
     // initializeSequenceCounter (empty) -> 64 opaque bytes for SPI frame 0x73.
-    Step { op: 0x42, name: "initSeqCounter", cmd_len: 0, reply_min: 0x40, reply_max: 0x40 },
+    step(0x42, "initSeqCounter", 0, None, (0x40, 0x40)),
     // 64 bytes of the sensor reply -> empty ack.
-    Step { op: 0x18, name: "seqCounter2", cmd_len: 0x40, reply_min: 0, reply_max: 0 },
+    step(0x18, "seqCounter2", 0x40, None, (0, 0)),
     // LoadPatch (`02 00`) -> patch block (fragmented), pushed raw to the sensor after prelude 0x60.
-    Step { op: 0x5f, name: "loadPatch", cmd_len: 2, reply_min: 2, reply_max: MAX_REPLY },
+    step(0x5f, "loadPatch", 2, Some(&[2, 0]), (2, MAX_REPLY)),
+    // --- after the patch (LIMIT_PARAMS), docs/j5_params_protocol.md §1 ---
+    // applySensorParams (`00 00 00 00`) -> 55 opaque bytes for SPI frame 0x55 (+ CRC16), status only.
+    step(0x5d, "sensorParams5d", 4, Some(&[0, 0, 0, 0]), (0x37, 0x37)),
+    step(0x5c, "sensorParams5c", 4, Some(&[0, 0, 0, 0]), (0x37, 0x37)),
+    // applySensorParams 0x6a: empty -> empty in the 1st pass (9/9), no SPI. Anything else is refused.
+    step(0x6a, "sensorParams6a", 0, Some(&[]), (0, 0)),
+    // module serial: empty -> 64 opaque bytes for SPI frame 0x55; the 0x75 answer (64 bytes @ 9) -> 0x32 -> 18 bytes.
+    step(0x31, "moduleSerial", 0, Some(&[]), (0x40, 0x40)),
+    step(0x32, "moduleSerial2", 0x40, None, (0x12, 0x12)),
+    // end of loadPatch (empty -> empty), cacheMatchPolicy (empty -> 2 bytes): SEP only.
+    step(0x01, "patchDone", 0, Some(&[]), (0, 0)),
+    step(0x1f, "matchPolicy", 0, Some(&[]), (2, 2)),
+    step(0x31, "moduleSerial", 0, Some(&[]), (0x40, 0x40)),
+    step(0x32, "moduleSerial2", 0x40, None, (0x12, 0x12)),
+    // --- calibration (LIMIT_CALIB) ---
+    // setCalibrationData: the captured blob, AP -> SEP in 4 fragments -> empty reply. SEP only.
+    Step { op: 0x5b, name: "setCalibration", cmd_len: CALIB_LEN, cmd_fixed: None, frag_in: true, reply_min: 0, reply_max: 0 },
+    // getCalibrationDataInfo: empty -> 28 bytes. Last step.
+    step(0x63, "calibrationInfo", 0, Some(&[]), (0x1c, 0x1c)),
 ];
 
-/// Step `next` of the sequence, if `op` and `len` are exactly what it allows.
-pub fn check_cmd(next: usize, op: u8, len: usize) -> Result<&'static Step> {
-    let s = RELAY_SEQUENCE.get(next).ok_or(Error::Unexpected("sbio relay: sequence finished (nothing after 0x5f)"))?;
+/// Number of steps admitted for each level of the kernel parameter `allow_sbio_params`.
+pub const LIMIT_PATCH: usize = 6;
+pub const LIMIT_PARAMS: usize = 15;
+pub const LIMIT_CALIB: usize = 17;
+
+/// Steps admitted for `allow_sbio_params` = 0 (up to 0x5f), 1 (up to the 2nd 0x32), 2 (up to 0x63).
+pub const fn limit(level: u32) -> Option<usize> {
+    match level {
+        0 => Some(LIMIT_PATCH),
+        1 => Some(LIMIT_PARAMS),
+        2 => Some(LIMIT_CALIB),
+        _ => None,
+    }
+}
+
+/// Step `next` of the sequence, if it is below `limit` and `op` / `payload` are exactly what it allows.
+pub fn check_cmd(next: usize, limit: usize, op: u8, payload: &[u8]) -> Result<&'static Step> {
+    if next >= limit.min(RELAY_SEQUENCE.len()) {
+        return Err(Error::Unexpected("sbio relay: sequence finished for this level (allow_sbio_params)"));
+    }
+    let s = &RELAY_SEQUENCE[next];
     if s.op != op {
         return Err(Error::Unexpected("sbio relay: opcode out of order or not whitelisted"));
     }
-    if s.cmd_len != len {
+    if s.cmd_len != payload.len() {
         return Err(Error::Unexpected("sbio relay: payload length differs from the whitelisted one"));
     }
+    if s.cmd_fixed.is_some_and(|f| f != payload) {
+        return Err(Error::Unexpected("sbio relay: payload differs from the fixed one of this opcode"));
+    }
+    if s.frag_in && (payload.len() != CALIB_LEN || payload[..CALIB_HEAD.len()] != CALIB_HEAD || crc32(payload) != CALIB_CRC32) {
+        return Err(Error::Unexpected("sbio relay: calibration blob is not the captured one (length / head / CRC-32)"));
+    }
+    if !s.frag_in && payload.len() > MAX_CMD {
+        return Err(Error::Unexpected("sbio relay: payload too long for one chunk"));
+    }
     Ok(s)
+}
+
+/// Number of AP -> SEP fragments of a command (1 unless `frag_in`).
+pub fn cmd_frags(s: &Step, len: usize) -> usize {
+    if s.frag_in { len.div_ceil(OOL_MAX_CHUNK).max(1) } else { 1 }
+}
+
+/// Header of AP -> SEP fragment `k` of a `total`-byte command, and the payload range it carries.
+pub fn fragment_header(op: u8, total: usize, k: usize) -> Result<([u8; OOL_HDR], core::ops::Range<usize>)> {
+    let off = k.checked_mul(OOL_MAX_CHUNK).ok_or(Error::Short)?;
+    if total > MAX_CMD_IN || off >= total.max(1) || k >= CALIB_FRAGS {
+        return Err(Error::Unexpected("sbio relay: fragment index out of range"));
+    }
+    let end = (off + OOL_MAX_CHUNK).min(total);
+    let h = OolHeader { valid: 1, total: total as u32, offset: off as u32, ty: u32::from(op), len: (end - off) as u32 };
+    Ok((h.to_bytes(), off..end))
 }
 
 /// Writes the command gt_packet (header + payload) at `out[0..]`; the caller zeroes the rest of A8 first.
@@ -123,9 +208,10 @@ pub fn check_fragment(step: &Step, hdr: &[u8], got: usize, total: Option<usize>,
 // --- records of /dev/sep_sbio (little-endian) -----------------------------------------------------------------
 /// "SBR1".
 pub const MAGIC: u32 = 0x3152_4253;
-/// Command written by userspace: `+0 u32 MAGIC | +4 op | +5..8 zero | +8 u32 len` then `len` payload bytes.
+/// Command written by userspace: `+0 u32 MAGIC | +4 op | +5..8 zero | +8 u32 len` then `len` payload bytes
+/// (<= 64, or the 0xfc99-byte calibration).
 pub const CMD_HDR: usize = 12;
-pub const CMD_MAX: usize = CMD_HDR + MAX_CMD;
+pub const CMD_MAX: usize = CMD_HDR + MAX_CMD_IN;
 /// Event read by userspace: `+0 u32 MAGIC | +4 kind | +5 tag | +6 type | +7 param | +8 u32 data | +12 u32 len`.
 pub const EVT_HDR: usize = 16;
 pub const EVT_MAX: usize = EVT_HDR + MAX_REPLY;
@@ -140,7 +226,7 @@ pub const fn is_notification(tag: u8) -> bool {
 
 pub fn encode_cmd(op: u8, payload: &[u8], out: &mut [u8]) -> Result<usize> {
     let n = CMD_HDR + payload.len();
-    if payload.len() > MAX_CMD {
+    if payload.len() > MAX_CMD_IN {
         return Err(Error::Unexpected("sbio command too long"));
     }
     let o = out.get_mut(..n).ok_or(Error::Short)?;
@@ -161,7 +247,7 @@ pub fn decode_cmd(b: &[u8]) -> Result<(u8, &[u8])> {
         return Err(Error::Unexpected("sbio command: reserved bytes not zero"));
     }
     let len = crate::le_u32(h, 8)? as usize;
-    if len > MAX_CMD || b.len() != CMD_HDR + len {
+    if len > MAX_CMD_IN || b.len() != CMD_HDR + len {
         return Err(Error::Unexpected("sbio command: length field differs from the record"));
     }
     Ok((h[4], &b[CMD_HDR..]))
@@ -203,20 +289,63 @@ impl EvtHdr {
 mod tests {
     use super::*;
 
+    fn payload(s: &Step) -> [u8; MAX_CMD + 1] {
+        let mut p = [0xa5u8; MAX_CMD + 1];
+        if let Some(f) = s.cmd_fixed {
+            p[..f.len()].copy_from_slice(f);
+        }
+        p
+    }
+
     #[test]
     fn order_and_lengths() {
-        for (i, s) in RELAY_SEQUENCE.iter().enumerate() {
-            assert!(check_cmd(i, s.op, s.cmd_len).is_ok());
-            assert!(check_cmd(i, s.op, s.cmd_len + 1).is_err());
-            assert!(check_cmd(i, OP_HELLO, s.cmd_len).is_err());
+        for (i, s) in RELAY_SEQUENCE.iter().enumerate().filter(|(_, s)| !s.frag_in) {
+            let p = payload(s);
+            assert!(check_cmd(i, LIMIT_CALIB, s.op, &p[..s.cmd_len]).is_ok(), "{i}");
+            assert!(check_cmd(i, LIMIT_CALIB, s.op, &p[..s.cmd_len + 1]).is_err());
+            assert!(check_cmd(i, LIMIT_CALIB, OP_HELLO, &p[..s.cmd_len]).is_err());
         }
-        assert!(check_cmd(1, 0x17, 0x10).is_err()); // replay / out of order
-        assert!(check_cmd(6, 0x5d, 0).is_err()); // nothing after 0x5f
+        let p = [0u8; 0x10];
+        assert!(check_cmd(1, LIMIT_CALIB, 0x17, &p).is_err()); // replay / out of order
+        assert!(check_cmd(6, LIMIT_PATCH, 0x5d, &[0; 4]).is_err()); // level 0: nothing after 0x5f
+        assert!(check_cmd(6, LIMIT_PARAMS, 0x5d, &[0; 4]).is_ok());
+        assert!(check_cmd(6, LIMIT_PARAMS, 0x5d, &[0, 0, 0, 1]).is_err()); // fixed payload
+        assert!(check_cmd(1, LIMIT_PATCH, 0x15, &[2, 0, 0, 0]).is_err());
+        assert!(check_cmd(15, LIMIT_PARAMS, 0x5b, &[0; 4]).is_err()); // level 1: nothing after 2nd 0x32
+        assert!(check_cmd(16, LIMIT_CALIB, 0x63, &[]).is_ok());
+        assert!(check_cmd(17, LIMIT_CALIB, 0x19, &[]).is_err()); // nothing after 0x63
+        assert_eq!((limit(0), limit(1), limit(2), limit(3)), (Some(6), Some(15), Some(17), None));
+        // c12 order of the 1st pass (daemon::INIT_SEQUENCE[1..18]).
+        let ops: [u8; 17] = core::array::from_fn(|i| RELAY_SEQUENCE[i].op);
+        assert_eq!(ops[..], crate::daemon::INIT_SEQUENCE[1..18]);
+        assert_eq!(RELAY_SEQUENCE[LIMIT_PATCH - 1].op, 0x5f);
+        assert_eq!(RELAY_SEQUENCE[LIMIT_PARAMS - 1].op, 0x32);
+    }
+
+    #[test]
+    fn calibration_gate_and_fragments() {
+        let s = &RELAY_SEQUENCE[15];
+        assert!(s.frag_in && RELAY_SEQUENCE.iter().filter(|s| s.frag_in).count() == 1);
+        // A blob of the right length but another content is refused (CRC-32 / head).
+        let mut fake = [0u8; CALIB_LEN];
+        fake[..8].copy_from_slice(&CALIB_HEAD);
+        assert!(check_cmd(15, LIMIT_CALIB, 0x5b, &fake).is_err());
+        assert!(check_cmd(15, LIMIT_CALIB, 0x5b, &fake[..100]).is_err());
+        assert_eq!((CALIB_FRAGS, cmd_frags(s, CALIB_LEN), cmd_frags(&RELAY_SEQUENCE[0], 16)), (4, 4, 1));
+        let want = [(0, 0x3fe4), (0x3fe4, 0x3fe4), (0x7fc8, 0x3fe4), (0xbfac, 0x3ced)];
+        for (k, (off, len)) in want.iter().enumerate() {
+            let (h, r) = fragment_header(0x5b, CALIB_LEN, k).unwrap();
+            let p = OolHeader::parse(&h).unwrap();
+            assert_eq!((p.valid, p.total, p.offset as usize, p.ty, p.len as usize), (1, 0xfc99, *off, 0x5b, *len));
+            assert_eq!(r, *off..off + len);
+        }
+        assert!(fragment_header(0x5b, CALIB_LEN, 4).is_err());
     }
 
     #[test]
     fn fragments_5f() {
         let s = &RELAY_SEQUENCE[5];
+        assert_eq!(s.op, 0x5f);
         let h0 = OolHeader { valid: 1, total: 0x568e, offset: 0, ty: 0x5f, len: 0x3fe4 }.to_bytes();
         let f0 = check_fragment(s, &h0, 0, None, 0).unwrap();
         assert_eq!((f0.total, f0.offset, f0.len), (0x568e, 0, 0x3fe4));

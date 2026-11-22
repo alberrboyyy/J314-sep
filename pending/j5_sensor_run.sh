@@ -17,6 +17,9 @@
 #       (logs/20261122-201601_j5-sensor-native). v2 = sbiod modifié (push « comme macOS » : lecture d'état ENTRE prélude
 #       et bloc, aucune lecture pendant le chargement, attente IRQ 195, cf. journal 21:00) → 1er run v2 = go d'Albert.
 #
+# Variables (défauts = run J5 v2 inchangé) : SBIO_PARAMS (0) = paramètre allow_sbio_params de sep_native (1 = params,
+#   2 = params + calibration, cf. docs/j5_params_protocol.md) ; SBIOD_ARGS ("") = arguments ajoutés à `sbiod run`
+#   (--upto params|calib --calib FICHIER). Utilisés par pending/j5c_params_run.sh ; ne pas les poser à la main.
 # Usage (root, après un reboot normal avec alias sep) : pending/j5_sensor_run.sh [STORE]
 #   STORE défaut = dossier NEUF /var/lib/sepd-run-<horodatage> (scellement frais : seul cas où l'ouverture TARDIVE de
 #   sbio est éprouvée, J3 19:20). SBIO_OPEN=0 par défaut ici (ouverture tardive éprouvée) ; SBIO_OPEN=1 = précoce.
@@ -28,6 +31,9 @@
 set -euo pipefail
 J5=${J5:-/home/albert/kbuild/j5}
 SBIO_OPEN=${SBIO_OPEN:-0}
+SBIO_PARAMS=${SBIO_PARAMS:-0}
+SBIOD_ARGS=${SBIOD_ARGS:-}
+case "$SBIO_PARAMS" in 0|1|2) ;; *) echo "STOP : SBIO_PARAMS=$SBIO_PARAMS (0, 1 ou 2)" >&2; exit 1;; esac
 TS=$(date +%Y%m%d-%H%M%S)
 STORE=${1:-/var/lib/sepd-run-$TS}
 OUT=/var/log/j5-$TS
@@ -41,6 +47,11 @@ lsmod | grep -q "^sep_native " && die "sep_native déjà chargé : redémarrer d
 lsmod | grep -qE "^mesa_(probe|statloop|irqwatch) " && die "un module mesa_* tient le capteur : redémarrer"
 modinfo -F parm "$J5/sep_native.ko" | grep -q "^allow_sbio_relay:" || die "sep_native.ko sans allow_sbio_relay (module J5 ?)"
 modinfo -F parm "$J5/sep_native.ko" | grep -q "^sbio_open:" || die "sep_native.ko sans sbio_open"
+PARAMS_ARG=   # absent si 0 : le script reste utilisable avec le module J5 v2 (sans ce paramètre)
+if [ "$SBIO_PARAMS" != 0 ]; then
+  PARAMS_ARG="allow_sbio_params=$SBIO_PARAMS"
+  modinfo -F parm "$J5/sep_native.ko" | grep -q "^allow_sbio_params:" || die "sep_native.ko sans allow_sbio_params (module J5c ?)"
+fi
 mkdir -p "$OUT" /etc/sepd "$STORE"
 [ -s /etc/sepd/os_uuid ] || echo 4c494e55580000000000000000000000 > /etc/sepd/os_uuid
 if [ -z "$(ls -A "$STORE")" ]; then echo "STORE = $STORE (vide : scellement frais)"; else
@@ -85,7 +96,8 @@ trap cleanup EXIT
 cp "$J5/sep-native.dtbo" /lib/firmware/
 insmod "$J5/sep_native_ovl.ko"
 # insmod reste en fond : le probe attend sbio, l'ouvre, envoie le 0x73, écoute 6 s, puis crée /dev/sep_sbio si VIVANT.
-insmod "$J5/sep_native.ko" allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 allow_sbio_relay=1 sbio_open="$SBIO_OPEN" &
+# shellcheck disable=SC2086 # PARAMS_ARG vide ou un seul mot
+insmod "$J5/sep_native.ko" allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 allow_sbio_relay=1 sbio_open="$SBIO_OPEN" $PARAMS_ARG &
 INSMOD=$!
 for i in $(seq 1 300); do [ -e /dev/sep_native ] && break; sleep 0.1; done
 [ -e /dev/sep_native ] || { journalctl -k -b --no-pager | grep sep_native | tail -20; die "/dev/sep_native absent après 30 s"; }
@@ -102,10 +114,11 @@ if [ ! -e /dev/sep_sbio ]; then
   die "/dev/sep_sbio absent (sbio non VIVANT ou Halted) : rien relayé ; sepd arrêté"
 fi
 set +e
-"$J5/sbiod" run --dev /dev/sep_sbio --log "$OUT/sbiod.log"
+# shellcheck disable=SC2086 # SBIOD_ARGS = liste d'options (pas d'espace dans les chemins de $J5)
+"$J5/sbiod" run --dev /dev/sep_sbio --log "$OUT/sbiod.log" $SBIOD_ARGS
 RC=$?
 set -e
 journalctl -k -b --no-pager | grep sep_native > "$OUT/kernel.log" || true
 grep -E 'VERDICT|HALTED' "$OUT/kernel.log" | tail -5 || true
-echo "sbiod rc=$RC (0 = patch chargé). Logs : $OUT. sepd continue (pid $SEPD) ; Ctrl-C pour finir ; power-cycle ensuite (Albert)."
+echo "sbiod rc=$RC (0 = cible atteinte : patch chargé, ou params / calibration selon SBIOD_ARGS). Logs : $OUT. sepd continue (pid $SEPD) ; Ctrl-C pour finir ; power-cycle ensuite (Albert)."
 wait "$SEPD"

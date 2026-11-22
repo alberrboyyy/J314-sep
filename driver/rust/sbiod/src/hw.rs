@@ -219,7 +219,7 @@ pub struct SepDev<'a> {
 
 impl Sep for SepDev<'_> {
     fn cmd(&mut self, op: u8, payload: &[u8]) -> Result<Vec<u8>, String> {
-        let mut rec = [0u8; CMD_MAX];
+        let mut rec = vec![0u8; CMD_MAX];
         let n = sbio_gate::encode_cmd(op, payload, &mut rec).map_err(|e| e.to_string())?;
         self.f.write_all(&rec[..n]).map_err(|e| format!("write : {e} (EIO/EINVAL = sep_native Halted, voir dmesg)"))?;
         let mut buf = vec![0u8; EVT_MAX];

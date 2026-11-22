@@ -92,6 +92,10 @@ kernel::module_platform_driver! {
             default: 0,
             description: "1 = after a live 0x73, /dev/sep_sbio relays 0x17,0x15,0x16,0x42,0x18,0x5f in that order, once each (needs allow_sbio=1)",
         },
+        allow_sbio_params: u32 {
+            default: 0,
+            description: "relay after 0x5f (needs allow_sbio_relay=1): 0 (default) = nothing; 1 = 0x5d 0x5c 0x6a 0x31 0x32 0x01 0x1f 0x31 0x32; 2 = those, then 0x5b (captured calibration, AP->SEP in 4 fragments) and 0x63",
+        },
         sbio_open: u32 {
             default: 1,
             description: "sbio CNTL open: 1 (default) = early, right after the 0x1d 'sbio' announce is acked, as macOS; 0 = late, after 2 s of xART quiet",
@@ -261,6 +265,13 @@ mod drv {
     fn param_allow_relay() -> bool {
         *crate::module_parameters::allow_sbio_relay.value() != 0
     }
+    /// Niveau du relais après le patch (`sbio_gate::limit`) : 0, 1 ou 2 (autre valeur refusée au probe).
+    fn param_sbio_params() -> u32 {
+        *crate::module_parameters::allow_sbio_params.value()
+    }
+    fn relay_limit() -> usize {
+        sbio_gate::limit(param_sbio_params()).unwrap_or(sbio_gate::LIMIT_PATCH)
+    }
     fn param_sbio_open() -> u32 {
         *crate::module_parameters::sbio_open.value()
     }
@@ -363,6 +374,12 @@ mod drv {
         step: &'static Step,
         /// `> fc` envoyé.
         sent: bool,
+        /// Fragments AP→SEP de la commande (1 sauf 0x5b) et nombre déjà envoyés (`> fc` puis `> fd`).
+        frags_in: usize,
+        sent_in: usize,
+        /// `< fe` reçu pendant l'envoi fragmenté : le fil d'écriture doit mettre le fragment suivant dans A8 et
+        /// envoyer `> fd DATA sent_in << 16`.
+        want_next: bool,
         /// Fragment reçu, réponse incomplète : le fil d'écriture doit envoyer `> fe`.
         want_more: bool,
         done: bool,
@@ -764,9 +781,16 @@ mod drv {
                 }
                 return;
             }
+            // Envoi fragmenté en cours (0x5b) : seul `< fe` est admis tant que tous les fragments ne sont pas partis
+            // (un `< fc` précoce = refus du SEP → Halted) ; ensuite la réponse normale (`< fc`).
+            let sending = core.relay.txn.as_ref().is_some_and(|t| t.sent_in < t.frags_in);
             let expected = core.relay.txn.as_ref().is_some_and(|t| {
-                t.sent && !t.want_more && !t.done && w.ty == t.step.op
-                    && ((t.nfrag == 0 && w.tag == GT_TAG_CMD) || (t.nfrag > 0 && w.tag == gt::TAG_FD))
+                t.sent && !t.want_more && !t.want_next && !t.done && w.ty == t.step.op
+                    && if sending {
+                        w.tag == gt::TAG_FE
+                    } else {
+                        (t.nfrag == 0 && w.tag == GT_TAG_CMD) || (t.nfrag > 0 && w.tag == gt::TAG_FD)
+                    }
             });
             if !expected {
                 return self.halt(core, "sbio : mot inattendu pendant le relais (hors transaction, TAG/TYPE)", Some(raw));
@@ -774,6 +798,19 @@ mod drv {
             if let Err(f) = core.relay.counter.check(&Msg::new(0, Dir::ToAp, w)) {
                 dev_err!(self.dev, "sbio : compteur GT faux : {:?}\n", f);
                 return self.halt(core, "sbio : règle du compteur GT violée", Some(raw));
+            }
+            if sending {
+                // `< fe DATA (sent_in - 1) << 16` (compteur contrôlé ci-dessus) : B8 n'est pas lu (c12 : tout à zéro ;
+                // qui l'efface n'est pas établi), seulement journalisé.
+                if let Some((_, b8)) = self.sbio_ool.as_ref() {
+                    self.dump_b8(b8, "B8 au < fe (envoi fragmenté)");
+                }
+                let Some(t) = core.relay.txn.as_mut() else { return };
+                t.want_next = true;
+                t.last = w;
+                dev_info!(self.dev, "sbio relais < {} TAG 0xfe DATA {:#010x} : fragment {}/{} reçu, suivant demandé\n",
+                          t.step.name, w.data, t.sent_in, t.frags_in);
+                return;
             }
             let Some((_, b8)) = self.sbio_ool.as_ref() else {
                 return self.halt(core, "sbio : B8 absent", Some(raw));
@@ -906,7 +943,8 @@ mod drv {
                     }
                     discovery::EP_CNTL => CNTL_TX_TYPES.contains(&w.ty),
                     // sbio : phase Open → exactement `TAG 0xfc TYPE 0x73 PARAM 0 DATA 0`, une seule fois (→ HelloSent) ;
-                    // phase Relay → `> fc` de la commande en vol (DATA 0, une fois) ou `> fe` demandé (DATA nfd << 16).
+                    // phase Relay → `> fc` de la commande en vol (DATA 0, une fois), `> fe` demandé (DATA nfd << 16), ou
+                    // pour la seule étape `frag_in` (0x5b) `> fd` du fragment suivant après un `< fe` (DATA k << 16).
                     EP_SBIO if param_allow_sbio() => match core.sbio {
                         SbioPhase::Open => {
                             let ok = (w.tag, w.ty, w.param, w.data) == (GT_TAG_CMD, SBIO_OP_HELLO, 0, 0);
@@ -921,7 +959,12 @@ mod drv {
                                     w.ty == t.step.op
                                         && w.param == 0
                                         && ((w.tag == GT_TAG_CMD && w.data == 0 && !t.sent)
-                                            || (w.tag == gt::TAG_FE && t.want_more && w.data == u32::from(t.nfd) << 16))
+                                            || (w.tag == gt::TAG_FE && t.want_more && w.data == u32::from(t.nfd) << 16)
+                                            || (w.tag == gt::TAG_FD
+                                                && t.step.frag_in
+                                                && t.want_next
+                                                && t.sent_in < t.frags_in
+                                                && w.data == (t.sent_in as u32) << 16))
                                 })
                         }
                         _ => false,
@@ -1139,14 +1182,19 @@ mod drv {
             if alive && param_allow_relay() && core.state == State::Running {
                 core.sbio = SbioPhase::Relay;
                 core.relay.counter = CounterChecker::new();
-                dev_info!(self.dev, "sbio : relais ouvert (allow_sbio_relay=1) ; étapes admises dans l'ordre : 0x17 0x15 0x16 0x42 0x18 0x5f\n");
+                dev_info!(
+                    self.dev,
+                    "sbio : relais ouvert (allow_sbio_relay=1, allow_sbio_params={}) : {} étape(s) dans l'ordre, de 0x17 à {:#04x}\n",
+                    param_sbio_params(), relay_limit(), sbio_gate::RELAY_SEQUENCE[relay_limit() - 1].op
+                );
             }
             Ok(alive && core.sbio == SbioPhase::Relay)
         }
 
-        /// Une commande du relais (`write` de /dev/sep_sbio, contexte processus) : contrôle (ordre, longueur exacte),
-        /// gt_packet dans A8, `> fc`, puis attente des fragments (`> fe` demandés par le work), 6 s par réponse.
-        /// Toute incohérence, délai ou signal → Halted (le SEP attend une suite qu'on ne donnera pas).
+        /// Une commande du relais (`write` de /dev/sep_sbio, contexte processus) : contrôle (ordre, longueur exacte,
+        /// charge fixe, niveau `allow_sbio_params`), gt_packet dans A8, `> fc`, puis pour 0x5b seulement les fragments
+        /// suivants (`> fd`, chacun après le `< fe` du SEP), puis attente des fragments de la réponse (`> fe` demandés
+        /// par le work), 6 s par mot attendu. Toute incohérence, délai ou signal → Halted.
         fn relay_cmd(&self, op: u8, payload: &[u8]) -> Result {
             let mut core = self.core.lock();
             if core.state != State::Running || core.sbio != SbioPhase::Relay {
@@ -1156,7 +1204,7 @@ mod drv {
                 // Réponse précédente pas encore lue : le relais est strictement en lockstep.
                 return Err(EBUSY);
             }
-            let step = match sbio_gate::check_cmd(core.relay.next, op, payload.len()) {
+            let step = match sbio_gate::check_cmd(core.relay.next, relay_limit(), op, payload) {
                 Ok(s) => s,
                 Err(e) => {
                     dev_err!(self.dev, "sbio relais : commande {:#04x} ({} o) refusée à l'étape {}\n", op, payload.len(), core.relay.next);
@@ -1164,26 +1212,8 @@ mod drv {
                     return Err(EINVAL);
                 }
             };
-            let Some((a8, _)) = self.sbio_ool.as_ref() else { return Err(EIO) };
-            let mut pkt = [0u8; OOL_HDR + sbio_gate::MAX_CMD];
-            let n = match sbio_gate::build_packet(op, payload, &mut pkt) {
-                Ok(n) => n,
-                Err(e) => {
-                    self.halt(&mut core, why(&e), None);
-                    return Err(EINVAL);
-                }
-            };
-            // SAFETY: `a8` est une allocation cohérente de SBIO_OOL_SIZE octets, vivante (tenue par `self`) ;
-            // `n <= OOL_HDR + MAX_CMD < SBIO_OOL_SIZE`. Le SEP ne lit A8 qu'après le `> fc` envoyé ci-dessous et
-            // aucune transaction n'est en vol (contrôlé ci-dessus) ; seul ce fil écrit A8, sous `core`.
-            let (v0, o14) = unsafe {
-                let dst = a8.as_mut_ptr().cast::<u8>();
-                core::ptr::write_bytes(dst, 0, a8.len());
-                core::ptr::copy_nonoverlapping(pkt.as_ptr(), dst, n);
-                (core::ptr::read_volatile(dst), core::ptr::read_volatile(dst.add(0x14)))
-            };
-            if v0 != 1 || o14 != op {
-                self.halt(&mut core, "A8 relu : pas le gt_packet de la commande", None);
+            let frags_in = sbio_gate::cmd_frags(step, payload.len());
+            if self.write_a8(&mut core, step, payload, 0).is_err() {
                 return Err(EIO);
             }
             let w = Word::new(EP_SBIO, GT_TAG_CMD, op, 0, 0);
@@ -1193,13 +1223,16 @@ mod drv {
             }
             core.relay.buf.clear();
             core.relay.txn = Some(Txn {
-                step, sent: false, want_more: false, done: false, total: None, got: 0, nfrag: 0, nfd: 0, last: w,
+                step, sent: false, frags_in, sent_in: 0, want_next: false, want_more: false, done: false, total: None,
+                got: 0, nfrag: 0, nfd: 0, last: w,
             });
-            dev_info!(self.dev, "sbio relais > {} ({:#04x}) : charge {} o, tête {:02x?}\n", step.name, op, payload.len(), &payload[..payload.len().min(8)]);
+            dev_info!(self.dev, "sbio relais > {} ({:#04x}) : charge {} o en {} fragment(s), tête {:02x?}\n",
+                      step.name, op, payload.len(), frags_in, &payload[..payload.len().min(8)]);
             dma_wmb();
             self.send_running(&mut core, w, "sbio relais (fc)")?;
             if let Some(t) = core.relay.txn.as_mut() {
                 t.sent = true;
+                t.sent_in = 1;
             }
             let mut left = msecs_to_jiffies(RELAY_REPLY_TIMEOUT_MS);
             loop {
@@ -1209,6 +1242,27 @@ mod drv {
                 let Some(t) = core.relay.txn.as_ref() else { return Err(EIO) };
                 if t.done {
                     break;
+                }
+                if t.want_next {
+                    // Fragment `k` (1..frags_in) : A8 réécrit (le SEP a fini de lire le précédent : il a répondu fe).
+                    let k = t.sent_in;
+                    if k >= t.frags_in || self.write_a8(&mut core, step, payload, k).is_err() {
+                        self.halt(&mut core, "sbio : fragment AP→SEP hors bornes", None);
+                        return Err(EIO);
+                    }
+                    let fd = Word::new(EP_SBIO, gt::TAG_FD, op, 0, (k as u32) << 16);
+                    if core.relay.counter.check(&Msg::new(0, Dir::ToSep, fd)).is_err() {
+                        self.halt(&mut core, "sbio : compteur GT faux au > fd", None);
+                        return Err(EIO);
+                    }
+                    dma_wmb();
+                    self.send_running(&mut core, fd, "sbio relais (fd, fragment AP→SEP)")?;
+                    if let Some(t) = core.relay.txn.as_mut() {
+                        t.want_next = false;
+                        t.sent_in = k + 1;
+                    }
+                    left = msecs_to_jiffies(RELAY_REPLY_TIMEOUT_MS);
+                    continue;
                 }
                 if t.want_more {
                     let more = Word::new(EP_SBIO, gt::TAG_FE, op, 0, u32::from(t.nfd) << 16);
@@ -1244,6 +1298,58 @@ mod drv {
                 "sbio relais : {} ({:#04x}) terminé, réponse {} o en {} fragment(s), tête {:02x?}\n",
                 step.name, op, t.got, t.nfrag, &core.relay.buf[..t.got.min(8)]
             );
+            Ok(())
+        }
+
+        /// A8 = gt_packet du fragment `k` de la commande (k = 0 : commande entière si elle tient en un morceau), reste
+        /// à zéro ; relit `+0x00`, `+0x08` (offset) et `+0x14`. Erreur → Halted.
+        fn write_a8(&self, core: &mut Core, step: &Step, payload: &[u8], k: usize) -> Result {
+            let Some((a8, _)) = self.sbio_ool.as_ref() else {
+                self.halt(core, "sbio : A8 absent", None);
+                return Err(EIO);
+            };
+            let mut hdr = [0u8; OOL_HDR];
+            let range = if step.frag_in {
+                match sbio_gate::fragment_header(step.op, payload.len(), k) {
+                    Ok((h, r)) => {
+                        hdr = h;
+                        r
+                    }
+                    Err(e) => {
+                        self.halt(core, why(&e), None);
+                        return Err(EINVAL);
+                    }
+                }
+            } else {
+                let mut pkt = [0u8; OOL_HDR + sbio_gate::MAX_CMD];
+                if k != 0 || sbio_gate::build_packet(step.op, payload, &mut pkt).is_err() {
+                    self.halt(core, "sbio : gt_packet impossible", None);
+                    return Err(EINVAL);
+                }
+                hdr.copy_from_slice(&pkt[..OOL_HDR]);
+                0..payload.len()
+            };
+            let chunk = &payload[range.clone()];
+            if OOL_HDR + chunk.len() > a8.len() {
+                self.halt(core, "sbio : fragment plus grand que A8", None);
+                return Err(EINVAL);
+            }
+            // SAFETY: `a8` est une allocation cohérente de SBIO_OOL_SIZE octets, vivante (tenue par `self`) ;
+            // `OOL_HDR + chunk.len() <= a8.len()` (contrôlé ci-dessus). Le SEP ne lit A8 qu'après le mot envoyé
+            // ensuite (`> fc`, ou `> fd` qui suit son `< fe` : il a fini de lire le fragment précédent) ; seul le fil
+            // d'écriture écrit A8, sous `core`.
+            let (v0, off, o14) = unsafe {
+                let dst = a8.as_mut_ptr().cast::<u8>();
+                core::ptr::write_bytes(dst, 0, a8.len());
+                core::ptr::copy_nonoverlapping(hdr.as_ptr(), dst, OOL_HDR);
+                core::ptr::copy_nonoverlapping(chunk.as_ptr(), dst.add(OOL_HDR), chunk.len());
+                let rd = |o: usize| core::ptr::read_volatile(dst.add(o));
+                (rd(0), u32::from_le_bytes([rd(8), rd(9), rd(10), rd(11)]), rd(0x14))
+            };
+            if v0 != 1 || o14 != step.op || off as usize != range.start {
+                self.halt(core, "A8 relu : pas le gt_packet de la commande", None);
+                return Err(EIO);
+            }
             Ok(())
         }
 
@@ -1714,7 +1820,8 @@ mod drv {
 
     // --- /dev/sep_sbio (allow_sbio_relay=1) ----------------------------------------------------------------
     // write : UNE commande `sbio_gate` (MAGIC, opcode, longueur, charge) ; bloque jusqu'à la réponse complète
-    //         (réassemblée) ; contrôlée par `check_cmd` (liste, ordre, longueur exacte). Refus/délai → Halted.
+    //         (réassemblée) ; contrôlée par `check_cmd` (liste, ordre, longueur exacte, charge fixe, niveau
+    //         `allow_sbio_params` ; 0x5b : blob capturé seulement, CRC-32). Refus/délai → Halted.
     // read  : bloque jusqu'à un événement : notification TAG 0x01-0x04 (d'abord) ou la réponse de la dernière
     //         commande. Tampon >= EVT_MAX exigé. EIO une fois Halted. Un seul ouvreur (EBUSY).
     // N'existe qu'après « VERDICT sbio : VIVANT » avec allow_sbio_relay=1. Jamais de mot brut.
@@ -1965,11 +2072,13 @@ mod drv {
                 || (param_allow_save_ack() && !param_allow_xart())
                 || (param_allow_sbio() && !param_allow_xart())
                 || (param_allow_relay() && !param_allow_sbio())
+                || (param_sbio_params() != 0 && !param_allow_relay())
+                || sbio_gate::limit(param_sbio_params()).is_none()
                 || param_sbio_open() > 1
             {
                 dev_err!(
                     pdev,
-                    "allow_xart exige allow_boot=1, allow_xart_save_ack et allow_sbio exigent allow_xart=1, allow_sbio_relay exige allow_sbio=1, sbio_open vaut 0 ou 1 : refus\n"
+                    "allow_xart exige allow_boot=1, allow_xart_save_ack et allow_sbio exigent allow_xart=1, allow_sbio_relay exige allow_sbio=1, allow_sbio_params (0, 1 ou 2) exige allow_sbio_relay=1, sbio_open vaut 0 ou 1 : refus\n"
                 );
                 return Err(EINVAL);
             }

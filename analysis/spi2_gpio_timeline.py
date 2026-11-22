@@ -4,6 +4,9 @@
 Usage :
   analysis/spi2_gpio_timeline.py traces/<dossier> --patch [avant_ms] [apres_ms]
       fenêtre autour de chaque transaction de patch (len 0x568e ou 0x70ce), temps relatifs au bloc
+  analysis/spi2_gpio_timeline.py traces/<dossier> --params
+      phase « paramètres » de chaque passe : du `> 0x5d` (fc) au `< 0x63` (fc) suivant, mots SEP de l'EP 0x08
+      (sep.log) intercalés, temps relatifs au `> 0x5d`
   analysis/spi2_gpio_timeline.py traces/<dossier> <ts_debut> <ts_fin>
       fenêtre absolue
 
@@ -45,13 +48,26 @@ def line(rw, dev, off, val):
     return None
 
 
-def show(d, lo, hi, ref=None):
-    for ts, rw, dev, off, val in events(d):
-        if lo <= ts <= hi:
-            s = line(rw, dev, off, val)
-            if s:
-                t = f"{(ts - ref) * 1000:+8.1f} ms" if ref is not None else f"{ts:.6f}"
-                print(f"{t}  {s}")
+def sep_words(d):
+    """(ts, texte) des mots EP 0x08 de sep.log (lignes `<ts> <dir> EP=0x08 TAG=… TYPE=…`)."""
+    try:
+        f = open(d + "/sep.log", errors="replace")
+    except OSError:
+        return []
+    out = []
+    for l in f:
+        if l[0].isdigit() and " EP=0x08 " in l:
+            ts, rest = l.split(" ", 1)
+            out.append((float(ts), "SEP  " + rest.strip().replace(" PARAM=0x00", "")))
+    return out
+
+
+def show(d, lo, hi, ref=None, sep=None):
+    rows = [(ts, line(rw, dev, off, val)) for ts, rw, dev, off, val in events(d) if lo <= ts <= hi]
+    rows += [(ts, s) for ts, s in (sep or []) if lo <= ts <= hi]
+    for ts, s in sorted((r for r in rows if r[1]), key=lambda r: r[0]):
+        t = f"{(ts - ref) * 1000:+8.1f} ms" if ref is not None else f"{ts:.6f}"
+        print(f"{t}  {s}")
 
 
 def main():
@@ -64,6 +80,13 @@ def main():
         for r in refs:
             print(f"=== bloc patch @ {r:.6f}")
             show(d, r - before / 1000, r + after / 1000, r)
+    elif sys.argv[2] == "--params":
+        sep = sep_words(d)
+        starts = [ts for ts, s in sep if s.startswith("SEP  > EP=0x08 TAG=0xfc TYPE=0x5d")]
+        for r in starts:
+            end = next((ts for ts, s in sep if ts > r and s.startswith("SEP  < EP=0x08 TAG=0xfc TYPE=0x63")), r + 1.0)
+            print(f"=== phase paramètres @ {r:.6f} (fin {end:.6f})")
+            show(d, r - 0.002, end + 0.002, r, sep)
     else:
         show(d, float(sys.argv[2]), float(sys.argv[3]))
 
