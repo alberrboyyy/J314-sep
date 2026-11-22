@@ -14,6 +14,12 @@ Format :
 
 ---
 
+## 2026-11-22 03:30 — Albert — DÉCISION : règle de lancement SEP RELÂCHÉE
+- Albert relâche la ligne rouge « seul Albert lance les écritures SEP » (CLAUDE.md, « Écriture SEP » + « Qui décide quoi »).
+- NOUVELLE RÈGLE : Claude **lance lui-même** les scripts `pending/` **déjà éprouvés** (relus + déjà tournés propre sur matériel : classe route-native/sbio-climb = boot IMG4, ACK SAVE xART 0x13, relais capteur 0x08). Toute **classe jamais testée** (gigalocker en écriture, SKS 0x12 écriture, enrôlement, **1er run d'un script neuf**) = Claude montre + attend le « go » d'Albert.
+- Le **power-cycle physique reste Albert** (reboot logiciel fige le PMU/SPMI — non automatisable). Filet : backup `alarm_p5.img` + DFU.
+- Conséquence : les RE-RUNS de scripts prouvés = autonomes ; un script NEUF (ex. sbio7, le push patch) = toujours « go » d'Albert.
+
 ## 2026-11-22 03:18 — Albert (lance) + Claude (Opus 4.8) — patch capteur REÇU+RÉASSEMBLÉ nativement (poignée fe/fd, 22158o) ; reste le PUSH (DMA) au capteur
 - Trace : traces/20261122-033138_native_sbio6 (patch_spi_push.bin = prélude+bloc construit, NON émis).
 - Fait : `./pending/sep_native_sbio6.sh` (Albert lance, store neuf). KX + compteur relayés (connus). PHASE 6 RECON : envoi 0x5f → fragment TAG=0xfc (op=0x5f kind=1 total=0x568e offset=0 fraglen=0x3fe4=16356, tête `8c563a…`) → réclame suite (TAG=0xfe) → fragment TAG=0xfd (offset=0x3fe4 fraglen=0x16aa=5802) → **patch 22158o (0x568e) réassemblé, préfixe 2o == total-2**. Trame de push construite (prélude `80600007` + bloc) NON émise, dumpée. STOP avant push. Teardown OK.

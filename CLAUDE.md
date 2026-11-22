@@ -11,9 +11,13 @@ objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le 
 ## Lignes rouges (toutes phases, non négociables)
 
 - **Jamais de matériel Apple leaké** (sources internes, firmwares déchiffrés non publics, dumps). Ne pas en chercher sur le web.
-- **Aucune écriture vers le SEP par un agent** : endpoints 0x12 (SKS), 0x13 (xART), 0x10, 0x15, gigalockers, envoi d'IMG4.
-  Un agent qui pense qu'une écriture est nécessaire écrit un script dans `pending/` avec un en-tête expliquant
-  le but, le risque et le résultat attendu, puis s'arrête. Albert relit et lance.
+- **Écriture SEP — règle RELÂCHÉE par Albert (2026-11-22).** Claude peut **lancer lui-même** un script `pending/`
+  **déjà éprouvé** : relu par Claude ET déjà exécuté proprement sur matériel (classe « route native / sbio-climb » :
+  boot IMG4, ACK des SAVE xART 0x13, relais capteur 0x08 — key exchange, compteur, réception patch). Pour toute
+  écriture d'une **classe encore JAMAIS testée sur matériel** (ex. écriture/persistance gigalocker, **SKS 0x12 en
+  écriture**, enrôlement, ou le **1er run d'un script neuf**), Claude prépare le script dans `pending/` (en-tête
+  but/risque/résultat), le **montre à Albert et attend son « go »**. Toujours : fail-closed, backup disque +
+  DFU en filet. Le **power-cycle physique reste Albert** (le reboot logiciel fige le PMU/SPMI).
 - **Le hardware passe uniquement par `tools/*.sh`.** Pas d'appel direct à `m1n1/proxyclient`, pas de script Python ad hoc qui ouvre `/dev/ttyACM*`.
 - **Jamais** : `bputil`, `kmutil`, `csrutil`, `nvram`, partitionnement, `dd`, `sudo`. Boot policy et install de m1n1 = Albert, à la main.
 - **Rien ne sort de ce repo vers Asahi** (issues, PR, doc, IRC/Matrix). Projet privé.
@@ -23,10 +27,10 @@ objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le 
 
 - L'agent décide seul : lecture, analyse, docs, outils sur le PC, captures en lecture seule, et les validations techniques
   (le sceptique tranche « vérifié » ou « hypothèse » ; ce qui reste incertain est noté, pas renvoyé à Albert).
-- L'agent demande à Albert **seulement** si l'action peut abîmer le Mac ou écrit vers le SEP, en une phrase simple
-  (ce qu'on fait, ce qui peut rater, oui/non). Pas de jargon dans les questions.
-- Les lignes rouges ci-dessus ne changent pas. Albert prévoit un backup du Mac plus tard : tant qu'il n'existe pas,
-  aucune action risquée pour les données.
+- L'agent demande à Albert **seulement** si l'action peut abîmer le Mac, ou pour une **écriture SEP d'une classe
+  jamais testée** (cf. ligne rouge « Écriture SEP », relâché 2026-11-22) ; les écritures SEP **déjà éprouvées**,
+  Claude les lance seul. En une phrase simple (ce qu'on fait, ce qui peut rater, oui/non). Pas de jargon.
+- Les **autres** lignes rouges ne changent pas. Backup disque (`alarm_p5.img`) + DFU restore = filet en place.
 
 ## Phase 1 — sources autorisées
 
