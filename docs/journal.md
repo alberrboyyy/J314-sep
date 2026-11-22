@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 03:05 — Albert (lance) + Claude (Opus 4.8) — 🎯 COMPTEUR DE SÉQUENCE RELAYÉ : 2e maillon lockstep (0x42/0x18, frame 0x73) ; mur suivant = patch 0x5f (DMA)
+- Trace : traces/20261122-031411_native_sbio5 (store neuf xart_store_sbio5_1 ; cnt_0x42_B.bin, spi_0x73_resp_raw.bin).
+- Fait : `./pending/sep_native_sbio5.sh` (Albert lance). Phase 1-4 OK (key exchange relayé de nouveau). Phase 5 : 0x42 → le SEP rend blob 64o `3a0000000000003e9f8ad3…` → relais SPI trame 0x73 (71o, en-tête `80730047000000`) → état 0x10 = 0x4b (75) → réponse 75o → 64o @ offset 9 → 0x18 → **le SEP ACQUITTE (`< EP=0x08 TYPE=0x18`)**.
+- Vu (faits bruts) : 2e relais lockstep réussi. La fonction générique `spi_relay`/`build_spi_frame` marche pour 0x72 ET 0x73 (non-régression du 0x72 prouvée au SELFTEST + au run). Le blob compteur commence par `3a…` (enveloppe 0x3a + compteur, cf. sbio_session : le patch aussi).
+- Interprété : **le pattern de relais lockstep généralise** — 2 commandes capteur relayées nativement, toute « petite trame » se relaie pareil. Reste avant la fin de l'init capteur : le **PATCH (0x5f, ~22Ko, 1 burst DMA SIO)** = le seul vrai mur SPI restant ; puis params (0x55, faciles), n° série module, calibration (mailbox, PAS SPI). Puis enroll + match (doigts, session humaine).
+- Incidents : RAS. Compteur anti-rejeu +12 (xart_store_sbio5_1). Capteur restauré. Linux intact ; DFU prêt.
+
 ## 2026-11-22 02:50 — Albert (lance) + Claude (Opus 4.8) — 🎯 KEY EXCHANGE RELAYÉ nativement : 1er dialogue chiffré SEP↔capteur en lockstep (frame 0x72 corrigée + store neuf)
 - Trace : traces/20261122-0247*_native_sbio4 (store NEUF xart_store_sbio4b ; kx_0x15_B.bin, spi_0x72_resp_raw.bin, kx_0x16_B.bin). Script : pending/sep_native_sbio4.sh (frame 0x72 = 0x2f corrigée).
 - Fait : `M1N1TIMEOUT=20 XART_STORE=…xart_store_sbio4b ./pending/sep_native_sbio4.sh` (Albert lance). Phase 1-3 OK (stab, sbio vivant, 0x17 franchi). Phase 4 : 0x15 → le SEP rend blob 40o `ea88c46a…3092300a` → relais SPI trame 0x72 (47o, en-tête `8072002f000000`) → état 0x10 = **0x33 (51)** → réponse 51o `80d4003300000000 72 <40o> <crc>` → 40o extraits @ offset 9 → 0x16 → **le SEP ACQUITTE (`< EP=0x08 TYPE=0x16`)**.
