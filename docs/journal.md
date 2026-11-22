@@ -2074,3 +2074,11 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   spinlock coupant les IRQ ni de `dma_wmb`.
 - DÉDUIT : anneau RX atomique (1 producteur sous `mbox->rx_lock`, 1 work) au lieu d'un `SpinLock` ; DATA de 0x66
   contrôlée strictement (1 puis 2, `source: kext`). Statut : **hypothèses** ; 1er `allow_boot=1` = go d'Albert.
+
+## 2026-11-22 — Albert + Claude (session ALARM, Opus 5.5) — J2 préparé : DT avec alias `sep` installé dans m1n1
+- Go d'Albert pour J2 (option 2 : sans câble). Albert a lancé `sudo DTBS=~/kbuild/j2/t6001-j314c-sep.dtb update-m1n1`
+  (« m1n1 updated at /run/.system-efi/m1n1/boot.bin », ESP /dev/nvme0n1p7 ; l'ancien est gardé en `boot.bin.old`).
+- DTB = DTB du noyau 7.2.12-3-1-ARCH + `/aliases/sep = "/soc/sep@396400000"` seulement ; nœud `apple,sep` toujours
+  `disabled` (sep.rs ne se lie pas). GRUB : aucune ligne `devicetree` (vérifié par Albert).
+- Prochaine étape : reboot normal, puis docs/j2_runbook.md étape 4 (lecture seule, puis `allow_boot=1`).
+- Retour arrière : `sudo update-m1n1` (DT stock). Secours : tethered boot (fichiers sur le PC, ~/alarm-recovery/j2).
