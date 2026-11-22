@@ -1,4 +1,18 @@
-# ▶️ COMMENCE ICI — REPRISE 2026-11-22 (jour) — 🎯 VIRAGE : cible = pilote Touch ID LINUX NATIF, sans tether
+# ▶️ COMMENCE ICI — 2026-11-22 (soir) — 🎯 J2 RÉUSSI : SEPOS boote sous Linux NATIF, sans tether ; J4 (xART) en cours
+
+**MODE DE TRAVAIL EN BINÔME (fixé par Albert 2026-11-22) :**
+- **Agent Claude sur ALARM (le Mac) = les MAINS** : il agit sur le matériel, écrit le driver (`driver/rust/`), lance les runs. Son go vient d'**Albert directement dans SA session** (pas via l'orchestrateur). ⚠️ Sa session **s'arrête à chaque reboot du Mac** et repart sous un **nouveau nom/ID** → on se retrouve par `ListAgents`, et **tout le contexte durable passe par le repo git** (push/pull) + ce handoff + la mémoire.
+- **Session PC `sep-touchid-c9` = CERVEAU protocole + HÔTE DE BUILD + relecteur** : fournit les séquences SEP vérifiées (avant chaque étape neuve), compile noyau/modules (rustc 1.99.1, ~7 min), tranche vérifié/hypothèse, tient ce handoff. Ne pilote plus de hardware.
+
+**ÉTAT (le plus récent d'abord) :**
+- ✅ **J1** : transport SEP porté en **Rust** (`driver/rust/sep-proto/`, no_std, rejeu offline conforme). Noyau croisé **buildé sur le PC** (6m41s, Image 35 Mo, 1864 modules, rustc 1.99.1). `sep_proto_selftest.ko` chargé sur ALARM (21/21).
+- ✅ **J2 RÉUSSI (sans tether)** : `sep_native.ko` (notre module, PAS sep.rs qui est buggé : CNIP/pas de GET_STATUS) boote **SEPOS sous Linux natif** via `update-m1n1` (DTB + alias `sep`) + reboot. Séquence validée (0x66 1→2, IMG4+SHMEM→0x6A). 7 EP annoncés (xarm 0x13…), Running, xART pas encore servi (fail-closed). `journal.md`.
+- 🔸 **J4 (servir xART) EN COURS** : go d'Albert **donné dans la session agent** ; script `pending/j4_xart_run.sh` ; politique = `docs/xart_native_policy.md` (ma **vérification orchestrateur** en bas = formes exactes, GO protocole : FETCH réponse TYPE 0x00, SECMODE PARAM 0, UUID `4c494e5558…`). Run après **power-cycle d'Albert** (SEP propre). **C'est l'écriture qui invalide le Touch ID macOS** (accepté). Guetter : `sbio`+`sks` s'annoncent-ils après le SAVE ? + risque dual-boot (master partagé).
+- Prochain après J4 : J3 (ouvrir sbio 0x08 + 0x73), puis init capteur ; **patch capteur = tenter PIO noyau d'abord** (le mur m1n1 venait de la latence tunnel, pas du DMA — `docs/dma_spi2_design.md`).
+
+---
+
+# ▶️ REPRISE 2026-11-22 (jour) — 🎯 VIRAGE : cible = pilote Touch ID LINUX NATIF, sans tether
 
 **Décision d'Albert (2026-11-22) : le livrable = un pilote Linux natif, pour NE PLUS dépendre du montage m1n1-proxy tethered (PC USB + power-cycle). m1n1 = échafaudage de reverse.** Lis, dans l'ordre : cette entrée, `docs/linux_roadmap.md` (roadmap J0→J6 + écarts à coder), `driver/linux/MISSION_AGENT_MAC.md` (paquet de mission pour l'agent Claude qu'Albert lance côté Mac sous Linux), le haut de `docs/journal.md` (entrées 2026-11-22 « bloc autonome » / « DÉCISION ALBERT »), et les mémoires [[cible-linux-natif-sans-tether]] + [[regle-lancement-sep-relachee]].
 
