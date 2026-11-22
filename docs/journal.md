@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 01:58 — Albert (lance) + Claude (Opus 4.8) — sbio au-delà du 0x73 : le 1er mur = 0x17 prepareSession, et il PORTE le serial du capteur (qu'on sait lire)
+- Trace : traces/20261122-015806_native_sbio2 (wall_A8/B8.bin, wall_ref_17_A.bin). Sanity capteur : traces/20261122-015340_sensor_sanity (identité capteur = macOS, état restauré). Script : pending/sep_native_sbio2.sh (relu).
+- Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio2.sh` (Albert lance). PHASE 1 persist (stabilisation **n=5**) + PHASE 2 0x73 (**sbio vivant n=4**) + PHASE 3 déroulé post-0x73 (fail-closed, store séparé xart_store_sbio2).
+- Vu (faits bruts) : AUCUN message EP 0x08 spontané après le 0x73 — le SEP **attend que l'AP pilote la commande suivante** (comme macOS). Mur = étape 0 = commande **0x17 prepareSession** classe [SPI]. Réf capture c12 (000303_08_A.bin) : gt_packet `+0x14=0x17`, `+0x18=0x10` (len), charge `+0x1c = 0219c05c0fd2aa349a81c76e030200d8`. Cette charge **== les 16 octets de série lus du capteur par SPI** (sanity : identité `80d4001b00000000 70 0219c05c0fd2aa349a81c76e030200d8 7576`).
+- Interprété : **0x17 prepareSession = l'AP DONNE au SEP le n° de série du capteur** (qu'il a lu par SPI). Comme on sait lire ces 16 octets (mesa_hello / `analysis/mesa_spi_proxy.py`, identité identique sur CE Mac), on peut **franchir 0x17 nativement** → script `sep_native_sbio3.sh` (en construction) le fait (lire identité live → la servir dans 0x17 → envoyer). Mur SUIVANT attendu = **0x15 performKeyExchange** = le vrai lockstep chiffré SEP↔capteur (prochain défi).
+- Incidents : RAS. Compteur anti-rejeu +12 (xart_store_sbio2). Catcher : fix baseline (un port disparu sort de la baseline → réapparition saisie) + run en arrière-plan OK. Linux intact ; DFU prêt.
+
 ## 2026-11-22 01:05 — Albert (lance) + Claude (Opus 4.8) — 🎯 sbio VIVANT : répond au 0x73 exactement comme macOS, via le stream 0 (la route native tient jusqu'au capteur)
 - Trace : traces/<...>_native_sbio (B8 dumpé dans OUT/sbio_probe_B.bin) ; store SÉPARÉ xart_store_sbio/ (xart_store_linux/ préservé). Script : pending/sep_native_sbio.sh (relu par Claude avant lancement ; SELFTEST vert). Proxy rattrapé par catcher v2 (t+15s).
 - Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio.sh` (Albert lance). Cold-boot. PHASE 1 = flux PERSIST reproduit à l'identique (12 SAVE : 8 xART + 4 locker ; idle ; sbio+sks annoncés) = **stabilisation reproduite n=2**. PHASE 2 = sonde sbio.

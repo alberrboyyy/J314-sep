@@ -66,6 +66,9 @@ catch_proxy_run() {
 
   # 2. Boucle serrée sur les NŒUDS BRUTS (pas les liens udev).
   while [ "$(date +%s)" -lt "$deadline" ]; do
+    # Un port de baseline qui DISPARAÎT (ancien proxy coupé au power-cycle) sort de la baseline,
+    # pour que sa réapparition (même nom ttyACMx) soit bien vue comme NEUVE et saisie.
+    for k in "${!seen[@]}"; do [ -e "$k" ] || unset 'seen[$k]'; done
     for d in /dev/ttyACM*; do
       [ -e "$d" ] || continue
       [ -n "${seen[$d]:-}" ] && continue
