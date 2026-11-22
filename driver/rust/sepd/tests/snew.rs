@@ -134,7 +134,8 @@ fn native_absent_and_persist() {
     assert_eq!(&r.a[MASTER_PREFIX..], &blob[..]);
     // reload from disk: same store
     assert_eq!(Store::load(&dir).unwrap().masters.get(&2), Some(&blob));
-    // SAVE locker: persisted, keyed by B[0..16], served back verbatim (no 0x11 prefix)
+    // SAVE locker: persisted, keyed by B[0..16]; with --locker-verbatim served back as is (no 0x11 prefix)
+    d.strip_locker_uuid = false;
     let mut lb = lu.to_vec();
     lb.extend_from_slice(&[0xee; 0x40]);
     let r = d.answer(&rq(9, OP_SAVE_LOCKER, 0x50, 0x1234_0100), &lb).unwrap();
@@ -144,17 +145,21 @@ fn native_absent_and_persist() {
     assert_eq!(r.w, rq(5, 0, lb.len() as u8, (lb.len() >> 8) as u32 | 0x100));
     assert_eq!(r.a, lb);
     assert_eq!(Store::load(&dir).unwrap().lockers.get(&lu), Some(&lb));
-    // J7b: same store, locker served WITHOUT its UUID (B[16..]), length recomputed
+    // default (J7b, verified n=2): same store, locker served WITHOUT its UUID (B[16..]), length recomputed
     d.strip_locker_uuid = true;
     let r = d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &lu).unwrap();
     assert_eq!(r.w, rq(5, 0, (lb.len() - 16) as u8, ((lb.len() - 16) >> 8) as u32 | 0x100));
     assert_eq!(r.a, lb[16..]);
-    // a stored blob not starting with its UUID: no reply (fail-closed)
+    assert!(Store::load(&dir).unwrap().saved.contains(&lu));
+    // a SAVE-learnt blob not starting with its UUID: no reply (fail-closed)
     let other = [0x47u8; 16];
     d.store.lockers.insert(other, vec![0x11; 0x30]);
+    d.store.saved.insert(other);
     assert!(d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &other).is_err());
+    // an explicit locker_<uuid>.bin (payload, no UUID) is served as is even by default
+    d.store.saved.remove(&other);
+    assert_eq!(d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &other).unwrap().a, vec![0x11; 0x30]);
     d.store.lockers.remove(&other);
-    d.strip_locker_uuid = false;
     // SAVE with a B length different from the announced one: refused
     assert!(d.answer(&rq(5, OP_SAVE_XART, 0x10, 0x100), &blob).is_err());
     // announce / absent acks

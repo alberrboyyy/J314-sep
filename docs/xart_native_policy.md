@@ -28,6 +28,12 @@ Source : session PC (orchestration), 2026-11-22. Tirée de `pending/sep_native_p
 3. Dual-boot : re-sceller le MASTER (0x01) désynchronise macOS. À observer : le SEP accepte-t-il un master Linux
    distinct, ou n'a-t-il qu'un master partagé ?
 
+## MAJ 2026-11-23 — boot chaîné : lockers servis SANS UUID (vérifié n=2) ; « Track B = SKS » réfuté
+- FETCH locker : A = B[16..] du SAVE (défaut de `sepd` depuis le 2026-11-23 ; `--locker-verbatim` = ancienne forme, fausse).
+- Avec cette forme, sur boot chaîné : 4 lockers + op 0x07 servis, **0 SAVE**, sks annoncé, **sbio VIVANT au 0x73 sans aucun
+  RPC SKS** (J7b n=2). L'hypothèse « sbio gated derrière l'init SKS » (Track B ci-dessous) est **réfutée** : le mur était
+  l'emballage des lockers. Reste ouvert : l'ouverture CNTL de skdl/sks/scrd est-elle nécessaire (J7c) ?
+
 ## Gate
 `allow_xart=1 allow_xart_save_ack=1` = classe d'écriture neuve → **go d'Albert**. C'est l'étape où l'enrôlement
 Touch ID macOS est invalidé (macOS déclaré sacrifiable par Albert le 2026-11-22). Après le xART scellé, `sbio`

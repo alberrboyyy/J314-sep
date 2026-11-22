@@ -64,8 +64,10 @@ mkdir -p "$OUT" /etc/sepd "$STORE"
 [ -s /etc/sepd/os_uuid ] || echo 4c494e55580000000000000000000000 > /etc/sepd/os_uuid
 if [ -z "$(ls -A "$STORE")" ]; then echo "STORE = $STORE (vide : scellement frais)"; else
   echo "STORE = $STORE (NON vide) :"; ls -l "$STORE"
-  # Boot chaîné : ouverture tardive refusée (J3/J3b, n=2) et 0x73 muet même tôt (J3d) → sbio gated derrière SKS.
-  [ "${ALLOW_CHAINED:-0}" = 1 ] || die "STORE non vide = boot chaîné : sbio ne répond pas sans SKS (J3d). ALLOW_CHAINED=1 pour forcer"
+  # Boot chaîné : exige SBIO_OPEN=1 (ouverture tardive refusée, J3/J3b) et sepd « sans UUID » (J7b, vérifié n=2 ;
+  # avant, lockers servis avec UUID = 0x73 muet, J3d). Garde-fou conservé : chaîné seulement si demandé (pending/j8).
+  [ "${ALLOW_CHAINED:-0}" = 1 ] || die "STORE non vide = boot chaîné : ALLOW_CHAINED=1 pour forcer (pending/j8_chained_sensor.sh)"
+  [ "$SBIO_OPEN" = 1 ] || die "boot chaîné : SBIO_OPEN=1 obligatoire (ouverture tardive jamais acquittée, J3/J3b)"
 fi
 exec > >(tee -a "$OUT/run.log") 2>&1
 echo "journal : $OUT"

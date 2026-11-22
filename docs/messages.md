@@ -682,6 +682,18 @@ app »). Pour `TYPE=0x01 PARAM=0x53|0x9c` et `TYPE=0x06`, DATA>>16 = CRC affich�
 d'endpoint en ASCII (PARAM + DATA, ex. L106 `sbio`). Les lignes doc-asahi (`> TYPE 0`, `< TYPE 5/7 PARAM 0x10`) décrivent
 donc un sens qui n'est pas celui observé ici : à revoir (hypothèse : la doc décrit l'usage depuis m1n1/Linux).
 
+### xART (0x13) — réponse FETCH locker en boot CHAÎNÉ natif : SANS UUID — VÉRIFIÉ (2026-11-23, Claude, session ALARM)
+
+| EP | sens | TAG | TYPE | PARAM | DATA | contenu A | statut | source | date |
+|---|---|---|---|---|---|---|---|---|---|
+| 0x13 | < | n | 0x05 | 0x10 | 0x0100 | B = UUID 16 o du locker demandé (chaque locker demandé 2× de suite) | vérifié (n=2 + 4 runs antérieurs) | logs J7b 2026-11-23 | 2026-11-23 |
+| 0x13 | > | n | 0x00 | len & 0xff | 0x0100 \| len>>8 | **A = B[16..] du SAVE-locker (op 0x06) de cet UUID**, sans préfixe ni UUID | **vérifié (n=2, prédiction écrite avant)** | logs `20261123-000245/001026_j7b-*` | 2026-11-23 |
+
+- Servi AVEC l'UUID (B entier, J3b/J3d/J7a) = même effet qu'ABSENT (J3) : le SEP s'arrête après le 1er locker, sks jamais
+  annoncé, 0x73 muet. Servi sans UUID : les 4 lockers (+ op 0x07 au TAG 0x09, comme macOS c12) puis FD sks, 0 SAVE, sbio VIVANT.
+- Lève le « point ouvert » ci-dessous pour les lockers appris d'un SAVE ; cohérent avec seq133 (A gigalocker macOS = charge
+  sans UUID) et le slot `.gl` de 9133c5d5… (0x28 = 56 − 16). Kext op 0x05/0x06 non relu (`source: kext` absente).
+
 ### xART (0x13) — format de la réponse FETCH DÉCODÉ + coffre lu sur disque (2026-11-17, Claude Opus 4.8)
 
 Deux acquis nouveaux, détaillés dans **`docs/gigalocker.md`** (décodage complet) ; résumés ici pour la table canonique.

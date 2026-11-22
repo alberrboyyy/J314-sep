@@ -13,9 +13,9 @@
 //! - 0x06 SAVE locker  -> B persisted (`locker_save_<uuid>.bin`, UUID = B[0..16], verified J3) BEFORE the ACK, and
 //!   served back VERBATIM on a later FETCH 0x05 with that UUID (c9, 2026-11-22: on a chained boot, sbio stays unarmed
 //!   if lockers are ABSENT; serving form = hypothesis to confirm on hardware)
-//!   With `strip_locker_uuid` (J7b, `--locker-strip-uuid`): served as B[16..] instead, i.e. WITHOUT the leading UUID
-//!   (hypothesis: a macOS FETCH A starts with the payload, `docs/gigalocker.md`; `.gl` slot of 9133c5d5… = 0x28 o =
-//!   its SAVE B 56 o minus 16). A stored blob that does not start with the requested UUID = error (fail-closed).
+//!   DEFAULT since 2026-11-23 (`strip_locker_uuid`, VERIFIED n=2, J7b): a locker learnt from a SAVE is served as
+//!   B[16..], i.e. WITHOUT its leading UUID; served verbatim (J3b/J3d/J7a) it had the effect of ABSENT. A stored blob
+//!   that does not start with the requested UUID = error (fail-closed). `--locker-verbatim` restores the old form.
 //! - anything else     -> error: the daemon stops WITHOUT replying (fail-closed).
 use sep_proto::word::Word;
 use sep_proto::xart::*;
@@ -69,8 +69,10 @@ pub struct Store {
     pub dir: PathBuf,
     /// type (1 USER / 2 SEP) -> payload served after the 0x11-byte prefix.
     pub masters: BTreeMap<u8, Vec<u8>>,
-    /// UUID -> bytes served as is in A for a locker FETCH.
+    /// UUID -> bytes for a locker FETCH (`locker_<uuid>.bin`: served as is; learnt from a SAVE: see `saved`).
     pub lockers: BTreeMap<[u8; UUID_LEN], Vec<u8>>,
+    /// UUIDs whose bytes are the B of a SAVE (UUID-prefixed): served as B[16..] unless `--locker-verbatim`.
+    pub saved: std::collections::BTreeSet<[u8; UUID_LEN]>,
 }
 
 impl Store {
@@ -89,11 +91,15 @@ impl Store {
                 // lockers are answered ABSENT on a chained boot). An explicit `locker_<uuid>.bin` wins.
                 if let Ok(u) = parse_uuid(u) {
                     let blob = fs::read(e.path())?;
-                    st.lockers.entry(u).or_insert(blob);
+                    if let std::collections::btree_map::Entry::Vacant(v) = st.lockers.entry(u) {
+                        v.insert(blob);
+                        st.saved.insert(u);
+                    }
                 }
             } else if let Some(u) = name.strip_prefix("locker_").and_then(|r| r.strip_suffix(".bin")) {
                 if let Ok(u) = parse_uuid(u) {
                     st.lockers.insert(u, fs::read(e.path())?);
+                    st.saved.remove(&u);
                 }
             }
         }
@@ -124,13 +130,13 @@ pub struct Daemon {
     pub store: Store,
     pub os_uuid: [u8; UUID_LEN],
     pub nsave: u32,
-    /// J7b: serve a locker FETCH as B[16..] of its SAVE (UUID stripped) instead of verbatim.
+    /// Serve a locker FETCH as B[16..] of its SAVE (UUID stripped; default, verified J7b n=2) instead of verbatim.
     pub strip_locker_uuid: bool,
 }
 
 impl Daemon {
     pub fn new(store: Store, os_uuid: [u8; UUID_LEN]) -> Self {
-        Daemon { store, os_uuid, nsave: 0, strip_locker_uuid: false }
+        Daemon { store, os_uuid, nsave: 0, strip_locker_uuid: true }
     }
 
     /// Reply to the SEP request `req` (`b` = copy of buffer B made by the kernel). For a SAVE the blob is durable
@@ -158,7 +164,7 @@ impl Daemon {
             OP_FETCH_GL => {
                 let uuid: [u8; UUID_LEN] = b.try_into().map_err(|_| format!("FETCH locker: B = {} o, 16 expected", b.len()))?;
                 let (a, what) = match self.store.lockers.get(&uuid) {
-                    Some(p) if self.strip_locker_uuid => {
+                    Some(p) if self.strip_locker_uuid && self.store.saved.contains(&uuid) => {
                         if p.len() <= UUID_LEN || p[..UUID_LEN] != uuid {
                             return Err(format!("FETCH locker {}: stored blob does not start with its UUID", hex(&uuid)));
                         }
@@ -194,6 +200,7 @@ impl Daemon {
                     self.store.put_locker_save(uuid, b).map_err(|e| format!("SAVE locker: {e}"))?;
                     if let Ok(k) = <[u8; UUID_LEN]>::try_from(uuid) {
                         self.store.lockers.insert(k, b.to_vec());
+                        self.store.saved.insert(k);
                     }
                     format!("SAVE locker {} PERSISTED ({} o, served {} on FETCH)", hex(uuid), b.len(), if self.strip_locker_uuid { "without UUID" } else { "verbatim" })
                 };

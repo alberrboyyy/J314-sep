@@ -1,7 +1,7 @@
 //! sepd: serves EP 0x13 (xART) of `sep_native` through `/dev/sep_native`. See `lib.rs` for the policy and
 //! `driver/rust/kmod/SEP_NATIVE.md` for the interface and the test plan.
 //!
-//! Usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH] [--locker-strip-uuid]
+//! Usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH] [--locker-strip-uuid | --locker-verbatim]
 //!   defaults: /var/lib/sepd, /etc/sepd/os_uuid, /dev/sep_native.
 //! Every exchange is logged to stderr and appended to DIR/sepd.log. Any error = exit WITHOUT replying.
 use sep_proto::xart::op_name;
@@ -32,11 +32,11 @@ impl Log {
 
 fn main() {
     let (mut store, mut uuid_file, mut dev) = (PathBuf::from(DEFAULT_STORE), PathBuf::from(DEFAULT_UUID_FILE), PathBuf::from(DEFAULT_DEV));
-    let mut strip = false;
+    let mut strip = true; // default since J7b (verified n=2); --locker-strip-uuid kept for the J7b script
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
-        if a == "--locker-strip-uuid" {
-            strip = true;
+        if a == "--locker-strip-uuid" || a == "--locker-verbatim" {
+            strip = a == "--locker-strip-uuid";
             continue;
         }
         let v = args.next().map(PathBuf::from);
@@ -45,7 +45,7 @@ fn main() {
             ("--os-uuid-file", Some(v)) => uuid_file = v,
             ("--dev", Some(v)) => dev = v,
             _ => {
-                eprintln!("usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH] [--locker-strip-uuid]");
+                eprintln!("usage: sepd [--store DIR] [--os-uuid-file FILE] [--dev PATH] [--locker-strip-uuid | --locker-verbatim]");
                 exit(64);
             }
         }
@@ -64,7 +64,7 @@ fn main() {
         st.masters.keys().collect::<Vec<_>>(),
         st.lockers.len(),
         dev.display(),
-        if strip { "WITHOUT UUID (J7b)" } else { "verbatim" }
+        if strip { "WITHOUT UUID" } else { "VERBATIM (--locker-verbatim)" }
     ));
     let mut d = Daemon::new(st, uuid);
     d.strip_locker_uuid = strip;

@@ -2526,3 +2526,15 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Seul écart, bénin : skdl ouvert avec « 2 requête(s) 0x13 en attente » (n=1 : 0) = entrelacement des FETCH, sans effet.
 - ⇒ **VÉRIFIÉ (n=2, prédiction écrite avant)** : sur boot chaîné natif, servir les lockers SANS UUID (A = B[16..] du SAVE)
   → le SEP accepte l'état scellé rechargé (0 re-scellement), annonce sks et sbio répond au 0x73.
+
+## 2026-11-23 — Claude (session ALARM, autonome pendant l'absence d'Albert) — sepd « sans UUID » par défaut ; J7c et J8 préparés ; RIEN lancé
+- `sepd` : retrait de l'UUID par DÉFAUT pour les lockers appris d'un SAVE (`Store.saved`) ; `locker_<uuid>.bin` explicites
+  servis tels quels ; `--locker-verbatim` = ancienne forme. Tests snew 3/3, clippy 0. `~/kbuild/j5/sepd` sha256
+  `6ad1992f12b0d300b37b6b20ba2e9e3c0cc44d4e02bd7b74ce031cc958e37f4a` (ancien → `sepd.v1` = `64daab0a…0b1c` ; `sepd.j7b` gardé).
+  Seal frais inchangé (store vide → lockers ABSENT).
+- `pending/j7c_chained_no_ks_open.sh STORE` : J7b sans `allow_sks` (seul sbio ouvert tôt, puis 0x73). Tranche la nécessité
+  des ouvertures skdl/sks/scrd. Script neuf → go d'Albert.
+- `pending/j8_chained_sensor.sh STORE` : boot chaîné + j5c `UPTO=pass2` (`ALLOW_CHAINED=1 SBIO_OPEN=1`). À lancer SEULEMENT si
+  J7c = VIVANT (le module refuse `allow_sks` avec `allow_sbio_relay=1`). Script neuf → go d'Albert.
+- `pending/j5_sensor_run.sh` : garde-fou chaîné réécrit (motif périmé « gated SKS » retiré ; chaîné exige aussi SBIO_OPEN=1).
+- Doc : `messages.md` (ligne FETCH locker vérifiée), `gigalocker.md` (point ouvert tranché pour les SAVE), `xart_native_policy.md`.

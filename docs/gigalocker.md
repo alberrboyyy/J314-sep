@@ -141,6 +141,9 @@ Message de réponse AP→SEP : `> EP=0x13 TAG=<même que la requête> TYPE=0x00 
 - Le **CRC** n'est PAS dans le message : il est **dans le blob** (le `.gl` le porte à +0x16) ; le SEP le revérifie en interne.
 
 ### Point ENCORE ouvert (bloquant pour un code byte-correct) : l'en-tête du tampon A
+> **MAJ 2026-11-23 — tranché sur matériel pour les lockers appris d'un SAVE** : A = B[16..] du SAVE (sans UUID, sans
+> préfixe) → accepté par le SEP sur boot chaîné natif, **vérifié n=2** (J7b, `messages.md` « réponse FETCH locker en boot
+> CHAÎNÉ »). Servir B entier (UUID compris) = effet d'un locker absent. Le préfixe 0x11 reste propre au maître.
 - **Maître (op 0x00)** : A = `[0x11 octets]` (16 nuls + 1 octet nul observé) **puis** la charge (payload à +0x11). VU : seq94/96.
 - **Gigalocker (op 0x05)** : A observé commence **directement à l'offset 0** par la charge (seq133 : `e2fa4b48…`, **pas** l'UUID,
   **pas** 16 nuls). VU.
