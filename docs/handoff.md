@@ -1,4 +1,23 @@
-# ▶️ COMMENCE ICI — REPRISE 2026-11-22 (nuit) — 🎯 ROUTE NATIVE RÉUSSIE sur matériel : SEP scelle un état frais pour Linux, sbio+sks armés
+# ▶️ COMMENCE ICI — REPRISE 2026-11-22 (nuit, FIN) — route native prouvée JUSQU'AU PATCH ; mur = charger le patch INTÈGRE (DMA ?)
+
+**Contexte neuf / après /clear : lis ceci, puis `docs/sbio_session.md` + `docs/sbio_keyexchange.md`, le haut de `docs/journal.md` (entrées 2026-11-22), et la mémoire [[route-native-0x13-breakthrough]] + [[regle-lancement-sep-relachee]]. Règle de lancement RELÂCHÉE (CLAUDE.md) : Claude lance les scripts `pending/` ÉPROUVÉS ; script NEUF = « go » d'Albert ; power-cycle physique = TOUJOURS Albert (le reboot logiciel fige le PMU).**
+
+**CE QUI MARCHE (prouvé matériel, répété) — toute la session capteur native jusqu'au patch inclus (transmission) :**
+scellé xART frais → `sbio` VIVANT (0x73, **vérifié n=3**) → **0x17** (serial capteur lu live) → **key exchange 0x15/0x16** (relais lockstep chiffré, trame SPI 0x72) → **compteur 0x42/0x18** (trame 0x73) → **réception patch 0x5f** (poignée fe/fd, 22158o) → **PUSH patch** au capteur (FIFO scruté, 22Ko en 2.4s, sans timeout). L'AP = **PUR RELAIS d'octets** (aucune crypto/clé côté AP, prouvé décompil). Scripts chaînés `pending/sep_native_sbio{,2,3,4,5,6,7,8,9}.sh` (9 = le plus complet : jusqu'aux params). Moteur SPI capteur : `analysis/mesa_spi_proxy.py` (xfer FIFO, timeout param).
+
+**LE MUR (sessions sbio8 + sbio9) :** après le push patch, le 1er param **0x5d** → **état capteur = TOUT ZÉRO** → STOP fail-closed. Le fix CRC des trames 0x55 (sbio9 : +CRC16-ARC suffixe, VU C19) était NÉCESSAIRE mais n'a PAS suffi. **Cause probable = le patch ne CHARGE pas intègre.** Le push FIFO transmet les 22Ko (pas de timeout) MAIS le marqueur « patch chargé » de C19 (`00 29 01 00 7c`) **n'apparaît pas** (état post-push = `…60000008…`). → le **CS lâche probablement** pendant le long transfert FIFO → patch corrompu → params refusés (« push accepté » = faux positif : état bien formé ≠ patch chargé).
+
+**PROCHAINS PAS (ordre) :**
+1. **Charger le patch INTÈGRE** = le vrai prochain chantier (recherche) : implémenter le **DMA SIO** (coprocesseur ; macOS pousse le patch en 1 burst DMA, cf. `docs/sbio_session.md` §4 + `sensor_hw.md`), OU prouver/corriger pourquoi le FIFO corrompt (CS asserté sur 22Ko). **Vérif de succès = le marqueur `00 29 01 00 7c` dans l'état capteur 0x10.**
+2. Puis params (0x5d/0x5c/0x55, CRC déjà corrigé sbio9) + **calibration 0x5b** (blob userspace livré au SEP par mailbox ; analyse sbio10 lancée en fin de session — voir `docs/` si rendue).
+3. Puis **ENROLL + MATCH = DOIGTS** (session humaine ; séquences déjà cartographiées : `docs/sbio_enroll.md`, `docs/sbio_match.md` ; D2 keybag = gating AP-side, cf. sbio_match).
+
+**Infra :** `tools/catch_loop.sh` = catcher permanent (lancer 1× en fond ; re-catch auto à chaque power-cycle d'Albert). `tools/catch_lib.sh` v2 (nœud brut + baseline + retry d'ouverture) fiable en local. Tunnel tél préparé mais NON validé (appli Android « USB Serial Telnet Server » port 2323 ; `TUNNEL_PROXY_PORT=2323 TUNNEL_CONSOLE=0 python3 tunnel.py` ; à tester : raw-vs-telnet-IAC + le catch côté appli via Autostart). Docs protocole complètes : `sbio_sequence/keyexchange/session/enroll/match.md`, `handler_0x13.md`, `route_native.md`. Audit GitHub fait (IDs Mac dans traces/historique = « pg » selon Albert). ~28 commits, tout committé ; compteur anti-rejeu avancé (récupérable DFU + `alarm_p5.img`).
+
+---
+
+<!-- bandeau précédent (début de nuit) conservé pour l'historique -->
+# REPRISE 2026-11-22 (nuit) — 🎯 ROUTE NATIVE RÉUSSIE sur matériel : SEP scelle un état frais pour Linux, sbio+sks armés
 
 **Si contexte neuf / après /clear : lis ceci, puis `docs/route_native.md`, puis le haut de `docs/journal.md` (2026-11-22 00:46), puis la mémoire [[route-native-0x13-breakthrough]]. CLAUDE.md = règles (PHASE 2 ; écriture SEP = Albert lance).**
 
