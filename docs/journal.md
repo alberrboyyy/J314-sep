@@ -2563,3 +2563,20 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Prédiction : sepd = 4 lockers sans UUID ×2 + op 0x07, **0 SAVE** ; sbio VIVANT ; sbiod : « patch chargé (0x29 … IRQ 195 vue) »,
   « capteur initialisé et calibré (1re passe ; 0x5b acquitté, 0x63 = référence macOS) », 2e passe « patch chargé (0x29) » puis
   « VERDICT : 2e passe terminée, capteur au repos final de macOS … 0x63 ×2 = référence macOS » ; sbiod rc=0.
+
+## 2026-11-23 — Claude (analyse, session ALARM) — Reconnexion à un SEP déjà démarré : le reboot logiciel Linux suffit déjà (n=6) ; `docs/sep_reconnect.md`
+- Trace : `journalctl --list-boots` / `journalctl -b -17…-1` (lecture seule), `logs/2026112*/kernel.log`, traces C6/C13/C14
+  (`sep.log`, `hv_uart.log`). Rien lancé : pas d'insmod, pas de sudo, aucune écriture SEP.
+- Vu : les boots -17 (J2), -16 (J4), -15 (J3, Halted), -14 (J3b, Halted), -13 (J3c), -3 (J7b n=2) se terminent par un
+  **reboot systemd** (`System is rebooting` / `reboot.target`), et le run suivant lit GET_STATUS #1 = 0x66 DATA 0x1 et boote
+  SEPOS normalement. Boot et run sont reliés par `sepfw phys`. Les boots -12…-4 et -1 finissent par
+  `macsmc-input: Triggering forced shutdown!` (power-cycle). Reboot Linux = SMC `MBSE 'phra'` (`macsmc-reboot.c:112-122`),
+  pas le watchdog de m1n1.
+- Vu : **correction** de l'entrée J7c (00:29) : précédée de deux reboots logiciels (boot -2 → reboot), pas d'un power-cycle.
+- Vu : la veille macOS envoie CNTL `> EP 0 TYPE 0x0c PARAM 0x02` (SLEEP), avec ack TYPE 0x01 (C6, C13, C14), après
+  « SEP EP n disabled » côté AP (sans mot sur le fil). Aucun réveil capturé.
+- Interprété : le gel PMU/SPMI concerne le reboot **via le proxy m1n1**, pas le reboot Linux (hypothèse forte, n=6). Un
+  reboot après une init capteur (J5-J8) n'a jamais été fait. Une vraie reprise après rmmod (handover) est déconseillée :
+  tampons DMA référencés par SEPOS, table EP perdue, réponse de SEPOS à GET_STATUS inconnue. Proposition graduée P0-P3 et
+  mission kext pour c9 dans `docs/sep_reconnect.md`.
+- Incidents : aucun. Le boot courant (J8) a encore `sep_native` chargé.
