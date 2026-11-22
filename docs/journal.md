@@ -2265,3 +2265,18 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   (prélude, état, bloc, état, rien d'autre) ; sbiod 4/4, sep-proto verts, clippy 0. Binaire installé dans
   `~/kbuild/j5/sbiod` (sha256 a2b40c01…), ancien gardé en `sbiod.v1` (5be67e47…).
 - 1er run v2 = go d'Albert ; power-cycle d'abord (le SEP et sepd du run v1 tournent encore).
+
+## 2026-11-22 20:43 — Albert + Claude (session ALARM) — 🎯 J5 v2 : PATCH CAPTEUR CHARGÉ en Linux natif (0x29)
+- Go d'Albert (power-cycle, puis `sudo pending/j5_sensor_run.sh`, store neuf, sbiod v2 sha256 a2b40c01…). Logs bruts :
+  `logs/20261122-204249_j5b-patch-loaded/`.
+- VU : seal frais, sbio VIVANT, relais 0x17 → 0x15/0x72/0x16 → 0x42/0x73/0x18 → 0x5f (22158 o) comme v1. Puis :
+  état avant `80200010 00000000 60000000 52330000` ; prélude → IRQ 195 haute à t+0 ; **lecture d'état entre prélude
+  et bloc** = `…60000008 5233…` (= ce que macOS lit en C19 au même point) ; bloc en un transfert, **29 ms**, IRQ basse
+  avant ; IRQ remonte à **t+43 ms** (macOS : 38-55 ms) ; une lecture : **`80200010 00000000 2901007c 52330016`**.
+  **Octet d'état 0x60 → 0x29, marqueur `29 01 00 7c` = « correctif chargé » (sensor_hw.md, sbio_session.md Q4).**
+  VERDICT sbiod : patch chargé. Capteur éteint ensuite.
+- ⇒ Le mur du patch (bloquant sous m1n1 depuis sbio6) est tombé : la cause était la **séquence** (lecture d'état
+  manquante entre prélude et bloc + lectures pendant le chargement), PAS le DMA. Statut : n=1 → à reproduire pour
+  `vérifié` (le sceptique tranche) ; l'hypothèse « débit » est sans objet pour le chargement (PIO 29 ms suffit).
+- Suite (J5 étape 2) : params 0x5d/0x5c/0x55 (+CRC16) et calibration 0x5b — liste blanche à étendre (après 0x5f,
+  rien n'est autorisé aujourd'hui) ; protocole vérifié à demander d'abord (session PC).
