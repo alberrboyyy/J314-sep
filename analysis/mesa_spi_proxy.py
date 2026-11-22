@@ -169,7 +169,7 @@ class MesaSPI:
             raise MesaError(f"broche {PWR_PIN} dans un état inattendu ({self._pwr_orig:#x}) : arrêt")
 
     # ---- transaction SPI ---------------------------------------------------
-    def xfer(self, tx, rx_len=None):
+    def xfer(self, tx, rx_len=None, timeout=None):
         """
         Une transaction SPI2 en mode FIFO scruté. Émet `tx` (bytes), reçoit `rx_len`
         octets et les rend. Séquence identique à mesa_hello.sh `xfer` (l.89-123).
@@ -181,12 +181,21 @@ class MesaSPI:
           - 0 < rx_len < len(tx) ou autre : hypothèse (jamais exercé par mesa_hello).
             mesa_hello impose rx_len ∈ {0, n} (assert l.91) ; on garde ce garde-fou.
 
+        timeout : délai (s) au-delà duquel un échange bloqué lève MesaError. Par défaut
+                 (None) on garde XFER_TIMEOUT_S = 2 s — valeur de mesa_hello, suffisante
+                 pour les petites trames. RÉTRO-COMPAT : les appels existants (sbio4/5/6,
+                 sans `timeout`) sont INCHANGÉS. Un gros transfert (ex. le push du patch
+                 ~22 Ko, des milliers d'allers-retours MMIO sur lien distant) passe une
+                 valeur plus large (ex. 60) : SEULE la borne de temps change, la séquence
+                 de registres (fill/drain, CS, RUN/STOP) reste identique.
+
         NOTE RELAIS (hypothèse, non vérifié matériel) : relayer des trames chiffrées
         SEP↔capteur de longueur quelconque en mode scruté est une EXTENSION. Sous
         macOS ces gros blocs (jusqu'à 0x7200 o) passent en DMA (SIO), pas par ce FIFO.
         La boucle fill/drain ci-dessous gère une longueur quelconque, mais chaque octet
-        = un aller-retour MMIO par le proxy : pour de gros blocs, XFER_TIMEOUT_S (2 s)
-        peut être trop court sur lien distant. À régler/valider sur matériel.
+        = un aller-retour MMIO par le proxy : pour de gros blocs, le défaut 2 s est trop
+        court sur lien distant (passer `timeout`). RIEN ici ne garantit que le contrôleur
+        maintient CS asserté sur un transfert FIFO aussi long : à valider sur matériel.
         """
         import time
         p, SPI = self.p, self.SPI
@@ -195,6 +204,7 @@ class MesaSPI:
             rx_len = n
         if rx_len not in (0, n):                             # garde-fou de mesa_hello:91
             raise MesaError(f"rx_len doit être 0 ou {n} (mode scruté de mesa_hello), reçu {rx_len}")
+        tmo = XFER_TIMEOUT_S if timeout is None else timeout
 
         p.write32(SPI + CTRL, CTRL_FIFO_RESET)               # l.93 : reset FIFO
         p.write32(SPI + IF_XFER, IF_CLEAR)                   # l.94
@@ -227,9 +237,9 @@ class MesaSPI:
             flags = p.read32(SPI + IF_XFER)
             if sent == n and len(rx) == rx_len and (flags & XFER_DONE_BIT):
                 break
-            if time.monotonic() - t0 > XFER_TIMEOUT_S:
+            if time.monotonic() - t0 > tmo:
                 raise MesaError(
-                    f"échange bloqué : émis {sent}/{n}, reçu {len(rx)}/{rx_len}, "
+                    f"échange bloqué (timeout {tmo}s) : émis {sent}/{n}, reçu {len(rx)}/{rx_len}, "
                     f"IF_XFER={flags:#x} FIFOSTAT={p.read32(SPI + FIFOSTAT):#x}")
         p.write32(SPI + CTRL, CTRL_STOP)                     # l.121
         return bytes(rx)
@@ -488,6 +498,18 @@ def _selftest():
     payload = bytes(range(20))   # > FIFO_DEPTH pour exercer la boucle fill/drain
     got = m.xfer(payload, len(payload))
     check(got == payload, "xfer full-duplex rend l'écho (longueur > 16, boucle fill/drain OK)")
+
+    # 2b) paramètre timeout (ajout sbio7) : accepté, rétro-compat, borne de temps seule.
+    import inspect
+    sig = inspect.signature(MesaSPI.xfer)
+    check("timeout" in sig.parameters and sig.parameters["timeout"].default is None,
+          "xfer accepte timeout=None (défaut = XFER_TIMEOUT_S, rétro-compat sbio4/5/6)")
+    got_t = m.xfer(payload, len(payload), timeout=60)
+    check(got_t == payload, "xfer(timeout=60) rend l'écho (gros transfert : seule la borne change)")
+    # un gros émis (rx_len=0) passe aussi sur le faux proxy (séquence fill identique).
+    big = bytes((i & 0xff) for i in range(1000))
+    out_big = m.xfer(big, 0, timeout=60)
+    check(out_big == b"" and len(fp.tx_fifo) == 0, "xfer(1000 o, rx_len=0, timeout=60) émet tout, rend b''")
 
     # 3) status() : lit 0x17 octets, découpe au 7e.
     body = m.status()
