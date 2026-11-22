@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 02:50 — Albert (lance) + Claude (Opus 4.8) — 🎯 KEY EXCHANGE RELAYÉ nativement : 1er dialogue chiffré SEP↔capteur en lockstep (frame 0x72 corrigée + store neuf)
+- Trace : traces/20261122-0247*_native_sbio4 (store NEUF xart_store_sbio4b ; kx_0x15_B.bin, spi_0x72_resp_raw.bin, kx_0x16_B.bin). Script : pending/sep_native_sbio4.sh (frame 0x72 = 0x2f corrigée).
+- Fait : `M1N1TIMEOUT=20 XART_STORE=…xart_store_sbio4b ./pending/sep_native_sbio4.sh` (Albert lance). Phase 1-3 OK (stab, sbio vivant, 0x17 franchi). Phase 4 : 0x15 → le SEP rend blob 40o `ea88c46a…3092300a` → relais SPI trame 0x72 (47o, en-tête `8072002f000000`) → état 0x10 = **0x33 (51)** → réponse 51o `80d4003300000000 72 <40o> <crc>` → 40o extraits @ offset 9 → 0x16 → **le SEP ACQUITTE (`< EP=0x08 TYPE=0x16`)**.
+- Vu (faits bruts) : état 0x10 = 0x33 (= les 51o attendus ; avant le fix : 0x0b = erreur status=2). Réponse capteur 51o, charge-clé 40o à offset 9. Le SEP a acquitté 0x16. 2 causes du run raté précédent réglées : (a) frame 0x72 longueur totale 0x2f (était 0x28) ; (b) store POLLUÉ (réutilisait xart_store_sbio4 du run précédent → servait un vieux master → sbio n'ouvrait plus) → store NEUF.
+- Interprété : **le relais lockstep du key exchange fonctionne nativement** — l'AP comme pur relais d'octets est validé de bout en bout sur matériel (`sbio_keyexchange.md` confirmé en vrai). Les commandes capteur suivantes (0x42/0x18 compteur via trame 0x73, params via 0x55) suivent le MÊME pattern → sbio5 relaiera toute la session capteur. Reste : patch/calibration (blobs, rejouables), puis enroll + match (doigts, session humaine).
+- Incidents : RAS (hormis un flake USB transitoire au catch — port apparu/disparu, réglé au power-cycle suivant). Compteur anti-rejeu +12 (xart_store_sbio4b). Capteur restauré. Linux intact ; DFU prêt.
+
 ## 2026-11-22 02:36 — Albert (lance) + Claude (Opus 4.8) — sbio4 : key exchange relayé à MOITIÉ (le SEP rend bien le blob 40o ; la réponse SPI capteur = 11o, pas 40 → enveloppe SPI du 0x72 à reverser)
 - Trace : traces/20261122-023626_native_sbio4 (spi_0x72_resp_raw.bin, kx_0x15_B.bin).
 - Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio4.sh` (Albert lance). Phase 1-3 OK (stab **n=7**, sbio vivant **n=6**, 0x17 franchi). Phase 4 : 0x15 envoyé → le SEP rend un blob de 40o (0x28) `7ad7436c0366aa4e59891dbb3a16f6b4feeb23bb0456de33f062ea4fd7da28a7958cbf8492e296ff` (offset +0x1c, taille confirmée par capture). Relais SPI trame 0x72 (47o) → poll état 0x10 : pending = **0x0b (11o)** → réponse brute **11o = `80d4000b00000000 0272 ed57`** (≠ 40o attendus) → STOP fail-closed (on ne devine pas). Teardown capteur (power_off+restore) OK.
