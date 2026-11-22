@@ -5,6 +5,7 @@
 # J4 étape 7 : boot SEPOS + service xART (go d'Albert 2026-11-22). Lancer en root après un reboot normal.
 set -euo pipefail
 J=/home/albert/kbuild/j2
+lsmod | grep -q "^sep_native" && { echo "sep_native déjà chargé : redémarrer d'abord (SEP déjà démarré sur ce boot)"; exit 1; }
 mkdir -p /etc/sepd /var/lib/sepd
 [ -s /etc/sepd/os_uuid ] || echo 4c494e55580000000000000000000000 > /etc/sepd/os_uuid
 [ -z "$(ls -A /var/lib/sepd)" ] || { echo "store /var/lib/sepd non vide : arrêt (1er run = store neuf)"; exit 1; }
