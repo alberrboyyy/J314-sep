@@ -2,7 +2,8 @@
 
 Fichiers : `sep_native.rs` (ce dossier), `driver/linux/sep_native_ovl.c` + `driver/linux/sep-native-overlay.dts`.
 Conception : `docs/driver_rust_design.md` (§2 option (b), §3.1-3.6). Boot (`allow_boot=1`) **éprouvé sur matériel
-le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **compilé, jamais chargé.**
+le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **éprouvé sur matériel le 2026-11-22** (J4,
+`logs/20261122-183847_j4-xart-native/`). Ouverture de sbio + poignée 0x73 (`allow_sbio`, J3) : **compilé, jamais chargé.**
 
 ## Ce que ça fait
 
@@ -38,8 +39,33 @@ le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **compilé, j
    (fail-closed, comme `pending/sep_native_0x13.sh`). Avec `allow_xart_save_ack=1` : la requête est remise au démon
    avec B ; le démon écrit le blob sur disque (tmp + fsync + rename + fsync du dossier) **avant** de soumettre l'ACK.
    Le noyau passe en `Halted` juste après le 48e ACK (`MAX_SAVES`, comme le harnais).
-7. Aucun chemin d'envoi vers 0x08 (sbio) ni 0x12 (sks) : la porte d'envoi (`send_running`) n'admet que l'EP 0x00
-   (TYPE 0x14, 0x02-0x05, 0x12) et l'EP de `xarm` une fois ouvert, et refuse explicitement 0x08 et 0x12.
+7. Porte d'envoi (`send_running`) : l'EP 0x00 (TYPE 0x14, 0x02-0x05, 0x12 ; un CNTL de PARAM 0x08 seulement en
+   phase d'ouverture de sbio et seulement TYPE 0x02-0x05), l'EP de `xarm` une fois ouvert, et, avec `allow_sbio=1`,
+   **un seul** mot vers 0x08 : `TAG 0xfc TYPE 0x73 PARAM 0 DATA 0`, admis une fois (phase `Open` → `HelloSent`).
+   0x12 (sks) toujours refusé. Sans `allow_sbio`, aucun chemin vers 0x08.
+8. `allow_sbio=1` (exige `allow_xart=1`), J3 selon `docs/j3_sbio_open.md` : au probe, deux tampons DMA cohérents de
+   0x4000 o (A8, B8), distincts de ceux de 0x13. Après la création de `/dev/sep_native`, **le probe (donc `insmod`)
+   attend** (sepd sert le xART en parallèle) :
+   - que `sbio` soit annoncé **en 0x08** (annoncé ailleurs → rien envoyé, abandon) ;
+   - que le xART soit **calme** : aucune requête 0x13 en attente, aucun ack CNTL attendu, aucun mot 0x13 reçu ou
+     envoyé depuis **2 s**. Choix : sbio est annoncé au milieu de la rafale de SAVE (J4 : annonce à 18:38:50, SAVE
+     jusqu'à 18:38:52) ; ouvrir à ce moment mélangerait nos CNTL aux échanges xART. Le harnais m1n1 attendait 25 s
+     de silence (`IDLE`) ; 2 s suffit à séparer les deux phases (J4 : SAVE espacés de moins de 0,5 s), hypothèse ;
+   - délai maximal 120 s depuis l'ouverture de 0x13 ; au-delà, ou sur signal, **rien n'est envoyé à 0x08 et pas de
+     `Halted`** (le service xART continue).
+   Puis 4 CNTL PARAM 0x08, **sans 2e SECMODE** : 0x04 (taille A8 = 0x4000), 0x02 (IOVA A8 >> 12), 0x05 (taille B8),
+   0x03 (IOVA B8 >> 12), chacun attendant son ack TYPE 0x01 de même TAG (5 s ; sinon `Halted`). Puis A8 = gt_packet
+   0x73 capturé sous macOS (`sbio_hello_0x73.bin`, copie de `traces/20261108-032454_c12-boot-ho/sep.log.ool/000300_08_A.bin`,
+   1024 o, sha256 `0982f722…92f3`), **embarqué à la compilation** (`include_bytes!`, le noyau ne lit aucun fichier) ;
+   `+0x00 == 1` et `+0x14 == 0x73` contrôlés à la compilation (assertion) et relus dans A8 avant l'envoi (sinon
+   `Halted`). Envoi de `> EP 0x08 TAG 0xfc TYPE 0x73 PARAM 0 DATA 0`, écoute 6 s, dump de B8 avant le 0x73, après
+   chaque nouveau mot 0x08 (4 au plus) et en fin d'écoute : nombre d'octets non nuls sur 0x4000, en-tête gt_packet
+   (version, total, offset, opcode, fragment) et 0x80 premiers octets. Ligne finale :
+   `VERDICT sbio : VIVANT` si `B8[0x00] == 1 && B8[0x14] == 0x73`, ou si un mot 0x08 `TAG 0xfc TYPE 0x73` ou
+   `TAG 0x04` arrive après le 0x73 ; sinon `VERDICT sbio : MUET`. Ensuite **rien d'autre** vers 0x08 (ni 0x17, ni
+   0x15, ni 0x16 : J5). Tout mot reçu sur 0x08 (notifications TAG 0x01 lockState, 0x02-0x04, réponses GT) est
+   journalisé `sbio < …` (128 lignes au plus, compte gardé), **sans réponse ni `Halted`**. Le dump de B8 n'est pas
+   exposé à l'espace utilisateur (dmesg seulement).
 
 ## Paramètres (u32, défaut 0, absents de sysfs : figés au chargement)
 
@@ -48,7 +74,8 @@ le 2026-11-22** (`docs/journal.md`). Service xART (`allow_xart`) : **compilé, j
 | `allow_boot` | 1 = séquence de boot ci-dessus. 0 = probe seul. |
 | `allow_xart` | 1 = ouverture de 0x13 et `/dev/sep_native` (réponses 0x0e, 0x13, FETCH servi/ABSENT, 0x07, 0x1d). Exige `allow_boot=1` (sinon EINVAL). |
 | `allow_xart_save_ack` | 1 = le démon peut acquitter les SAVE (⚠️ le compteur scellé avance). 0 = un SAVE → `Halted`. Exige `allow_xart=1`. |
-| `allow_sbio`, `allow_sks` | **non implémentés** : toute valeur ≠ 0 fait échouer le probe (EINVAL). |
+| `allow_sbio` | 1 = J3 (point 8) : ouverture de 0x08 et UNE poignée 0x73 quand le xART est calme. Exige `allow_xart=1` (sinon EINVAL). En pratique il faut aussi `allow_xart_save_ack=1` : sbio n'est annoncé qu'après le scellement. |
+| `allow_sks` | **non implémenté** : toute valeur ≠ 0 fait échouer le probe (EINVAL). |
 
 ## États
 
@@ -60,7 +87,8 @@ ou d'une autre DATA (0x66), timeout, signal, erreur mailbox, IOVA inutilisable, 
 inconnu après le boot, EP annoncé deux fois ; et avec `allow_xart` : TYPE 0x13 hors liste (0x0e, 0x13, 0x00, 0x05,
 0x07, 0x1d, 0x01, 0x06), SAVE sans `allow_xart_save_ack`, requête autre que 0x0e avant l'ouverture, longueur B hors
 tampon (FETCH locker : B ≠ 16 o), deux requêtes à tampon B en attente, plus de 16 requêtes en attente, ack CNTL
-absent ou de TAG inattendu, réponse du démon refusée par `check_reply` (ou à un `seq` inconnu), 48e SAVE acquitté.
+absent ou de TAG inattendu, réponse du démon refusée par `check_reply` (ou à un `seq` inconnu), 48e SAVE acquitté ;
+avec `allow_sbio` : ack CNTL absent à l'ouverture de 0x08, A8 relu qui n'est pas un 0x73.
 
 **Après l'ouverture de 0x13, journalisé et ignoré (ni réponse, ni `Halted`)**, comme le harnais m1n1 qui ne lisait
 que l'EP 0 et 0x13 : tout message sur un **autre EP annoncé** (0x08 sbio, 0x12 sks, 0x10, 0x14, 0x15, 0x18, 0x0e…),
@@ -131,6 +159,22 @@ fuit volontairement mailbox, shmem et mapping firmware, et tout nouveau probe es
 
 Différences avec m1n1, côté AP seulement : TAG 0 comme m1n1 (macOS met 1) ; le firmware est mappé juste avant
 IMG4 et non avant le 1er GET_STATUS (le SEP ne voit l'IOVA qu'avec IMG4).
+
+## Test de J3 (sbio), plus tard
+
+**1er run de ce chemin dans sep_native = go d'Albert.** Filet : `alarm_p5.img`, backup, DFU ; reboot avant le run.
+1. Compiler (`driver/rust/build.sh`), copier `sep_native.ko` dans `~/kbuild/j2/` (le script vérifie que le module a
+   `allow_sbio`).
+2. Root : `pending/j3_sbio_run.sh [STORE]` (comme `j4_xart_run.sh`, plus `allow_sbio=1`). Le script affiche le store
+   utilisé et s'il est vide.
+3. Lire `journalctl -k -b | grep -E 'sbio|VERDICT|HALTED'`. Attendu : même déroulé que J4, puis « xART calme »,
+   4 acks CNTL, « 0x08 ouvert », `> sbio 0x73`, les mots `sbio <` éventuels, les dumps de B8 et le `VERDICT`.
+
+**Question ouverte (à trancher avec l'orchestrateur PC, avant le run)** : le store `/var/lib/sepd` du run J4 n'est plus
+vide (`master_2.bin` + 4 `locker_save_*`). Le servir (voie « persist » : le SEP retrouve son master) ou repartir d'un
+store neuf (scellement frais, compteur encore avancé) ? Le script ne tranche pas : défaut = dossier neuf
+`/var/lib/sepd-run-<horodatage>` (même situation que le J4 réussi) ; passer `/var/lib/sepd` en argument pour l'autre
+voie. Note : `sepd` ne re-sert pas les `locker_save_*` (forme non établie), seul `master_<t>.bin` est servi.
 
 ## Test de l'étape 7 (xART), plus tard
 

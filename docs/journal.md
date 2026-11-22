@@ -2114,3 +2114,13 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   = même résultat que le run m1n1 `native_persist`, cette fois depuis Linux natif.
 - Store `/var/lib/sepd` : master_2.bin (420 o) + 4 locker_save_*.bin. Compteur scellé avancé de 12 (attendu).
 - Suite : J3, ouverture de sbio (EP 0x08) et poignée 0x73 — demander d'abord la liste protocole vérifiée à c9.
+
+## 2026-11-22 — Claude (driver, session ALARM) — J3 préparé : `allow_sbio` dans sep_native (compilé, rien chargé)
+- `sep_native.rs` : `allow_sbio` (exige `allow_xart=1`) selon `docs/j3_sbio_open.md` : attente de `sbio` annoncé en 0x08
+  et du xART calme (aucune requête en attente, 2 s sans mot 0x13), 4 CNTL PARAM 0x08 (A8/B8 0x4000, sans SECMODE),
+  UNE poignée `> 0x08 TAG 0xfc TYPE 0x73` (A8 = `driver/rust/kmod/sbio_hello_0x73.bin`, copie de
+  `traces/20261108-032454_c12-boot-ho/sep.log.ool/000300_08_A.bin`, embarquée), écoute 6 s, dumps de B8, ligne VERDICT.
+  Porte d'envoi : 0x08 = ce seul mot, une fois. Détails : `driver/rust/kmod/SEP_NATIVE.md` point 8.
+- `pending/j3_sbio_run.sh` (store en argument, défaut neuf `/var/lib/sepd-run-<horodatage>`). Question ouverte : servir
+  le store J4 ou repartir neuf (à trancher avec l'orchestrateur). 1er run = go d'Albert.
+- Build : `build.sh` et `CLIPPY=1` sans avertissement ; tests sepd et sep-proto verts. Aucun chargement, aucun matériel.
