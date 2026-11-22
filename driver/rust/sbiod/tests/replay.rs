@@ -106,6 +106,8 @@ struct FakeSensor {
     pending: Option<Vec<u8>>,
     armed: usize,
     prelude: bool,
+    mid_read: bool,
+    t_block: u64,
     block: Option<Vec<u8>>,
     accept: bool,
     polls_after: u32,
@@ -130,12 +132,17 @@ impl Sensor for FakeSensor {
         }
         if self.prelude && tx.len() > 7 && tx[0] != 0x80 {
             self.block = Some(tx.to_vec());
+            self.t_block = self.t;
             self.prelude = false;
             return Ok(out);
         }
         match (tx[0], tx[1]) {
             (0x80, 0x10) => {
-                let st8 = if self.block.is_some() && self.accept && self.polls_after >= 2 { 0x29 } else { 0x60 };
+                // Like macOS (C17..C20): the block is only accepted if the status was read between prelude and block.
+                if self.prelude {
+                    self.mid_read = true;
+                }
+                let st8 = if self.block.is_some() && self.accept && self.mid_read { 0x29 } else { 0x60 };
                 if self.block.is_some() {
                     self.polls_after += 1;
                 }
@@ -154,7 +161,9 @@ impl Sensor for FakeSensor {
         Ok(out)
     }
     fn ready(&mut self) -> Option<bool> {
-        Some(self.block.is_some())
+        // Pin: up after the prelude until the status read, then down while loading (5 ms), then up.
+        let loading = self.block.is_some() && self.t < self.t_block + 5;
+        Some((self.prelude && !self.mid_read) || (self.block.is_some() && !loading))
     }
     fn sleep_ms(&mut self, ms: u64) {
         self.t += ms;
@@ -192,8 +201,12 @@ fn full_run_relays_the_right_bytes() {
     assert_eq!(sep.sent[2].1, relay_answer(0x72, 40, 0x33)[9..49]);
     assert_eq!(sep.sent[4].1, relay_answer(0x73, 64, 0x4b)[9..73]);
     // Prelude alone, then the whole block in ONE transfer.
+    // macOS order: prelude, ONE status read, the whole block in ONE transfer, then ONE status read.
     let i = s.frames.iter().position(|f| f[..] == [0x80, 0x60, 0, 7, 0, 0, 0]).unwrap();
-    assert_eq!(s.frames[i + 1], reassemble(0x5f, &r[5].1));
+    assert_eq!(&s.frames[i + 1][..2], &[0x80, 0x10]);
+    assert_eq!(s.frames[i + 2], reassemble(0x5f, &r[5].1));
+    assert_eq!(&s.frames[i + 3][..2], &[0x80, 0x10]);
+    assert_eq!(s.frames.len(), i + 4, "aucune lecture en plus après le chargement");
 }
 
 #[test]

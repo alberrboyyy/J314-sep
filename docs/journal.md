@@ -2252,3 +2252,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Expérience proposée (sceptique/driver) : même route J5, push modifié comme macOS : prélude → attendre 195 haute (≤ 50 ms)
   → 1 lecture d'état (en-tête valide attendu, 195 doit retomber) → bloc sans pause → ne rien lire avant que 195 remonte (≤ 300 ms)
   → 1 seule lecture. Si `29…7c` : écart trouvé. Sinon : refaire la même chose en DMA (débit).
+
+## 2026-11-22 — Claude (driver, session ALARM) — sbiod v2 : push du patch « comme macOS » (compilé, rien lancé)
+- Contrôle de l'analyse (c19 `sio.log:836-858`, VU) : après le prélude `80600007…` (seq 758 done), macOS envoie `8010…`
+  et lit 0x17 o d'état (seq 761/763), PUIS le bloc `8c563a…` 0x568e (seq 765). Écart confirmé avec J5 v1.
+- `driver/rust/sbiod/src/lib.rs::push_patch` réécrit : prélude sans pause → attente IRQ 195 (≤ 50 ms) → UNE lecture
+  d'état (stop si non reconnue) → bloc en un transfert, sans pause → AUCUN SPI : si IRQ encore haute, attente qu'elle
+  retombe, puis qu'elle remonte (≤ 300 ms chacun) → UNE lecture (0x29 = chargé) ; sinon une lecture tardive à +500 ms
+  (diagnostic). Rien de neuf émis vers le SEP ; côté capteur, seule la lecture d'état (déjà émise des dizaines de fois)
+  change de place.
+- Tests : faux capteur durci (n'accepte que si l'état est lu entre prélude et bloc) ; ordre des trames vérifié
+  (prélude, état, bloc, état, rien d'autre) ; sbiod 4/4, sep-proto verts, clippy 0. Binaire installé dans
+  `~/kbuild/j5/sbiod` (sha256 a2b40c01…), ancien gardé en `sbiod.v1` (5be67e47…).
+- 1er run v2 = go d'Albert ; power-cycle d'abord (le SEP et sepd du run v1 tournent encore).

@@ -13,7 +13,9 @@
 #       dmesg (plus aucun envoi), power-cycle (Albert). Aucun doigt, aucun enrôlement, aucune image.
 # RÉSULTAT ATTENDU : ligne « VERDICT : patch chargé (0x29 …) » de sbiod ; sinon « patch refusé » / « IRQ absente »
 #       (informatifs, cf. docs/sbio_session.md §3b) ou « arrêt (fail-closed) : <raison> ».
-# PRÉPARÉ PAR : Claude (agent driver, session ALARM), 2026-11-22. 1er run de ce script = go d'Albert (pas encore donné).
+# PRÉPARÉ PAR : Claude (agent driver, session ALARM), 2026-11-22. Run v1 (go d'Albert) : 20:16, patch refusé
+#       (logs/20261122-201601_j5-sensor-native). v2 = sbiod modifié (push « comme macOS » : lecture d'état ENTRE prélude
+#       et bloc, aucune lecture pendant le chargement, attente IRQ 195, cf. journal 21:00) → 1er run v2 = go d'Albert.
 #
 # Usage (root, après un reboot normal avec alias sep) : pending/j5_sensor_run.sh [STORE]
 #   STORE défaut = dossier NEUF /var/lib/sepd-run-<horodatage> (scellement frais : seul cas où l'ouverture TARDIVE de
