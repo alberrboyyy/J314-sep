@@ -134,13 +134,16 @@ fn native_absent_and_persist() {
     assert_eq!(&r.a[MASTER_PREFIX..], &blob[..]);
     // reload from disk: same store
     assert_eq!(Store::load(&dir).unwrap().masters.get(&2), Some(&blob));
-    // SAVE locker: persisted raw, keyed by B[0..16], NOT served back
+    // SAVE locker: persisted, keyed by B[0..16], served back verbatim (no 0x11 prefix)
     let mut lb = lu.to_vec();
     lb.extend_from_slice(&[0xee; 0x40]);
     let r = d.answer(&rq(9, OP_SAVE_LOCKER, 0x50, 0x1234_0100), &lb).unwrap();
     assert_eq!(r.w, rq(9, 0, 0, 0x1234_0100));
     assert_eq!(std::fs::read(dir.join(format!("locker_save_{}.bin", hexs(&lu)))).unwrap(), lb);
-    assert!(d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &lu).unwrap().a.is_empty());
+    let r = d.answer(&rq(5, OP_FETCH_GL, 0x10, 0x100), &lu).unwrap();
+    assert_eq!(r.w, rq(5, 0, lb.len() as u8, (lb.len() >> 8) as u32 | 0x100));
+    assert_eq!(r.a, lb);
+    assert_eq!(Store::load(&dir).unwrap().lockers.get(&lu), Some(&lb));
     // SAVE with a B length different from the announced one: refused
     assert!(d.answer(&rq(5, OP_SAVE_XART, 0x10, 0x100), &blob).is_err());
     // announce / absent acks

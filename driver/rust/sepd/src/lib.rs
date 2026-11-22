@@ -10,9 +10,9 @@
 //! - 0x07 absent (SEP) -> ACK
 //! - 0x1d EP announce  -> ACK TYPE 0x16, DATA & 0xFFFFFF00
 //! - 0x01 SAVE master  -> B persisted (`master_1.bin` USER / `master_2.bin` SEP) BEFORE the ACK is returned
-//! - 0x06 SAVE locker  -> B persisted raw (`locker_save_<uuid>.bin`, UUID = B[0..16]) BEFORE the ACK; NOT served
-//!   back (the SAVE-B -> FETCH-A form of a locker is not established, `docs/gigalocker.md`; the proven script did
-//!   the same: raw dump, lockers always ABSENT)
+//! - 0x06 SAVE locker  -> B persisted (`locker_save_<uuid>.bin`, UUID = B[0..16], verified J3) BEFORE the ACK, and
+//!   served back VERBATIM on a later FETCH 0x05 with that UUID (c9, 2026-11-22: on a chained boot, sbio stays unarmed
+//!   if lockers are ABSENT; serving form = hypothesis to confirm on hardware)
 //! - anything else     -> error: the daemon stops WITHOUT replying (fail-closed).
 use sep_proto::word::Word;
 use sep_proto::xart::*;
@@ -80,6 +80,13 @@ impl Store {
             if let Some(t) = name.strip_prefix("master_").and_then(|r| r.strip_suffix(".bin")) {
                 if let Ok(t @ (T_USER_MASTER | T_SEP_MASTER)) = t.parse::<u8>() {
                     st.masters.insert(t, fs::read(e.path())?);
+                }
+            } else if let Some(u) = name.strip_prefix("locker_save_").and_then(|r| r.strip_suffix(".bin")) {
+                // B of a locker SAVE, served back verbatim (c9 2026-11-22, after J3: sbio stays unarmed when
+                // lockers are answered ABSENT on a chained boot). An explicit `locker_<uuid>.bin` wins.
+                if let Ok(u) = parse_uuid(u) {
+                    let blob = fs::read(e.path())?;
+                    st.lockers.entry(u).or_insert(blob);
                 }
             } else if let Some(u) = name.strip_prefix("locker_").and_then(|r| r.strip_suffix(".bin")) {
                 if let Ok(u) = parse_uuid(u) {
@@ -172,7 +179,10 @@ impl Daemon {
                 } else {
                     let uuid = b.get(..UUID_LEN).ok_or("SAVE locker: B shorter than a UUID")?;
                     self.store.put_locker_save(uuid, b).map_err(|e| format!("SAVE locker: {e}"))?;
-                    format!("SAVE locker {} PERSISTED raw ({} o, not served)", hex(uuid), b.len())
+                    if let Ok(k) = <[u8; UUID_LEN]>::try_from(uuid) {
+                        self.store.lockers.insert(k, b.to_vec());
+                    }
+                    format!("SAVE locker {} PERSISTED ({} o, served verbatim on FETCH)", hex(uuid), b.len())
                 };
                 self.nsave += 1;
                 Reply { w: w(RESP_DONE, 0, ack), a: vec![], what: format!("{what} [SAVE #{}/{MAX_SAVES}]", self.nsave) }
