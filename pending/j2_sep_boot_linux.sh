@@ -26,6 +26,19 @@
 #     par iBoot (pas fabriqué par nous).
 #   - Le SEP, une fois SEPOS lancé, enverra des requêtes (xART 0x13 etc.) que sep.rs ignore : il peut rester
 #     bloqué en attente. Sans conséquence persistante attendue (aucun acquittement = aucune écriture scellée).
+#   - ⚠️ sep.rs N'EST PAS la séquence éprouvée sous m1n1 (relecture 2026-11-22, docs/driver_rust_design.md §1) :
+#       a) pas de GET_STATUS avant BOOT_TZ0 (m1n1 sep.py en envoie un) ;
+#       b) la shmem commence par le magic « CNIP » (sep.rs:118) là où m1n1 sep.py écrit « CINP » (à confirmer
+#          côté PC dans m1n1/proxyclient/m1n1/hw/sep.py) : coquille probable, effet inconnu ;
+#       c) le firmware n'est jamais démappé après 0x6A ; sep.rs boote dès la sonde, sans garde ni délai ;
+#       d) les messages reçus passent par la workqueue système (ordre non garanti, sep.rs:147-156) ; sans
+#          incidence ici puisque sep.rs ne traite que 0xFF/0xFD.
+#     Donc ce n'est PAS une simple re-exécution de la classe « boot IMG4 » : c'est un premier boot par un code neuf.
+#     Alternative plus sûre (design §2) : notre propre module Rust `sep_native` lié à un nœud distinct, paramètres
+#     à 0 par défaut, qui reprend la séquence m1n1 exacte. Ce script reste la voie la plus rapide pour savoir si
+#     SEPOS démarre sous Linux.
+#   - Pas d'entrée GRUB `devicetree` dans ce chemin : tethered boot = noyau chargé par m1n1, le DT patché par
+#     m1n1 (sepfw) est bien celui que reçoit Linux. (Au boot normal, l'entrée GRUB « test PMP » remplacerait le DT.)
 #   - macOS : déjà déclaré sacrifiable par Albert (2026-11-22). Filet : alarm_p5.img + DFU.
 #   - Rien sur le disque, ni dans la chaîne de démarrage : un reboot normal du Mac revient au DTB stock (sans SEP).
 #     Si le Mac fige : appui long sur le bouton d'alimentation, puis rallumage normal (power-cycle = Albert).
