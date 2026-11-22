@@ -1,3 +1,16 @@
+# ▶️ COMMENCE ICI — 2026-11-23 (00h05) — 🎯 J7b : BOOT CHAÎNÉ NATIF COMPLET, sbio VIVANT (n=1)
+
+- **Cause du mur « boot chaîné »** : sepd servait les lockers AVEC leurs 16 o d'UUID. Servis **sans UUID** (A = B[16..] du
+  SAVE, `sepd --locker-strip-uuid`), le SEP les accepte tous (4 lockers + op 0x07, 0 SAVE), **annonce sks (0x12)**, et
+  **sbio répond au 0x73** — sans aucun RPC SKS. Logs `logs/20261123-000245_j7b-sks-open-chained-nouuid/`, journal 2026-11-23 00:02.
+- ⇒ Le « Track B = implémenter SKS » est réfuté pour l'armement de sbio ; la persistance de l'état scellé + sbio vivant = OK.
+- **PROCHAIN** : (1) re-run J7b (n=2, script éprouvé → autonome, power-cycle = Albert) ; (2) J7b sans `allow_sks` (les
+  ouvertures 0x17/0x12/0x0a sont-elles nécessaires ?) ; (3) faire de « sans UUID » le défaut de sepd et rejouer
+  l'init capteur complète (j5c) sur boot chaîné ; (4) enrôlement : toujours bloqué par le jeton du 0x03 (BiometricKit, c9).
+- Session c9 : le reverse kext op 0x05/0x06 n'est plus bloquant (le matériel a tranché), mais il confirmerait le format.
+
+---
+
 # ▶️ COMMENCE ICI — 2026-11-22 (nuit, 23h30) — 🎯 INIT CAPTEUR COMPLÈTE EN LINUX NATIF ; enrôlement bloqué (jeton 0x03) ; SKS = prochain mur
 
 **Lis d'abord :** cette entrée, puis `docs/journal.md` (entrées 2026-11-22 20:16 → fin), `docs/j5_params_protocol.md`,

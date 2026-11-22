@@ -2492,3 +2492,21 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `94f334db796903e68a86661dc2b93232bcbd647997c886264056e9419bdc6428` (`sepd` J7a inchangé). `sep_native.ko` = celui de J7a.
 - `pending/j7b_sks_open_chained_nouuid.sh STORE` : corps = J7a + vérif sha256 de sepd.j7b + copie du STORE hors repo avant
   run + `--locker-strip-uuid`. **Script neuf → 1er run = go d'Albert.**
+
+## 2026-11-23 00:02 — Albert + Claude (session ALARM) — 🎯 J7b : lockers servis SANS UUID → le SEP les accepte, sks s'annonce, sbio VIVANT sur boot CHAÎNÉ
+- Go d'Albert (power-cycle, `sudo pending/j7b_sks_open_chained_nouuid.sh /var/lib/sepd-run-20261122-230441`). Logs bruts :
+  `logs/20261123-000245_j7b-sks-open-chained-nouuid/`. Copie du store avant run : `/var/lib/sepd-run-20261122-230441.avant-j7b-20261123-000245`.
+- VU (`sepd.log`) : master t2 SERVED (437 o), t1 ABSENT, 5 annonces 0x1d acquittées, puis le SEP **enchaîne tous les lockers**,
+  chacun demandé deux fois : 407e94c4… (TAG 0x05/0x06, 90 o), e01e3b5e… (0x07/0x08, 597 o), **op 0x07 absent (TAG 0x09)**,
+  2438821b… (0x0a/0x0b, 369 o), 9133c5d5… (0x0c/0x0d, 40 o). **0 SAVE** (store inchangé, compteur scellé non avancé).
+  Même forme que macOS c12 (paires de FETCH, op 0x07 au TAG 0x09). DATA octet0 de la réponse = octet haut de la longueur.
+- VU (`kernel.log`) : **`découverte : EP 0x12 = 'sks'`, tailles 0x02010201** (1re fois sur un boot chaîné natif) ; skdl,
+  sks (0x8000) et scrd ouverts (4 acks chacun) ; écoute 10 s : 0 mot sur 0x17/0x12/0x0a, B vides ; table finale **12 EP**.
+- VU : `> 0x08 0x73` → `< TAG 0x04` puis `< TAG 0xfc TYPE 0x73`, B8 +0x00=1 +0x14=0x73 → **VERDICT sbio : VIVANT** sur
+  boot CHAÎNÉ, **sans aucun RPC SKS**. Pas de Halted, 0 message ignoré.
+- Conclusions (n=1 → hypothèse forte, à reproduire n≥2 pour « vérifié ») :
+  1. **Format FETCH locker** : A = B[16..] du SAVE (sans UUID). Le « verbatim » était faux ; il valait ABSENT (J3/J3b/J3d/J7a).
+  2. **Réfuté** : « sbio est gated derrière l'init SKS (RPC 0x12) sur un boot chaîné » (xart_native_policy.md Track B,
+     handoff 2026-11-22). Le mur était l'emballage des lockers. Ouvrir skdl/sks/scrd sans contenu a suffi ; reste à savoir
+     si même ces ouvertures sont nécessaires (test : J7b sans allow_sks).
+  3. La **tension persistance ↔ armement sbio** (handoff 2026-11-22) **tombe** : un état scellé est rechargé ET sbio répond.
