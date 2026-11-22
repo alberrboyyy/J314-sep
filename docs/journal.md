@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 03:42 — Albert (go) + Claude (LANCE, 1er lancement autonome) — 🎯🎯 PATCH POUSSÉ au capteur en FIFO (22Ko en 2.4s, PAS de DMA) : le dernier mur SPI dur tombe
+- Trace : traces/20261122-035658_native_sbio7 (patch_spi_push.bin, push_status_avant/apres.bin). **1er lancement par Claude** après « go » d'Albert (règle relâchée 2026-11-22).
+- Fait : `M1N1TIMEOUT=20 XART_STORE=…xart_store_sbio7_1 ./pending/sep_native_sbio7.sh` (Claude lance seul). KX + compteur + réception patch (fe/fd, 22158o) OK. PUSH : état capteur avant `80200010…60000000…` → prélude `80600007` + **bloc patch 22158o émis en UN transfert FIFO en 2.4s, SANS timeout** → état capteur après `80200010…60000008…` (BIEN FORMÉ + CHANGÉ). Teardown OK.
+- Vu (faits bruts) : le bloc de 22158o passe en FIFO scruté en **2.4s**, le contrôleur SPI2 **tient le CS asserté** (aucun timeout sur 60s de marge), l'état capteur 0x10 change (`60000000`→`60000008`). → **le FIFO suffit, PAS besoin du DMA SIO.**
+- Interprété : **LE DERNIER MUR SPI DUR EST TOMBÉ** — le push du patch marche en FIFO. RÉSERVE : « status changé + bien formé » = push **accepté** (signal fort) ; « patch pleinement chargé » reste à confirmer en enchaînant les **params 0x5d/0x5c/0x55** (si le patch n'était pas chargé, le capteur les refuserait). Reste : params (faciles, même relais), n° série module, calibration (mailbox, pas SPI), puis **enroll + match (doigts, session humaine)**.
+- Incidents : RAS. Compteur anti-rejeu +12 (xart_store_sbio7_1). Capteur restauré. 1er lancement autonome par Claude = OK.
+
 ## 2026-11-22 03:30 — Albert — DÉCISION : règle de lancement SEP RELÂCHÉE
 - Albert relâche la ligne rouge « seul Albert lance les écritures SEP » (CLAUDE.md, « Écriture SEP » + « Qui décide quoi »).
 - NOUVELLE RÈGLE : Claude **lance lui-même** les scripts `pending/` **déjà éprouvés** (relus + déjà tournés propre sur matériel : classe route-native/sbio-climb = boot IMG4, ACK SAVE xART 0x13, relais capteur 0x08). Toute **classe jamais testée** (gigalocker en écriture, SKS 0x12 écriture, enrôlement, **1er run d'un script neuf**) = Claude montre + attend le « go » d'Albert.
