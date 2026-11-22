@@ -7,7 +7,7 @@
 #       Le 0x73 est un « bonjour » rejouable, sans doigt ni enrôlement. Échec = HALTED dans dmesg, power-cycle (Albert).
 # RÉSULTAT ATTENDU : dmesg « VERDICT sbio : VIVANT » (B8 +0x00=1 +0x14=0x73, ou mot 0x08 TAG 0xfc TYPE 0x73 / TAG 0x04),
 #       sinon « VERDICT sbio : MUET » (on diagnostique, on ne force pas). Spec : docs/j3_sbio_open.md.
-# PRÉPARÉ PAR : Claude (session ALARM, agent driver), 2026-11-22. 1er run de ce chemin = go d'Albert (pas encore donné).
+# PRÉPARÉ PAR : Claude (session ALARM, agent driver), 2026-11-22. Go d'Albert donné ; lancé 3× le 2026-11-22 (18:56, 19:04, 19:20 = VIVANT sur seal frais).
 #
 # Usage (root, après un reboot normal avec alias sep) : pending/j3_sbio_run.sh [STORE]
 #   STORE = dossier du store xART servi par sepd. Défaut : dossier NEUF et vide /var/lib/sepd-run-<horodatage>.

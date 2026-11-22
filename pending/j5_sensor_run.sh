@@ -2,7 +2,7 @@
 # BUT : J5, depuis un reboot : boot SEPOS + xART (sepd) + ouverture sbio + 0x73 (comme J3), puis relais d'init capteur
 #       par sbiod : identité SPI → 0x17 (n° de série) → 0x15/0x72/0x16 (échange de clés) → 0x42/0x73/0x18 (compteur) →
 #       0x5f (patch, réassemblé par le noyau) → push au capteur (prélude 80 60 00 07 00 00 00 + bloc en UN transfert,
-#       PIO noyau spi-apple via spidev) → attente de l'état octet 1 == 0x29. STOP là (pas de 0x5d/0x5c/0x6a/0x5b).
+#       PIO noyau spi-apple via spidev) → attente de l'état corps[8] == 0x29 (sbiod lib.rs:269). STOP là (pas de 0x5d/0x5c/0x6a/0x5b).
 # ENDPOINTS TOUCHÉS : 0xFF/0xFE (boot), 0x00 (CNTL : SECMODE + tampons 0x13 et 0x08), 0x13 (xART, SAVE acquittés),
 #       0x08 (sbio : 0x73 puis 0x17, 0x15, 0x16, 0x42, 0x18, 0x5f (+ 0xfe fragment suivant), dans cet ordre, une fois
 #       chacun : liste blanche du noyau). Jamais 0x12. Capteur : spi2 (trames 0x78 0x10 0x70 0x13 0x72 0x73 0x60 + bloc),
@@ -41,7 +41,11 @@ modinfo -F parm "$J5/sep_native.ko" | grep -q "^allow_sbio_relay:" || die "sep_n
 modinfo -F parm "$J5/sep_native.ko" | grep -q "^sbio_open:" || die "sep_native.ko sans sbio_open"
 mkdir -p "$OUT" /etc/sepd "$STORE"
 [ -s /etc/sepd/os_uuid ] || echo 4c494e55580000000000000000000000 > /etc/sepd/os_uuid
-if [ -z "$(ls -A "$STORE")" ]; then echo "STORE = $STORE (vide : scellement frais)"; else echo "STORE = $STORE (NON vide) :"; ls -l "$STORE"; fi
+if [ -z "$(ls -A "$STORE")" ]; then echo "STORE = $STORE (vide : scellement frais)"; else
+  echo "STORE = $STORE (NON vide) :"; ls -l "$STORE"
+  # Boot chaîné : ouverture tardive refusée (J3/J3b, n=2) et 0x73 muet même tôt (J3d) → sbio gated derrière SKS.
+  [ "${ALLOW_CHAINED:-0}" = 1 ] || die "STORE non vide = boot chaîné : sbio ne répond pas sans SKS (J3d). ALLOW_CHAINED=1 pour forcer"
+fi
 exec > >(tee -a "$OUT/run.log") 2>&1
 echo "journal : $OUT"
 
@@ -71,7 +75,9 @@ CTRL=$(readlink -f "$D/..")
 [ -w "$CTRL/power/control" ] && echo on > "$CTRL/power/control"
 echo "capteur : $DEV ($(ls "$D/spidev")), contrôleur $(basename "$CTRL") power/control=$(cat "$CTRL/power/control" 2>/dev/null)"
 "$J5/sbiod" preflight --log "$OUT/sbiod.log"
-trap '"$J5/sbiod" power-off --log "$OUT/sbiod.log" || true' EXIT
+SEPD=
+cleanup() { [ -n "$SEPD" ] && kill "$SEPD" 2>/dev/null; "$J5/sbiod" power-off --log "$OUT/sbiod.log" || true; }
+trap cleanup EXIT
 
 # --- 2. SEP : boot, xART (sepd en fond), sbio (0x73), relais ----------------------------------------------------
 cp "$J5/sep-native.dtbo" /lib/firmware/
@@ -91,7 +97,7 @@ done
 sleep 0.5
 if [ ! -e /dev/sep_sbio ]; then
   journalctl -k -b --no-pager | grep -E 'sbio|VERDICT|HALTED' | tail -30
-  die "/dev/sep_sbio absent (sbio non VIVANT ou Halted) : rien relayé ; sepd continue (pid $SEPD)"
+  die "/dev/sep_sbio absent (sbio non VIVANT ou Halted) : rien relayé ; sepd arrêté"
 fi
 set +e
 "$J5/sbiod" run --dev /dev/sep_sbio --log "$OUT/sbiod.log"

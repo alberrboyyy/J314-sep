@@ -199,9 +199,8 @@ répondre** (le SEP attend ; power-cycle).
   `LINUX_OS_UUID` de `pending/sep_native_persist.sh`). Le bon UUID reste un point ouvert (politique, ouvert n°1).
 - Store : `master_1.bin` (USER, sélecteur pair) / `master_2.bin` (SEP, sélecteur impair) = charge servie après le
   préfixe de 0x11 zéros ; `locker_<uuid32hex>.bin` = octets servis tels quels pour un FETCH locker.
-- SAVE maître → `master_<t>.bin` (B brut). SAVE locker → `locker_save_<uuid>.bin` (B brut, UUID = B[0..16]) ; **pas
-  re-servi** : la forme « B du SAVE → A du FETCH » d'un locker n'est pas établie (`docs/gigalocker.md`), et le harnais
-  éprouvé faisait pareil (dump brut, lockers toujours ABSENT).
+- SAVE maître → `master_<t>.bin` (B brut). SAVE locker → `locker_save_<uuid>.bin` (B brut, UUID = B[0..16]) ; **re-servi
+  tel quel** au FETCH 0x05 de cet UUID (commit 7707e4d ; accepté par le SEP en J3b, 2026-11-22 19:04, n=1).
 - Tests (`cargo test --offline`) : les 30 paires 0x13 de `snew-reel` (macOS) sont reproduites mot et tampon A quand
   le store contient ce que macOS a servi (8 TYPE couverts) ; branches natives (store vide : ABSENT maître 0x11 et
   locker 0, SAVE persisté puis servi avec la longueur recalculée, SAVE locker non re-servi, TYPE inconnu, budget).
@@ -219,7 +218,7 @@ fuit volontairement mailbox, shmem et mapping firmware, et tout nouveau probe es
 | Élément | Statut |
 |---|---|
 | Séquence GET_STATUS / TZ0 / GET_STATUS / IMG4 + SET_SHMEM / 0x6A | éprouvée sous m1n1, puis **exécutée par ce pilote le 2026-11-22** (J2, `docs/journal.md`) |
-| Ouverture CNTL de 0x13 (SECMODE, A/B 0x8000) et politique xART | éprouvées sous m1n1 (`native_persist`, n=4) ; **jamais exécutées par ce pilote** |
+| Ouverture CNTL de 0x13 (SECMODE, A/B 0x8000) et politique xART | éprouvées sous m1n1 (`native_persist`, n=4), puis **exécutées par ce pilote le 2026-11-22** (J4, J3×4) |
 | Encodage du mot (EP/TAG/TYPE/PARAM/DATA) | `hypothèse (cohérent)`, éprouvé de fait par tous les runs natifs (sep-proto `word`) |
 | DATA de 0x66 = 1 puis 2 | `source: kext` + trace C11 (macOS) ; m1n1 ne la vérifie pas. Contrôle strict ici (fail-closed) |
 | Magic `CINP` du tampon panique | m1n1 ; `sep.rs` écrit `CNIP`. **À confirmer** (const `SHMEM_MAGIC_PANIC`) |

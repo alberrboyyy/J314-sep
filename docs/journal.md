@@ -2179,3 +2179,13 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - INTERPRÉTÉ (hypothèse) : sur un boot chaîné, sbio ne répond au 0x73 qu'une fois le keybag chargé côté SKS (0x12) ; sur un
   seal frais il n'y a pas de keybag, donc sbio répond tout de suite. Ce n'est PAS un problème de délai (macOS attend 26 s).
   L'expérience qui tranche demande d'écrire en SKS 0x12 = classe jamais testée → protocole vérifié à demander à c9, puis go d'Albert.
+
+## 2026-11-22 20:30 — Claude (session ALARM) — relecture complète du repo ; corrections de cohérence (rien lancé)
+- `pending/j5_sensor_run.sh` (jamais lancé) : refuse un STORE non vide sauf `ALLOW_CHAINED=1` (boot chaîné = sbio
+  gated, J3d) ; `sepd` tué par le trap à toute sortie ; libellé du critère 0x29 aligné sur le code (corps[8]).
+- Docs alignées sur l'état réel : `SEP_NATIVE.md` (lockers re-servis, ouverture 0x13 exécutée par le pilote),
+  `driver/README.md` (écritures SEP présentes derrière `allow_*`), en-têtes `j3_sbio_run.sh` / `j3_chained_run.sh` (lancés).
+- Incohérence notée (non corrigée, à trancher) : `messages.md` dit SKS `TAG = commande, TYPE = compteur` ;
+  `sks_sequence_c12.md` dit `TYPE = opcode séquentiel`. Même observation (TYPE +1 par requête) : l'opération est
+  dans le DER (kext §15.2), le TAG reste à interpréter. Hypothèse ouverte : sur un état scellé par Linux (sans keybag
+  utilisateur), sbio n'exige peut-être que l'ouverture 0x12 + négociation IPC, pas les 25 RPC de c12.

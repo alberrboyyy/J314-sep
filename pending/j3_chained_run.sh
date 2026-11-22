@@ -9,7 +9,7 @@
 #       xART (1er run de ce chemin). Ack CNTL absent → HALTED propre (plus aucun envoi), power-cycle (Albert).
 # RÉSULTAT ATTENDU : dmesg « sbio : ouverture PRÉCOCE », 4 « CNTL ack », « 0x08 ouvert », puis « VERDICT sbio : VIVANT ».
 #       « pas d'ack CNTL à l'ouverture de 0x08 » (HALTED) = l'ouverture précoce ne suffit pas non plus.
-# PRÉPARÉ PAR : Claude (agent driver, session ALARM), 2026-11-22. 1er run = go d'Albert (pas encore donné).
+# PRÉPARÉ PAR : Claude (agent driver, session ALARM), 2026-11-22. Go d'Albert donné ; lancé le 2026-11-22 19:57 (CNTL acké, 0x73 muet).
 #
 # Usage (root, après un reboot normal avec alias sep) : pending/j3_chained_run.sh STORE   (STORE obligatoire, non vide)
 set -euo pipefail

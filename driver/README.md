@@ -26,8 +26,9 @@ Chaque module le répète dans sa docstring.
   seulement la liste de commandes comparée aux traces.
 
 ## Hors périmètre / interdit ici
-Aucune écriture SEP (SKS 0x12, xART 0x13, 0x10, 0x15, gigalockers, IMG4) : aucun code de ce type dans driver/ à ce stade.
-Quand il y en aura, il sera derrière un paramètre de module désactivé par défaut et signalé.
+Écritures SEP présentes dans `driver/rust/` (IMG4, CNTL, xART 0x13 avec SAVE, sbio 0x08), chacune derrière un
+paramètre de module désactivé par défaut (`allow_*`, voir `driver/rust/kmod/SEP_NATIVE.md`). SKS 0x12, 0x10, 0x15 :
+aucun code (0x12 refusé par la porte d'envoi).
 
 ## Lancer
 `cd driver && python3 -m unittest discover -s tests -v` (29 tests, < 1 s).
