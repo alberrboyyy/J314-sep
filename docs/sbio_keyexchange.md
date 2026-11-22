@@ -203,3 +203,77 @@ mécanisme « demande d'état 0x10 » → longueur en attente → « lis-moi N o
 5. Rien ici n'est **`vérifié`** au sens matériel : tout est lecture de binaire + recoupement de traces existantes.
    La preuve « le SEP accepte ce relais en natif » reste à faire par l'expérience (prérequis : xART frais scellé,
    capteur vivant), hors périmètre de cette analyse hors-ligne.
+
+---
+
+## 9. Enveloppe SPI 0x72 — séquence de lecture (VU trace macOS C19)
+
+2026-11-22, reverseur. **L'ouvert §8.3 est tranché par une capture macOS réelle.** Source : `traces/20261110-002829_c19-spi-dma-boot`
+(bus capteur en DMA SIO, `analysis/sio_dialog.py <dir> --sep --full`). Le key exchange 0x72 y est **complet et exploitable**.
+Marquage : **VU (trace macOS)** — octets lus tels quels dans la capture. Recoupe le run `sbio4` (2026-11-22) qui, lui, a échoué.
+
+### 9.1 La séquence macOS exacte (VU, C19, t≈28.67 s)
+
+Entre `SEP 0x15` (acquitté) et `SEP 0x16`, l'AP exécute **6 transferts SPI** dans cet ordre :
+
+| # | sens | octets (hex) | taille | rôle |
+|---|---|---|---|---|
+| 1 | TX | `8072002f000000` + **40 o** (blob du SEP) | 0x2f = 47 | **émettre la commande 0x72** + la charge |
+| 2 | TX | `80100007000000` | 7 | poll d'état (0x10) |
+| 3 | RX | `00000000000000` + `8020001000000007 6000008833000000` | 0x17 = 23 | état : **longueur en attente = 0x33** |
+| 4 | TX | `8013000b00000033000000` | 0x0b = 11 | demande 0x13 : « donne-moi **0x33 = 51** octets » |
+| 5 | TX | `00` | 1 | octet muet (voir 9.3) |
+| 6 | RX | `80d4003300000000 72 <40 o charge> <crc16>` | 0x33 = 51 | **la réponse-clé** |
+
+Après le #6, l'AP refait un poll 0x10 (état revenu à `…006000000052330000`, au repos) puis acquitte `SEP 0x16`.
+
+### 9.2 Les deux clés de la recette
+
+1. **La longueur dans l'en-tête 0x72 = TAILLE TOTALE de la trame, pas la charge.** macOS envoie
+   `80 72 00 2f 00 00 00` : `0x2f = 47 = 7 (en-tête) + 40 (charge)`. **PAS `0x28`.** C'est la même règle que toutes les
+   autres trames (`80 10 00 07…` = 7 o total ; `80 13 00 0b…` = 11 o total ; identité `80 70 00 07…`). (VU, recoupé sensor_hw.md
+   « longueur totale, 16 bits gros-boutiste ».)
+2. **La charge de 40 o est à l'offset 9 de la réponse RX.** Enveloppe réponse = `80 d4 <len16 BE> <status32> <cmd> <charge> <crc16>` :
+   - `80 d4 00 33` (4 o) · `00 00 00 00` (status = 0 = OK) · `72` (écho de la commande) → **9 o d'en-tête**, puis **40 o de charge**
+     (offset 9..49), puis **2 o de CRC16**. `SPI_RESP_OFF = 9` est donc **correct** (même offset que le n° de série dans l'identité).
+   - Le `status32` discrimine succès/erreur : **0 = OK** (réponse pleine), **≠0 = erreur** (réponse courte, voir 9.4).
+
+### 9.3 L'octet muet #5 est optionnel
+
+macOS sépare la demande 0x13 (#4), l'octet `00` (#5) et la lecture (#6) en **trois** cycles CS. `tools/mesa_hello.sh`
+(et `analysis/mesa_spi_proxy.hello`) lit l'identité en **deux** cycles seulement — `xfer(req,0)` puis `xfer(zeros(N),N)` —
+**sans** octet muet séparé, et cela marche (lecture d'identité **vérifiée matériel**, 2026-11-10). En mode FIFO scruté, le
+premier octet `00` de la lecture full-duplex joue le rôle du muet. Donc #5 **n'est pas requis** : la lecture 2-cycles de
+mesa_hello suffit. (VU mesa_hello vérifié + VU trace macOS.)
+
+### 9.4 Décodage de l'échec du run sbio4 (2026-11-22) — confirme le diagnostic
+
+Le run `traces/20261122-023626_native_sbio4` a envoyé `80 72 00 28 …` (longueur = **0x28**, erronée). Résultats bruts :
+- état (`spi_0x72_status.bin`) : `8020001000000007 6000 46 88 0b 000000` → longueur en attente = st[12] = **0x0b = 11** (et non 0x33) ;
+- réponse (`spi_0x72_resp_raw.bin`, 11 o) : `80 d4 00 0b 00 00 00 02 72 ed57` = `80 d4 00 0b` · status32 = **`00 00 00 02` (= 2, ERREUR)**
+  · `72` (écho) · `ed57` (CRC). **Pas un ACK à re-poller : une réponse d'erreur (status = 2).**
+
+Le capteur a reçu une trame qui s'annonçait longue de 0x28 = 40 o mais dont on a poussé 47 o : trame malformée → il répond
+« commande 0x72 refusée, code 2 » en 11 o. La séquence de **lecture** du script était **correcte** (poll 0x10 → 0x13 → read →
+offset 9) ; seule la **longueur d'en-tête à l'émission** était fausse. (VU, recoupe 9.1.)
+
+### 9.5 Ce qu'il faut changer dans `pending/sep_native_sbio4.sh` → `spi_relay_0x72`
+
+**Un seul changement, sur la construction de la trame (ligne ~711) :**
+```
+- frame = bytes.fromhex("80720028000000") + bytes(blob40)   # 0x28 = charge → FAUX
++ frame = bytes.fromhex("8072002f000000") + bytes(blob40)   # 0x2f = TOTALE (7+40) → macOS C19
+```
+Rien d'autre à toucher dans la fonction : le poll d'état (`st[12]|st[13]<<8`), la demande `80 13 00 0b … <len LE>` et la lecture
+de `pending` octets reproduisent déjà la séquence macOS ; `SPI_RESP_OFF = 9` (offset de la charge) est confirmé juste.
+(Corrigé dans le script le 2026-11-22 ; même correction appliquée au bloc SELFTEST et aux en-têtes de commentaire.)
+
+**Garde-fou recommandé (facultatif) :** après la lecture, vérifier `resp[4:8] == b"\x00\x00\x00\x00"` (status32 = OK) et
+`pending == 0x33` ; sinon c'est une réponse d'erreur → STOP+dump plutôt que d'injecter 40 o d'erreur dans le `SEP 0x16`.
+
+### 9.6 Statut et limites
+
+- La **forme** et la **séquence** 0x72 sont désormais **VU (trace macOS)**, plus seulement hypothèse §8.3.
+- Reste **`hypothèse`** au sens matériel : que le SEP *accepte en natif* le blob relayé (ACK 0x16) — à prouver au prochain run
+  réel (Albert), la correction de longueur levée. Les 40 o de charge restent **opaques** (chiffrés bout-à-bout, frais à chaque
+  allumage : la charge C19 `c01f…abb` ≠ la charge sbio4, normal). Aucune clé ni secret extrait.

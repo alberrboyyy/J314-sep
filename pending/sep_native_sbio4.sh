@@ -11,7 +11,7 @@
 #   sbio_keyexchange.md, désassemblage kext) que pour cet échange de clés, l'AP est un PUR RELAIS
 #   D'OCTETS : AUCUNE crypto, AUCUN secret côté AP. Le mécanisme est du simple transport en lockstep :
 #     {sbio 0x15 → le SEP rend un blob OPAQUE de 40 o} → {SPI : on envoie ces 40 o au capteur dans une
-#      trame 0x72 (en-tête 80 72 00 28 00 00 00 + 40 o = 47 o) ; le capteur rend 40 o} → {sbio 0x16 :
+#      trame 0x72 (en-tête 80 72 00 2f 00 00 00 + 40 o = 47 o ; longueur = TAILLE TOTALE 0x2f) ; le capteur rend 40 o} → {sbio 0x16 :
 #      on renvoie au SEP les 40 o de réponse du capteur}.
 #   Les 40 o ne sont JAMAIS lus, interprétés ni modifiés par l'AP : on les transporte, point.
 #   Ce script refait toute la route native (persist → sbio → 0x73 VIVANT → 0x17 FRANCHI), PUIS relaie
@@ -68,7 +68,7 @@
 #     (1) sbio 0x15 : gabarit 000305_08_A.bin (sessionType=1), envoyer EP 0x08 TYPE=0x15, lire B8 ;
 #         EXTRAIRE le blob du SEP = 40 o à +0x1c (offset CONFIRMÉ par la capture 000306_08_B.bin :
 #         +0x14=0x15, +0x18=0x28). VÉRIFIER taille == 0x28, sinon STOP+dump (fail-closed).
-#     (2) SPI : trame 0x72 = 80 72 00 28 00 00 00 + 40 o → mesa.xfer ; poll état 0x10 (long. en attente) ;
+#     (2) SPI : trame 0x72 = 80 72 00 2f 00 00 00 + 40 o → mesa.xfer ; poll état 0x10 (long. en attente) ;
 #         demande 0x13 ; lecture. EXTRAIRE 40 o de réponse capteur (offset SPI_RESP_OFF, défaut 9 =
 #         en-tête 80 d4 00 LL 00000000 <type>, comme l'identité). DUMPE toute la réponse SPI brute.
 #     (3) sbio 0x16 : gabarit 000307_08_A.bin, INJECTER les 40 o du capteur à la place de la charge,
@@ -285,9 +285,9 @@ if SELFTEST:
         print(f"  reference 000306_08_B.bin : reponse SEP 0x15 = +0x14=0x15 +0x18=0x{KX_BLOB_LEN:02x} ; "
               f"blob 40 o @ +0x1c = {rb15[GT_PAYLOAD:GT_PAYLOAD+KX_BLOB_LEN].hex()} (offset CONFIRME par capture).", flush=True)
     # (4) construction de la trame SPI 0x72 = en-tete 7 o + 40 o = 47 o (0x2f), sans toucher au capteur.
-    kx_frame = bytes.fromhex("80720028000000") + bytes(KX_BLOB_LEN)
+    kx_frame = bytes.fromhex("8072002f000000") + bytes(KX_BLOB_LEN)   # longueur d'en-tete = TOTALE (0x2f=47), pas la charge
     assert len(kx_frame) == 0x2f, f"trame 0x72 = {len(kx_frame)} o (attendu 0x2f=47)"
-    assert kx_frame[:7].hex() == "80720028000000", "en-tete 0x72 incorrect"
+    assert kx_frame[:7].hex() == "8072002f000000", "en-tete 0x72 incorrect (longueur TOTALE 0x2f, VU macOS C19)"
     print(f"  trame 0x72 construite (a blanc) : en-tete {kx_frame[:7].hex()} + 40 o = {len(kx_frame)} o (0x2f). OK.", flush=True)
     print(f"  offset d'extraction de la charge SPI (SPI_RESP_OFF) = {SPI_RESP_OFF} (best-effort ; l'ACK 0x16 tranche).", flush=True)
     print("  Plan Phase 4 : 0x15 -> B8 (blob 40 o @ +0x1c) -> SPI 0x72 (poll etat, 0x13, lecture) -> 40 o capteur ", flush=True)
@@ -708,7 +708,10 @@ def spi_relay_0x72(mesa, blob40, label="kx"):
     Sequence = transport documente (sensor_hw.md / mesa_hello) : emettre la commande, poll etat 0x10 pour
     la longueur en attente, demander 0x13, lire. DUMPE la reponse brute. Ne modifie JAMAIS les octets."""
     from analysis.mesa_spi_proxy import MesaError
-    frame = bytes.fromhex("80720028000000") + bytes(blob40)      # en-tete 7 o + 40 o = 47 o (0x2f)
+    # en-tete 7 o + 40 o = 47 o (0x2f). La LONGUEUR de l'en-tete (octets 2-3, BE) = TAILLE TOTALE de la trame
+    # (47 = 0x2f), PAS la taille de la charge. Corrige 2026-11-22 (reverseur) : etait 0x28 (=40, charge) a tort,
+    # d'ou l'erreur capteur (ack 11 o, status=2) au run sbio4. macOS envoie 8072002f000000 (VU : C19, 28.672).
+    frame = bytes.fromhex("8072002f000000") + bytes(blob40)      # en-tete 80 72 002f 000000 + 40 o = 47 o (0x2f)
     if len(frame) != 0x2f:
         raise MesaError(f"trame 0x72 mal formee ({len(frame)} o, attendu 0x2f)")
     print(f"  SPI> trame 0x72 ({len(frame)} o) : en-tete {frame[:7].hex()} + 40 o opaques du SEP.", flush=True)
