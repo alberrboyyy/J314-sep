@@ -2366,3 +2366,33 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - ⇒ **toute l'init capteur de macOS (2 passes, 0x73 → 0x63×2) est reproduite en Linux natif.** n=1 pour la 2e passe.
 - Suite = J6 : enrôlement / match = session HUMAINE (doigt). Protocole d'abord : `docs/sbio_enroll.md`, `docs/sbio_match.md`
   (0x6c/0x6d, 0x23/0x06/0x65/0x09 ; D2 = gating SKS/keybag possible sur un état Linux sans keybag).
+
+## 2026-11-22 — agent driver (session ALARM, Opus 5.5) — J6 cartographié : enrôlement + match = BLOQUÉ (D2 + payloads inconnus), code de carte + verdict, RIEN lancé
+- Protocole d'abord (règle CLAUDE.md). Sources (lecture seule) : `docs/sbio_enroll.md`, `docs/sbio_match.md`,
+  `docs/sbio_sequence.md`, `docs/messages.md` §SBIO, `docs/verification_status.md`, `docs/kext_sepmanager.md` §6/§7/§12,
+  traces doigt C20 (`…003201`), C11, C8, C6 (via `analysis/sio_dialog.py --sep`, `sbio_transactions.py`,
+  `sbio_gt_packet.py`). Aucun accès matériel, aucun insmod.
+- Écrit `docs/j6_enroll_match_protocol.md` : séquence MATCH octet-près VU C20 (doigt → IRQ gpio195 → image SPI 0x7200 →
+  `0x23 06 65 07 [1e] 09 1f 22 0b`, `<03`→`0x21`, `0x70` HRLB ; après succès le gabarit s'adapte → ré-export `0x6c` à
+  persister) ; verdict `0x09` (`match_info_t` 0xca2, +0x00 uid 0x1f5/−1, +0x04 id) VÉRIFIÉ ; séquence ENROLL
+  (`0x03` 68 o → boucle capture+`0x1e`+`0x08` `enrollment_info_t` 0xc98 jusqu'à +0xbfe COMPLETE, N décidé par le SEP)
+  = `source: kext` (AUCUNE trace d'enroll n'existe). Liste exhaustive des opcodes connus (règle FOLLOW).
+- **D2 tranché comme BLOQUANT (honnête)** : notre état natif n'a ni keybag ni gabarit (EP 0x12 SKS JAMAIS ouvert sur la
+  route native). Le 1er match suppose un gabarit (enrôlement) ; l'enrôlement/0x09 peuvent exiger le keybag — SEP-refus
+  non tranchable en lecture seule. Deux murs en plus : `enroll_indata_v2_t` (0x03, 68 o) et `0x06` (0xa7 o, nonce par
+  lock) de contenu INCONNU → impossible d'émettre un enroll/match fidèle. Donc **pas de niveau enroll/match « établi »**.
+- Code (seulement l'établi ; fail-closed sur le reste) : `sep-proto::bio` = carte des 2 séquences (opcodes, longueurs
+  connues, payloads marqués INCONNU) + **parseur de verdict 0x09** (vérifié) + lecture `enrollment_info_t` (kext) ;
+  tests de rejeu sur C20/C11/C8/C6 : **35 verdicts 0x09** parsés (0 mauvaise longueur, 0 faux positif), séquence de match
+  reconnue dans l'ordre en C20. `sep_native` : paramètre `allow_sbio_bio` ajouté en **butoir REFUSÉ** (comme `allow_sks` ;
+  toute valeur ≠ 0 fait échouer le probe, motif D2 + payloads inconnus) ; aucune logique bio dans le noyau.
+- `pending/j6_enroll_match.sh` : GARDE-FOU non exécutable (exit 2) qui imprime le blocage et l'expérience la moins chère.
+  `docs/hypotheses.md` : EXPÉRIENCE **E-ENROLL-START** (sans doigt : un seul `0x03` best-effort, observer le refus exact →
+  tranche si l'EP 0x12 est indispensable) + consignes de la future session humaine d'enrôlement.
+- Builds : `build.sh` et `build.sh CLIPPY=1` 0 avertissement ; sep-proto 35 unit + 19 replay verts, clippy 0 ; sbiod
+  15 verts. Binaires installés dans `~/kbuild/j5` (anciens → `.v4`) :
+  `sep_native.ko` sha256 `627d2977f60671a18de78c87fecdb0e5a81f23cc0b5cabe65e7539b2b454d4aa` (ancien `.v4`
+  `66b5235f…7941`), `sbiod` sha256 `f9fff14dafc048428d0d250fde4df77bb966619c60ccd871012977a3f38b91df` (ancien `.v4`
+  `259e7d5f…149b`). Rien chargé, rien envoyé au SEP, aucun doigt.
+- Suite : trancher E-enroll-start (go d'Albert) AVANT toute session humaine J6 ; si le SEP exige le keybag, l'ouverture
+  de l'EP 0x12 (SKS, protocole DER, kext §15) devient le prochain chantier.

@@ -104,6 +104,10 @@ kernel::module_platform_driver! {
             default: 0,
             description: "NOT IMPLEMENTED: any value other than 0 makes probe fail",
         },
+        allow_sbio_bio: u32 {
+            default: 0,
+            description: "NOT IMPLEMENTED (J6 blocked, docs/j6_enroll_match_protocol.md §6): enroll/match need the 0x03 (enroll_indata, unknown) and 0x06 (image params, per-lock nonce, unknown) payloads AND a keybag/template (D2, EP 0x12 never opened). Any value other than 0 makes probe fail",
+        },
     },
 }
 
@@ -277,8 +281,11 @@ mod drv {
     }
 
     /// Paramètres d'écriture prévus par le design mais non implémentés dans cette version.
-    fn unimplemented_params() -> [(&'static str, u32); 1] {
-        [("allow_sks", *crate::module_parameters::allow_sks.value())]
+    fn unimplemented_params() -> [(&'static str, u32); 2] {
+        [
+            ("allow_sks", *crate::module_parameters::allow_sks.value()),
+            ("allow_sbio_bio", *crate::module_parameters::allow_sbio_bio.value()),
+        ]
     }
 
     /// Raison lisible d'une erreur de `sep-proto`.

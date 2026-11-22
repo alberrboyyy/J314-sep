@@ -17,6 +17,7 @@ const C9: &str = "20261108-010915";
 const C10B: &str = "20261108-012015";
 const C11: &str = "20261108-025802";
 const C12: &str = "20261108-032454";
+const C20: &str = "20261110-003201";
 const SNEW: &str = "20261111-113919";
 const BOOTS: [&str; 8] = ["20261107-043309", C6, "20261107-045400", C8, C9, C10B, C11, C12];
 
@@ -214,6 +215,76 @@ fn step4_fixed_sizes_c11_c12() {
         assert!(ts.iter().all(|x| x.complete()));
         assert_eq!(ts.iter().map(|x| (x.ty, x.total)).collect::<Vec<_>>(), vec![(0x5F, 0x568E), (0x5B, 0xFC99), (0x5F, 0x70CE)]);
     }
+}
+
+// ---- bio (J6): the match wire sequence and the 0x09 verdict ------------------------------------
+#[test]
+fn bio_verdict_c20_c11_c8_c6() {
+    use sep_proto::bio::{parse_verdict, Verdict, UID_MATCH, VERDICT_LEN};
+    let mut total = 0;
+    for p in [C20, C11, C8, C6] {
+        let t = tr!(p);
+        let verdicts: Vec<Transfer> =
+            reassemble(&t.load_ool(8).unwrap(), 8, Some(&[0x09])).into_iter().filter(|x| x.buf == b'B' && x.dir == Dir::ToAp && x.total as usize == VERDICT_LEN).collect();
+        for v in &verdicts {
+            // The tracer may cap an OOL dump (C20: 0x400 bytes), while the gt header declares the real total 0xca2;
+            // the driver always gets the complete reply. The verdict fields are in the first 20 bytes, so pad the
+            // (possibly truncated) dump to the declared length before parsing (tail = image metadata, not read).
+            let mut info = v.blob();
+            assert!(info.len() >= 20, "{p} line {}: 0x09 dump too short ({} bytes)", v.line, info.len());
+            info.resize(VERDICT_LEN, 0);
+            match parse_verdict(&info) {
+                // every documented verdict is either a 501 success or a clean no-match (0 false positive).
+                Verdict::Match { uid, .. } => assert_eq!(uid, UID_MATCH, "{p} line {}", v.line),
+                Verdict::NoMatch => {}
+                Verdict::BadLen(n) => panic!("{p} line {}: match_info_t {n} bytes", v.line),
+            }
+        }
+        total += verdicts.len();
+    }
+    if total == 0 {
+        eprintln!("SKIP: no finger traces");
+        return;
+    }
+    assert!(total >= 7, "{total} verdicts");
+    println!("[bio] {total} 0x09 verdicts parsed (match_info_t 0xca2), 0 bad length, 0 false positive");
+}
+
+#[test]
+fn bio_match_wire_sequence_c20() {
+    use sep_proto::bio::MATCH_SEQUENCE;
+    let t = tr!(C20);
+    // The ordered opcodes of the match core must appear as a subsequence of C20's sbio commands (AP->SEP, TAG 0xfc).
+    let core: Vec<u8> = MATCH_SEQUENCE.iter().map(|s| s.op).collect();
+    let cmds: Vec<u8> = t.msgs.iter().filter(|m| m.w.ep == 8 && m.to_sep() && m.w.tag == gt::TAG_FC).map(|m| m.w.ty).collect();
+    // find the first window where 0x23..0x09 appears in order (0x1e optional between 0x07 and 0x09).
+    let mut found = false;
+    for start in 0..cmds.len() {
+        let mut i = start;
+        let mut ok = true;
+        for &op in &core {
+            if op == 0x1e {
+                // optional retry step
+                if cmds.get(i) == Some(&0x1e) {
+                    i += 1;
+                }
+                continue;
+            }
+            match cmds[i..].iter().position(|&c| c == op) {
+                Some(0) => i += 1,
+                _ => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if ok {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "match core 0x23 06 65 07 [1e] 09 1f 22 0b not found in order in C20");
+    println!("[bio] C20: match core sequence (0x23 06 65 07 [1e] 09 1f 22 0b) found in order");
 }
 
 // ---- step 5: daemon ------------------------------------------------------------------------------

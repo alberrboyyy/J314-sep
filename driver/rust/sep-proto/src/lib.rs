@@ -18,6 +18,7 @@ mod common;
 pub use common::{Error, Result};
 pub(crate) use common::{le_u16, le_u32};
 
+pub mod bio;
 pub mod crc;
 pub mod daemon;
 pub mod discovery;

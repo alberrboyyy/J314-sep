@@ -1395,3 +1395,29 @@ Il y a un risque de confondre « jamais vu » et « interdit » : l'hypothèse n
   que le SEP lui envoie sous macOS). Elle peut en revanche bouger à l'allumage, au réveil ou autour des lectures d'état (lu à 1 sous m1n1).
   Si elle change au moment du doigt (et pas dans la référence) : le capteur détecte le doigt seul → à refaire pour le dire vérifié.
 - Limite : scrutation à 20 ms, une impulsion plus courte est invisible.
+
+## EXPÉRIENCE — E-ENROLL-START (J6) : le SEP accepte-t-il d'entrer en mode enrôlement SANS keybag ? (2026-11-22, agent driver ; source: kext + trace)
+- Statut : PROPOSÉE, non exécutable en l'état (code dédié absent ; le noyau refuse `allow_sbio_bio`). 1er run = « go »
+  d'Albert quand elle sera codée et validée par l'orchestrateur/sceptique. Protocole complet : `docs/j6_enroll_match_protocol.md`.
+- Problème : J6 (enrôlement puis match) est bloqué par D2 (ni keybag ni gabarit nativement ; EP 0x12 SKS jamais ouvert),
+  par le contenu inconnu de `enroll_indata_v2_t` (0x03, 68 o) et du 0x06 (0xa7 o, nonce par verrouillage). On ne peut donc
+  pas émettre un enroll/match fidèle. Avant d'investir dans le reverse de biometrickitd, on veut savoir si l'EP 0x12 est
+  INDISPENSABLE pour seulement ENTRER en mode enrôlement.
+- Expérience la MOINS CHÈRE qui tranche (SANS doigt, une seule écriture) : après J5c pass2 (capteur au repos final, non
+  éteint), catacomb absent/vide, émettre **UN SEUL `0x03`** avec un `enroll_indata_v2_t` minimal (68 o : u32[0]=1 = flag de
+  mode, hypothèse ; reste à 0) et **lire la réponse exacte du SEP** ; fail-closed immédiat. Aucune pose de doigt, aucun
+  gabarit créé.
+- PRÉDICTION (à écrire AVANT le run, à affiner avec le sceptique) : si le SEP exige le keybag, il refuse `0x03` avec un code
+  `0xe00000..` (asserts `enrollInit`/`isMesaDeviceAvailable` du kext, `docs/sbio_enroll.md` §4) ou reste muet ; s'il accepte,
+  il acquitte (B vide ou petit) et `_commandMode` passe en enrôlement côté SEP (observable par la tolérance d'un 0x23 ensuite).
+- CE QUE ÇA TRANCHE : (a) le SEP accepte-t-il le mode enrôlement sans keybag ? (b) quel refus exact sinon ? → dit si l'EP
+  0x12 est le vrai mur, et si une session humaine d'enrôlement a un sens.
+- CONSIGNES POUR LA SESSION (le jour où E-enroll-start passe, enrôlement réel = SESSION HUMAINE, à préparer alors) :
+  1. Ne rien poser tant que le script n'affiche pas « POSEZ LE DOIGT ».
+  2. À « POSEZ LE DOIGT » : poser le doigt à plat, bien couvrir le capteur, tenir ~1 s.
+  3. À « RETIREZ » : lever le doigt franchement.
+  4. Répéter (poser / retirer) tant que le script l'affiche (le SEP décide du nombre, ~10-15 poses ; barre de progression
+     via `enrollment_info_t +0x04`), en décalant légèrement le doigt à chaque pose (bords inclus).
+  5. Le script s'arrête à « ENRÔLEMENT TERMINÉ » (`enrollment_info_t +0xbfe ≠ 0`) et sauvegarde l'export catacomb (0x6c)
+     dans un fichier ; ce fichier devra être re-servi en 0x6d au boot suivant pour qu'un match soit possible.
+  6. Si le script dit « REFUS … » : lever le doigt, ne pas insister, noter le code. Power-cycle = Albert.
