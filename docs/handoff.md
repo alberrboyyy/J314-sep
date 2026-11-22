@@ -1,3 +1,44 @@
+# ▶️ COMMENCE ICI — 2026-11-22 (nuit, 23h30) — 🎯 INIT CAPTEUR COMPLÈTE EN LINUX NATIF ; enrôlement bloqué (jeton 0x03) ; SKS = prochain mur
+
+**Lis d'abord :** cette entrée, puis `docs/journal.md` (entrées 2026-11-22 20:16 → fin), `docs/j5_params_protocol.md`,
+`docs/j6_enroll_match_protocol.md`, `docs/sks_native_plan.md`, `docs/mission_pc_biometrickit.md`. Mémoire : commits
+signés, push avant test, **aucun trailer « Claude » dans les commits** (historique réécrit 2026-11-22, `8df1f7b`).
+
+**ÉTAT VÉRIFIÉ / OBTENU CE SOIR (Linux natif ALARM, sans macOS ni m1n1, scellement xART FRAIS à chaque boot) :**
+- ✅ **Patch capteur CHARGÉ** (`29 01 00 7c`) — **n=5**. Cause du mur m1n1 trouvée : macOS lit l'état capteur ENTRE
+  le prélude `80 60 00 07` et le bloc, et ne lit RIEN pendant le chargement (attente IRQ gpio195). PIO noyau suffit
+  (bloc 22158 o en 29 ms), pas besoin de DMA. `sbiod` v2+. Logs `logs/20261122-204249_j5b-patch-loaded/`.
+- ✅ **Params capteur** 0x5d/0x5c/0x6a/0x31-0x32×2/0x01/0x1f, états = macOS — n=4.
+- ✅ **Calibration 0x5b** (blob c12 rejoué, 64665 o, 4 fragments AP→SEP) acquittée + **0x63 = macOS** — n=3.
+- ✅ **2e passe** (coupure capteur, 0x19, patch n°2 28878 o chargé, 0x6f, 0x63×2 = macOS) — **n=2** (22:11, 23:04).
+  ⇒ **toute l'init capteur macOS reproduite**, capteur « au repos final de macOS ». Script : `pending/j5c_params_run.sh`
+  (`UPTO=params|calib|pass2`, défaut params). Binaires dans `~/kbuild/j5` (sep_native.ko, sbiod, calib_0x5b.bin).
+- ❌ **Enrôlement (J6a, 23:04)** : `0x03` de 68 o à zéro → SEP répond **TAG 0xff** (jamais vu, refus probable), rien
+  ensuite. Logs `logs/20261122-230441_j6a-enroll-start/`. Albert n'avait pas posé le doigt : sans effet (refus immédiat).
+- 🔎 **BiometricKit (session PC, partiel, `docs/biometrickit_protocol.md` côté PC — à pousser)** : 0x03 v2 (0x44 o) =
+  `+0 u32 0 ; +4 userID ; +8 usingAuthToken ; +0xc tokenLength ; +0x10 token[32] ; +0x30 deviceGroup.type ;
+  +0x34 uuid[16]` ; jeton = CredentialSet (1-32 o) ou AuthToken (0/16 o) ⇒ notre 0x03 nul refusé faute de jeton
+  (hypothèse). Non traité : 0x06/nonce, préconditions, sens TAG 0xff, boucle de poses (filtre modèle a coupé ; reprendre
+  en session neuve). **Pas de J6b sans go d'Albert.**
+- 🔎 **SKS (EP 0x12)** : `docs/sks_native_plan.md` — TYPE = compteur global de transaction, TAG = opération (messages.md
+  avait raison ; sks_sequence_c12.md corrigé). Session PC a décodé `get_capabilities` (TAG 0x4d, 0x64 o) dans
+  `docs/sks_ipc_negotiation.md` (côté PC, à pousser). **Fait nouveau VU** : sur boot CHAÎNÉ natif, `sks` n'est JAMAIS
+  dans la table 0xFD (J3/J3b/J3d) alors qu'il y est sur tout seal frais.
+
+**PROCHAIN PAS (dans l'ordre) :**
+1. **J7a** = `pending/j7a_sks_open_chained.sh /var/lib/sepd-run-20261122-230441` (prêt, compilé, sha256 ff799c11…) :
+   boot chaîné, sbio ouvert tôt, ouverture skdl 0x17 / sks 0x12 / scrd 0x0a SANS RPC, écoute, puis 0x73. 1er run =
+   **go d'Albert** (classe neuve). Tranche : sks s'annonce-t-il si on attend/ouvre skdl ? l'ouverture seule réveille-t-elle sbio ?
+2. Session PC : pousser `biometrickit_protocol.md` + `sks_ipc_negotiation.md` ; reprendre BiometricKit (0x06, TAG 0xff,
+   d'où vient le jeton 0x03 → ACM/SKS ?).
+3. Selon J7a : expérience 2 = `get_capabilities` seul (forme du doc PC ; contient horodatage/pid/cdhash, pas un rejeu).
+
+**PIÈGES :** `sync` AVANT chaque power-cycle (un power-cycle a vidé 25 objets git, réparé par `git fetch`) ; la clé SSH
+disparaît de l'agent à chaque boot → Albert tape `! ssh-add` ; les runs tournent en root → Albert tape
+`! sudo <script>` (sudo interdit à l'agent) ; `sepd` reste en fond après chaque run (Ctrl-C).
+
+---
+
 # ▶️ COMMENCE ICI — 2026-11-22 (soir) — 🎯 J2 RÉUSSI : SEPOS boote sous Linux NATIF, sans tether ; J4 (xART) en cours
 
 **MODE DE TRAVAIL EN BINÔME (fixé par Albert 2026-11-22) :**
