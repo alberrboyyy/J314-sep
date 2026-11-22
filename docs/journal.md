@@ -2215,3 +2215,40 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   correctif avec le bit 0x08 levé (code de rejet ?). Pistes restantes : cadrage du bloc (prélude/longueur/trailer),
   étape manquante entre 0x18 et le push (comparer octet-près aux trames SPI de c17/c20), ou contenu lié à la session.
 - Après le run : sepd tourne encore (lancé en root par Albert) ; SEP Running, rien d'autre envoyé. Power-cycle = Albert.
+
+## 2026-11-22 21:00 — Claude (analyste) — J5 contre macOS (C17-C20), phase patch, octet par octet : une étape manque après le prélude
+- Sources : `logs/20261122-201601_j5-sensor-native/sbiod.log:49-57` ; `traces/20261110-00{1859_c17,2417_c18,2829_c19,3201_c20}*/spi2.log`
+  (registres spi2 + gpio0 195/196) et `sio.log`/`sio.bufs` (C18-C20) ; blocs complets de nos runs m1n1
+  `traces/20261122-0*_native_sbio{6,7,8,9}/patch_reassembled.bin`. Outils : `analysis/sio_dialog.py --sep`, nouveau
+  `analysis/spi2_gpio_timeline.py <trace> --patch` (chronologie spi2 + broche 195, mode décodé selon `pinctrl-apple-gpio.c`).
+- VU, macOS, 8 pushes sur 8 (C17-C20, 2 passes chacun) : prélude 7 o → la broche 195, armée en « IRQ niveau haut »
+  (`0x6a85`), est masquée (`0x6a81`) en même temps que la fin du prélude (C17 : DONE −1,5 ms et masque −1,5 ms) → **lecture
+  d'état 0x10** (0x17 o) → **bloc** (C17 : 0,6 ms après cette lecture). Exemple C19 `sio.log:840-858` : état lu entre
+  les deux = `…00 60 00 00 08 52 33 00 00` (C19 2/2 ; C20 2/2 donne `…00 60 00 00 00 52 33 00 00`).
+- VU, nous (J5 et m1n1 sbio8/9/11) : prélude, pause fixe de 10 ms (`GAP_MS`, `driver/rust/sbiod/src/lib.rs:251`), bloc,
+  **sans lecture d'état entre les deux**.
+- VU, après le bloc chez macOS (8/8) : 195 réarmée juste après DONE, puis masquée 38 à 55 ms plus tard (1re passe : +63,8 à
+  +64,8 ms après le début du bloc ; 2e passe : +83 à +84 ms) ; **une seule** lecture d'état, après ce masquage → `…29 01 00 7c…`.
+  Aucune lecture avant. Nous : 1re lecture ≈3 ms après le bloc, puis une toutes les ~63 ms ; réponses tout à zéro pendant ~1 s.
+- VU, débit : bloc macOS de START à DONE = 21,3 ms (C17, 22158 o) / 27,9 ms (C17, 28878 o), soit ≈8,3 Mbit/s, continu à
+  8 MHz ; 24 à 34 ms sous le traceur DMA. Nous : 48 ms (≈3,7 Mbit/s). **Correction de l'entrée 20:16** : les « 74 ms macOS »
+  comptaient l'attente de l'IRQ ; le vrai burst dure ~21-26 ms, donc notre PIO met environ 2 fois plus longtemps. L'hypothèse
+  « trous d'horloge » n'est donc **pas** réfutée.
+- VU, registres : la transaction du bloc a exactement les mêmes registres spi2 que les petites trames (CLKDIV 3, CFG
+  `0x40042`, SHIFTCFG `0x80c07`, +0x00c = 0) ; aucun canal RX (0x19) n'est programmé pendant le bloc (`sio.log:855-858`).
+  Nous : un seul `SPI_IOC_MESSAGE`, rx_buf = 0. Pas d'écart.
+- VU, contenu : entrée 0x5f = `02 00` chez macOS (C12 `000313_08_A.bin`, `000357_08_A.bin`) comme chez nous ; taille 22158 o
+  identique ; sur 4 blocs à nous, seules les positions 0-8 et 15-17 sont constantes (`8c 56 3a 00 00 00 00 00 00` … `00 56 6a`),
+  et elles sont identiques à celles des blocs macOS. Le bloc porte le même en-tête `3a` + compteur que 0x73/0x55, décalé de 2 o :
+  compteur du bloc = compteur du 0x73 + 1 chez macOS (4/4 : `…46ee`→`…46ef`, `…0056`→`…0057`, `…aa65`→`…aa66`, `…adfe`→`…adff`)
+  et chez nous (5/5 : J5 `…e876`→`…e877`, sbio6-9 `…37fa`→`…37fb`, `…143f`→`…1440`, `…1190`→`…1191`, `…78f1`→`…78f2`).
+- VU, états : avant le prélude, macOS et nous lisons le même état (`…60 00 00 00 52 33 00 00`). Notre état final
+  `…60 00 00 08 52 33 00 00` est celui que macOS lit **entre le prélude et le bloc** (C19).
+- INTERPRÉTÉ (hypothèse) : le prélude lève l'IRQ (événement « prêt pour le patch », bit 0x08 ?) et macOS l'acquitte en lisant
+  l'état avant d'envoyer le bloc. Nous ne l'acquittons pas : l'IRQ « haute à t+0 » de J5 serait cette IRQ du prélude, pas une
+  fin de chargement. Notre état final ressemble à « prélude pris, bloc jamais terminé ». Deuxième écart possible : nos lectures
+  d'état pendant que le capteur traite le bloc (macOS n'en fait jamais). Le débit deux fois plus lent vient en troisième.
+  Rien n'indique un problème de session ou de compteur.
+- Expérience proposée (sceptique/driver) : même route J5, push modifié comme macOS : prélude → attendre 195 haute (≤ 50 ms)
+  → 1 lecture d'état (en-tête valide attendu, 195 doit retomber) → bloc sans pause → ne rien lire avant que 195 remonte (≤ 300 ms)
+  → 1 seule lecture. Si `29…7c` : écart trouvé. Sinon : refaire la même chose en DMA (débit).
