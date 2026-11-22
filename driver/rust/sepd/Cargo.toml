@@ -1,0 +1,10 @@
+[package]
+name = "sepd"
+version = "0.1.0"
+edition = "2021"
+description = "Userspace xART (EP 0x13) daemon for sep_native: holds the store and the policy, answers through /dev/sep_native."
+license = "GPL-2.0-or-later OR MIT"
+publish = false
+
+[dependencies]
+sep-proto = { path = "../sep-proto" }

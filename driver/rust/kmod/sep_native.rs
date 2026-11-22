@@ -11,8 +11,16 @@
 //! Avec `allow_boot=1` : séquence de boot de m1n1 `proxyclient/m1n1/hw/sep.py` `SEP.boot()` (la séquence
 //! éprouvée, et non celle de `drivers/soc/apple/sep.rs`) : GET_STATUS→0x66, BOOT_TZ0→0x69 puis 0xD2,
 //! GET_STATUS→0x66, BOOT_IMG4 + SET_SHMEM→0x6A, démapping du firmware. Puis il **écoute seulement** :
-//! annonces de découverte 0xFD (table nom→EP) et messages spontanés connus. Il ne répond à RIEN
-//! (aucun EP de service, aucun ACK de SAVE xART). Tout message inattendu → état `Halted` définitif.
+//! annonces de découverte 0xFD (table nom→EP) et messages spontanés connus. Tout message inattendu → état
+//! `Halted` définitif.
+//!
+//! Avec `allow_xart=1` (exige `allow_boot=1`) : ouverture de l'EP 0x13 `xarm` par le CNTL (SECMODE 0x14, puis
+//! tampons A/B de 0x8000 : 0x04/0x02/0x05/0x03, chacun attendant son ack), comme `pending/sep_native_persist.sh`,
+//! puis `/dev/sep_native` : le démon `sepd` lit les requêtes 0x13 (avec la copie du tampon B) et soumet des
+//! réponses typées ; le noyau ne garde AUCUN store ni politique, il vérifie chaque réponse contre la requête en
+//! attente (`xart_gate::check_reply` : même TAG, TYPE/PARAM/DATA permis, longueurs) avant de l'envoyer.
+//! Les SAVE (0x01/0x06) ne sont acquittés que si `allow_xart_save_ack=1` ; sinon un SAVE reçu → `Halted`.
+//! Rien n'est jamais envoyé vers 0x08 (sbio) ni 0x12 (sks).
 //!
 //! Une fois le premier mot envoyé au SEP, le module garde une référence sur lui-même (rmmod → EBUSY) et
 //! un unbind fuit volontairement mailbox, shmem et mapping firmware (le SEP peut encore faire du DMA ;
@@ -34,6 +42,15 @@ mod discovery;
 #[path = "../sep-proto/src/word.rs"]
 #[allow(dead_code, unreachable_pub)]
 mod word;
+#[path = "../sep-proto/src/crc.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod crc;
+#[path = "../sep-proto/src/xart.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod xart;
+#[path = "../sep-proto/src/xart_gate.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod xart_gate;
 
 kernel::module_platform_driver! {
     type: drv::SepNative,
@@ -48,11 +65,11 @@ kernel::module_platform_driver! {
         },
         allow_xart: u32 {
             default: 0,
-            description: "NOT IMPLEMENTED: any value other than 0 makes probe fail",
+            description: "1 = open EP 0x13 (CNTL SECMODE + OOL A/B) and serve it through /dev/sep_native (needs allow_boot=1)",
         },
         allow_xart_save_ack: u32 {
             default: 0,
-            description: "NOT IMPLEMENTED: any value other than 0 makes probe fail",
+            description: "1 = allow the daemon to ACK xART SAVEs (advances the sealed counter). 0 = a SAVE halts the driver",
         },
         allow_sbio: u32 {
             default: 0,
@@ -68,8 +85,14 @@ kernel::module_platform_driver! {
 mod drv {
     use crate::discovery::{self, EpInfo};
     use crate::word::Word;
+    use crate::xart::{is_save, EP_XART, OP_FWBOOT};
+    use crate::xart_gate::{check_reply, request_b_len, AWrite, RecHdr, MAX_SAVES, OOL_SIZE, REC_HDR, REC_MAX};
     use kernel::{
-        bindings, c_str, device, dma, new_condvar, new_mutex, of, platform,
+        bindings, c_str, device, dma,
+        fs::{File, Kiocb},
+        iov::{IovIterDest, IovIterSource},
+        miscdevice::{MiscDevice, MiscDeviceOptions, MiscDeviceRegistration},
+        new_condvar, new_mutex, of, platform,
         prelude::*,
         soc::apple::mailbox::{MailCallback, Mailbox, Message},
         sync::{
@@ -129,14 +152,34 @@ mod drv {
     // Messages spontanés connus après le boot (toutes les captures : `docs/messages.md` « xART au boot »,
     // SEP-BOOT 2026-11-09, `kext_sepmanager.md` §3). On les journalise sans répondre.
     const CNTL_SPONTANEOUS: [u8; 3] = [0x0d, 0x29, 0x10];
-    /// 1er message de `xarm` (C1 L30, 19/19) : TAG 0x02 TYPE 0x0e. Non servi (allow_xart non implémenté).
+    /// 1er message de `xarm` (C1 L30, 19/19) : TAG 0x02 TYPE 0x0e. Non servi si allow_xart=0.
     const XARM_FIRST_TAG: u8 = 0x02;
     const XARM_FIRST_TYPE: u8 = 0x0e;
+
+    // CNTL EP 0x00 (`pending/sep_native_persist.sh` `cntl_send` / `pump_ep0`, éprouvé sous m1n1 ; design §3.3).
+    const CNTL_ACK: u8 = 0x01;
+    const CNTL_SET_A_IOVA: u8 = 0x02;
+    const CNTL_SET_B_IOVA: u8 = 0x03;
+    const CNTL_SET_A_SIZE: u8 = 0x04;
+    const CNTL_SET_B_SIZE: u8 = 0x05;
+    const CNTL_PING: u8 = 0x11;
+    const CNTL_PONG: u8 = 0x12;
+    const CNTL_SECMODE: u8 = 0x14;
+    /// Seuls TYPE que le pilote envoie sur l'EP 0x00 après le boot.
+    const CNTL_TX_TYPES: [u8; 6] = [CNTL_SECMODE, CNTL_SET_A_SIZE, CNTL_SET_A_IOVA, CNTL_SET_B_SIZE, CNTL_SET_B_IOVA, CNTL_PONG];
+    /// Délai par ack CNTL (5 s, comme le harnais).
+    const CNTL_ACK_TIMEOUT_MS: u32 = 5000;
+    /// EP auxquels ce pilote ne doit jamais rien envoyer (défense en profondeur ; aucun chemin n'y mène).
+    const EP_SBIO: u8 = 0x08;
+    const EP_SKS: u8 = 0x12;
+    /// Requêtes 0x13 en attente de réponse (snew-reel : 6 au plus en même temps).
+    const PEND_LEN: usize = 16;
 
     const RING_LEN: usize = 64; // puissance de 2 (indices u32 qui bouclent)
     const ROM_QUEUE_LEN: usize = 4;
     const EPTABLE_LEN: usize = 32;
     const HALTED_LOG_LIMIT: u32 = 16;
+    const IGNORED_LOG_LIMIT: u32 = 256;
 
     /// Un seul device lié à la fois (deux clients de `sep_mbox` s'écraseraient sans erreur, design §2).
     static BOUND: Atomic<u32> = Atomic::new(0);
@@ -146,15 +189,29 @@ mod drv {
     fn param_allow_boot() -> u32 {
         *crate::module_parameters::allow_boot.value()
     }
+    fn param_allow_xart() -> bool {
+        *crate::module_parameters::allow_xart.value() != 0
+    }
+    fn param_allow_save_ack() -> bool {
+        *crate::module_parameters::allow_xart_save_ack.value() != 0
+    }
 
     /// Paramètres d'écriture prévus par le design mais non implémentés dans cette version.
-    fn unimplemented_params() -> [(&'static str, u32); 4] {
+    fn unimplemented_params() -> [(&'static str, u32); 2] {
         [
-            ("allow_xart", *crate::module_parameters::allow_xart.value()),
-            ("allow_xart_save_ack", *crate::module_parameters::allow_xart_save_ack.value()),
             ("allow_sbio", *crate::module_parameters::allow_sbio.value()),
             ("allow_sks", *crate::module_parameters::allow_sks.value()),
         ]
+    }
+
+    /// Raison lisible d'une erreur de `sep-proto`.
+    fn why(e: &crate::Error) -> &'static str {
+        match e {
+            crate::Error::Unexpected(s) => s,
+            crate::Error::OutOfRange(s, _) => s,
+            crate::Error::Short => "enregistrement trop court",
+            crate::Error::BadMagic => "magic",
+        }
     }
 
     // --- anneau RX ------------------------------------------------------------------------------------------
@@ -222,6 +279,15 @@ mod drv {
         Halted,
     }
 
+    /// Requête 0x13 reçue, pas encore acquittée.
+    #[derive(Clone, Copy)]
+    struct Pending {
+        seq: u32,
+        w: Word,
+        /// Déjà lue par le démon (remise à false à chaque ouverture de /dev/sep_native).
+        delivered: bool,
+    }
+
     struct Core {
         state: State,
         halt_reason: &'static str,
@@ -234,10 +300,27 @@ mod drv {
         eps: [Option<EpInfo>; EPTABLE_LEN],
         n_eps: usize,
         ignored_after_halt: u32,
+        /// Messages bénins ignorés après l'ouverture de 0x13 (autres EP annoncés, 0xFD).
+        ignored: u32,
+        // --- xART (allow_xart=1) ---
+        /// EP de `xarm` une fois l'ouverture commencée (toujours 0x13).
+        xarm: Option<u8>,
+        /// Tampons A/B annoncés au SEP et acquittés.
+        xart_open: bool,
+        /// TAG du message CNTL dont on attend l'ack.
+        cntl_wait: Option<u8>,
+        cntl_tag: u8,
+        pend: [Option<Pending>; PEND_LEN],
+        n_pend: usize,
+        next_seq: u32,
+        /// Copie du tampon B prise à l'arrivée de la requête `b_owner` (une seule à la fois).
+        bsnap: KVec<u8>,
+        b_owner: Option<u32>,
+        nsave: u32,
     }
 
     impl Core {
-        const fn new() -> Self {
+        fn new(bsnap: KVec<u8>) -> Self {
             Core {
                 state: State::Idle,
                 halt_reason: "",
@@ -247,7 +330,28 @@ mod drv {
                 eps: [const { None }; EPTABLE_LEN],
                 n_eps: 0,
                 ignored_after_halt: 0,
+                ignored: 0,
+                xarm: None,
+                xart_open: false,
+                cntl_wait: None,
+                cntl_tag: 0,
+                pend: [None; PEND_LEN],
+                n_pend: 0,
+                next_seq: 1,
+                bsnap,
+                b_owner: None,
+                nsave: 0,
             }
+        }
+
+        fn pend_index(&self, seq: u32) -> Option<usize> {
+            self.pend[..self.n_pend].iter().position(|p| p.is_some_and(|p| p.seq == seq))
+        }
+
+        fn pend_remove(&mut self, i: usize) {
+            self.pend.copy_within(i + 1..self.n_pend, i);
+            self.n_pend -= 1;
+            self.pend[self.n_pend] = None;
         }
 
         fn rom_pop(&mut self) -> Option<Word> {
@@ -277,14 +381,25 @@ mod drv {
         size: usize,
     }
 
+    /// Un tampon OOL (DMA cohérent sur le DART du SEP).
+    type Ool = dma::Coherent<[u8]>;
+
     #[pin_data]
     pub(crate) struct SepData {
         dev: ARef<device::Device>,
         shmem: dma::Coherent<[u8]>,
+        /// Tampons OOL de l'EP 0x13 (A = AP→SEP, B = SEP→AP), alloués seulement si allow_xart=1.
+        ool: Option<(Ool, Ool)>,
         fw: FwRegion,
         ring: Ring,
+        /// Un seul ouvreur de /dev/sep_native.
+        opened: Atomic<u32>,
         #[pin]
         core: Mutex<Core>,
+        /// Seule mailbox d'envoi. Verrou pris APRÈS `core` (jamais l'inverse). La mailbox tient une référence sur
+        /// ce `SepData` (cookie) : le cycle est cassé au unbind si rien n'a été envoyé, gardé exprès sinon.
+        #[pin]
+        tx: Mutex<Option<Mailbox<SepData>>>,
         #[pin]
         cv: CondVar,
         #[pin]
@@ -324,6 +439,8 @@ mod drv {
             }
             core.state = State::Halted;
             core.halt_reason = why;
+            // Réveille un éventuel `read` bloqué (il renvoie alors EIO).
+            self.cv.notify_all();
             match raw {
                 Some(w) => dev_err!(self.dev, "HALTED : {} (mot {:#018x}) ; plus aucun envoi jusqu'au power-cycle\n", why, w),
                 None => dev_err!(self.dev, "HALTED : {} ; plus aucun envoi jusqu'au power-cycle\n", why),
@@ -376,12 +493,23 @@ mod drv {
             match (w.ep, w.ty) {
                 (discovery::EP_DISCOVERY, 0x00) => {
                     if core.ep_index(w.param).is_some() {
-                        self.halt(core, "EP annoncé deux fois", Some(raw));
+                        if core.xart_open {
+                            self.ignore(core, "0xFD : EP déjà annoncé", raw);
+                        } else {
+                            self.halt(core, "EP annoncé deux fois", Some(raw));
+                        }
                     } else if core.n_eps >= EPTABLE_LEN {
-                        self.halt(core, "table de découverte pleine", Some(raw));
+                        if core.xart_open {
+                            self.ignore(core, "0xFD : table de découverte pleine, annonce non retenue", raw);
+                        } else {
+                            self.halt(core, "table de découverte pleine", Some(raw));
+                        }
                     } else {
                         let info = EpInfo { ep: w.param, name: discovery::decode_name(w.data), sizes_raw: None };
                         dev_info!(self.dev, "découverte : EP {:#04x} = '{}'\n", info.ep, info.name_str());
+                        if &info.name == b"sbio" {
+                            dev_info!(self.dev, "sbio annoncé (EP {:#04x}) ; rien ne lui sera envoyé\n", info.ep);
+                        }
                         let n = core.n_eps;
                         core.eps[n] = Some(info);
                         core.n_eps += 1;
@@ -394,22 +522,241 @@ mod drv {
                         }
                         dev_info!(self.dev, "découverte : EP {:#04x} tailles {:#010x}\n", w.param, w.data);
                     }
+                    None if core.xart_open => self.ignore(core, "0xFD TYPE 1 avant TYPE 0", raw),
                     None => self.halt(core, "FD TYPE 1 avant TYPE 0", Some(raw)),
                 },
+                (discovery::EP_DISCOVERY, _) if core.xart_open => self.ignore(core, "0xFD TYPE inconnu", raw),
                 (discovery::EP_CNTL, ty) if w.tag == 0 && CNTL_SPONTANEOUS.contains(&ty) => {
                     dev_info!(self.dev, "CNTL spontané connu TYPE {:#04x} (rien envoyé)\n", ty);
                 }
-                (ep, XARM_FIRST_TYPE)
-                    if w.tag == XARM_FIRST_TAG && core.ep_by_name(b"xarm") == Some(ep) =>
-                {
-                    dev_info!(
-                        self.dev,
-                        "xarm (EP {:#04x}) : 1re requête TYPE 0x0e reçue, NON servie (allow_xart non implémenté)\n",
-                        ep
-                    );
+                (discovery::EP_CNTL, CNTL_ACK) if core.cntl_wait == Some(w.tag) => {
+                    core.cntl_wait = None;
+                    dev_info!(self.dev, "CNTL ack TAG {:#04x} DATA {:#x}\n", w.tag, w.data);
+                }
+                (discovery::EP_CNTL, CNTL_PING) if param_allow_xart() => {
+                    // `< 0x11 → > 0x12`, même TAG (pump_ep0 du harnais).
+                    dev_info!(self.dev, "CNTL 0x11 TAG {:#04x} → 0x12\n", w.tag);
+                    let _ = self.send_running(core, Word::new(discovery::EP_CNTL, w.tag, CNTL_PONG, 0, 0), "CNTL 0x12");
+                }
+                (ep, _) if core.ep_by_name(b"xarm") == Some(ep) => self.on_xarm(core, w, raw),
+                // Une fois 0x13 ouvert : message sur un AUTRE EP annoncé (sbio, sks, xars, pnon, hibe, stac, hdcp…)
+                // → journalisé et ignoré, sans réponse ni Halted, comme le harnais m1n1 (un Halted au milieu des
+                // SAVE laisserait le xART à moitié scellé). Restent Halted : EP 0x00 inconnu, EP jamais annoncé.
+                (ep, _) if core.xart_open && ep != discovery::EP_CNTL && core.ep_index(ep).is_some() => {
+                    self.ignore(core, "message sur un autre EP annoncé, sans réponse", raw)
                 }
                 _ => self.halt(core, "message inconnu après le boot", Some(raw)),
             }
+        }
+
+        /// Journalise un message bénin ignoré (sans réponse). Journal limité à `IGNORED_LOG_LIMIT` lignes ; le
+        /// total figure dans la table finale.
+        fn ignore(&self, core: &mut Core, what: &'static str, raw: u64) {
+            core.ignored = core.ignored.saturating_add(1);
+            if core.ignored <= IGNORED_LOG_LIMIT {
+                dev_info!(self.dev, "ignoré ({}) : {:#018x}\n", what, raw);
+            } else if core.ignored == IGNORED_LOG_LIMIT + 1 {
+                dev_info!(self.dev, "ignorés : journal coupé au-delà de {} messages (compte gardé)\n", IGNORED_LOG_LIMIT);
+            }
+        }
+
+        /// Requête du SEP sur `xarm`. Sans allow_xart : seule la 1re (0x0e) est admise, journalisée sans réponse.
+        /// Avec : contrôle du TYPE, copie de B si la requête en porte, mise en file pour le démon.
+        fn on_xarm(&self, core: &mut Core, w: Word, raw: u64) {
+            if !param_allow_xart() {
+                if w.tag == XARM_FIRST_TAG && w.ty == XARM_FIRST_TYPE {
+                    dev_info!(self.dev, "xarm (EP {:#04x}) : 1re requête TYPE 0x0e reçue, NON servie (allow_xart=0)\n", w.ep);
+                } else {
+                    self.halt(core, "requête xarm alors que allow_xart=0", Some(raw));
+                }
+                return;
+            }
+            if w.ep != EP_XART {
+                return self.halt(core, "xarm annoncé ailleurs qu'en 0x13", Some(raw));
+            }
+            if is_save(w.ty) && !param_allow_save_ack() {
+                return self.halt(core, "SAVE xART reçu et allow_xart_save_ack=0 : pas d'ACK, arrêt (fail-closed)", Some(raw));
+            }
+            let blen = match request_b_len(&w) {
+                Ok(n) => n,
+                Err(e) => return self.halt(core, why(&e), Some(raw)),
+            };
+            if !core.xart_open && w.ty != OP_FWBOOT {
+                return self.halt(core, "requête xarm autre que 0x0e avant l'ouverture des tampons", Some(raw));
+            }
+            if core.n_pend >= PEND_LEN {
+                return self.halt(core, "trop de requêtes xarm en attente", Some(raw));
+            }
+            let seq = core.next_seq;
+            if blen > 0 {
+                if core.b_owner.is_some() {
+                    return self.halt(core, "deux requêtes à tampon B en attente (B écrasé)", Some(raw));
+                }
+                let Some((_, b)) = self.ool.as_ref() else {
+                    return self.halt(core, "tampon B absent", Some(raw));
+                };
+                core.bsnap.clear();
+                if blen > b.len() || core.bsnap.resize(blen, 0, GFP_KERNEL).is_err() {
+                    return self.halt(core, "copie de B impossible", Some(raw));
+                }
+                dma_rmb();
+                // SAFETY: `b` est une allocation cohérente de `b.len()` octets, vivante (tenue par `self`) ;
+                // `bsnap` a `blen <= b.len()` octets. Le SEP a écrit B avant d'envoyer la requête et ne le
+                // réécrit qu'après notre réponse (protocole, une seule requête à B en attente, contrôlé ci-dessus).
+                unsafe { core::ptr::copy_nonoverlapping(b.as_ptr().cast::<u8>(), core.bsnap.as_mut_ptr(), blen) };
+                core.b_owner = Some(seq);
+            }
+            core.next_seq = seq.wrapping_add(1);
+            let n = core.n_pend;
+            core.pend[n] = Some(Pending { seq, w, delivered: false });
+            core.n_pend += 1;
+            dev_info!(
+                self.dev,
+                "xarm < seq {} TAG {:#04x} TYPE {:#04x} PARAM {:#04x} DATA {:#010x} (B {} o)\n",
+                seq, w.tag, w.ty, w.param, w.data, blen
+            );
+        }
+
+        /// Envoi après le boot : CNTL (TYPE de la liste fermée) ou xarm une fois ouvert ; rien d'autre.
+        /// Appelé avec `core` verrouillé (ordre des verrous : core puis tx). Refus ou erreur → Halted.
+        fn send_running(&self, core: &mut Core, w: Word, what: &'static str) -> Result {
+            let allowed = core.state == State::Running
+                && param_allow_xart()
+                && w.ep != EP_SBIO
+                && w.ep != EP_SKS
+                && match w.ep {
+                    discovery::EP_CNTL => CNTL_TX_TYPES.contains(&w.ty),
+                    ep => core.xarm == Some(ep) && core.xart_open,
+                };
+            if !allowed {
+                self.halt(core, "envoi refusé par la porte (bug)", Some(w.encode()));
+                return Err(EIO);
+            }
+            let raw = w.encode();
+            let r = match self.tx.lock().as_ref() {
+                Some(m) => m.send(Message { msg0: raw, msg1: 0 }, false),
+                None => Err(EIO),
+            };
+            match r {
+                Ok(()) => {
+                    dev_info!(self.dev, "> {} : {:#018x}\n", what, raw);
+                    Ok(())
+                }
+                Err(e) => {
+                    self.halt(core, "erreur d'envoi mailbox", Some(raw));
+                    Err(e)
+                }
+            }
+        }
+
+        /// Ouverture de l'EP 0x13 : SECMODE puis A taille/adresse, B taille/adresse (PARAM = EP), chacun attendant
+        /// son ack CNTL (même TAG). Séquence de `pending/sep_native_persist.sh`.
+        fn open_xart(&self) -> Result {
+            let Some((a, b)) = self.ool.as_ref() else { return Err(EINVAL) };
+            let (Some(ia), Some(ib)) = (iova_page(a.dma_handle()), iova_page(b.dma_handle())) else {
+                dev_err!(self.dev, "IOVA A/B inutilisables : 0x13 non ouvert (rien envoyé)\n");
+                return Err(EINVAL);
+            };
+            let size = OOL_SIZE as u32;
+            let mut core = self.core.lock();
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            if core.ep_by_name(b"xarm") != Some(EP_XART) {
+                dev_err!(self.dev, "xarm non annoncé en 0x13 : 0x13 non ouvert (rien envoyé)\n");
+                return Err(ENODEV);
+            }
+            core.xarm = Some(EP_XART);
+            dev_info!(self.dev, "ouverture 0x13 : A IOVA {:#x}, B IOVA {:#x}, {:#x} o chacun\n", a.dma_handle(), b.dma_handle(), size);
+            dma_wmb();
+            let steps: [(u8, u8, u32, &'static str); 5] = [
+                (CNTL_SECMODE, 0, 0, "CNTL SECMODE"),
+                (CNTL_SET_A_SIZE, EP_XART, size, "CNTL A taille"),
+                (CNTL_SET_A_IOVA, EP_XART, ia, "CNTL A adresse"),
+                (CNTL_SET_B_SIZE, EP_XART, size, "CNTL B taille"),
+                (CNTL_SET_B_IOVA, EP_XART, ib, "CNTL B adresse"),
+            ];
+            for (ty, param, d, what) in steps {
+                core.cntl_tag = core.cntl_tag % 8 + 1;
+                let tag = core.cntl_tag;
+                core.cntl_wait = Some(tag);
+                self.send_running(&mut core, Word::new(discovery::EP_CNTL, tag, ty, param, d), what)?;
+                let mut left = msecs_to_jiffies(CNTL_ACK_TIMEOUT_MS);
+                while core.cntl_wait.is_some() {
+                    if core.state == State::Halted {
+                        return Err(EIO);
+                    }
+                    match self.cv.wait_interruptible_timeout(&mut core, left) {
+                        CondVarTimeoutResult::Woken { jiffies } => left = jiffies,
+                        CondVarTimeoutResult::Timeout => {
+                            self.halt(&mut core, "pas d'ack CNTL à l'ouverture de 0x13", None);
+                            return Err(ETIMEDOUT);
+                        }
+                        CondVarTimeoutResult::Signal { .. } => {
+                            self.halt(&mut core, "signal reçu pendant l'ouverture de 0x13", None);
+                            return Err(EINTR);
+                        }
+                    }
+                }
+            }
+            core.xart_open = true;
+            dev_info!(self.dev, "0x13 ouvert ; requêtes en attente : {}\n", core.n_pend);
+            Ok(())
+        }
+
+        /// Réponse du démon (`write`) : contrôle contre la requête en attente, écriture de A, envoi. Toute
+        /// incohérence → Halted (rien n'est envoyé).
+        fn submit_reply(&self, rec: &[u8]) -> Result {
+            let mut core = self.core.lock();
+            if core.state != State::Running || !core.xart_open {
+                return Err(EIO);
+            }
+            let (h, a) = match RecHdr::decode(rec) {
+                Ok(x) => x,
+                Err(e) => {
+                    self.halt(&mut core, why(&e), None);
+                    return Err(EINVAL);
+                }
+            };
+            let Some(i) = core.pend_index(h.seq).filter(|&i| core.pend[i].is_some_and(|p| p.delivered)) else {
+                self.halt(&mut core, "réponse à une requête inconnue ou non lue", Some(h.w.encode()));
+                return Err(EINVAL);
+            };
+            let Some(req) = core.pend[i].map(|p| p.w) else { return Err(EINVAL) };
+            let aw = match check_reply(&req, &h.w, a, param_allow_save_ack()) {
+                Ok(aw) => aw,
+                Err(e) => {
+                    dev_err!(self.dev, "réponse refusée seq {} : requête {:#018x}\n", h.seq, req.encode());
+                    self.halt(&mut core, why(&e), Some(h.w.encode()));
+                    return Err(EINVAL);
+                }
+            };
+            if aw == AWrite::Replace {
+                let Some((abuf, _)) = self.ool.as_ref() else { return Err(EIO) };
+                // SAFETY: `abuf` est une allocation cohérente de `abuf.len()` (= OOL_SIZE) octets, vivante ;
+                // `a.len() <= OOL_SIZE` (check_reply). Le SEP ne lit A qu'après le mot de réponse envoyé
+                // ci-dessous ; les écritures sont sérialisées par `core`.
+                unsafe {
+                    let dst = abuf.as_mut_ptr().cast::<u8>();
+                    core::ptr::write_bytes(dst, 0, abuf.len());
+                    core::ptr::copy_nonoverlapping(a.as_ptr(), dst, a.len());
+                }
+            }
+            dma_wmb();
+            self.send_running(&mut core, h.w, "réponse xarm")?;
+            dev_info!(self.dev, "xarm > seq {} TYPE {:#04x} PARAM {:#04x} DATA {:#010x} (A {} o)\n", h.seq, h.w.ty, h.w.param, h.w.data, a.len());
+            core.pend_remove(i);
+            if core.b_owner == Some(h.seq) {
+                core.b_owner = None;
+            }
+            if is_save(req.ty) {
+                core.nsave += 1;
+                dev_warn!(self.dev, "SAVE acquitté #{}/{} (compteur scellé avancé)\n", core.nsave, MAX_SAVES);
+                if core.nsave >= MAX_SAVES {
+                    self.halt(&mut core, "budget de SAVE atteint (MAX_SAVES) sans stabilisation", None);
+                }
+            }
+            Ok(())
         }
 
         fn state(&self) -> State {
@@ -418,7 +765,7 @@ mod drv {
 
         fn log_table(&self) {
             let core = self.core.lock();
-            dev_info!(self.dev, "table de découverte : {} EP (état {:?})\n", core.n_eps, core.state);
+            dev_info!(self.dev, "table de découverte : {} EP (état {:?}, {} message(s) ignoré(s))\n", core.n_eps, core.state, core.ignored);
             for e in core.eps[..core.n_eps].iter().flatten() {
                 match e.pages() {
                     Some(p) => dev_info!(self.dev, "  EP {:#04x} '{}' pages {:?}\n", e.ep, e.name_str(), p),
@@ -485,15 +832,27 @@ mod drv {
         unsafe { core::arch::asm!("dmb oshst", options(nostack, preserves_flags)) };
     }
 
-    /// Envoie un mot au SEP. Seul chemin d'envoi du module ; refuse hors de l'état Booting.
-    fn send(data: &SepData, mbox: &Mailbox<SepData>, ep: u8, ty: u8, payload: u32, what: &str) -> Result {
-        if data.state() != State::Booting {
+    /// Barrière de lecture DMA (`dma_rmb()`, arm64 `dmb oshld`) entre la réception d'une requête et la lecture de B.
+    fn dma_rmb() {
+        // SAFETY: `dmb oshld` est une barrière mémoire : aucun accès mémoire, aucun registre modifié, aucun
+        // effet sur la pile ; elle ne fait qu'ordonner les lectures précédentes avant les suivantes.
+        unsafe { core::arch::asm!("dmb oshld", options(nostack, preserves_flags)) };
+    }
+
+    /// Envoie un mot de boot (EP 0xFF / 0xFE) au SEP ; refuse hors de l'état Booting. Après le boot, le seul
+    /// chemin d'envoi est `SepData::send_running`.
+    fn send(data: &SepData, ep: u8, ty: u8, payload: u32, what: &str) -> Result {
+        if data.state() != State::Booting || (ep != EP_BOOT && ep != EP_SHMEM) {
             dev_err!(data.dev, "envoi {} refusé : état {:?}\n", what, data.state());
             return Err(EIO);
         }
         let w = Word::new(ep, BOOT_TAG, ty, 0, payload).encode();
         dev_info!(data.dev, "> {} : {:#018x}\n", what, w);
-        if let Err(e) = mbox.send(Message { msg0: w, msg1: 0 }, false) {
+        let r = match data.tx.lock().as_ref() {
+            Some(m) => m.send(Message { msg0: w, msg1: 0 }, false),
+            None => Err(EIO),
+        };
+        if let Err(e) = r {
             dev_err!(data.dev, "envoi {} : erreur mailbox {:?}\n", what, e);
             data.halt(&mut data.core.lock(), "erreur d'envoi mailbox", Some(w));
             return Err(e);
@@ -562,7 +921,7 @@ mod drv {
 
     /// Séquence de m1n1 `hw/sep.py` `SEP.boot()`. Toute erreur laisse l'état en Halted ; l'appelant ne
     /// libère jamais rien après le premier envoi.
-    fn boot(data: &SepData, mbox: &Mailbox<SepData>) -> Result {
+    fn boot(data: &SepData) -> Result {
         let shmem_page = iova_page(data.shmem.dma_handle()).ok_or_else(|| {
             dev_err!(data.dev, "IOVA shmem {:#x} inutilisable (alignement / 32 bits)\n", data.shmem.dma_handle());
             EINVAL
@@ -577,14 +936,14 @@ mod drv {
         }
         mark_touched();
 
-        send(data, mbox, EP_BOOT, ROM_GET_STATUS, 0, "GET_STATUS")?;
+        send(data, EP_BOOT, ROM_GET_STATUS, 0, "GET_STATUS")?;
         data.expect_rom(ROM_STATUS_OK, Some(STATUS_BEFORE_TZ0), "GET_STATUS #1")?;
 
-        send(data, mbox, EP_BOOT, ROM_BOOT_TZ0, 0, "BOOT_TZ0")?;
+        send(data, EP_BOOT, ROM_BOOT_TZ0, 0, "BOOT_TZ0")?;
         data.expect_rom(ROM_TZ0_DONE, None, "BOOT_TZ0 ack 0x69")?;
         data.expect_rom(ROM_UNK_DONE, None, "BOOT_TZ0 ack 0xD2")?;
 
-        send(data, mbox, EP_BOOT, ROM_GET_STATUS, 0, "GET_STATUS")?;
+        send(data, EP_BOOT, ROM_GET_STATUS, 0, "GET_STATUS")?;
         data.expect_rom(ROM_STATUS_OK, Some(STATUS_AFTER_TZ0), "GET_STATUS #2")?;
 
         // m1n1 mappe le firmware avant le 1er GET_STATUS ; ici juste avant IMG4 (différence côté AP
@@ -605,8 +964,8 @@ mod drv {
         };
 
         dma_wmb();
-        send(data, mbox, EP_BOOT, ROM_BOOT_IMG4, fw_page, "BOOT_IMG4")?;
-        send(data, mbox, EP_SHMEM, ROM_SET_SHMEM, shmem_page, "SET_SHMEM")?;
+        send(data, EP_BOOT, ROM_BOOT_IMG4, fw_page, "BOOT_IMG4")?;
+        send(data, EP_SHMEM, ROM_SET_SHMEM, shmem_page, "SET_SHMEM")?;
         {
             let mut core = data.core.lock();
             core.shmem_sent = true;
@@ -622,7 +981,7 @@ mod drv {
         dev_info!(data.dev, "firmware démappé après 0x6A (comme m1n1)\n");
         // L'état est passé à Running dans le work, à la réception de 0x6A (cf. `Core::shmem_sent`).
         if data.state() == State::Running {
-            dev_info!(data.dev, "SEPOS lancé ; écoute seule (aucune réponse à aucun EP)\n");
+            dev_info!(data.dev, "SEPOS lancé\n");
             Ok(())
         } else {
             Err(EIO)
@@ -676,10 +1035,109 @@ mod drv {
         matches!(node.get_property::<KVec<u8>>(name), Ok(v) if v[..] == *want)
     }
 
+    // --- /dev/sep_native (allow_xart=1) -------------------------------------------------------------------
+    // read  : bloque jusqu'à une requête 0x13 non lue ; renvoie un enregistrement `xart_gate::RecHdr` + copie de B.
+    //         Tampon utilisateur >= REC_MAX exigé (EINVAL sinon). EIO une fois Halted.
+    // write : UN enregistrement de réponse (en-tête + octets pour A) par appel ; contrôlé par `check_reply`.
+    // Pas d'ioctl ; un seul ouvreur (EBUSY). Le périphérique n'existe qu'après l'ouverture réussie de 0x13.
+
+    /// Enregistrement du miscdevice, jamais libéré (le SEP a été touché : rien n'est rendu avant le power-cycle).
+    #[pin_data]
+    struct XartDev {
+        #[pin]
+        reg: MiscDeviceRegistration<SepData>,
+        data: Arc<SepData>,
+    }
+
+    #[vtable]
+    impl MiscDevice for SepData {
+        type Ptr = Arc<SepData>;
+
+        fn open(_file: &File, misc: &MiscDeviceRegistration<SepData>) -> Result<Arc<SepData>> {
+            // SAFETY: le seul `MiscDeviceRegistration<SepData>` enregistré est le champ `reg` d'un `XartDev`
+            // épinglé dans un `KBox` oublié (`core::mem::forget`) : jamais libéré, donc `container_of` donne un
+            // pointeur valide pour toujours.
+            let x: &XartDev = unsafe { &*kernel::container_of!(core::ptr::from_ref(misc).cast_mut(), XartDev, reg) };
+            let d = &x.data;
+            if d.opened.cmpxchg(0, 1, Full).is_err() {
+                return Err(EBUSY);
+            }
+            let mut core = d.core.lock();
+            let n = core.n_pend;
+            // Un démon relancé revoit les requêtes lues mais pas acquittées.
+            for p in core.pend[..n].iter_mut().flatten() {
+                p.delivered = false;
+            }
+            dev_info!(d.dev, "/dev/sep_native ouvert ({} requête(s) en attente)\n", n);
+            drop(core);
+            Ok(d.clone())
+        }
+
+        fn release(device: Arc<SepData>, _file: &File) {
+            device.opened.store(0, Release);
+        }
+
+        fn read_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterDest<'_>) -> Result<usize> {
+            let me = kiocb.file();
+            if iov.len() < REC_MAX {
+                return Err(EINVAL);
+            }
+            let mut core = me.core.lock();
+            loop {
+                if core.state == State::Halted {
+                    return Err(EIO);
+                }
+                let n = core.n_pend;
+                if let Some(i) = core.pend[..n].iter().position(|p| p.is_some_and(|p| !p.delivered)) {
+                    let Some(p) = core.pend[i] else { return Err(EIO) };
+                    let b: &[u8] = if core.b_owner == Some(p.seq) { &core.bsnap } else { &[] };
+                    let hdr = RecHdr { seq: p.seq, w: p.w, len: b.len() as u32 }.encode();
+                    if iov.copy_to_iter(&hdr) != REC_HDR || iov.copy_to_iter(b) != b.len() {
+                        return Err(EFAULT);
+                    }
+                    let total = REC_HDR + b.len();
+                    if let Some(q) = core.pend[i].as_mut() {
+                        q.delivered = true;
+                    }
+                    return Ok(total);
+                }
+                if me.cv.wait_interruptible(&mut core) {
+                    return Err(ERESTARTSYS);
+                }
+            }
+        }
+
+        fn write_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterSource<'_>) -> Result<usize> {
+            let me = kiocb.file();
+            let n = iov.len();
+            if !(REC_HDR..=REC_MAX).contains(&n) {
+                return Err(EINVAL);
+            }
+            let mut buf = KVec::with_capacity(n, GFP_KERNEL)?;
+            if iov.copy_from_iter_vec(&mut buf, GFP_KERNEL)? != n {
+                return Err(EFAULT);
+            }
+            me.submit_reply(&buf)?;
+            Ok(n)
+        }
+    }
+
+    fn register_xart_dev(data: &Arc<SepData>) -> Result {
+        let reg = KBox::pin_init(
+            try_pin_init!(XartDev {
+                reg <- MiscDeviceRegistration::register(MiscDeviceOptions { name: c_str!("sep_native") }),
+                data: data.clone(),
+            }),
+            GFP_KERNEL,
+        )?;
+        // Jamais libéré (cf. `XartDev`) : `open` s'appuie dessus.
+        core::mem::forget(reg);
+        Ok(())
+    }
+
     // --- pilote ---------------------------------------------------------------------------------------------
     pub(crate) struct SepNative {
         data: Arc<SepData>,
-        mbox: Option<Mailbox<SepData>>,
     }
 
     kernel::of_device_table!(
@@ -720,14 +1178,26 @@ mod drv {
         let shmem = build_shmem(dev, &lpol, &ibot)?;
         dev_info!(dev, "shmem {:#x} o allouée, IOVA {:#x} (magic panique {:?})\n", SHMEM_SIZE, shmem.dma_handle(),
                   SHMEM_MAGIC_PANIC);
+        let ool = if param_allow_xart() {
+            let a = dma::Coherent::<u8>::zeroed_slice(dev, OOL_SIZE, GFP_KERNEL)?;
+            let b = dma::Coherent::<u8>::zeroed_slice(dev, OOL_SIZE, GFP_KERNEL)?;
+            dev_info!(dev, "OOL 0x13 alloués : A IOVA {:#x}, B IOVA {:#x}\n", a.dma_handle(), b.dma_handle());
+            Some((a, b))
+        } else {
+            None
+        };
+        let bsnap = KVec::with_capacity(if ool.is_some() { OOL_SIZE } else { 0 }, GFP_KERNEL)?;
 
         let data = Arc::pin_init(
             try_pin_init!(SepData {
                 dev: ARef::<device::Device>::from(dev),
                 shmem,
+                ool,
                 fw,
                 ring: Ring::new(),
-                core <- new_mutex!(Core::new()),
+                opened: Atomic::new(0),
+                core <- new_mutex!(Core::new(bsnap)),
+                tx <- new_mutex!(None),
                 cv <- new_condvar!(),
                 work <- new_work!("SepData::work"),
             }),
@@ -736,6 +1206,7 @@ mod drv {
         let mbox = Mailbox::new_byname(dev, c_str!("mbox"), data.clone()).inspect_err(|e| {
             dev_err!(dev, "mailbox 'mbox' indisponible : {:?}\n", e);
         })?;
+        *data.tx.lock() = Some(mbox);
         dev_info!(dev, "mailbox 'mbox' prise (réception active, rien envoyé)\n");
 
         if param_allow_boot() == 0 {
@@ -743,15 +1214,25 @@ mod drv {
         } else {
             dev_info!(dev, "allow_boot=1 : séquence de boot m1n1 (GET_STATUS/TZ0/GET_STATUS/IMG4+SET_SHMEM)\n");
             // Erreur de boot ≠ échec du probe : une fois un mot envoyé, rien ne doit être libéré.
-            match boot(&data, &mbox) {
+            match boot(&data) {
                 Ok(()) => {
                     data.settle(DISCOVERY_SETTLE_MS);
+                    if param_allow_xart() {
+                        match data.open_xart().and_then(|()| register_xart_dev(&data)) {
+                            Ok(()) => dev_info!(
+                                dev,
+                                "/dev/sep_native prêt (lancer sepd) ; ACK des SAVE : {}\n",
+                                if param_allow_save_ack() { "AUTORISÉ" } else { "refusé (un SAVE → Halted)" }
+                            ),
+                            Err(e) => dev_err!(dev, "0x13 non servi : {:?} (état {:?})\n", e, data.state()),
+                        }
+                    }
                 }
                 Err(e) => dev_err!(dev, "boot interrompu : {:?} (état {:?})\n", e, data.state()),
             }
             data.log_table();
         }
-        Ok(SepNative { data, mbox: Some(mbox) })
+        Ok(SepNative { data })
     }
 
     impl platform::Driver for SepNative {
@@ -768,6 +1249,10 @@ mod drv {
                     dev_err!(pdev, "{}={} : non implémenté dans cette version, refus\n", name, v);
                     return Err(EINVAL);
                 }
+            }
+            if (param_allow_xart() && param_allow_boot() == 0) || (param_allow_save_ack() && !param_allow_xart()) {
+                dev_err!(pdev, "allow_xart exige allow_boot=1 et allow_xart_save_ack exige allow_xart=1 : refus\n");
+                return Err(EINVAL);
             }
             if TOUCHED.load(Acquire) != 0 {
                 dev_err!(pdev, "le SEP a déjà été touché depuis ce boot : refus (power-cycle requis)\n");
@@ -793,16 +1278,14 @@ mod drv {
                     "unbind après envoi au SEP : fuite volontaire de la mailbox, de la shmem et du mapping firmware \
                      (le SEP peut encore faire du DMA) ; power-cycle requis\n"
                 );
-                // La mailbox garde son cookie (une référence sur `SepData`) : la shmem et l'état restent
-                // vivants, le callback reste valide (le module ne peut plus être déchargé, cf. mark_touched).
-                if let Some(m) = self.mbox.take() {
-                    core::mem::forget(m);
-                }
+                // La mailbox reste dans `SepData::tx` et garde son cookie (une référence sur `SepData`) : ce
+                // cycle voulu garde la shmem, les OOL et l'état vivants, le callback reste valide (le module ne
+                // peut plus être déchargé, cf. mark_touched). /dev/sep_native, s'il existe, reste aussi.
             } else {
                 // Rien n'a été envoyé : arrêt normal. Le drop de la mailbox fait `apple_mbox_stop` (plus aucun
-                // callback, donc plus aucune mise en file), puis on attend un éventuel work en cours : le
-                // module peut être déchargé juste après.
-                self.mbox = None;
+                // callback, donc plus aucune mise en file) et rend le cookie (fin du cycle), puis on attend un
+                // éventuel work en cours : le module peut être déchargé juste après.
+                drop(self.data.tx.lock().take());
                 // SAFETY: `self.data` est vivant (on tient une référence), donc son champ `work`, épinglé dans
                 // l'`Arc`, est un `work_struct` initialisé par `new_work!` ; `raw_get` ne fait que calculer
                 // son adresse.

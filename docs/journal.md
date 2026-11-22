@@ -2092,3 +2092,14 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   xarm 0x13 [2,2,2,2], pnon 0x15 [7,7,5,5], hdcp 0x0e [1,1,1,1] (= SEP-BOOT sous m1n1, sans sbio/sks tant que
   xART n'est pas servi). CNTL spontanés 0x0d, 0x29, 0x10 (rien envoyé). xarm : 1re requête TYPE 0x0e reçue,
   NON servie. État final Running. Aucun ACK envoyé, aucun SAVE.
+
+## 2026-11-22 — Claude (driver) — J4 étape 7 préparée : service xART dans sep_native + démon sepd (compilé, rien chargé)
+- `sep_native.rs` : `allow_xart` (ouverture CNTL 0x13 SECMODE + A/B 0x8000 comme `sep_native_persist.sh`, puis
+  `/dev/sep_native`) et `allow_xart_save_ack` (sinon SAVE → Halted). Noyau sans store ni politique : il contrôle chaque
+  réponse du démon par `sep-proto/src/xart_gate.rs::check_reply` avant envoi. Détails : `driver/rust/kmod/SEP_NATIVE.md`.
+- `driver/rust/sepd` : démon (store `/var/lib/sepd`, UUID d'OS dans `/etc/sepd/os_uuid`, absent → refus de démarrer).
+  Tests : 30 paires 0x13 de snew-reel reproduites (mot + tampon A), branches natives ABSENT/SAVE testées hors ligne.
+- Build : `build.sh` et `CLIPPY=1` sans avertissement, vermagic 7.2.12-3-1-ARCH. Aucun chargement, aucun matériel.
+- 1er run `allow_xart=1 allow_xart_save_ack=1` = classe neuve pour ce pilote → go d'Albert.
+- Correctif (demande de la coordination) : après ouverture de 0x13, messages des autres EP annoncés et annonces 0xFD
+  journalisés et ignorés (comme le harnais m1n1), plus de Halted pour eux ; ligne « sbio annoncé » à l'annonce de 0x08.

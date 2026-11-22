@@ -26,6 +26,7 @@ pub mod sensor;
 pub mod word;
 pub mod xart;
 pub mod xart_responder;
+pub mod xart_gate;
 
 #[cfg(feature = "std")]
 pub mod trace;

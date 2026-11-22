@@ -12,6 +12,8 @@ Modules (les statuts vérifié / hypothèse sont ceux de `docs/verification_stat
 - `gt` : règle de compteur GT (`CounterChecker`, utilisable en ligne), en-tête OOL, réassemblage, CRC des tranches
   0x65, et `fragment()` (découpage côté émetteur, calcul seulement).
 - `sensor` : trames capteur, statut, commandes et identité vérifiées sur matériel (`mesa_probe`, 2026-11-22).
+- `xart_gate` : porte des réponses 0x13 (politique native) et format des enregistrements de `/dev/sep_native`, partagés
+  par le noyau (`kmod/sep_native.rs`) et le démon (`sepd/`).
 - `xart` : codec EP 0x13 et coffre gigalocker (.gl). `xart_responder` : réponses de macOS reproduites ; la politique
   native (ABSENT, persistance des SAVE) est isolée et marquée HYPOTHÈSE.
 - `daemon` : séquence d'init sbio (57 commandes) et stockage des blobs 0x6c → 0x6d.
