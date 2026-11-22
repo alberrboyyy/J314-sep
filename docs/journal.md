@@ -2082,3 +2082,6 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `disabled` (sep.rs ne se lie pas). GRUB : aucune ligne `devicetree` (vérifié par Albert).
 - Prochaine étape : reboot normal, puis docs/j2_runbook.md étape 4 (lecture seule, puis `allow_boot=1`).
 - Retour arrière : `sudo update-m1n1` (DT stock). Secours : tethered boot (fichiers sur le PC, ~/alarm-recovery/j2).
+- 17:58 (après reboot) : sep_native en lecture seule OK. Overlay appliqué (sepfw phys 0x1000550c000 taille 0x5b0000,
+  mbox 0x35, DART sep 0x36 sid 0, ps 0x37). sep_native : manifestes lpol 0xb7b o / ibot 0x15cc o, shmem 0x30000 o à
+  IOVA 0xfffc0000, magic « CINP », mailbox prise, allow_boot=0 → aucun envoi. Suite : rmmod puis allow_boot=1.
