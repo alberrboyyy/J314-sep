@@ -13,7 +13,8 @@
       "Bash(git -C m1n1 commit:*)",
       "Bash(git -C m1n1 switch:*)",
       "Bash(ls:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(git push origin master)"
     ],
     "ask": [
       "Bash(./tools/boot_test_kernel.sh:*)",
@@ -33,7 +34,12 @@
       "Bash(nvram:*)",
       "Bash(picocom:*)",
       "Bash(screen:*)",
-      "Bash(git push:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push origin master --force:*)",
+      "Bash(git push origin master -f:*)",
+      "Bash(git push origin +master:*)",
       "Bash(git -C m1n1 push:*)",
       "Bash(gh:*)",
       "Bash(rm -rf:*)",
