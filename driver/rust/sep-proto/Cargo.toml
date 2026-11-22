@@ -1,0 +1,14 @@
+[package]
+name = "sep-proto"
+version = "0.1.0"
+edition = "2021"
+description = "AP<->SEP protocol (mailbox word, discovery, GT, xART, sensor frames) for the j314c Touch ID driver. Offline, emits nothing."
+license = "GPL-2.0-or-later OR MIT"
+publish = false
+
+[features]
+default = ["std"]
+# std: offline reader for traces/ (sep.log + .ool). The core is no_std + alloc so the kernel module can reuse it.
+std = []
+
+[dependencies]

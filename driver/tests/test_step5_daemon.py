@@ -42,7 +42,7 @@ class InitSequenceTests(unittest.TestCase):
         trs = sbio_traces()
         n = sum(ap_cmds(t)[:57] == list(INIT_SEQUENCE) for t in trs)
         self.assertEqual(n, len(trs))
-        self.assertEqual(len(trs), 18)
+        self.assertGreaterEqual(len(trs), 18)   # 18 when written (C1-C12) ; 23 since c13-c25
         print("\n[step5] séquence d'init de 57 commandes reproduite exactement : %d/%d captures avec sbio" % (n, len(trs)))
 
     def test_plan_without_store_has_only_types(self):
