@@ -2556,3 +2556,10 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   « VERDICT : 2e passe terminée, capteur au repos final de macOS ». sbiod rc=0.
 - ⇒ (n=1) toute l'init capteur fonctionne sur un état scellé RECHARGÉ : plus besoin de seal frais. Un enrôlement futur
   ne serait plus effacé au boot suivant. Reste : enrôlement (jeton du 0x03), match.
+
+## 2026-11-23 — Claude (session ALARM) — J8 re-run (n=2) : PRÉDICTION écrite AVANT le run
+- Même script (`pending/j8_chained_sensor.sh`, éprouvé 00:30), mêmes binaires (sepd `6ad1992f…`, sep_native.ko `ff799c11…`, sbiod J5c),
+  même store (identique à sa copie d'avant J7b).
+- Prédiction : sepd = 4 lockers sans UUID ×2 + op 0x07, **0 SAVE** ; sbio VIVANT ; sbiod : « patch chargé (0x29 … IRQ 195 vue) »,
+  « capteur initialisé et calibré (1re passe ; 0x5b acquitté, 0x63 = référence macOS) », 2e passe « patch chargé (0x29) » puis
+  « VERDICT : 2e passe terminée, capteur au repos final de macOS … 0x63 ×2 = référence macOS » ; sbiod rc=0.
