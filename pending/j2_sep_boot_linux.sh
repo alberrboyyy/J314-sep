@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 # =============================================================================
-# j2_sep_boot_linux.sh — J2 : faire démarrer SEPOS par le pilote Linux `sep.rs` (noyau ALARM stock), en
-#                         tethered boot, avec un DTB qui active le SEP. RIEN n'est écrit sur le disque du Mac.
+# j2_sep_boot_linux.sh — J2, étape 1/2 : démarrer ALARM en tethered boot avec un DTB portant l'alias `sep`, pour
+#   que m1n1 réserve `sepfw`. Ce boot n'envoie RIEN au SEP. L'étape 2 (boot SEPOS) = sep_native, sur ALARM, go
+#   d'Albert. RIEN n'est écrit sur le disque du Mac.
 #
 # BUT : premier démarrage de SEPOS **depuis Linux natif** (roadmap J2). Le noyau ALARM contient déjà le pilote
 #   `drivers/soc/apple/sep.rs` (CONFIG_APPLE_SEP=y), mais il ne se lie à rien : le nœud `sep@396400000` est
 #   `disabled` et il n'y a pas d'alias `sep`. Sans alias, m1n1 ne réserve pas la zone `sepfw`, et la sonde de
 #   `sep.rs` échoue de toute façon (`reserved_mem_region_to_resource_byname("sepfw")`, sep.rs:346).
 #   On démarre donc ALARM en tethered boot (tools/tethered_boot.sh, déjà éprouvé le 2026-11-11), avec le DTB
-#   du noyau qui tourne + exactement 2 changements :
-#     1. /aliases/sep = "/soc/sep@396400000"   → m1n1 (kboot, dt_set_sep) réserve SEPFW et copie les manifestes ;
-#     2. /soc/sep@396400000 status = "okay"     → `sep.rs` se lie au SEP.
+#   du noyau qui tourne + UN SEUL changement (révisé 2026-11-22 : on ne passe plus par sep.rs, cf. RISQUE) :
+#     /aliases/sep = "/soc/sep@396400000" → m1n1 (kboot, dt_set_sep) réserve SEPFW et pose les manifestes sur ce
+#     nœud. Le nœud apple,sep RESTE disabled → sep.rs ne se lie pas, rien n'est envoyé au SEP pendant le boot.
+#   Ensuite, sur ALARM démarré (go d'Albert) : overlay sep_native_ovl (nœud « j314c,sep-native ») puis
+#   `insmod sep_native.ko allow_boot=1`, qui rejoue la séquence m1n1 éprouvée (GET_STATUS, TZ0, GET_STATUS,
+#   IMG4 + SET_SHMEM, magic CINP, unmap). Détails : driver/rust/kmod/SEP_NATIVE.md.
+#   ANCIENNE version (status okay → sep.rs) : ABANDONNÉE, sep.rs s'écarte de la séquence m1n1 :
 #   Au démarrage, `sep.rs` envoie de lui-même BOOT_TZ0 (EP 0xFF), attend 0x69 puis 0xD2, envoie BOOT_IMG4
 #   (EP 0xFF, IOVA du firmware) + SET_SHMEM (EP 0xFE), attend 0x6A (sep.rs:198-252). Ce script N'ENVOIE RIEN
 #   au SEP lui-même : c'est le pilote public du noyau qui le fait, au boot.
 #
-# ENDPOINTS TOUCHÉS : 0xFF (BOOT_TZ0, BOOT_IMG4) et 0xFE (SET_SHMEM), envoyés par sep.rs. sep.rs IGNORE tous les
-#   autres EP (sep.rs:281 `_ => {}`) : il n'acquitte AUCUN message xART 0x13 (donc aucun SAVE, aucun compteur
-#   scellé avancé), aucun 0x12 SKS, aucun 0x08 sbio. Rien vers le Secure Element « Stockholm ».
+# ENDPOINTS TOUCHÉS : AUCUN par ce script (sep.rs ne se lie pas). Étape 2 (sep_native allow_boot=1) : 0xFF
+#   (GET_STATUS, BOOT_TZ0, BOOT_IMG4) et 0xFE (SET_SHMEM) seulement ; sep_native ne répond à AUCUN autre EP (pas
+#   d'ACK xART 0x13, donc aucun SAVE, aucun compteur scellé avancé ; rien vers 0x12/0x08 ni vers « Stockholm »).
 #
 # RISQUE :
 #   - Classe « boot IMG4 » = déjà éprouvée sous m1n1 (route native, CLAUDE.md) ; mais 1er run de CE script et
@@ -79,7 +84,6 @@ for f in "$KERNEL" "$INITRAMFS" "$DTB_SRC"; do [ -f "$f" ] || die "fichier absen
 fdtget "$DTB_SRC" /smbios compatible >/dev/null 2>&1 && die "le DTB source a un nœud smbios (cf. journal 2026-11-11) : mauvais DTB"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 cp "$DTB_SRC" "$tmp/edit.dtb"
-fdtput -t s "$tmp/edit.dtb" "$SEP_PATH" status okay
 fdtput -t s "$tmp/edit.dtb" /aliases sep "$SEP_PATH"
 # Espace libre EN DERNIER (fdtput recompacte) : m1n1 kboot ajoute des nœuds au DTB (cf. journal 2026-11-11).
 dtc -q -I dtb -O dtb -p 32768 -o "$DTB_OUT" "$tmp/edit.dtb"
@@ -89,16 +93,17 @@ dtc -q -I dtb -O dtb -p 32768 -o "$DTB_OUT" "$tmp/edit.dtb"
 dtc -q -I dtb -O dts -o "$tmp/a.dts" "$DTB_SRC"
 dtc -q -I dtb -O dts -o "$tmp/b.dts" "$DTB_OUT"
 changes="$(diff "$tmp/a.dts" "$tmp/b.dts" | grep -E '^[<>]' || true)"
-echo "Différences DTB (attendu : status disabled→okay + alias sep) :"; echo "$changes"
+echo "Différences DTB (attendu : alias sep seulement ; le nœud apple,sep reste disabled) :"; echo "$changes"
 nplus=$(echo "$changes" | grep -c '^>' || true); nminus=$(echo "$changes" | grep -c '^<' || true)
-[ "$nplus" -eq 2 ] && [ "$nminus" -eq 1 ] || die "DTB : changements inattendus (+$nplus/-$nminus), arrêt (fail-closed)"
-echo "$changes" | grep -q 'status = "okay"' && echo "$changes" | grep -q 'sep = "/soc/sep@396400000"' \
-  || die "DTB : les 2 changements attendus ne sont pas là"
+[ "$nplus" -eq 1 ] && [ "$nminus" -eq 0 ] || die "DTB : changements inattendus (+$nplus/-$nminus), arrêt (fail-closed)"
+echo "$changes" | grep -q 'sep = "/soc/sep@396400000"' || die "DTB : alias sep absent du diff"
+[ "$(fdtget -t s "$DTB_OUT" "$SEP_PATH" status)" = "disabled" ] || die "le nœud apple,sep doit rester disabled (sinon sep.rs boote seul)"
 [ "$(fdtget -t s "$DTB_OUT" /aliases sep)" = "$SEP_PATH" ] || die "alias sep absent"
 
 echo
 echo "DTB prêt : $DTB_OUT"
-echo "⚠️  1er boot de SEPOS par Linux. Lancer seulement avec le GO d'Albert (P1..P4 vérifiées)."
+echo "Ce boot NE démarre PAS le SEP : sep.rs ne se lie pas (nœud disabled). Le boot SEPOS se fait ensuite, sur ALARM,"
+echo "par sep_native (allow_boot=1), avec le GO d'Albert. Voir driver/rust/kmod/SEP_NATIVE.md."
 [ "${YES:-}" = 1 ] || { read -r -p "Tethered boot d'ALARM avec le SEP activé ? [oui/N] " ok; [ "$ok" = oui ] || die "annulé."; }
 
 YES=1 KERNEL="$KERNEL" INITRAMFS="$INITRAMFS" DTB="$DTB_OUT" exec "$(dirname "$0")/../tools/tethered_boot.sh" alarm
