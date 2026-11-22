@@ -5,7 +5,8 @@
 //!
 //! Protocol (`docs/sbio_session.md`, `docs/sbio_keyexchange.md`, `docs/j5_params_protocol.md`; 0x17..0x5f
 //! hardware-proven under m1n1 by `pending/sep_native_sbio3.sh` .. `sep_native_sbio11.sh` and natively by J5 v2;
-//! 0x5d..0x63 = macOS captures only, c12 seq 317-344, identical sizes in 9/9 boots):
+//! 0x5d..0x63 natively by J5c (n=1); 2nd pass 0x19..0x63 ×2 = macOS captures only, c12 seq 345-382, identical sizes in
+//! 9/9 boots, `docs/j5_params_protocol.md` §8):
 //! - command: buffer A8 = gt_packet `OolHeader { valid 1, total = len, offset 0, TYPE = op, len }` + payload, zero
 //!   padded; then `> EP 0x08 TAG 0xfc TYPE op PARAM 0 DATA 0`. The c12 templates `000303..000343_08_A.bin` are exactly
 //!   this (checked by `sbiod/tests/replay.rs`), so the kernel builds the packet from (op, payload), no template.
@@ -59,10 +60,16 @@ const fn step(op: u8, name: &'static str, cmd_len: usize, cmd_fixed: Option<&'st
     Step { op, name, cmd_len, cmd_fixed, frag_in: false, reply_min: reply.0, reply_max: reply.1 }
 }
 
-/// The whitelist, IN ORDER (c12 seq 303-344 = 1st pass of the macOS init). Each step is admitted once, in this
-/// order, after the 0x73 hello (done by the kernel itself), up to the limit chosen at load time (`limit`).
-/// Nothing after 0x63 (no 0x19 / 2nd pass, no 0x6c / 0x6d, nothing about enrolment or match).
-pub const RELAY_SEQUENCE: [Step; 17] = [
+/// Exact total of the 2nd-pass patch (0x5f after 0x19): 0x70ce in 9/9 boots with OOL (c12 seq 358/360) and in the
+/// 4 SPI captures C17-C20 (one 0x70ce transfer each).
+pub const PATCH2_LEN: usize = 0x70ce;
+
+/// The whitelist, IN ORDER (c12 seq 303-382 = 1st pass, 0x19, 2nd pass of the macOS init = `daemon::INIT_SEQUENCE
+/// [1..35]`). Each step is admitted once, at its own position, after the 0x73 hello (done by the kernel itself), up to
+/// the limit chosen at load time (`limit`): an opcode of the 2nd pass is only admitted at its place in the 2nd pass,
+/// never as a free repetition. Nothing after the 2nd 0x63 of the 2nd pass (no 0x7c / 0x6b / 0x79 / 0x6d, no 0x6c,
+/// nothing about enrolment or match).
+pub const RELAY_SEQUENCE: [Step; 34] = [
     // prepareSession: sensor serial (16 bytes, identity frame [9..25]) -> empty ack.
     step(0x17, "prepareSession", 0x10, None, (0, 0)),
     // performKeyExchange (sessionType = 1, `01 00 00 00`) -> 40 opaque bytes for SPI frame 0x72.
@@ -92,7 +99,30 @@ pub const RELAY_SEQUENCE: [Step; 17] = [
     // --- calibration (LIMIT_CALIB) ---
     // setCalibrationData: the captured blob, AP -> SEP in 4 fragments -> empty reply. SEP only.
     Step { op: 0x5b, name: "setCalibration", cmd_len: CALIB_LEN, cmd_fixed: None, frag_in: true, reply_min: 0, reply_max: 0 },
-    // getCalibrationDataInfo: empty -> 28 bytes. Last step.
+    // getCalibrationDataInfo: empty -> 28 bytes. Last step of the 1st pass.
+    step(0x63, "calibrationInfo", 0, Some(&[]), (0x1c, 0x1c)),
+    // --- 2nd pass (LIMIT_PASS2), docs/j5_params_protocol.md §8; c12 seq 345-382, 9/9 boots ---
+    // HandleReset: empty -> empty. macOS sends it after powering the sensor off and on (C17-C20).
+    step(0x19, "handleReset", 0, Some(&[]), (0, 0)),
+    step(0x17, "prepareSession", 0x10, None, (0, 0)),
+    step(0x15, "keyExchange", 4, Some(&[1, 0, 0, 0]), (0x28, 0x28)),
+    step(0x16, "keyExchange2", 0x28, None, (0, 0)),
+    step(0x42, "initSeqCounter", 0, None, (0x40, 0x40)),
+    step(0x18, "seqCounter2", 0x40, None, (0, 0)),
+    // 2nd patch: 0x70ce bytes exactly (2 fragments 0x3fe4 + 0x30ea).
+    step(0x5f, "loadPatch", 2, Some(&[2, 0]), (PATCH2_LEN, PATCH2_LEN)),
+    step(0x5d, "sensorParams5d", 4, Some(&[0, 0, 0, 0]), (0x37, 0x37)),
+    step(0x5c, "sensorParams5c", 4, Some(&[0, 0, 0, 0]), (0x37, 0x37)),
+    // 2nd pass: 0x6a now returns 68 bytes (SPI frame 0x55 of 0x4d), and 0x6f (77 bytes, frame of 0x56) follows.
+    step(0x6a, "sensorParams6a", 0, Some(&[]), (0x44, 0x44)),
+    step(0x6f, "sensorParams6f", 0, Some(&[]), (0x4d, 0x4d)),
+    // ONE module serial pair in the 2nd pass.
+    step(0x31, "moduleSerial", 0, Some(&[]), (0x40, 0x40)),
+    step(0x32, "moduleSerial2", 0x40, None, (0x12, 0x12)),
+    step(0x01, "patchDone", 0, Some(&[]), (0, 0)),
+    step(0x1f, "matchPolicy", 0, Some(&[]), (2, 2)),
+    // No 0x5b in the 2nd pass; 0x63 twice in a row (same 28 bytes both times). Last step.
+    step(0x63, "calibrationInfo", 0, Some(&[]), (0x1c, 0x1c)),
     step(0x63, "calibrationInfo", 0, Some(&[]), (0x1c, 0x1c)),
 ];
 
@@ -100,13 +130,16 @@ pub const RELAY_SEQUENCE: [Step; 17] = [
 pub const LIMIT_PATCH: usize = 6;
 pub const LIMIT_PARAMS: usize = 15;
 pub const LIMIT_CALIB: usize = 17;
+pub const LIMIT_PASS2: usize = 34;
 
-/// Steps admitted for `allow_sbio_params` = 0 (up to 0x5f), 1 (up to the 2nd 0x32), 2 (up to 0x63).
+/// Steps admitted for `allow_sbio_params` = 0 (up to 0x5f), 1 (up to the 2nd 0x32), 2 (up to 0x63), 3 (then 0x19 and
+/// the 2nd pass, up to its 2nd 0x63).
 pub const fn limit(level: u32) -> Option<usize> {
     match level {
         0 => Some(LIMIT_PATCH),
         1 => Some(LIMIT_PARAMS),
         2 => Some(LIMIT_CALIB),
+        3 => Some(LIMIT_PASS2),
         _ => None,
     }
 }
@@ -301,9 +334,10 @@ mod tests {
     fn order_and_lengths() {
         for (i, s) in RELAY_SEQUENCE.iter().enumerate().filter(|(_, s)| !s.frag_in) {
             let p = payload(s);
-            assert!(check_cmd(i, LIMIT_CALIB, s.op, &p[..s.cmd_len]).is_ok(), "{i}");
-            assert!(check_cmd(i, LIMIT_CALIB, s.op, &p[..s.cmd_len + 1]).is_err());
-            assert!(check_cmd(i, LIMIT_CALIB, OP_HELLO, &p[..s.cmd_len]).is_err());
+            assert!(check_cmd(i, LIMIT_PASS2, s.op, &p[..s.cmd_len]).is_ok(), "{i}");
+            assert!(check_cmd(i, LIMIT_PASS2, s.op, &p[..s.cmd_len + 1]).is_err());
+            assert!(check_cmd(i, LIMIT_PASS2, OP_HELLO, &p[..s.cmd_len]).is_err());
+            assert_eq!(check_cmd(i, LIMIT_CALIB, s.op, &p[..s.cmd_len]).is_ok(), i < LIMIT_CALIB);
         }
         let p = [0u8; 0x10];
         assert!(check_cmd(1, LIMIT_CALIB, 0x17, &p).is_err()); // replay / out of order
@@ -313,13 +347,43 @@ mod tests {
         assert!(check_cmd(1, LIMIT_PATCH, 0x15, &[2, 0, 0, 0]).is_err());
         assert!(check_cmd(15, LIMIT_PARAMS, 0x5b, &[0; 4]).is_err()); // level 1: nothing after 2nd 0x32
         assert!(check_cmd(16, LIMIT_CALIB, 0x63, &[]).is_ok());
-        assert!(check_cmd(17, LIMIT_CALIB, 0x19, &[]).is_err()); // nothing after 0x63
-        assert_eq!((limit(0), limit(1), limit(2), limit(3)), (Some(6), Some(15), Some(17), None));
-        // c12 order of the 1st pass (daemon::INIT_SEQUENCE[1..18]).
-        let ops: [u8; 17] = core::array::from_fn(|i| RELAY_SEQUENCE[i].op);
-        assert_eq!(ops[..], crate::daemon::INIT_SEQUENCE[1..18]);
+        assert!(check_cmd(17, LIMIT_CALIB, 0x19, &[]).is_err()); // level 2: nothing after 0x63
+        assert!(check_cmd(17, LIMIT_PASS2, 0x19, &[]).is_ok());
+        assert!(check_cmd(33, LIMIT_PASS2, 0x63, &[]).is_ok());
+        assert!(check_cmd(34, LIMIT_PASS2, 0x63, &[]).is_err()); // nothing after the 2nd 0x63 of the 2nd pass
+        assert!(check_cmd(34, LIMIT_PASS2, 0x7c, &[]).is_err());
+        assert_eq!((limit(0), limit(1), limit(2), limit(3), limit(4)), (Some(6), Some(15), Some(17), Some(34), None));
+        // c12 order of the 1st pass, 0x19 and the 2nd pass (daemon::INIT_SEQUENCE[1..35]).
+        let ops: [u8; 34] = core::array::from_fn(|i| RELAY_SEQUENCE[i].op);
+        assert_eq!(ops[..], crate::daemon::INIT_SEQUENCE[1..35]);
         assert_eq!(RELAY_SEQUENCE[LIMIT_PATCH - 1].op, 0x5f);
         assert_eq!(RELAY_SEQUENCE[LIMIT_PARAMS - 1].op, 0x32);
+        assert_eq!(RELAY_SEQUENCE[LIMIT_CALIB].op, 0x19);
+        assert_eq!(INIT_SEQUENCE_NEXT, 0x7c);
+    }
+
+    const INIT_SEQUENCE_NEXT: u8 = crate::daemon::INIT_SEQUENCE[35];
+
+    #[test]
+    fn second_pass_is_linear() {
+        // A 2nd-pass opcode is admitted only at its own position: not as a repetition right after the 1st pass,
+        // not out of order inside the 2nd pass.
+        assert!(check_cmd(17, LIMIT_PASS2, 0x17, &[0; 0x10]).is_err()); // 0x17 before 0x19
+        assert!(check_cmd(18, LIMIT_PASS2, 0x15, &[1, 0, 0, 0]).is_err()); // skipping 0x17
+        assert!(check_cmd(27, LIMIT_PASS2, 0x31, &[]).is_err()); // 0x31 where 0x6f is due
+        assert!(check_cmd(32, LIMIT_PASS2, 0x5b, &[]).is_err()); // no calibration in the 2nd pass
+        assert!(check_cmd(27, LIMIT_PASS2, 0x6f, &[]).is_ok());
+        assert!(check_cmd(27, LIMIT_PASS2, 0x6f, &[0]).is_err());
+        // Reply bounds of the 2nd pass: 0x6a = 0x44 (and no longer 0), 0x6f = 0x4d, 0x5f = 0x70ce exactly.
+        let h = |op: u8, t: u32| OolHeader { valid: 1, total: t, offset: 0, ty: u32::from(op), len: t.min(0x3fe4) }.to_bytes();
+        assert!(check_fragment(&RELAY_SEQUENCE[26], &h(0x6a, 0x44), 0, None, 0).is_ok());
+        assert!(check_fragment(&RELAY_SEQUENCE[26], &h(0x6a, 0), 0, None, 0).is_err());
+        assert!(check_fragment(&RELAY_SEQUENCE[8], &h(0x6a, 0x44), 0, None, 0).is_err()); // 1st pass: empty only
+        assert!(check_fragment(&RELAY_SEQUENCE[27], &h(0x6f, 0x4d), 0, None, 0).is_ok());
+        assert!(check_fragment(&RELAY_SEQUENCE[23], &h(0x5f, 0x70ce), 0, None, 0).is_ok());
+        assert!(check_fragment(&RELAY_SEQUENCE[23], &h(0x5f, 0x568e), 0, None, 0).is_err());
+        assert!(check_fragment(&RELAY_SEQUENCE[5], &h(0x5f, 0x568e), 0, None, 0).is_ok());
+        assert_eq!(RELAY_SEQUENCE.iter().filter(|s| s.frag_in).count(), 1);
     }
 
     #[test]

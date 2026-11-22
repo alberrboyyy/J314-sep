@@ -2327,3 +2327,28 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - ⇒ toute la 1re passe d'init macOS (0x73 → 0x63) tourne en Linux natif, sans macOS ni m1n1. Statut : calibration n=1.
 - Ouvert : macOS enchaîne ensuite 0x19 (reset capteur) + 2e passe (0x17→0x5f patch 28878 o, 0x6f, …) avant d'être
   « prêt pour un doigt » : nécessaire ou pas pour un match/enrôlement ? → à cartographier (protocole d'abord) avant J6.
+
+## 2026-11-22 22:00 — agent driver (session ALARM) — 2e passe macOS cartographiée et codée (niveau 3 / `--upto pass2`), RIEN lancé
+- Sources (lecture seule) : c12 `sep.log` L404-482 + OOL 000345-000380 ; 23 captures à trafic 0x08 (ordre des mots) ;
+  9 boots à OOL (tailles) ; C17 `spi2.log` L1239-1812 (gpio0 196/195, registres) ; C18/C19/C20 via
+  `analysis/sio_dialog.py --sep --full` et `spi2_gpio_timeline.py --patch/--params`. Doc : `docs/j5_params_protocol.md` §8.
+- VU : 2e passe `19 17 15 16 42 18 5f 5d 5c 6a 6f 31 32 01 1f 63 63` (23/23), puis 0x7c (usage). 0x19 et 0x5b une fois
+  par boot (23/23 : pas de 2e 0x5b). Tailles 9/9 : 0x19 0→0 ; 0x5f → **0x70ce** (2 fragments) ; 0x6a 0→**0x44** (1re
+  passe 0→0) ; 0x6f 0→**0x4d** ; une seule paire 0x31/0x32 (même chaîne de 18 o) ; 0x63 ×2 = même réf. 28 o.
+- VU capteur : juste après `< 0x63`, macOS coupe gpio0 196 (≤ 0,8 ms) **11,0-11,6 ms** (4/4) puis rallume ; IRQ ~8 ms ;
+  DEUX lectures d'état (`00 60 00 00 18 52 33 00 00` puis `…00 00 52 33 00 00`, 3/3) ; puis `> 0x19` ; identité par
+  `80 70` **sans 80 78** ; 0x72/0x73 ; push du patch n°2 même motif (IRQ 49-55 ms après le bloc, état `…29 01 00 7c…`) ;
+  trames 0x55 de 0x40/0x40/0x4d/0x56/0x49, état `00 00 21 00 0c 52 33 00 16` après 0x5d/0x5c/0x6a/0x6f (3/3) ;
+  aucune SPI après la réponse 0x75.
+- Code : `sbio_gate.rs` RELAY_SEQUENCE 17 → 34 étapes (linéaire, chaque 2e occurrence à son rang seulement ; 0x5f n°2
+  borné à 0x70ce exact, 0x6a n°2 à 0x44, 0x6f à 0x4d), `LIMIT_PASS2`, `limit(3)` ; `sensor.rs` états de réveil ;
+  `sep_native.rs` `allow_sbio_params=3` ; `sbiod` `--upto pass2` (coupure 40 ms, réveil/identité comparés à macOS,
+  patch n°2 = 0x70ce, n° de série module = 1re passe, 2e 0x63 non envoyé si le 1er diffère) ; `Sensor::power` ;
+  `pending/j5c_params_run.sh` UPTO=pass2 (défaut inchangé = params), `j5_sensor_run.sh` accepte SBIO_PARAMS=3.
+- Tests : sep-proto 32+17, sbiod 1+15 (rejeu pass2 contre c12 : A8 = macOS pour les 16 commandes de la 2e passe,
+  ordre SPI = macOS, 12 arrêts fail-closed), sepd verts ; `build.sh` et `build.sh CLIPPY=1` 0 avertissement ; clippy
+  sbiod/sep-proto 0.
+- Builds : `~/kbuild/j5/sep_native.ko` 66b5235f…7941 (ancien → `.v3` 891c5f96…2e9a), `sbiod` 259e7d5f…149b (ancien →
+  `.v3` 56996c18…3c34).
+- Écarts choisis / incertains : coupure 40 ms (macOS 11 ms) ; pas de 80 78 (comme macOS, jamais fait sous Linux) ;
+  0x19 jamais envoyé hors macOS ; sensibilité au délai 0x63→0x19 inconnue. 1er run `UPTO=pass2` = go d'Albert.

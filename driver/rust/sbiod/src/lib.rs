@@ -10,7 +10,14 @@
 //!    0x6a (empty, no SPI); 0x31 → 64 bytes → frame 0x55 → pin → status (0x4b pending) → 0x75 answer (CRC16) →
 //!    64 bytes @ 9 → 0x32 → 18 bytes; 0x01; 0x1f; 0x31/0x32 again (docs/j5_params_protocol.md §1-3);
 //! 6. `Upto::Calib`: 0x5b with the captured calibration file (sha256, sensor serial at [91..107], module serial at
-//!    [889..907] == the 0x32 answer), fragmented by the kernel; 0x63 → 28 bytes, compared with macOS. STOP (no 0x19).
+//!    [889..907] == the 0x32 answer), fragmented by the kernel; 0x63 → 28 bytes, compared with macOS. STOP (no 0x19);
+//! 7. `Upto::Pass2` (only if 6 gave the macOS 0x63): the 2nd pass of the macOS init (docs/j5_params_protocol.md §8,
+//!    C17-C20): sensor power cycled (gpio0 196 low, then high), ready pin, TWO status reads (`ST_POWER_ON`,
+//!    `ST_POWER_ON_2`), sbio 0x19 (empty → empty), identity WITHOUT the 0x78 wake (`80 70`, ready pin, status
+//!    `ST_IDENTITY_READY`, 0x13, 27 bytes == identity, status), then 0x17 .. 0x5f as in 1-4 (patch of 0x70ce bytes,
+//!    same push), 0x5d, 0x5c, 0x6a (68 bytes → frame 0x4d), 0x6f (77 bytes → frame 0x56), ONE 0x31/0x32 pair (same
+//!    module serial), 0x01, 0x1f, 0x63 twice (macOS answer both times). STOP there: the rest state of macOS before its
+//!    first use of the sensor (macOS goes on with 0x7c / 0x6b / 0x79 / 0x6d: never sent).
 //!
 //! Source of every step: `pending/sep_native_sbio3.sh` .. `sep_native_sbio11.sh` (hardware-proven under m1n1 up to
 //! the push; the push itself never loaded the patch under m1n1: FIFO through the tunnel, 2.2 s), `docs/sbio_session.md`
@@ -65,6 +72,14 @@ pub const SERIAL_J314C: [u8; 16] =
 /// sessionType = 1 (`000305_08_A.bin`) and LoadPatch input (`000313_08_A.bin`).
 pub const KX_SESSION: [u8; 4] = [1, 0, 0, 0];
 pub const PATCH_INPUT: [u8; 2] = [2, 0];
+/// 2nd pass: the sensor stays off this long (macOS C17-C20: 11.0-11.6 ms; 40 ms = our power-on low time, longer is
+/// only a more complete reset).
+pub const PWR_CYCLE_OFF_MS: u64 = 40;
+/// 2nd pass: ready pin after power-on (macOS C17: status read 8.6 ms after power-on, right after the IRQ).
+pub const WAKE_IRQ_MS: u64 = 100;
+/// Lengths of the 2nd-pass 0x6a / 0x6f blobs (c12 000368 / 000370, 9/9 boots), sent as frames 0x55 of 0x4d / 0x56.
+pub const P6A_LEN: usize = 0x44;
+pub const P6F_LEN: usize = 0x4d;
 
 /// The SEP side: one whitelisted sbio command, its complete (reassembled) reply.
 pub trait Sep {
@@ -74,6 +89,9 @@ pub trait Sep {
 /// The sensor side. `xfer` = one SPI message of one transfer (tx; full duplex read of `tx.len()` if `rx`).
 pub trait Sensor {
     fn xfer(&mut self, tx: &[u8], rx: bool) -> Result<Vec<u8>, String>;
+    /// Power line (gpio0 196): true = on. Used only by the 2nd pass (the caller powers on before the run and off
+    /// after, in every path).
+    fn power(&mut self, on: bool) -> Result<(), String>;
     /// Ready / IRQ pin (gpio0 195), None if unavailable.
     fn ready(&mut self) -> Option<bool>;
     fn sleep_ms(&mut self, ms: u64);
@@ -101,6 +119,8 @@ pub enum Upto {
     Params,
     /// Then 0x5b + 0x63 (kernel level 2), with the calibration file.
     Calib,
+    /// Then the 2nd pass, 0x19 .. 0x63 ×2 (kernel level 3), with the calibration file.
+    Pass2,
 }
 
 /// Final result of a run.
@@ -110,6 +130,9 @@ pub enum Verdict {
     ParamsDone,
     /// `Upto::Calib`: 0x5b acked; `info_ref` = the 0x63 answer is the macOS one.
     Calibrated { info_ref: bool },
+    /// `Upto::Pass2`: every step of the 2nd pass passed its check; `info_ref` = both 0x63 answers are the macOS one
+    /// (false: the first one differed and the second was not sent).
+    Pass2Done { info_ref: bool },
     /// Status byte 1 == 0x29 after the block.
     Loaded { t_ms: u64, irq_seen: bool },
     /// Ready pin rose after the block but byte 1 never became 0x29 (sensor finished receiving and refused?).
@@ -135,6 +158,10 @@ impl Verdict {
             }
             Verdict::Calibrated { info_ref: false } => {
                 "VERDICT : 0x5b acquitté mais 0x63 ≠ référence macOS (calibration douteuse ; rien envoyé après)".into()
+            }
+            Verdict::Pass2Done { info_ref: true } => "VERDICT : 2e passe terminée, capteur au repos final de macOS (0x19, réveil, patch n°2 chargé, 0x5d/0x5c/0x6a/0x6f, 0x31/0x32, 0x01/0x1f ; 0x63 ×2 = référence macOS)".into(),
+            Verdict::Pass2Done { info_ref: false } => {
+                "VERDICT : 2e passe déroulée mais 0x63 ≠ référence macOS (2e 0x63 non envoyé ; rien après)".into()
             }
             Verdict::Stopped(why) => format!("VERDICT : arrêt (fail-closed) : {why}"),
         }
@@ -248,6 +275,50 @@ impl<S: Sensor> Mesa<'_, S> {
         Ok(id)
     }
 
+    /// Status read that must be `want` exactly (body bytes 7..16), logged in full.
+    fn status_is(&mut self, what: &str, want: &[u8; 9]) -> Result<(), String> {
+        let st = self.status_raw()?.ok_or_else(|| format!("{what} : état non reconnu (en-tête ≠ 80 20 00 10)"))?;
+        (self.log)(&format!("état {what} : {}", hex(&st)));
+        self.s.sleep_ms(GAP_MS);
+        if st[7..16] != want[..] {
+            return Err(format!("{what} : état {} ≠ macOS {}", hex(&st[7..16]), hex(want)));
+        }
+        Ok(())
+    }
+
+    /// 2nd pass, sensor side before sbio 0x19 (C17 gpio timeline + C18/C19/C20 contents, 3/3): power off, power on,
+    /// ready pin, two status reads with the macOS values. Fail-closed: the SEP has not been told anything yet.
+    pub fn power_cycle(&mut self) -> Result<(), String> {
+        self.s.power(false).map_err(|e| format!("coupure capteur : {e}"))?;
+        (self.log)(&format!("capteur coupé (gpio0 196 = 0), {PWR_CYCLE_OFF_MS} ms"));
+        self.s.sleep_ms(PWR_CYCLE_OFF_MS);
+        self.s.power(true).map_err(|e| format!("rallumage capteur : {e}"))?;
+        let t = self.s.now_ms();
+        let up = self.wait_pin(true, WAKE_IRQ_MS);
+        (self.log)(&format!("capteur rallumé (gpio0 196 = 1) ; IRQ 195 : {} (t+{} ms)", pin(up), self.s.now_ms() - t));
+        if up != Some(true) {
+            return Err(format!("IRQ 195 {} {WAKE_IRQ_MS} ms après le rallumage : aucune lecture, 0x19 non envoyé", pin(up)));
+        }
+        self.status_is("après rallumage (1)", &sensor::ST_POWER_ON)?;
+        self.status_is("après rallumage (2)", &sensor::ST_POWER_ON_2)
+    }
+
+    /// 2nd pass, after sbio 0x19: identity as macOS (C17-C20: `80 70` with NO `80 78` wake), every status checked.
+    pub fn identity2(&mut self) -> Result<Vec<u8>, String> {
+        self.x("identité 0x70", &CMD_IDENTITY, false)?;
+        let up = self.wait_pin(true, READY_TIMEOUT_MS);
+        if up != Some(true) {
+            return Err(format!("identité : IRQ 195 {} en {READY_TIMEOUT_MS} ms (aucune lecture)", pin(up)));
+        }
+        self.status_is("identité prête", &sensor::ST_IDENTITY_READY)?;
+        let id = self.read_pending("identité", IDENTITY_J314C.len())?;
+        if id != IDENTITY_J314C {
+            return Err(format!("identité inattendue {}", hex(&id)));
+        }
+        self.status_is("après l'identité", &sensor::ST_IDENTITY_READ)?;
+        Ok(id)
+    }
+
     /// Relay frame `op` carrying `blob`, then the sensor's answer (raw), as `spi_relay` of sbio4..11.
     pub fn relay(&mut self, op: u8, blob: &[u8], want_pending: usize) -> Result<Vec<u8>, String> {
         let mut f = [0u8; 0x100];
@@ -357,6 +428,11 @@ pub fn calib_from_c12(dir: &std::path::Path) -> Result<Vec<u8>, String> {
 /// sensor serial must be the one it holds (checked before the first command to the SEP).
 pub fn session<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, calib: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let id = m.identity()?;
+    relay_to_patch(sep, m, &id, calib)
+}
+
+/// 0x17 (serial of `id`) .. 0x5f, shared by both passes. Returns the patch block (prefix checked).
+fn relay_to_patch<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, id: &[u8], calib: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let serial = &id[sensor::SERIAL_RANGE];
     (m.log)(&format!("identité OK, n° de série {}", hex(serial)));
     if serial != SERIAL_J314C {
@@ -523,14 +599,66 @@ pub fn calibrate(sep: &mut dyn Sep, log: &mut dyn FnMut(&str), blob: &[u8]) -> R
     Ok(Verdict::Calibrated { info_ref: same })
 }
 
+/// Frame 0x55 of a 2nd-pass parameter opcode with an exact blob length, status = the 0x5d one (C19/C20 2/2, C18).
+fn param2<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, op: u8, input: &[u8], len: usize) -> Result<(), String> {
+    let blob = sep_cmd(sep, m.log, op, input)?;
+    expect_len(op, &blob, len)?;
+    m.param_frame(&format!("{op:#04x} (2e passe)"), &blob, &sensor::ST_AFTER_PARAMS)?;
+    Ok(())
+}
+
+/// Step 7: the 2nd pass (docs/j5_params_protocol.md §8), after a 1st pass that ended with the macOS 0x63. `s1` = the
+/// module serial of the 1st pass. Sensor powered on at the end (the caller powers it off).
+pub fn pass2<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, calib: &[u8], s1: &[u8]) -> Result<Verdict, String> {
+    m.power_cycle()?;
+    let r = sep_cmd(sep, m.log, 0x19, &[])?;
+    expect_len(0x19, &r, 0)?;
+    let id = m.identity2()?;
+    (m.log)("2e passe : identité OK (même capteur)");
+    let patch = relay_to_patch(sep, m, &id, Some(calib))?;
+    if patch.len() != sbio_gate::PATCH2_LEN {
+        return Err(format!("patch n°2 : {:#x} o ({:#x} attendus) : non poussé", patch.len(), sbio_gate::PATCH2_LEN));
+    }
+    let v = push_patch(m, &patch).map_err(|e| format!("push n°2 : {e}"))?;
+    (m.log)(&format!("2e passe : {}", v.line()));
+    if !matches!(v, Verdict::Loaded { .. }) {
+        return Err(format!("patch n°2 non chargé ({}) : rien après 0x5f", v.line()));
+    }
+    for op in [0x5d, 0x5c] {
+        param2(sep, m, op, &PARAMS_INPUT, 0x37)?;
+    }
+    param2(sep, m, 0x6a, &[], P6A_LEN)?;
+    param2(sep, m, 0x6f, &[], P6F_LEN)?;
+    let s3 = module_serial(sep, m, 3)?;
+    if s3 != s1 {
+        return Err("0x32 (2e passe) : n° de série module ≠ celui de la 1re passe : arrêt avant 0x01".into());
+    }
+    let r = sep_cmd(sep, m.log, 0x01, &[])?;
+    expect_len(0x01, &r, 0)?;
+    let r = sep_cmd(sep, m.log, 0x1f, &[])?;
+    if r != MATCH_POLICY_REF {
+        return Err(format!("0x1f (2e passe) : réponse {} ≠ macOS {}", hex(&r), hex(&MATCH_POLICY_REF)));
+    }
+    for k in 1..=2 {
+        let info = sep_cmd(sep, m.log, 0x63, &[])?;
+        expect_len(0x63, &info, 0x1c)?;
+        let same = info[..] == CAL_INFO_REF[..];
+        (m.log)(&format!("0x63 n°{k} (2e passe) : {} ({})", hex(&info), if same { "= macOS" } else { "≠ macOS" }));
+        if !same {
+            return Ok(Verdict::Pass2Done { info_ref: false });
+        }
+    }
+    Ok(Verdict::Pass2Done { info_ref: true })
+}
+
 /// Whole J5 run (the caller powers the sensor on before and off after, in every path). `calib` is required (and
 /// checked first) for `Upto::Calib`; the later steps run only after a loaded patch.
 pub fn run<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, upto: Upto, calib: Option<&[u8]>) -> Verdict {
-    if upto == Upto::Calib {
+    if matches!(upto, Upto::Calib | Upto::Pass2) {
         match calib.map(check_calib) {
             Some(Ok(())) => {}
             Some(Err(e)) => return Verdict::Stopped(e),
-            None => return Verdict::Stopped("--upto calib sans fichier de calibration".into()),
+            None => return Verdict::Stopped("--upto calib|pass2 sans fichier de calibration".into()),
         }
     }
     let calib = if upto == Upto::Patch { None } else { calib };
@@ -546,14 +674,20 @@ pub fn run<S: Sensor>(sep: &mut dyn Sep, m: &mut Mesa<'_, S>, upto: Upto, calib:
     }
     (m.log)(&loaded.line());
     // macOS reads nothing between the "loaded" status and the 0x5d frame (C17): the pin must be low already.
-    if let Err(e) = params(sep, m, calib) {
-        return Verdict::Stopped(format!("paramètres : {e}"));
-    }
+    let s1 = match params(sep, m, calib) {
+        Ok(s) => s,
+        Err(e) => return Verdict::Stopped(format!("paramètres : {e}")),
+    };
     if upto == Upto::Params {
         return Verdict::ParamsDone;
     }
     let Some(c) = calib else { return Verdict::Stopped("calibration absente".into()) };
-    calibrate(sep, m.log, c).unwrap_or_else(|e| Verdict::Stopped(format!("calibration : {e}")))
+    let v = calibrate(sep, m.log, c).unwrap_or_else(|e| Verdict::Stopped(format!("calibration : {e}")));
+    if upto == Upto::Calib || v != (Verdict::Calibrated { info_ref: true }) {
+        return v;
+    }
+    (m.log)(&v.line());
+    pass2(sep, m, c, &s1).unwrap_or_else(|e| Verdict::Stopped(format!("2e passe : {e}")))
 }
 
 /// True when `v` is the verdict a run up to `upto` aims at.
@@ -562,6 +696,7 @@ pub fn success(upto: Upto, v: &Verdict) -> bool {
         Upto::Patch => matches!(v, Verdict::Loaded { .. }),
         Upto::Params => *v == Verdict::ParamsDone,
         Upto::Calib => *v == Verdict::Calibrated { info_ref: true },
+        Upto::Pass2 => *v == Verdict::Pass2Done { info_ref: true },
     }
 }
 

@@ -183,21 +183,26 @@ pub const PWR_PRE_MS: u64 = 40;
 pub const PWR_ON_MS: u64 = 60;
 pub const PWR_OFF_MS: u64 = 20;
 
-pub struct HwSensor {
+/// `pwr` = the power line held by the caller's power-off guard (borrowed: the guard still powers off in every path).
+pub struct HwSensor<'a> {
     pub spi: Spi,
     pub ready: Option<Line>,
+    pub pwr: &'a Line,
     t0: Instant,
 }
 
-impl HwSensor {
-    pub fn new(spi: Spi, ready: Option<Line>) -> Self {
-        HwSensor { spi, ready, t0: Instant::now() }
+impl<'a> HwSensor<'a> {
+    pub fn new(spi: Spi, ready: Option<Line>, pwr: &'a Line) -> Self {
+        HwSensor { spi, ready, pwr, t0: Instant::now() }
     }
 }
 
-impl Sensor for HwSensor {
+impl Sensor for HwSensor<'_> {
     fn xfer(&mut self, tx: &[u8], rx: bool) -> Result<Vec<u8>, String> {
         self.spi.xfer(tx, rx)
+    }
+    fn power(&mut self, on: bool) -> Result<(), String> {
+        self.pwr.set(on)
     }
     fn ready(&mut self) -> Option<bool> {
         self.ready.as_ref().and_then(|l| l.get().ok())

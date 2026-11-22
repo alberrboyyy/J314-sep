@@ -1,8 +1,9 @@
 //! sbiod — J5 relay (see `lib.rs`). Usage (root):
 //!   sbiod preflight                     checks bufsiz of spidev, the spidev node, gpio0 (sysfs only, opens nothing)
-//!   sbiod run [--dev P] [--log FILE] [--upto patch|params|calib] [--calib FILE]
-//!                                       run up to the patch (default), the params, or the calibration (needs --calib);
-//!                                       sensor powered off in every path; prints the VERDICT
+//!   sbiod run [--dev P] [--log FILE] [--upto patch|params|calib|pass2] [--calib FILE]
+//!                                       run up to the patch (default), the params, the calibration, or the end of the
+//!                                       2nd macOS pass (calib and pass2 need --calib); sensor powered off in every
+//!                                       path; prints the VERDICT
 //!   sbiod calib-prepare --from DIR --out FILE
 //!                                       builds the calibration file from the four c12 0x5b A8 files (offline)
 //!   sbiod power-off                     drives gpio0 196 low (teardown from the run script's trap)
@@ -80,7 +81,7 @@ fn main() {
     let (mut upto, mut calibf, mut from, mut out) = (Upto::Patch, None::<PathBuf>, None::<PathBuf>, None::<PathBuf>);
     let usage = || -> ! {
         eprintln!(
-            "usage: sbiod preflight|run|power-off [--dev /dev/sep_sbio] [--log FILE] [--upto patch|params|calib] [--calib FILE]\n       sbiod calib-prepare --from DIR --out FILE"
+            "usage: sbiod preflight|run|power-off [--dev /dev/sep_sbio] [--log FILE] [--upto patch|params|calib|pass2] [--calib FILE]\n       sbiod calib-prepare --from DIR --out FILE"
         );
         exit(64)
     };
@@ -96,6 +97,7 @@ fn main() {
                     "patch" => Upto::Patch,
                     "params" => Upto::Params,
                     "calib" => Upto::Calib,
+                    "pass2" => Upto::Pass2,
                     _ => usage(),
                 }
             }
@@ -122,7 +124,7 @@ fn main() {
         "run" => {
             // Calibration file checked before anything is opened (nothing sent on error).
             let calib = match (upto, &calibf) {
-                (Upto::Calib, None) => die(2, "--upto calib exige --calib FILE"),
+                (Upto::Calib | Upto::Pass2, None) => die(2, "--upto calib|pass2 exige --calib FILE"),
                 (_, Some(f)) => {
                     let b = std::fs::read(f).unwrap_or_else(|e| die(2, &format!("{} : {e}", f.display())));
                     check_calib(&b).unwrap_or_else(|e| die(2, &e));
@@ -148,11 +150,12 @@ fn main() {
             }
             std::thread::sleep(Duration::from_millis(hw::PWR_ON_MS));
             log.line(&format!("capteur alimenté (gpio0 {} = 1), spi 8 MHz mode 1", hw::PWR_LINE));
-            let mut sensor = HwSensor::new(spi, ready);
+            let mut sensor = HwSensor::new(spi, ready, &power.line);
             let (mut l1, mut l2) = (|s: &str| log.line(s), |s: &str| log.line(s));
             let mut sep = SepDev { f, log: &mut l1 };
             let mut m = Mesa { s: &mut sensor, log: &mut l2 };
             let v = run(&mut sep, &mut m, upto, calib.as_deref());
+            drop(sensor);
             drop(power);
             log.line(&v.line());
             exit(if success(upto, &v) { 0 } else { 1 });

@@ -53,11 +53,19 @@ pub const SERIAL_ANSWER_HEAD: [u8; 9] = [0x80, 0xd4, 0x00, 0x4b, 0, 0, 0, 0, OP_
 /// Status bodies (9 bytes after `80 20 00 10 00 00 00`) read by macOS after each frame, C18/C19/C20 3/3 identical.
 pub const ST_AFTER_PARAMS: [u8; 9] = [0x00, 0x00, 0x21, 0x00, 0x0c, 0x52, 0x33, 0x00, 0x16];
 pub const ST_SERIAL_READY: [u8; 9] = [0x07, 0x00, 0x21, 0x00, 0x8c, 0x4b, 0x00, 0x00, 0x00];
+/// 2nd pass, sensor power cycled by the AP right after the 1st-pass 0x63 (VU C17-C20 gpio0 196, C18/C19/C20 contents,
+/// 3/3 identical; docs/j5_params_protocol.md §8): 1st status after the ready pin, 2nd status right after it (macOS
+/// reads twice, then sends sbio 0x19), status after the `80 70` identity command (0x1b pending), and after reading
+/// the identity.
+pub const ST_POWER_ON: [u8; 9] = [0x00, 0x60, 0x00, 0x00, 0x18, 0x52, 0x33, 0x00, 0x00];
+pub const ST_POWER_ON_2: [u8; 9] = [0x00, 0x60, 0x00, 0x00, 0x00, 0x52, 0x33, 0x00, 0x00];
+pub const ST_IDENTITY_READY: [u8; 9] = [0x07, 0x60, 0x00, 0x00, 0x88, 0x1b, 0x00, 0x00, 0x00];
+pub const ST_IDENTITY_READ: [u8; 9] = ST_POWER_ON_2;
 /// Status byte 0 (frame byte 7) when an answer is pending; only then do bytes 5-6 hold its length (at rest they read
 /// `52 33`).
 pub const ST_ANSWER_READY: u8 = 0x07;
 
-/// Frame 0x55 carrying `blob` (+ CRC). Totals < 0x100 only (all frames of the 1st pass: 0x40, 0x49).
+/// Frame 0x55 carrying `blob` (+ CRC). Totals < 0x100 only (1st pass: 0x40, 0x49; 2nd pass also 0x4d, 0x56).
 pub fn build_param_frame(blob: &[u8], out: &mut [u8]) -> Result<usize> {
     let n = HEADER_LEN + blob.len() + PARAM_CRC_LEN;
     if n >= 0x100 {

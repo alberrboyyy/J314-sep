@@ -18,8 +18,8 @@
 #       et bloc, aucune lecture pendant le chargement, attente IRQ 195, cf. journal 21:00) → 1er run v2 = go d'Albert.
 #
 # Variables (défauts = run J5 v2 inchangé) : SBIO_PARAMS (0) = paramètre allow_sbio_params de sep_native (1 = params,
-#   2 = params + calibration, cf. docs/j5_params_protocol.md) ; SBIOD_ARGS ("") = arguments ajoutés à `sbiod run`
-#   (--upto params|calib --calib FICHIER). Utilisés par pending/j5c_params_run.sh ; ne pas les poser à la main.
+#   2 = params + calibration, 3 = en plus la 2e passe macOS, cf. docs/j5_params_protocol.md) ; SBIOD_ARGS ("") =
+#   arguments ajoutés à `sbiod run` (--upto params|calib|pass2 --calib FICHIER). Utilisés par pending/j5c_params_run.sh ; ne pas les poser à la main.
 # Usage (root, après un reboot normal avec alias sep) : pending/j5_sensor_run.sh [STORE]
 #   STORE défaut = dossier NEUF /var/lib/sepd-run-<horodatage> (scellement frais : seul cas où l'ouverture TARDIVE de
 #   sbio est éprouvée, J3 19:20). SBIO_OPEN=0 par défaut ici (ouverture tardive éprouvée) ; SBIO_OPEN=1 = précoce.
@@ -33,7 +33,7 @@ J5=${J5:-/home/albert/kbuild/j5}
 SBIO_OPEN=${SBIO_OPEN:-0}
 SBIO_PARAMS=${SBIO_PARAMS:-0}
 SBIOD_ARGS=${SBIOD_ARGS:-}
-case "$SBIO_PARAMS" in 0|1|2) ;; *) echo "STOP : SBIO_PARAMS=$SBIO_PARAMS (0, 1 ou 2)" >&2; exit 1;; esac
+case "$SBIO_PARAMS" in 0|1|2|3) ;; *) echo "STOP : SBIO_PARAMS=$SBIO_PARAMS (0 à 3)" >&2; exit 1;; esac
 TS=$(date +%Y%m%d-%H%M%S)
 STORE=${1:-/var/lib/sepd-run-$TS}
 OUT=/var/log/j5-$TS

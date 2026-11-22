@@ -94,7 +94,7 @@ kernel::module_platform_driver! {
         },
         allow_sbio_params: u32 {
             default: 0,
-            description: "relay after 0x5f (needs allow_sbio_relay=1): 0 (default) = nothing; 1 = 0x5d 0x5c 0x6a 0x31 0x32 0x01 0x1f 0x31 0x32; 2 = those, then 0x5b (captured calibration, AP->SEP in 4 fragments) and 0x63",
+            description: "relay after 0x5f (needs allow_sbio_relay=1): 0 (default) = nothing; 1 = 0x5d 0x5c 0x6a 0x31 0x32 0x01 0x1f 0x31 0x32; 2 = those, then 0x5b (captured calibration, AP->SEP in 4 fragments) and 0x63; 3 = those, then the 2nd macOS pass 0x19 0x17 0x15 0x16 0x42 0x18 0x5f 0x5d 0x5c 0x6a 0x6f 0x31 0x32 0x01 0x1f 0x63 0x63, each at its own place only",
         },
         sbio_open: u32 {
             default: 1,
@@ -265,7 +265,7 @@ mod drv {
     fn param_allow_relay() -> bool {
         *crate::module_parameters::allow_sbio_relay.value() != 0
     }
-    /// Niveau du relais après le patch (`sbio_gate::limit`) : 0, 1 ou 2 (autre valeur refusée au probe).
+    /// Niveau du relais après le patch (`sbio_gate::limit`) : 0, 1, 2 ou 3 (autre valeur refusée au probe).
     fn param_sbio_params() -> u32 {
         *crate::module_parameters::allow_sbio_params.value()
     }
@@ -2078,7 +2078,7 @@ mod drv {
             {
                 dev_err!(
                     pdev,
-                    "allow_xart exige allow_boot=1, allow_xart_save_ack et allow_sbio exigent allow_xart=1, allow_sbio_relay exige allow_sbio=1, allow_sbio_params (0, 1 ou 2) exige allow_sbio_relay=1, sbio_open vaut 0 ou 1 : refus\n"
+                    "allow_xart exige allow_boot=1, allow_xart_save_ack et allow_sbio exigent allow_xart=1, allow_sbio_relay exige allow_sbio=1, allow_sbio_params (0 à 3) exige allow_sbio_relay=1, sbio_open vaut 0 ou 1 : refus\n"
                 );
                 return Err(EINVAL);
             }
