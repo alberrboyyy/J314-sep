@@ -37,12 +37,12 @@ static T16: [u16; 256] = table16();
 static T32: [u32; 256] = table32();
 
 pub fn crc16_arc(data: &[u8]) -> u16 {
-    data.iter().fold(0u16, |c, &b| (c >> 8) ^ T16[((c ^ b as u16) & 0xFF) as usize])
+    data.iter().fold(0u16, |c, &b| (c >> 8) ^ T16[((c ^ u16::from(b)) & 0xFF) as usize])
 }
 
 /// CRC-32/ISO-HDLC (= zlib.crc32).
 pub fn crc32(data: &[u8]) -> u32 {
-    !data.iter().fold(!0u32, |c, &b| (c >> 8) ^ T32[((c ^ b as u32) & 0xFF) as usize])
+    !data.iter().fold(!0u32, |c, &b| (c >> 8) ^ T32[((c ^ u32::from(b)) & 0xFF) as usize])
 }
 
 #[cfg(test)]

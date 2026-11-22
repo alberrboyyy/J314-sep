@@ -6,10 +6,12 @@
 //!
 //! Observed format (SEP -> AP only): TYPE 0x00, PARAM = EP, DATA = 4-byte ASCII name, first char in the MSB.
 //! TYPE 0x01, PARAM = EP, DATA = 4 size bytes in 0x4000 pages (byte 0 = LSB): min send, max send, min recv, max recv.
+#[cfg(feature = "alloc")]
 use crate::word::{Dir, Msg};
+#[cfg(feature = "alloc")]
 use crate::{Error, Result};
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 pub const EP_DISCOVERY: u8 = 0xFD;
 pub const EP_CNTL: u8 = 0x00;
@@ -38,10 +40,10 @@ impl EpInfo {
         self.sizes_raw.map(|r| r.to_le_bytes())
     }
     pub fn max_send(&self) -> Option<u32> {
-        self.pages().map(|p| p[1] as u32 * OOL_PAGE)
+        self.pages().map(|p| u32::from(p[1]) * OOL_PAGE)
     }
     pub fn max_recv(&self) -> Option<u32> {
-        self.pages().map(|p| p[3] as u32 * OOL_PAGE)
+        self.pages().map(|p| u32::from(p[3]) * OOL_PAGE)
     }
     /// Name without trailing spaces.
     pub fn name_str(&self) -> &str {
@@ -49,6 +51,7 @@ impl EpInfo {
     }
 }
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Default, Clone)]
 pub struct DiscoveryTable {
     pub by_ep: BTreeMap<u8, EpInfo>,
@@ -56,6 +59,7 @@ pub struct DiscoveryTable {
     pub order: Vec<u8>,
 }
 
+#[cfg(feature = "alloc")]
 impl DiscoveryTable {
     pub fn new() -> Self {
         Self::default()
@@ -117,6 +121,7 @@ pub struct CntlOpen {
     pub recv_addr: u64,
 }
 
+#[cfg(feature = "alloc")]
 /// CNTL opening sequences `> EP=0x00` TYPE 4/2/5/3 (PARAM = EP), AP->SEP requests only.
 pub fn cntl_opens<'a>(msgs: impl IntoIterator<Item = &'a Msg>) -> BTreeMap<u8, Vec<CntlOpen>> {
     let mut out: BTreeMap<u8, Vec<CntlOpen>> = BTreeMap::new();

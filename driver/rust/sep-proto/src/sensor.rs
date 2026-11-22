@@ -85,6 +85,7 @@ pub fn parse_status(raw: &[u8]) -> Result<Status<'_>> {
     Ok(Status { frame: f })
 }
 
+#[cfg(feature = "alloc")]
 /// Bytes of a uart line `... SensorStatus:    16B | 80 20 ...`, None if absent.
 pub fn status_from_uart_line(line: &str) -> Option<Result<alloc::vec::Vec<u8>>> {
     let i = line.find("SensorStatus:")?;
@@ -147,6 +148,7 @@ mod tests {
         assert!(f.length_ok());
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn uart_line() {
         let l = "x SensorStatus:    16B | 80 20 00 10 00 00 00 00 60 00 00 00 52 33 00 00";

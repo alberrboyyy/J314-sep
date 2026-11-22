@@ -8,7 +8,10 @@ publish = false
 
 [features]
 default = ["std"]
-# std: offline reader for traces/ (sep.log + .ool). The core is no_std + alloc so the kernel module can reuse it.
-std = []
+# std: offline reader for traces/ (sep.log + .ool). Implies alloc.
+std = ["alloc"]
+# alloc: the parts that need Vec / BTreeMap (tables, reassembly, vault, blob store). Without it the core is
+# allocation-free and is what the kernel module embeds (the kernel has no `alloc` crate).
+alloc = []
 
 [dependencies]

@@ -5,8 +5,8 @@
 //! 0x6c -> 0x6d loop (`LTFC`) = **verified (macOS)**. Content encrypted/opaque, not interpreted.
 //! Import order "small blob (uid -1) then big (user uid)": observed in 5 boots, proposed.
 use crate::{le_u32, Error, Result};
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 pub const INIT_SEQUENCE: [u8; 57] = [
     0x73, //
@@ -36,12 +36,14 @@ pub fn export_request(uid: u32) -> [u8; 0x18] {
     r
 }
 
+#[cfg(feature = "alloc")]
 /// Last exported blob per uid (the SEP does not keep its templates: the AP does).
 #[derive(Debug, Default, Clone)]
 pub struct BlobStore {
     pub blobs: BTreeMap<u32, Vec<u8>>,
 }
 
+#[cfg(feature = "alloc")]
 impl BlobStore {
     pub fn new() -> Self {
         Self::default()
@@ -58,6 +60,7 @@ impl BlobStore {
     }
 }
 
+#[cfg(feature = "alloc")]
 /// (TYPE, payload or None) of the init commands. Payloads are only provided for 0x6d (import).
 pub fn init_plan(store: &BlobStore) -> Vec<(u8, Option<&[u8]>)> {
     let imports: Vec<&[u8]> = store.import_order().into_iter().map(|u| store.blobs[&u].as_slice()).collect();
@@ -76,7 +79,7 @@ pub fn init_plan(store: &BlobStore) -> Vec<(u8, Option<&[u8]>)> {
         .collect()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
     #[test]

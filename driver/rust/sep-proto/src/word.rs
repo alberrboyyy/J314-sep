@@ -83,7 +83,7 @@ impl Msg {
     pub const fn new(lineno: u32, dir: Dir, w: Word) -> Self {
         Msg { lineno, dir, w }
     }
-    pub const fn to_sep(&self) -> bool {
+    pub const fn to_sep(self) -> bool {
         matches!(self.dir, Dir::ToSep)
     }
 }

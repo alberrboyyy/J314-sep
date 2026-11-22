@@ -8,11 +8,12 @@
 //!
 //! Counter rule: `fc`: DATA = 0; `fe`: counter = number of `fd` already seen in the transfer; `fd`: that number + 1;
 //! the transfer restarts at each `> fc` or at an unsolicited `< fc`.
-use crate::crc::crc16_arc;
+use crate::le_u32;
 use crate::word::{Dir, Msg};
-use crate::{le_u16, le_u32};
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use crate::{crc::crc16_arc, le_u16};
+#[cfg(feature = "alloc")]
+use alloc::{collections::BTreeMap, vec::Vec};
 
 pub const TAG_FC: u8 = 0xFC;
 pub const TAG_FD: u8 = 0xFD;
@@ -43,10 +44,29 @@ pub enum CounterFault {
     Fd { got: u16, want: u16 },
 }
 
+/// Set of the 256 possible TYPE values, allocation-free (one bit per TYPE).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct TypeSet([u64; 4]);
+
+impl TypeSet {
+    fn insert(&mut self, t: u8) {
+        self.0[(t >> 6) as usize] |= 1 << (t & 63);
+    }
+    /// Remove `t`; true if it was present.
+    fn remove(&mut self, t: u8) -> bool {
+        let (w, b) = ((t >> 6) as usize, 1u64 << (t & 63));
+        let was = self.0[w] & b != 0;
+        self.0[w] &= !b;
+        was
+    }
+}
+
 /// Stateful checker of the GT counter rule for one EP. Usable online (a driver feeds every word) or offline.
+/// Allocation-free (usable in the kernel without `alloc`).
 #[derive(Debug, Default, Clone)]
 pub struct CounterChecker {
-    pending: BTreeSet<u8>,
+    /// TYPEs with an outstanding `> fc` (AP request) awaiting the SEP's `< fc`.
+    pending: TypeSet,
     nfd: u16,
 }
 
@@ -66,7 +86,7 @@ impl CounterChecker {
                 if m.dir == Dir::ToSep {
                     self.pending.insert(m.w.ty);
                     self.nfd = 0;
-                } else if !self.pending.remove(&m.w.ty) {
+                } else if !self.pending.remove(m.w.ty) {
                     self.nfd = 0;
                 }
                 if k != 0 {
@@ -89,6 +109,7 @@ impl CounterChecker {
     }
 }
 
+#[cfg(feature = "alloc")]
 /// Replay the counter rule over the GT messages of `ep`. Returns (number checked, faults with line numbers).
 pub fn check_counters<'a>(msgs: impl IntoIterator<Item = &'a Msg>, ep: u8) -> (usize, Vec<(u32, CounterFault)>) {
     let mut c = CounterChecker::new();
@@ -130,7 +151,7 @@ impl OolHeader {
     }
 
     /// Build the header for one outgoing chunk (same layout; words 3 and 4 = 0).
-    pub fn to_bytes(&self) -> [u8; OOL_HDR] {
+    pub fn to_bytes(self) -> [u8; OOL_HDR] {
         let mut h = [0u8; OOL_HDR];
         for (i, v) in [self.valid, self.total, self.offset, 0, 0, self.ty, self.len].iter().enumerate() {
             h[i * 4..i * 4 + 4].copy_from_slice(&v.to_le_bytes());
@@ -139,6 +160,7 @@ impl OolHeader {
     }
 }
 
+#[cfg(feature = "alloc")]
 /// One OOL buffer read, attached to the message that precedes it.
 #[derive(Debug, Clone)]
 pub struct OolRecord {
@@ -152,6 +174,7 @@ pub struct OolRecord {
     pub sha_ok: Option<bool>,
 }
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone)]
 pub struct Transfer {
     pub dir: Dir,
@@ -164,6 +187,7 @@ pub struct Transfer {
     pub conflict: bool,
 }
 
+#[cfg(feature = "alloc")]
 impl Transfer {
     pub fn blob(&self) -> Vec<u8> {
         self.chunks.values().flatten().copied().collect()
@@ -183,6 +207,7 @@ impl Transfer {
     }
 }
 
+#[cfg(feature = "alloc")]
 /// Reassemble the GT transfers whose first payload (offset 0) has been seen; one entry per transfer.
 /// `types` = None for all types.
 pub fn reassemble<'a>(recs: impl IntoIterator<Item = &'a OolRecord>, ep: u8, types: Option<&[u8]>) -> Vec<Transfer> {
@@ -232,6 +257,7 @@ pub fn reassemble<'a>(recs: impl IntoIterator<Item = &'a OolRecord>, ep: u8, typ
     out
 }
 
+#[cfg(feature = "alloc")]
 /// Check the sensor slices of an image: header `80 52 NN`, u32 LE at +3 = slice_len, final CRC-16/ARC LE.
 /// Returns one bool per slice.
 pub fn check_slices(blob: &[u8], slice_len: usize, n: usize) -> Vec<bool> {
@@ -246,6 +272,7 @@ pub fn check_slices(blob: &[u8], slice_len: usize, n: usize) -> Vec<bool> {
         .collect()
 }
 
+#[cfg(feature = "alloc")]
 /// Split a payload into GT chunks (header + piece), as an AP sender would put them in buffer A, one per page.
 /// Pure computation: returns the bytes, sends nothing.
 pub fn fragment(ty: u8, payload: &[u8]) -> Vec<Vec<u8>> {
@@ -266,7 +293,7 @@ pub fn fragment(ty: u8, payload: &[u8]) -> Vec<Vec<u8>> {
     out
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
     use crate::word::Word;

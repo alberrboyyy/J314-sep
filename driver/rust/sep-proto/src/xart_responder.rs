@@ -6,7 +6,9 @@
 //! only be validated on hardware (Albert's go). They are isolated in `native_fetch_decision` / `native_on_save`,
 //! marked HYPOTHESIS. This module COMPUTES a reply; it sends NOTHING.
 use crate::word::Word;
-use crate::xart::{self, *};
+#[cfg(feature = "alloc")]
+use crate::xart;
+use crate::xart::*;
 use crate::{Error, Result};
 
 /// Reply types of the AP (observed), distinct from the SEP request types.
@@ -73,12 +75,14 @@ pub fn observed_response(req: &Word, served_len: Option<usize>) -> Result<Respon
 // No ground truth: no capture shows these branches. Enabling them for real = SEP write = Albert's go.
 // -------------------------------------------------------------------------------------------------
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetchDecision<'a> {
     Serve(&'a Locker),
     Absent,
 }
 
+#[cfg(feature = "alloc")]
 /// HYPOTHESIS. A FETCH on Linux: serve the locker if the store has it, else ABSENT.
 pub fn native_fetch_decision<'a>(store: &'a [Locker], req: &Word) -> Result<FetchDecision<'a>> {
     let loc = match req.ty {
@@ -101,6 +105,7 @@ pub fn native_on_save(req: &Word) -> Result<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "alloc")]
     #[test]
     fn absent_when_store_empty() {
         let r = Word::new(EP_XART, 1, OP_FETCH_MASTER, 0, 0x100);

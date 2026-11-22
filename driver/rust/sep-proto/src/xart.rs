@@ -4,7 +4,10 @@
 //! module DECODES / ENCODES and READS the vault. It decides nothing and sends nothing. The native handler POLICY
 //! (answer "absent", ack + persist SAVE) is an untested hypothesis: see `xart_responder::native_*`.
 use crate::crc::crc32;
-use crate::{le_u32, Error, Result};
+#[cfg(feature = "alloc")]
+use crate::le_u32;
+use crate::{Error, Result};
+#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 pub const EP_XART: u8 = 0x13;
@@ -57,7 +60,7 @@ pub fn encode_fetch_len(length: usize, flag: u8) -> Result<(u8, u32)> {
     if length > 0xFFFF {
         return Err(Error::OutOfRange("fetch length", length as u64));
     }
-    Ok((length as u8, ((length >> 8) as u32 & 0xFF) | (flag as u32) << 8))
+    Ok((length as u8, ((length >> 8) as u32 & 0xFF) | u32::from(flag) << 8))
 }
 
 pub const SLOT: usize = 0x9000;
@@ -73,6 +76,7 @@ pub fn slot_crc(payload: &[u8]) -> u32 {
     crc32(payload)
 }
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Locker {
     pub slot: usize,
@@ -87,6 +91,7 @@ pub struct Locker {
     pub header: Vec<u8>,
 }
 
+#[cfg(feature = "alloc")]
 impl Locker {
     pub fn is_master(&self) -> bool {
         matches!(self.ty, T_USER_MASTER | T_SEP_MASTER)
@@ -96,6 +101,7 @@ impl Locker {
     }
 }
 
+#[cfg(feature = "alloc")]
 /// Bytes of the .gl file -> lockers. Pure reading; the payload stays opaque.
 pub fn parse_coffre(data: &[u8]) -> Result<Vec<Locker>> {
     let mut out = Vec::new();
@@ -142,6 +148,7 @@ pub fn build_header(ty: u8, uuid: &[u8], payload: &[u8], extra: u16) -> [u8; HDR
     h
 }
 
+#[cfg(feature = "alloc")]
 /// Locker -> bytes of ONE slot. A parsed locker reproduces its original slot byte for byte.
 pub fn serialize_locker(l: &Locker) -> Result<Vec<u8>> {
     let mut body = if l.header.len() == HDR { l.header.clone() } else { build_header(l.ty, &l.uuid, &l.payload, 0).to_vec() };
@@ -153,16 +160,18 @@ pub fn serialize_locker(l: &Locker) -> Result<Vec<u8>> {
     Ok(body)
 }
 
+#[cfg(feature = "alloc")]
 pub fn find_master(lockers: &[Locker], sel: u8) -> Option<&Locker> {
     let want = if sel == SEL_SEP { T_SEP_MASTER } else { T_USER_MASTER };
     lockers.iter().find(|l| l.ty == want)
 }
 
+#[cfg(feature = "alloc")]
 pub fn find_gigalocker<'a>(lockers: &'a [Locker], uuid: &[u8]) -> Option<&'a Locker> {
     lockers.iter().find(|l| !l.uuid.is_empty() && l.uuid == uuid)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
     #[test]
