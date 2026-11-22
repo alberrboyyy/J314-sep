@@ -2168,3 +2168,14 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   tôt débloque le CNTL, confirme le timing c12). Puis 2 s de calme, 0x73 → **MUET** (aucun mot 0x08, B8 vide en 6 s).
   ⇒ progrès partiel : sur un boot chaîné, le CNTL passe s'il est tôt, mais la poignée 0x73 envoyée 2 s plus tard ne
   répond pas. Logs : `logs/20261122-195701_j3d-chained-early/`.
+
+## 2026-11-22 20:10 — Claude (analyste, session ALARM) — J3d relu contre c12 : le 0x73 arrive 26 s APRÈS l'ouverture, précédé de tout le trafic SKS 0x12
+- Source : `traces/20261108-032454_c12-boot-ho/sep.log` (boot macOS chaîné), l. 126-318, comparé à `logs/20261122-195701_j3d-chained-early/`.
+- VU (c12) : CNTL 0x08 ouvert à t=711.371 (TYPE 04/02/05/03, comme nous). Le `> 0x08 TAG 0xfc TYPE 0x73` part à t=737.730,
+  soit **~26 s plus tard**. Entre-temps : skdl 0x17 ouvert, sks 0x12 ouvert (A/B 0x8000) puis **~25 échanges SKS 0x12**
+  (TYPE 0x01→0x19, dont 0x09/0x0b/0x18), scrd 0x0a, pnon 0x15, et des FETCH locker 0x05 servis (PARAM 0x82/0xb6/0x01/0x28/0x7c/0x1f)
+  + 2 SAVE locker. Le dernier mot avant le 0x73 = `< 0x12 TAG 0x99 TYPE 0x19 PARAM 0xfd`.
+- VU (nous, J3d) : 0x73 envoyé 2 s après l'ouverture, **aucun trafic 0x12/0x0a/0x17/0x15** → 0x73 muet.
+- INTERPRÉTÉ (hypothèse) : sur un boot chaîné, sbio ne répond au 0x73 qu'une fois le keybag chargé côté SKS (0x12) ; sur un
+  seal frais il n'y a pas de keybag, donc sbio répond tout de suite. Ce n'est PAS un problème de délai (macOS attend 26 s).
+  L'expérience qui tranche demande d'écrire en SKS 0x12 = classe jamais testée → protocole vérifié à demander à c9, puis go d'Albert.
