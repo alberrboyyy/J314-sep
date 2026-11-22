@@ -2424,3 +2424,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Binaires `~/kbuild/j5` (anciens → `.v5`) : `sep_native.ko` sha256
   `07d59c0ee78c9471f4b73bc6c241b8bef61b3cb644685ff5f586f825a399e88e` (`.v5` = `627d2977…d4aa`), `sbiod` sha256
   `29ed5e7cde1dd20dd45a0a80aa32013933df38a7de8276807def8e014b395a7c` (`.v5` = `f9fff14d…91df`).
+
+## 2026-11-22 23:04 — Albert + Claude (session ALARM) — J6a E-ENROLL-START : le SEP répond au 0x03 par un TAG 0xff (refus ?), rien ensuite
+- Go d'Albert (power-cycle, `sudo pending/j6a_enroll_start.sh`, doigt guidé). Logs bruts : `logs/20261122-230441_j6a-enroll-start/`.
+- VU : pass2 complète à nouveau (patch n°1 t+42 ms, n°2 t+55 ms, 0x63×2 = macOS) → **pass2 n=2**.
+- VU : `> 0x08 TAG 0xfc TYPE 0x03` (68 o à zéro) → `< 0x08 TAG 0xff TYPE 0x03 PARAM 0 DATA 0` (mot 0x000000000003ff08),
+  aucune charge : B8 non réécrit (en-tête gt nul ; octets +0x1c.. = restes du 0x63 précédent `03000000 00ac6041 …`).
+  TAG 0xff sur EP 0x08 : **jamais vu** dans nos traces macOS (TAG connus fc/fd/fe + notifs 0x01-0x04).
+- VU, écoute 90 s avec poses/retraits du doigt : **0 mot sbio, 0 montée d'IRQ 195** (le capteur n'a pas été armé pour
+  la détection : attendu, aucune commande de capture envoyée). Pas de Halted.
+- INTERPRÉTÉ (hypothèse) : TAG 0xff = rejet de la commande par le SEP (réponse d'erreur GT). Causes possibles : (a)
+  enroll_indata nul invalide, (b) gating keybag/SKS (D2), (c) précondition d'état manquante (0x7c ? acmContext ?).
+  Non tranché. Lecture du code d'erreur : aucune (B8 vide). → à éclairer par le reverse de biometrickitd/BiometricKit
+  (contenu réel du 0x03/0x06) et du traitement des réponses TAG 0xff dans AppleMesaSEPDriver (kext).

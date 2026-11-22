@@ -1,0 +1,432 @@
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: sepfw = /reserved-memory/sep-firmware [mem 0x10005e0c000-0x100063bbfff], phandle 0x127 ; manifestes présents
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: mboxes = 0x35 -> /soc/mbox@396408000
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: iommus = 0x36 -> /soc/iommu@3952c0000
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: power-domains = 0x37 -> /soc/power-management@28e580000/power-controller@c00
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: stream id DART = 0
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: phandle 0x132 donné (en mémoire) à /soc/sep@396400000
+Nov 22 23:04:41 alarm kernel: sep_native_ovl: overlay appliqué, ret=0 id=2
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: trouvé : sepfw phys 0x10005e0c000 taille 0x5b0000, local-policy-manifest 0xb7b o, iboot-manifest 0x15cc o
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: shmem 0x30000 o allouée, IOVA 0xfffc0000 (magic panique [67, 73, 78, 80])
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: OOL 0x13 alloués : A IOVA 0xfffb8000, B IOVA 0xfffb0000
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: OOL 0x08 alloués : A8 IOVA 0xfffac000, B8 IOVA 0xfffa8000
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: mailbox 'mbox' prise (réception active, rien envoyé)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: allow_boot=1 : séquence de boot m1n1 (GET_STATUS/TZ0/GET_STATUS/IMG4+SET_SHMEM)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: > GET_STATUS : 0x00000000000200ff
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: GET_STATUS #1 : TAG 0x00 TYPE 0x66 DATA 0x1 (OK)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: > BOOT_TZ0 : 0x00000000000500ff
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: BOOT_TZ0 ack 0x69 : TAG 0x00 TYPE 0x69 DATA 0x0 (OK)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: BOOT_TZ0 ack 0xD2 : TAG 0x00 TYPE 0xd2 DATA 0x2 (OK)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: > GET_STATUS : 0x00000000000200ff
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: GET_STATUS #2 : TAG 0x00 TYPE 0x66 DATA 0x2 (OK)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: firmware mappé : phys 0x10005e0c000 taille 0x5b0000 → IOVA 0xff800000
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: > BOOT_IMG4 : 0x000ff800000600ff
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: > SET_SHMEM : 0x000fffc0001800fe
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: BOOT_IMG4 ack 0x6A : TAG 0x00 TYPE 0x6a DATA 0x0 (OK)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: firmware démappé après 0x6A (comme m1n1)
+Nov 22 23:04:41 alarm kernel: sep_native soc:sep-native: SEPOS lancé
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x14 = 'hibe'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x14 tailles 0x01010101
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x18 = 'stac'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x18 tailles 0x02020202
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x00 = 'cntl'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x00 tailles 0x00000000
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x10 = 'xars'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x10 tailles 0x02020202
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x13 = 'xarm'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x13 tailles 0x02020202
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: xarm < seq 1 TAG 0x02 TYPE 0x0e PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x15 = 'pnon'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x15 tailles 0x05050707
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x0d (rien envoyé)
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x29 (rien envoyé)
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0e = 'hdcp'
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0e tailles 0x01010101
+Nov 22 23:04:42 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x10 (rien envoyé)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: ouverture 0x13 : A IOVA 0xfffb8000, B IOVA 0xfffb0000, 0x8000 o chacun
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > CNTL SECMODE : 0x0000000000140100
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0x3
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > CNTL A taille : 0x0000800013040200
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x8000
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > CNTL A adresse : 0x000fffb813020300
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfffb8
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > CNTL B taille : 0x0000800013050400
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x8000
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > CNTL B adresse : 0x000fffb013030500
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfffb0
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: 0x13 ouvert ; requêtes en attente : 1
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: /dev/sep_native prêt (lancer sepd) ; ACK des SAVE : AUTORISÉ
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: /dev/sep_native ouvert (1 requête(s) en attente)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010000000213
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 1 TYPE 0x00 PARAM 0x00 DATA 0x00000100 (A 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 2 TAG 0x01 TYPE 0x13 PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000000000113
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 2 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (A 16 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 3 TAG 0x03 TYPE 0x00 PARAM 0x00 DATA 0x00000100 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010011000313
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 3 TYPE 0x00 PARAM 0x11 DATA 0x00000100 (A 17 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 4 TAG 0x04 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000011000413
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 4 TYPE 0x00 PARAM 0x11 DATA 0x00000000 (A 17 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 5 TAG 0x00 TYPE 0x1d PARAM 0x6f DATA 0x00736269 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073620000160013
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 5 TYPE 0x16 PARAM 0x00 DATA 0x00736200 (A 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'sbio' acquittée (déclencheur de l'ouverture précoce)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x08 = 'sbio'
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: sbio annoncé (EP 0x08) ; ouverture quand le xART sera calme
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x08 tailles 0x01010101
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 6 TAG 0x00 TYPE 0x1d PARAM 0x6c DATA 0x00736b64 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x17 = 'skdl'
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x17 tailles 0x01010101
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00736b0000160013
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 6 TYPE 0x16 PARAM 0x00 DATA 0x00736b00 (A 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 7 TAG 0x00 TYPE 0x1d PARAM 0x20 DATA 0x00737365 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0c = 'sse'
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0c tailles 0x01010101
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 8 TAG 0x00 TYPE 0x1d PARAM 0x20 DATA 0x00736b73 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073730000160013
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 7 TYPE 0x16 PARAM 0x00 DATA 0x00737300 (A 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm < seq 9 TAG 0x00 TYPE 0x1d PARAM 0x64 DATA 0x00736372 (B 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00736b0000160013
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 8 TYPE 0x16 PARAM 0x00 DATA 0x00736b00 (A 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073630000160013
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: xarm > seq 9 TYPE 0x16 PARAM 0x00 DATA 0x00736300 (A 0 o)
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0a = 'scrd'
+Nov 22 23:04:44 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0a tailles 0x01010101
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm < seq 10 TAG 0x05 TYPE 0x01 PARAM 0x7f DATA 0xefe90100 (B 127 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0xefe9010000000513
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm > seq 10 TYPE 0x00 PARAM 0x00 DATA 0xefe90100 (A 0 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: SAVE acquitté #1/48 (compteur scellé avancé)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm < seq 11 TAG 0x06 TYPE 0x06 PARAM 0x6a DATA 0xf4c10100 (B 106 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0xf4c1010000000613
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm > seq 11 TYPE 0x00 PARAM 0x00 DATA 0xf4c10100 (A 0 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: SAVE acquitté #2/48 (compteur scellé avancé)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm < seq 12 TAG 0x07 TYPE 0x01 PARAM 0x7f DATA 0xb41a0100 (B 127 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0xb41a010000000713
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm > seq 12 TYPE 0x00 PARAM 0x00 DATA 0xb41a0100 (A 0 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: SAVE acquitté #3/48 (compteur scellé avancé)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm < seq 13 TAG 0x08 TYPE 0x01 PARAM 0xe1 DATA 0x75a00100 (B 225 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x75a0010000000813
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm > seq 13 TYPE 0x00 PARAM 0x00 DATA 0x75a00100 (A 0 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: SAVE acquitté #4/48 (compteur scellé avancé)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm < seq 14 TAG 0x09 TYPE 0x06 PARAM 0x38 DATA 0x34030100 (B 56 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x3403010000000913
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: xarm > seq 14 TYPE 0x00 PARAM 0x00 DATA 0x34030100 (A 0 o)
+Nov 22 23:04:45 alarm kernel: sep_native soc:sep-native: SAVE acquitté #5/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 15 TAG 0x0a TYPE 0x01 PARAM 0xe1 DATA 0x19110100 (B 225 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x1911010000000a13
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 15 TYPE 0x00 PARAM 0x00 DATA 0x19110100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #6/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 16 TAG 0x0b TYPE 0x01 PARAM 0x43 DATA 0xa0710101 (B 323 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0xa071010000000b13
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 16 TYPE 0x00 PARAM 0x00 DATA 0xa0710100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #7/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 17 TAG 0x0c TYPE 0x06 PARAM 0x65 DATA 0xaa3f0102 (B 613 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0xaa3f010000000c13
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 17 TYPE 0x00 PARAM 0x00 DATA 0xaa3f0100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #8/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 18 TAG 0x0d TYPE 0x01 PARAM 0x43 DATA 0x48b10101 (B 323 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x48b1010000000d13
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 18 TYPE 0x00 PARAM 0x00 DATA 0x48b10100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #9/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 19 TAG 0x0e TYPE 0x07 PARAM 0x10 DATA 0x00000000 (B 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000000000e13
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 19 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 20 TAG 0x0f TYPE 0x01 PARAM 0xa4 DATA 0x6c2d0101 (B 420 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x6c2d010000000f13
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 20 TYPE 0x00 PARAM 0x00 DATA 0x6c2d0100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #10/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 21 TAG 0x10 TYPE 0x06 PARAM 0x81 DATA 0x92490101 (B 385 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x9249010000001013
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 21 TYPE 0x00 PARAM 0x00 DATA 0x92490100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #11/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm < seq 22 TAG 0x11 TYPE 0x01 PARAM 0xa4 DATA 0x2f6c0101 (B 420 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x2f6c010000001113
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: xarm > seq 22 TYPE 0x00 PARAM 0x00 DATA 0x2f6c0100 (A 0 o)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: SAVE acquitté #12/48 (compteur scellé avancé)
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: découverte : EP 0x12 = 'sks'
+Nov 22 23:04:46 alarm kernel: sep_native soc:sep-native: découverte : EP 0x12 tailles 0x02010201
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: sbio : ouverture TARDIVE (xART calme depuis 2 s) (0 requête(s) 0x13 en attente) ; 0x08 : A8 IOVA 0xfffac000, B8 IOVA 0xfffa8000, 0x4000 o chacun
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: > CNTL A8 taille : 0x0000400008040600
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x06 DATA 0x4000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: > CNTL A8 adresse : 0x000fffac08020700
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x07 DATA 0xfffac
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: > CNTL B8 taille : 0x0000400008050800
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x08 DATA 0x4000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: > CNTL B8 adresse : 0x000fffa808030100
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0xfffa8
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: 0x08 ouvert ; mots sbio reçus jusqu'ici : 0
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: B8 avant le 0x73 : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: > sbio 0x73 (poignée) : 0x000000000073fc08
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: sbio < TAG 0x04 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (notification TAG 0x02-0x04, après le 0x73) : 0x0000000000000408
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x73 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000073fc08
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native: B8 après un mot sbio : 2 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x0 offset 0x0 opcode 0x73 fragment 0x0
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000073 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:48 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: B8 en fin d'écoute : 2 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x0 offset 0x0 opcode 0x73 fragment 0x0
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000073 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: VERDICT sbio : VIVANT (B8 +0x00=0x01 +0x14=0x73 ; 2 mot(s) 0x08 après le 0x73 ; TAG 0xfc TYPE 0x73 ou TAG 0x04 : oui)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio : relais ouvert (allow_sbio_relay=1, allow_sbio_params=3, allow_sbio_bio=1) : 34 étape(s) dans l'ordre, de 0x17 à 0x63, puis UN 0x03 (E-ENROLL-START) et écoute seule
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: /dev/sep_sbio prêt (lancer sbiod)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: table de découverte : 12 EP (état Running, 0 message(s) ignoré(s))
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x14 'hibe' pages [1, 1, 1, 1]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x18 'stac' pages [2, 2, 2, 2]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x00 'cntl' pages [0, 0, 0, 0]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x10 'xars' pages [2, 2, 2, 2]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x13 'xarm' pages [2, 2, 2, 2]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x15 'pnon' pages [7, 7, 5, 5]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x0e 'hdcp' pages [1, 1, 1, 1]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x08 'sbio' pages [1, 1, 1, 1]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x17 'skdl' pages [1, 1, 1, 1]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x0c 'sse' pages [1, 1, 1, 1]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x0a 'scrd' pages [1, 1, 1, 1]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native:   EP 0x12 'sks' pages [1, 2, 1, 2]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: /dev/sep_sbio ouvert (étape suivante 0)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais > prepareSession (0x17) : charge 16 o en 1 fragment(s), tête [02, 19, c0, 5c, 0f, d2, aa, 34]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000017fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x17 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000017fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais < prepareSession TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais : prepareSession (0x17) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais > keyExchange (0x15) : charge 4 o en 1 fragment(s), tête [01, 00, 00, 00]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000015fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x15 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000015fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais < keyExchange TAG 0xfc fragment 1 : total 0x28 offset 0x0 long 0x28 (complet)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais : keyExchange (0x15) terminé, réponse 40 o en 1 fragment(s), tête [7e, 25, 4a, 01, cd, 38, ed, 6f]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais > keyExchange2 (0x16) : charge 40 o en 1 fragment(s), tête [39, 50, 54, 88, 61, e1, bb, 2b]
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000016fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x16 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000016fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais < keyExchange2 TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais : keyExchange2 (0x16) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais > initSeqCounter (0x42) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000042fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x42 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000042fc08
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais < initSeqCounter TAG 0xfc fragment 1 : total 0x40 offset 0x0 long 0x40 (complet)
+Nov 22 23:04:55 alarm kernel: sep_native soc:sep-native: sbio relais : initSeqCounter (0x42) terminé, réponse 64 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > seqCounter2 (0x18) : charge 64 o en 1 fragment(s), tête [3a, 80, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000018fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x18 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000018fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < seqCounter2 TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : seqCounter2 (0x18) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > loadPatch (0x5f) : charge 2 o en 1 fragment(s), tête [02, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5f PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < loadPatch TAG 0xfc fragment 1 : total 0x568e offset 0x0 long 0x3fe4 (suite demandée)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fe, fragment suivant) : 0x00000000005ffe08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfd TYPE 0x5f PARAM 0x00 DATA 0x00010000 (GT, après le 0x73) : 0x00010000005ffd08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < loadPatch TAG 0xfd fragment 2 : total 0x568e offset 0x3fe4 long 0x16aa (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : loadPatch (0x5f) terminé, réponse 22158 o en 2 fragment(s), tête [8c, 56, 3a, 00, 00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams5d (0x5d) : charge 4 o en 1 fragment(s), tête [00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005dfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5d PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005dfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams5d TAG 0xfc fragment 1 : total 0x37 offset 0x0 long 0x37 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams5d (0x5d) terminé, réponse 55 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams5c (0x5c) : charge 4 o en 1 fragment(s), tête [00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005cfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5c PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005cfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams5c TAG 0xfc fragment 1 : total 0x37 offset 0x0 long 0x37 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams5c (0x5c) terminé, réponse 55 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams6a (0x6a) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000006afc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x6a PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000006afc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams6a TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams6a (0x6a) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > moduleSerial (0x31) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000031fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x31 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000031fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < moduleSerial TAG 0xfc fragment 1 : total 0x40 offset 0x0 long 0x40 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : moduleSerial (0x31) terminé, réponse 64 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > moduleSerial2 (0x32) : charge 64 o en 1 fragment(s), tête [3a, 80, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000032fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x32 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000032fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < moduleSerial2 TAG 0xfc fragment 1 : total 0x12 offset 0x0 long 0x12 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : moduleSerial2 (0x32) terminé, réponse 18 o en 1 fragment(s), tête [46, 35, 38, 32, 31, 31, 34, 30]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > patchDone (0x01) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000001fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x01 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000001fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < patchDone TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : patchDone (0x01) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > matchPolicy (0x1f) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000001ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x1f PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000001ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < matchPolicy TAG 0xfc fragment 1 : total 0x2 offset 0x0 long 0x2 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : matchPolicy (0x1f) terminé, réponse 2 o en 1 fragment(s), tête [05, 05]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > moduleSerial (0x31) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000031fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x31 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000031fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < moduleSerial TAG 0xfc fragment 1 : total 0x40 offset 0x0 long 0x40 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : moduleSerial (0x31) terminé, réponse 64 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > moduleSerial2 (0x32) : charge 64 o en 1 fragment(s), tête [3a, 80, 00, 00, 00, 00, 00, 2b]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000032fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x32 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000032fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < moduleSerial2 TAG 0xfc fragment 1 : total 0x12 offset 0x0 long 0x12 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : moduleSerial2 (0x32) terminé, réponse 18 o en 1 fragment(s), tête [46, 35, 38, 32, 31, 31, 34, 30]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > setCalibration (0x5b) : charge 64665 o en 4 fragment(s), tête [03, 00, 00, 00, 30, 82, fc, 91]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005bfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfe TYPE 0x5b PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005bfe08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: B8 au < fe (envoi fragmenté) : 16311 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x12 offset 0x0 opcode 0x32 fragment 0x12
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000012 00000000 00000000
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000032 00000012 32383546
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 30343131 51464641 41503735 22124343
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 5b29ee88 ca853b28 65bb7552 1629a24c
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x040 : d9c7e0a9 6f0a06b4 e843744e bfd9e898
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 28126d7c 15bb8d0f 40d467e7 94665cad
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 989c4621 14210295 4b8b6928 bbc8fc76
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 1c594c04 3e11e753 3781c900 535650f0
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < setCalibration TAG 0xfe DATA 0x00000000 : fragment 1/4 reçu, suivant demandé
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fd, fragment AP→SEP) : 0x00010000005bfd08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfe TYPE 0x5b PARAM 0x00 DATA 0x00010000 (GT, après le 0x73) : 0x00010000005bfe08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: B8 au < fe (envoi fragmenté) : 16311 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x12 offset 0x0 opcode 0x32 fragment 0x12
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000012 00000000 00000000
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000032 00000012 32383546
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 30343131 51464641 41503735 22124343
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 5b29ee88 ca853b28 65bb7552 1629a24c
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x040 : d9c7e0a9 6f0a06b4 e843744e bfd9e898
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 28126d7c 15bb8d0f 40d467e7 94665cad
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 989c4621 14210295 4b8b6928 bbc8fc76
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 1c594c04 3e11e753 3781c900 535650f0
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < setCalibration TAG 0xfe DATA 0x00010000 : fragment 2/4 reçu, suivant demandé
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fd, fragment AP→SEP) : 0x00020000005bfd08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfe TYPE 0x5b PARAM 0x00 DATA 0x00020000 (GT, après le 0x73) : 0x00020000005bfe08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: B8 au < fe (envoi fragmenté) : 16311 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x12 offset 0x0 opcode 0x32 fragment 0x12
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000012 00000000 00000000
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000032 00000012 32383546
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 30343131 51464641 41503735 22124343
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 5b29ee88 ca853b28 65bb7552 1629a24c
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x040 : d9c7e0a9 6f0a06b4 e843744e bfd9e898
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 28126d7c 15bb8d0f 40d467e7 94665cad
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 989c4621 14210295 4b8b6928 bbc8fc76
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 1c594c04 3e11e753 3781c900 535650f0
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < setCalibration TAG 0xfe DATA 0x00020000 : fragment 3/4 reçu, suivant demandé
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fd, fragment AP→SEP) : 0x00030000005bfd08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5b PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005bfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < setCalibration TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : setCalibration (0x5b) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > calibrationInfo (0x63) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000063fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x63 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000063fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < calibrationInfo TAG 0xfc fragment 1 : total 0x1c offset 0x0 long 0x1c (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : calibrationInfo (0x63) terminé, réponse 28 o en 1 fragment(s), tête [03, 00, 00, 00, 00, ac, 60, 41]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > handleReset (0x19) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000019fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x19 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000019fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < handleReset TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : handleReset (0x19) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > prepareSession (0x17) : charge 16 o en 1 fragment(s), tête [02, 19, c0, 5c, 0f, d2, aa, 34]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000017fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x17 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000017fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < prepareSession TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : prepareSession (0x17) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > keyExchange (0x15) : charge 4 o en 1 fragment(s), tête [01, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000015fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x15 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000015fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < keyExchange TAG 0xfc fragment 1 : total 0x28 offset 0x0 long 0x28 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : keyExchange (0x15) terminé, réponse 40 o en 1 fragment(s), tête [e4, 4d, fb, a6, d6, 6a, 3a, a6]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > keyExchange2 (0x16) : charge 40 o en 1 fragment(s), tête [ca, f4, b6, 28, 8a, e1, 30, 79]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000016fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x16 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000016fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < keyExchange2 TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : keyExchange2 (0x16) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > initSeqCounter (0x42) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000042fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x42 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000042fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < initSeqCounter TAG 0xfc fragment 1 : total 0x40 offset 0x0 long 0x40 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : initSeqCounter (0x42) terminé, réponse 64 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > seqCounter2 (0x18) : charge 64 o en 1 fragment(s), tête [3a, 80, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000018fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x18 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000018fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < seqCounter2 TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : seqCounter2 (0x18) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > loadPatch (0x5f) : charge 2 o en 1 fragment(s), tête [02, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5f PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < loadPatch TAG 0xfc fragment 1 : total 0x70ce offset 0x0 long 0x3fe4 (suite demandée)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fe, fragment suivant) : 0x00000000005ffe08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfd TYPE 0x5f PARAM 0x00 DATA 0x00010000 (GT, après le 0x73) : 0x00010000005ffd08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < loadPatch TAG 0xfd fragment 2 : total 0x70ce offset 0x3fe4 long 0x30ea (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : loadPatch (0x5f) terminé, réponse 28878 o en 2 fragment(s), tête [cc, 70, 3a, 00, 00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams5d (0x5d) : charge 4 o en 1 fragment(s), tête [00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005dfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5d PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005dfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams5d TAG 0xfc fragment 1 : total 0x37 offset 0x0 long 0x37 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams5d (0x5d) terminé, réponse 55 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams5c (0x5c) : charge 4 o en 1 fragment(s), tête [00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000005cfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x5c PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000005cfc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams5c TAG 0xfc fragment 1 : total 0x37 offset 0x0 long 0x37 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams5c (0x5c) terminé, réponse 55 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams6a (0x6a) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000006afc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x6a PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000006afc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams6a TAG 0xfc fragment 1 : total 0x44 offset 0x0 long 0x44 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams6a (0x6a) terminé, réponse 68 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > sensorParams6f (0x6f) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000006ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x6f PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000006ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < sensorParams6f TAG 0xfc fragment 1 : total 0x4d offset 0x0 long 0x4d (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : sensorParams6f (0x6f) terminé, réponse 77 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > moduleSerial (0x31) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000031fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x31 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000031fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < moduleSerial TAG 0xfc fragment 1 : total 0x40 offset 0x0 long 0x40 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : moduleSerial (0x31) terminé, réponse 64 o en 1 fragment(s), tête [3a, 00, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > moduleSerial2 (0x32) : charge 64 o en 1 fragment(s), tête [3a, 80, 00, 00, 00, 00, 00, bb]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000032fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x32 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000032fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < moduleSerial2 TAG 0xfc fragment 1 : total 0x12 offset 0x0 long 0x12 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : moduleSerial2 (0x32) terminé, réponse 18 o en 1 fragment(s), tête [46, 35, 38, 32, 31, 31, 34, 30]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > patchDone (0x01) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000001fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x01 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000001fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < patchDone TAG 0xfc fragment 1 : total 0x0 offset 0x0 long 0x0 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : patchDone (0x01) terminé, réponse 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > matchPolicy (0x1f) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x00000000001ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x1f PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x00000000001ffc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < matchPolicy TAG 0xfc fragment 1 : total 0x2 offset 0x0 long 0x2 (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : matchPolicy (0x1f) terminé, réponse 2 o en 1 fragment(s), tête [05, 05]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > calibrationInfo (0x63) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000063fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x63 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000063fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < calibrationInfo TAG 0xfc fragment 1 : total 0x1c offset 0x0 long 0x1c (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : calibrationInfo (0x63) terminé, réponse 28 o en 1 fragment(s), tête [03, 00, 00, 00, 00, ac, 60, 41]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > calibrationInfo (0x63) : charge 0 o en 1 fragment(s), tête []
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000063fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x63 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000063fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais < calibrationInfo TAG 0xfc fragment 1 : total 0x1c offset 0x0 long 0x1c (complet)
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : calibrationInfo (0x63) terminé, réponse 28 o en 1 fragment(s), tête [03, 00, 00, 00, 00, ac, 60, 41]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio E-ENROLL-START : envoi du 0x03 commandStartEnroll (68 o à zéro, allow_sbio_bio=1), une seule fois
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais > startEnroll (0x03) : charge 68 o en 1 fragment(s), tête [00, 00, 00, 00, 00, 00, 00, 00]
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: > sbio relais (fc) : 0x000000000003fc08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xff TYPE 0x03 PARAM 0x00 DATA 0x00000000 (autre, après le 0x73) : 0x000000000003ff08
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio 0x03 : la réponse viole la règle du compteur GT (Fd { got: 0, want: 1 }) : journalisé, pas de Halted
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: B8 à la réponse au 0x03 : 16270 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000000 00000000 00000000 00000000
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000001 00000000 00000000 00000003
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 4160ac00 00000000 00000000 00000009
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000003 00000003 008dfbfd 38b1a207
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 4597274e 2f923b08 3f7816b7 42113272
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x050 : ab9ce4b1 9f319c97 4b7baa24 c502a004
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 8b748cf8 2165b186 ed857314 248a8951
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native:   B8+0x070 : b26bbcad 41e02dd3 a23505eb 81e50b47
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio E-ENROLL-START < TAG 0xff TYPE 0x03 PARAM 0x00 DATA 0x00000000 : réponse NON conforme à un ack vide (B8 : 256 o remis au démon) ; ÉCOUTE seule désormais
+Nov 22 23:04:56 alarm kernel: sep_native soc:sep-native: sbio relais : startEnroll (0x03) terminé, réponse 256 o en 0 fragment(s), tête [00, 00, 00, 00, 00, 00, 00, 00]
