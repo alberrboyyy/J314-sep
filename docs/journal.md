@@ -14,6 +14,13 @@ Format :
 
 ---
 
+## 2026-11-22 02:13 — Albert (lance) + Claude (Opus 4.8) — 🎯 0x17 FRANCHI nativement : l'AP lit le serial capteur EN DIRECT et le SEP l'accepte ; mur suivant = 0x15 key exchange
+- Trace : traces/20261122-021249_native_sbio3. Script : pending/sep_native_sbio3.sh (relu, SELFTEST vert) ; moteur SPI : analysis/mesa_spi_proxy.py.
+- Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio3.sh` (Albert lance, après reboot + catcher permanent). PHASE 1 persist (**stab n=6**) + PHASE 2 0x73 (**sbio vivant n=5**) + PHASE 3 : dans la MÊME session proxy, `MesaSPI(iface,p,u)` → `power_on()` → `read_id()` → identité capteur `80d4001b00000000 70 0219c05c0fd2aa349a81c76e030200d8 7576` ; série [9:25] = `0219c05c0fd2aa349a81c76e030200d8` (== gabarit c12) ; construit la commande 0x17 (gabarit + série lue live) → envoie EP 0x08 TAG=0xfc TYPE=0x17.
+- Vu (faits bruts) : le SEP **acquitte** : `< EP=0x08 TAG=0xfc TYPE=0x17`, B8 `+0x14=0x17`. Puis déroulé post-0x17 → **mur suivant = commande 0x15 performKeyExchange** [SPI] (réf c12 000305_08_A.bin : gt_packet `+0x14=0x15`, `+0x18=0x04`, charge = `01000000` = sessionType=1). Teardown capteur : `power_off` + `restore` (état iBoot) OK.
+- Interprété : **le relais SEP↔capteur fonctionne pour 0x17** (donner le serial lu live) — 1ère étape de relais capteur franchie nativement, sans macOS. Prochain mur = **0x15 = échange de clés chiffré** : le vrai crux (l'AP est-il un **pur relais d'octets** — faisable — OU doit-il **détenir/générer une clé** — mur dur ?). Analyse en cours → `docs/sbio_keyexchange.md`.
+- Incidents : RAS. Compteur anti-rejeu +12 (xart_store_sbio3). Capteur restauré état iBoot. Linux intact ; DFU prêt.
+
 ## 2026-11-22 01:58 — Albert (lance) + Claude (Opus 4.8) — sbio au-delà du 0x73 : le 1er mur = 0x17 prepareSession, et il PORTE le serial du capteur (qu'on sait lire)
 - Trace : traces/20261122-015806_native_sbio2 (wall_A8/B8.bin, wall_ref_17_A.bin). Sanity capteur : traces/20261122-015340_sensor_sanity (identité capteur = macOS, état restauré). Script : pending/sep_native_sbio2.sh (relu).
 - Fait : `M1N1TIMEOUT=20 ./pending/sep_native_sbio2.sh` (Albert lance). PHASE 1 persist (stabilisation **n=5**) + PHASE 2 0x73 (**sbio vivant n=4**) + PHASE 3 déroulé post-0x73 (fail-closed, store séparé xart_store_sbio2).
