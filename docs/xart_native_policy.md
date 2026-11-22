@@ -61,6 +61,13 @@ Relu octet-près contre `pending/sep_native_persist.sh` (run n=4). **GO protocol
 - **Keying des lockers RÉSOLU** : la clé d'un locker = les **16 premiers octets de B au SAVE** (= l'UUID vu au FETCH 0x05).
   Donc au SAVE 0x06, indexer par `B[:16]` ; au FETCH 0x05, chercher par l'UUID lu en B et **servir le blob verbatim**
   (comme `serve_master` mais **sans** le préfixe 0x11 ; `TYPE 0x00, PARAM=ln&0xFF, DATA=((ln>>8)&0xFF)|(sel<<8)`).
-- **Ouverture sbio (0x08) après chaînage** : 1re tentative NON ackée → Halted. Forme/TAG/timing corrects. Cause
-  [hypothèse forte] : **lockers non servis** (répondus ABSENT) → l'état biométrique de sbio vit dans un gigalocker →
-  sbio annoncé mais **pas armé** → open refusé. ⇒ **au chaînage, SERVIR master ET lockers** avant d'ouvrir 0x08.
+- **Ouverture sbio (0x08) après chaînage** : J3 + J3bis (lockers servis) → open 0x08 NON acké (n=2). L'hypothèse
+  « lockers manquants » est **réfutée**. Mais sbio **ouvre bien après un SEAL FRAIS** (J3c, vérifié). ⇒ tension
+  persistance↔armement.
+- **TRACK B — FIX du chaînage (comparaison c12, boot macOS CHAÎNÉ où sbio marche)** : la différence = **le TIMING de
+  l'ouverture 0x08**. macOS ouvre le CNTL de 0x08 **~35 ms APRÈS l'annonce `0x1d 'sbio'`, ENTRELACÉ avec le service
+  xART qui continue** (FETCH lockers après l'open), PAS après le « calme ». Nos essais ouvraient TARD (après calme) →
+  refusés. ⇒ **au chaînage : dès réception du `0x1d 'sbio'`, ack 0x16 PUIS ouvrir tout de suite les 4 CNTL de 0x08**
+  (A=B=0x4000, TYPE 0x04/0x02/0x05/0x03 PARAM 0x08), en continuant à servir les FETCH restants. Secondaire : macOS sert
+  **les 2 masters (t2 ET t1) + ~15 lockers** ; servir tout le stocké. Source : `traces/20261108-032454_c12-boot-ho/sep.log`
+  (0x1d sbio @711.336 ; open 0x08 @711.371 ; 0x73 @737.73). Statut : **hypothèse (à tester au prochain run chaîné)**.
