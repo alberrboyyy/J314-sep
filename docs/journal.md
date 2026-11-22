@@ -2085,3 +2085,10 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - 17:58 (après reboot) : sep_native en lecture seule OK. Overlay appliqué (sepfw phys 0x1000550c000 taille 0x5b0000,
   mbox 0x35, DART sep 0x36 sid 0, ps 0x37). sep_native : manifestes lpol 0xb7b o / ibot 0x15cc o, shmem 0x30000 o à
   IOVA 0xfffc0000, magic « CINP », mailbox prise, allow_boot=0 → aucun envoi. Suite : rmmod puis allow_boot=1.
+- 18:06 : **J2 RÉUSSI : SEPOS démarré depuis Linux natif par sep_native (allow_boot=1)**, sans câble.
+  Séquence vue : GET_STATUS → 0x66 DATA 1 ; BOOT_TZ0 → 0x69 DATA 0, 0xD2 DATA 2 ; GET_STATUS → 0x66 DATA 2 ;
+  fw mappé IOVA 0xff800000 ; BOOT_IMG4 (0x000ff800000600ff) + SET_SHMEM (0x000fff80001800fe) → 0x6A ; fw démappé.
+  Découverte 0xFD : 7 EP — hibe 0x14 [1,1,1,1], stac 0x18 [2,2,2,2], cntl 0x00, xars 0x10 [2,2,2,2],
+  xarm 0x13 [2,2,2,2], pnon 0x15 [7,7,5,5], hdcp 0x0e [1,1,1,1] (= SEP-BOOT sous m1n1, sans sbio/sks tant que
+  xART n'est pas servi). CNTL spontanés 0x0d, 0x29, 0x10 (rien envoyé). xarm : 1re requête TYPE 0x0e reçue,
+  NON servie. État final Running. Aucun ACK envoyé, aucun SAVE.
