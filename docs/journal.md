@@ -2139,3 +2139,9 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   (106 o, PARAM 0x6a) ; 0 SAVE, aucune autre requête. sbio annoncé (0x1d puis 0xFD [1,1,1,1]). Ouverture CNTL 0x08,
   même 1er message `> 0x0000400008040600` → **toujours aucun ack en 5 s** → Halted. Logs :
   `logs/20261122-190438_j3b-sbio-lockers/`. L'hypothèse « lockers manquants » ne suffit pas.
+- 19:20 (J3 ter, reboot, **store NEUF**) : seal frais (FETCH maître ABSENT, 12 SAVE), sbio annoncé, 2 s de calme,
+  puis ouverture CNTL 0x08 TAG 06/07/08/01 → **les 4 ackés** ; 0x73 envoyé → `< 0x08 TAG 0x04 TYPE 0x00` puis
+  `< 0x08 TAG 0xfc TYPE 0x73` ; B8 = version 1, opcode 0x73. **VERDICT sbio : VIVANT** (1re fois en Linux natif).
+  ⇒ L'ouverture de 0x08 exige l'état « seal frais » : après un chaînage (master servi), le CNTL 0x08 reste sans ack,
+  même avec les lockers servis. Tension persistance ↔ armement de sbio, à résoudre. Logs :
+  `logs/20261122-192013_j3c-sbio-fresh/`.
