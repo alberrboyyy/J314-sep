@@ -53,3 +53,14 @@ Relu octet-près contre `pending/sep_native_persist.sh` (run n=4). **GO protocol
 - **Délai 0x0e** : large (anneau RX bufferise ; marge énorme vs harnais USB). Répondre dès que sepd lit.
 - Après le run : renvoyer le journal brut à `sep-touchid-c9` → vérifié/hypothèse (surtout : `sbio`+`sks` s'annoncent-ils
   après le SAVE ?) + MAJ `handoff.md`.
+
+## Résultat J3 (2026-11-22) — chaînage + ouverture sbio
+- **CHAÎNAGE cross-reboot = VÉRIFIÉ (n=1)** : au boot suivant, servir le master stocké (437o = 0x11 + 420) → le SEP
+  l'**accepte sans re-sceller** (0 SAVE, annonces immédiates). ⇒ persistance de l'état (et donc de l'enrôlement) viable.
+  Réserve : n=1, à reproduire ; les **lockers** doivent aussi être servis (voir ci-dessous).
+- **Keying des lockers RÉSOLU** : la clé d'un locker = les **16 premiers octets de B au SAVE** (= l'UUID vu au FETCH 0x05).
+  Donc au SAVE 0x06, indexer par `B[:16]` ; au FETCH 0x05, chercher par l'UUID lu en B et **servir le blob verbatim**
+  (comme `serve_master` mais **sans** le préfixe 0x11 ; `TYPE 0x00, PARAM=ln&0xFF, DATA=((ln>>8)&0xFF)|(sel<<8)`).
+- **Ouverture sbio (0x08) après chaînage** : 1re tentative NON ackée → Halted. Forme/TAG/timing corrects. Cause
+  [hypothèse forte] : **lockers non servis** (répondus ABSENT) → l'état biométrique de sbio vit dans un gigalocker →
+  sbio annoncé mais **pas armé** → open refusé. ⇒ **au chaînage, SERVIR master ET lockers** avant d'ouvrir 0x08.
