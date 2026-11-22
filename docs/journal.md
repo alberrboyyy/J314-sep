@@ -2197,3 +2197,21 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - État : boot du Mac 19:55:58 (= boot de J3d), `sep_native` encore chargé → reboot du Mac requis avant J5.
 - À la reprise (nouvelle session ALARM) : sur go d'Albert, `sudo pending/j5_sensor_run.sh` (store neuf par défaut).
 - (Correction : l'entrée « 20:30 » ci-dessus a été écrite vers 20:10 ; l'heure était fausse.)
+
+## 2026-11-22 20:16 — Albert + Claude (session ALARM) — J5 : relais capteur COMPLET en Linux natif jusqu'au patch ; patch REFUSÉ malgré un push en 48 ms
+- Go d'Albert (reboot 20:13, lancé par Albert : `sudo pending/j5_sensor_run.sh`, store neuf). Logs bruts :
+  `logs/20261122-201601_j5-sensor-native/` (console, run, sbiod, kernel).
+- VU, côté SEP : seal frais (2 FETCH maître ABSENT, 12 SAVE acquittés, 0 ignoré), sbio VIVANT au 0x73 (n=2 en natif
+  sur seal frais avec J3c).
+- VU, relais : identité capteur OK (n° de série 0219c05c…d8) → 0x17 (16→0) → 0x15 (4→40) → trame SPI 0x72 (réponse
+  0x33) → 0x16 (40→0) → 0x42 (0→64) → trame SPI 0x73 (réponse 0x4b) → 0x18 (64→0) → 0x5f (2→22158 o, fragments
+  fe/fd réassemblés). **Toute la chaîne fonctionne en natif, 1re fois depuis Linux.**
+- VU, push : état avant `80200010 00000000 60000000 52330000` ; prélude `80 60 00 07 00 00 00` puis bloc de 22158 o en
+  **UN transfert PIO de 48 ms** (m1n1 : ~2,2 s ; macOS DMA : ~74 ms). IRQ 195 haute dès t+0, lectures d'état à zéro
+  pendant ~1 s (capteur occupé ?), puis à t+1020 ms état `80200010 00000000 60000008 52330000` et IRQ retombe.
+  **Octet d'état 0x60 → jamais 0x29 ⇒ VERDICT sbiod : patch refusé.** Même état final (variante `…08…`) que sous m1n1.
+- INTERPRÉTÉ (hypothèse) : la vitesse/continuité du transfert n'est PAS la cause (48 ms < 74 ms macOS) → hypothèse
+  « FIFO trop lent / trous d'horloge » **réfutée** (n=1). Le capteur reçoit, traite ~1 s, puis revient à l'état sans
+  correctif avec le bit 0x08 levé (code de rejet ?). Pistes restantes : cadrage du bloc (prélude/longueur/trailer),
+  étape manquante entre 0x18 et le push (comparer octet-près aux trames SPI de c17/c20), ou contenu lié à la session.
+- Après le run : sepd tourne encore (lancé en root par Albert) ; SEP Running, rien d'autre envoyé. Power-cycle = Albert.
