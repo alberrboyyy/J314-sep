@@ -43,7 +43,8 @@ exactement son rustc. Mise en place (faite le 2026-11-22, `~/kbuild/`, rien d'in
    `/usr/include/linux/types.h` ;
 5. `make modules_prepare` (15 s), puis `./build.sh`.
 `kmod/sep_hello.rs` = module de contrôle de la chaîne : il n'accède à aucun matériel. vermagic identique au noyau,
-tous ses symboles présents. Gros acquis : l'arbre fournit `kernel::soc::apple::{mailbox, rtkit}` en Rust (ce que
+tous ses symboles présents. **Chargé et déchargé sur ALARM le 2026-11-22 : OK** (`dmesg` : « chaîne Rust OK », puis
+« déchargé »). Gros acquis : l'arbre fournit `kernel::soc::apple::{mailbox, rtkit}` en Rust (ce que
 `drivers/soc/apple/sep.rs` utilise). En revanche, il n'y a pas de liaison Rust SPI : le capteur restera en C ou
 passera par une petite couche de liaison. `CONFIG_APPLE_SEP=y` (intégré au noyau) : un pilote SEP étendu
 remplacera `sep.rs` dans un noyau custom, ou se liera via un nœud DT distinct. Tout module qui parle au SEP :

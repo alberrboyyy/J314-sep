@@ -15,13 +15,13 @@ struct SepHello;
 
 impl kernel::Module for SepHello {
     fn init(_module: &'static ThisModule) -> Result<Self> {
-        pr_info!("sep_hello: chaîne Rust OK (aucun accès matériel)\n");
+        pr_info!("chaîne Rust OK (aucun accès matériel)\n");
         Ok(SepHello)
     }
 }
 
 impl Drop for SepHello {
     fn drop(&mut self) {
-        pr_info!("sep_hello: déchargé\n");
+        pr_info!("déchargé\n");
     }
 }
