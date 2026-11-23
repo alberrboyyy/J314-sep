@@ -14,6 +14,25 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — J10 : make_system_keybag byte-exact (voie identité) → docs/keybag_native_path.md §J10
+- Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
+  envoyé au SEP, matériel non touché). source: kext. Aucune clé/secret/passcode extrait.
+- Vu : la voie identité (`identity_load` @0xcf79a4, seul appelant = userclient `KeyBagCreateWithData` @0xcd0844) fait
+  **DEUX ops fil**, pas une : (1) **`load_keybag` TAG 0x03** (`identity_open` @0xcf7160 → `load_keybag` @0xcc6c3c →
+  builder @0xcdb934 `mov w1,#3`), qui **importe le blob 16 o** (`w3=#0x10`) et **REND le handle** (codec @0xcde92c :
+  réponse = `__word` +0x6c) ; (2) **`make_system_keybag` TAG 0x0d** (builder @0xcdbce4 `mov w1,#0xd`), qui **ne rend
+  qu'un statut** (builder relit juste w0, efface la struct via bzero @0xd027cc). Const +0x50 = u64 1 (lu @0x770fec8 =
+  `01 00…`). Codec 0x0d @0xce0134 branche state==1 → corps = état(+0x50)/handle(+0x58)/u32(+0x60)/u32(+0x64)/blob
+  (+0x68,+0x70)/flag(+0x78). Les 3 scalaires (uuid 16 o, handle y=`sp[0xc8]`, type=`sp[0xf0]`) sont **lus du
+  dictionnaire USERLAND** au site @0xcd411c, PAS du kext/ADT. Contrainte VU : `type ≤ -10` (`cmn w21,#0xa ; b.gt`→err).
+  `create_keybag` 0x01 (@0xcf9a34) = chemin distinct, non requis.
+- Interprété : le GABARIT des deux messages est byte-connu (tout VU) ; le MESSAGE complet NON — il reste 3 valeurs
+  userland à obtenir hors binaire (blob 16 o/uuid, handle y, type≤-10). Le +0x60 de 0x0d n'est pas à inventer (= handle
+  rendu par 0x03). Aucun passcode sur toute la voie. `load_keybag`=« charger » : un uuid arbitraire peut être refusé si
+  le SEP exige une identité pré-enregistrée → INCONNU, à trancher matériel (classe neuve → go d'Albert). Corrige §1 de
+  keybag_native_path.md (pas de « fabrication ex nihilo ») et §3.2 de sks_keybag_unlock.md (1re op = 0x03, pas 0x01).
+- Incidents : —
+
 ## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — chemin natif minimal « keybag prêt pour authentication_token_create » → docs/keybag_native_path.md
 - Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
   envoyé au SEP, matériel non touché). source: kext. Aucune clé/secret/passcode/dérivation extrait.

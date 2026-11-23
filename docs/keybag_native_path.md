@@ -158,3 +158,133 @@ TAG fil EP 0x12** (recoupé trace c12 pour 0x32/0x48/0x41/0x18, cf. `sks_keybag_
   observé = notify-port de persistance DISQUE côté userland).
 - Un keybag d'appareil NEUF peut-il forger le jeton avec le passcode fourni seulement à la forge (sans 0x18 préalable) ? INCONNU.
 - Le SEP ungate-t-il sbio sur un keybag d'appareil recréé par Linux, ou exige-t-il l'identité d'appareil d'origine ? INCONNU (politique interne SEP).
+
+---
+
+## J10 : `make_system_keybag` byte-exact (voie identité) — 2026-11-23, reverseur (Opus 4.8, capstone, hors-ligne)
+
+**Source binaire** : kernelcache `macos/kc/26B131__MacBookPro18,4/kernelcache.release.*` (27.2.1), bundle
+`com.apple.driver.AppleSEPKeyStore`. **`source: kext` (27.2.1)**. VU = lu au désassemblage ; DÉDUIT = interprété ;
+INCONNU = non tranché par ce binaire. Rien lancé, rien `vérifié`, aucun octet de clé/secret extrait.
+
+### J10.0 Correction de la §1 : la voie identité fait DEUX ops fil, pas une — VU
+
+`AppleKeyStore::identity_load` (@0xfffffe0009cf79a4, sig `identity_load(y, OSData* uuid, int type)`) enchaîne **deux
+transactions fil EP 0x12** (VU, désassemblage octet) :
+
+1. **`load_keybag` (TAG fil 0x03)** via `identity_open` (@0xcf7160) → `AppleKeyStore::load_keybag` (@0xcc6c3c) →
+   builder `__ipc_load_keybag` (@0xcdb934, submit `mov w1,#3`). **C'est l'op qui REND un handle.** Elle **importe le
+   blob de 16 o** (l'OSData `uuid`) comme données de keybag (`load_keybag(y, uuid_ptr, 16, &handle)` ; `w3=#0x10`
+   VU @0xcf7180).
+2. **`make_system_keybag` (TAG fil 0x0d)** via builder `__ipc_make_system_keybag_v1` (@0xcdbce4, submit `mov w1,#0xd`).
+   **Elle ne rend QUE un statut**, pas de handle (VU : le builder fait `mov x19,x0` = statut, puis efface la struct
+   via le thunk bzero @0xd027cc, et `ret` x19 ; aucun champ de réponse relu).
+
+→ **Rectifie la §1** : la voie identité ne « fabrique pas un keybag ex nihilo ». Le keybag est **désigné/importé par
+un blob de 16 o fourni via `load_keybag` 0x03** ; `make_system_keybag` 0x0d ne fait ensuite que **marquer** ce keybag
+comme « system ». Le blob de `make_system_keybag` est bien **vide** sur cette voie (VU x5=x6=0), mais les 16 o ont
+déjà transité par `load_keybag`. (Corrige aussi `sks_keybag_unlock.md` §3.2 : la 1re op identité est `load_keybag`
+0x03, pas `create_keybag` 0x01.)
+
+### J10.1 D'où viennent les 3 scalaires — VU : du USERLAND, pas du kext
+
+`identity_load` n'a **qu'un seul appelant** (VU `callers`) : le userclient **`kAppleKeyStoreKeyBagCreateWithData`**
+(@0xcd0844, entitlement `com.apple.keystore.keybag.create`, cf. `sks_keybag_unlock.md` §3.1). Au site d'appel
+(@0xcd411c) les trois entrées sont lues du **dictionnaire de requête userland** (VU) :
+
+- **`uuid` (OSData 16 o)** = `x2`, objet extrait du dict (helpers `0xcbe490/0xcbe6b4`). Validé **= 16 o exactement**
+  (`cmp w0,#0x10 ; b.ne` @0xcf7a28 dans `identity_load`, et @0xcf7264 dans le chemin large). **Valeur INCONNU** (choisie
+  par le démon userland, pas lue d'un ADT/global/constante par le kext).
+- **`handle y` (u64)** = `ldr x1,[sp,#0xc8]` @0xcd4114 → un **handle de keybag parent/session** choisi par l'appelant.
+  **Valeur INCONNU.**
+- **`type` (int)** = `ldr w3,[sp,#0xf0]` @0xcd4110. Contrainte VU : `identity_load` rejette si `type > -10`
+  (`cmn w21,#0xa ; b.gt`→erreur @0xcf7a30) → **type doit être ≤ -10**. **Valeur exacte INCONNU** (choisie par
+  l'appelant dans la plage autorisée).
+
+→ **Aucun de ces trois champs n'est dérivable du binaire.** Ce ne sont pas des secrets (un uuid/identifiant, un
+handle, un petit entier), mais leurs **valeurs** sont posées par la politique userland (coreauthd/keystored), que ce
+kernelcache ne contient pas. L'ADT capturé (`traces/20261108-162919_adt/adt.txt`) a bien un `apfs-preboot-uuid`
+(16 o : `EFF3C698-A740-4F41-AB86-99C85C0EB880`) et un `unique-chip-id`/ECID (8 o) — **candidats PLAUSIBLES** pour le
+blob de 16 o, mais **aucune preuve VU** que `load_keybag` attende précisément celui-là (le kext ne le lit pas) → **INCONNU**.
+
+### J10.2 Gabarit d'octets COMPLET de `make_system_keybag` (TAG 0x0d) — VU struct / VU codec
+
+Builder `__ipc_make_system_keybag_v1` @0xcdbce4 (VU) : en-tête IPC via `_gen_ipc_header` (@0xcec458), puis struct :
+`+0x50` ← `ldr d0,[0x770fec8]` = **u64 1** (VU, const lue : `01 00 00 00 00 00 00 00`) ; `+0x58`←arg2 ; `w+0x60`←arg3 ;
+`w+0x64`←arg4 ; blob `+0x68/+0x70`←{arg5,arg6} ; `+0x78`←arg7. Submit `x0=arg1, w1=#0xd, blraa [global+0x150]`.
+Codec `_code_ipc_make_system_keybag` @0xce0134 (VU) : lit `+0x50` en **u32** (= 1), prend la **branche state==1**
+(@0xce028c) et sérialise **dans cet ordre** : `__lword +0x58`, `__word +0x60`, `__word +0x64`, `__blob +0x68/+0x70`,
+`__lword +0x78`. (La branche state==0 omettrait le `+0x78` ; ici state=1 car le builder force la const 1.)
+
+Valeurs posées par `identity_load` (@0xcf7b30-0xcf7b50, VU) : arg2=`y` (handle), arg3=handle rendu par `load_keybag`,
+arg4=`type`, arg5=arg6=**0** (blob vide), arg7=**0** (flag).
+
+| off. OOL | taille | primitive | champ | valeur (voie identité) | statut |
+|---|---|---|---|---|---|
+| 0x00 | 0x54 | `__ipc_header`+en-tête | en-tête IPC négocié (§1.6/§1.7) | len=0x50 + 0x50 o (condensé, version, horodatage µs, flags=0, bloc proc) | **VU** gabarit ; **contextuel** (à construire, pas secret) |
+| 0x54 | 4 | `__word` | état | **1** (const @0x770fec8) | **VU** |
+| 0x58 | 8 | `__lword` | **handle `y`** (keybag parent) | = `identity_load` arg1 = userland `sp[0xc8]` | **VU** champ ; **valeur INCONNU** (userland) |
+| 0x60 | 4 | `__word` | **handle du keybag chargé** | = sortie de `load_keybag` 0x03 (**lue à l'exécution, PAS à inventer**) | **VU** champ ; valeur **dynamique** |
+| 0x64 | 4 | `__word` | **type** | = `identity_load` arg3 ; contrainte VU **≤ -10** | **VU** champ+contrainte ; **valeur INCONNU** (userland) |
+| 0x68 | 4 | `__blob` len | longueur blob | **0** (vide sur voie identité) | **VU** |
+| (0x6c) | 0 | `__blob` data | données blob | — (vide) | **VU** |
+| 0x6c | 8 | `__lword` | **flag** | **0** (identity_load passe x7=0) | **VU** |
+
+Longueur fil requête ≈ **0x74** (0x54 en-tête + 0x20 corps) — **DÉDUIT** de l'ordre du codec (OOL 0x12 jamais capturé,
+donc non confirmé trace). **Byte-connu OUI pour le GABARIT** (offsets, types, ordre, const 1, blob vide, flag 0 : tout
+VU). **Byte-connu NON pour le MESSAGE complet** : il reste **2 valeurs à obtenir hors binaire** — `handle y` (+0x58) et
+`type` (+0x64) — plus, en amont, le **blob 16 o** de `load_keybag`. Le champ +0x60 n'est PAS à inventer (il vient de la
+réponse `load_keybag`).
+
+### J10.3 Gabarit de `load_keybag` (TAG 0x03) — VU, l'op qui REND le handle
+
+Builder `__ipc_load_keybag` @0xcdb934 (VU) ; codec `_code_ipc_load_keybag` @0xcde92c (VU). Requête (branche
+« encode », VU) :
+
+| off. OOL | taille | primitive | champ | valeur (voie identité) | statut |
+|---|---|---|---|---|---|
+| 0x00 | 0x54 | en-tête IPC | négocié (§1.6/§1.7) | — | **VU** gabarit |
+| 0x54 | 4 | `__word` | état | **0** (builder : `stp xzr,x24` @0xcdb9dc) | **VU** |
+| 0x58 | 8 | `__lword` | **handle `y`** | = userland `sp[0xc8]` | **VU** champ ; valeur **INCONNU** |
+| 0x60 | 4 | `__blob` len | longueur blob | **16** (`w3=#0x10`) | **VU** |
+| 0x64 | 16 | `__blob` data | **le blob de 16 o** (uuid) | = OSData userland | **VU** champ ; **valeur INCONNU** (userland ; candidats ADT §J10.1 non prouvés) |
+
+**Réponse** : codec branche « decode » → `__word` à `+0x6c` = **le handle attribué par le SEP** (VU : le builder
+`load_keybag` recopie `[sp+0x6c]` vers `*outHandle` après un retour OK @0xcdba28). → **C'est le handle observable
+côté AP pour juger « RÉPONDU / handle obtenu ».**
+
+### J10.4 Réponses attendues — VU côté AP / DÉDUIT côté fil
+
+- **`load_keybag` 0x03** : mot mailbox réponse `< EP=0x12 TAG=0x83 TYPE=seq PARAM=s DATA=(len<<16|flag)` (TAG = requête
+  |0x80, convention §1.6.4). PARAM=0 = OK. **Charge OOL B** = en-tête + état(u32, doit être 0) + **handle u32 à +0x6c**.
+  Côté AP, `load_keybag` renvoie ce handle (VU). **C'est le signal « handle obtenu ».** (Longueur exacte INCONNU, OOL
+  jamais capturé.)
+- **`make_system_keybag` 0x0d** : réponse `< TAG=0x8d TYPE=seq PARAM=s …`. Côté AP **seul le statut w0 est lu** (VU :
+  builder ne relit aucun champ) → PARAM=0 = « marqué system OK », PARAM≠0 = refus (ex. 0xff). **Aucun handle** rendu
+  par 0x0d (le handle vient de 0x03). Longueur réponse INCONNU (jamais capturé).
+
+### J10.5 Ordre et prérequis — VU / DÉDUIT
+
+- **Séquence minimale réelle (VU)** : `load_keybag` 0x03 (importe le blob 16 o → rend un handle) **PUIS**
+  `make_system_keybag` 0x0d (marque system, statut seul). `create_keybag` 0x01 (@0xcf9a34, submit `mov w1,#1`, VU) est
+  un **chemin DISTINCT** (import d'un keybag complet + 9 args, autre userclient) : **PAS requis** sur la voie identité.
+- **`make_system_keybag` juste après `set_env` ?** **NON** tel quel — il exige d'abord le **handle rendu par
+  `load_keybag`** (son champ +0x60), lequel exige le blob 16 o. Donc l'ordre est **`set_env` → `load_keybag` 0x03 →
+  `make_system_keybag` 0x0d** (contrairement à `null_d_key` J9c qui, lui, pouvait suivre `set_env` directement).
+- **Passcode ?** **AUCUN** sur toute cette voie (load_keybag/make_system_keybag ne prennent pas d'OSData secret, VU).
+  Conforme à l'objectif « sans mot de passe ». Le passcode n'entre qu'à l'unlock 0x18 / forge du jeton (hors J10).
+
+### J10.6 Verdict J10 — byte-connu ?
+
+- **GABARITS** `load_keybag` 0x03 et `make_system_keybag` 0x0d : **byte-connus** (offsets, primitives, ordre, const,
+  blob vide, flag — tous VU).
+- **MESSAGE complet : NON byte-connu.** Trois valeurs **à obtenir hors de ce binaire** (toutes userland, non secrètes
+  mais non déductibles ici) :
+  1. **le blob de 16 o** de `load_keybag` (uuid d'identité) — INCONNU (candidats ADT non prouvés) ;
+  2. **`handle y`** (+0x58 des deux ops) — INCONNU ;
+  3. **`type`** (+0x64 de 0x0d), seule contrainte VU = **≤ -10** — valeur exacte INCONNU.
+- **Risque sémantique** : `load_keybag` = « charger » ; un uuid **arbitraire** risque un refus SEP « keybag not found »
+  si le SEP attend une identité **déjà enregistrée**. Que le SEP crée à la volée depuis un uuid neuf, ou exige une
+  identité pré-existante, est **INCONNU** (politique SEP, non lisible ici). → À trancher **matériel** (classe neuve →
+  go d'Albert) : un `load_keybag` 0x03 avec un uuid candidat et lecture du handle rendu est l'expérience la moins chère,
+  mais **au moins 3 valeurs restent à fixer** avant tout envoi.
