@@ -2858,3 +2858,55 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - ⇒ (n=1) les 2 premières transactions du bring-up SKS (get_capabilities, set_env) passent depuis Linux natif avec des
   champs processus neutres et le mode de protection de contenu de l'ADT. §1.7 (c9) confirmée sur matériel.
   Prochaine marche : txn 3 = perform_operation (TAG 0x22, DATA 0x008c0000) — transporte du DER (kext §2) → reverse + J9c.
+
+## 2026-11-23 — agent reverseur (session ALARM, Opus 4.8, capstone) — jeton d'enrôlement 0x03 = AuthToken forgé par le SEP
+- Cible : fabrication du jeton (AuthToken/CredentialSet) exigé par sbio 0x03 et faisabilité Linux. Désassemblage
+  hors-ligne du kernelcache 27.2.1 (`AppleSEPKeyStore`) + chaînes de `biometrickitd`. Rien lancé. Doc : `docs/acm_token.md`.
+- VU (kext) : le jeton n'est PAS calculé par l'AP — il est FORGÉ PAR LE SEP via l'op IPC
+  `AppleKeyStore::authentication_token_create` @0xcc709c (builder `__ipc_authentication_token_create` @0xcfb52c, codec
+  `_code_ipc_authentication_token_create` @0xce2644). Le SEP sait aussi le VÉRIFIER (`authentication_token_verify`
+  @0xcc71f0, codec @0xce283c : reçoit le blob jeton, rend un u32 résultat) → clé tenue par le SEP, jeton non forgeable AP.
+- VU : atteint UNIQUEMENT par le dispatch userclient `AppleKeyStoreUserClient` @0xcd0844, gated par l'entitlement
+  **`com.apple.keystore.auth-token`** (chaîne @0x770e2dc). Entrées : handle de keybag du process (`effective_bag_handle_actual`
+  @0xccfd20) + un SECRET (`secretFromInput` @0xcedd30, blob userspace borné ≤0x1000). Sortie = blob jeton (OSData), posé
+  en `token[32]`/`tokenLength` de `enroll_indata_v2_t` (recoupe `biometrickit_protocol.md` §A.1).
+- VU : vocabulaire ACL ACM (`___acm_der_key_*` @0x74511c0…) = contraintes {user_passcode, bio, …} + params
+  {credential_max_age, credential_max_usage_count, bio_catacomb_uuid, bio_database_hash, bio_uuids, …}. DÉDUIT :
+  anti-rejeu = fraîcheur (max_age) + liaison à la base bio (catacomb_uuid/database_hash) → jeton non rejouable à volonté.
+- VERDICT : Linux ne peut PAS forger le jeton hors-ligne ; il doit le FAIRE FORGER par le SEP, ce qui exige d'abord
+  d'ouvrir EP 0x12, négocier l'en-tête, puis DÉVERROUILLER le keybag (passcode) — préalable bloquant jamais fait en natif.
+  Ordre : sks open → get_capabilities → verify_secret/fv_unwrap keybag → authentication_token_create → sbio 0x03.
+- INCONNU : structure interne du jeton (opaque AP) ; TAG fil EP 0x12 de create/verify (non mappé dans la table d'ops
+  base 0x8295290 stride 0x50) ; nonce/session exacts (pas de capture OOL 0x12). coreauthd/LocalAuthentication non
+  re-disassemblés (cache dyld compressé ; apfs-fuse/ipsw effacés au reboot) → linkage userland repris de docs existantes.
+
+## 2026-11-23 — agent driver (session ALARM, Opus 4.8, capstone) — J9c codé : null_d_key en sautant les perform_operation (allow_sks=4), rien lancé
+- But : trancher si on peut SAUTER les deux perform_operation (TAG 0x22, txn3/txn5 du bring-up) et envoyer directement
+  `null_d_key` (TAG 0x0a). Désassemblage hors-ligne du kernelcache 27.2.1 (`com.apple.driver.AppleSEPKeyStore`) +
+  trace c12. Rien envoyé au SEP. Docs : `sks_native_plan.md` §8 ; code : `driver/rust/sep-proto/src/sks_nulldkey.rs`,
+  `kmod/sep_native.rs` (allow_sks=4), `sks-setenv` étendu ; script : `pending/j9c_sks_nulldkey_chained.sh`.
+- VU (trace c12 L186-187) : `> 0x12 TAG 0x0a TYPE 0x04 PARAM 0 DATA 0x00600000` → `< 0x12 TAG 0x8a TYPE 0x04 PARAM 0xff
+  DATA 0` (null_d_key = txn4, émis sur le fil APRÈS txn3/txn5 ; le compteur l'a numéroté 4).
+- VU (binaire, PAS une hypothèse) : `__ipc_null_d_key` @0xfffffe0009cdbbd0 pose ctx+0x50=0 (état), ctx+0x58=arg2, op
+  `w1=0xa` ; `_code_ipc_null_d_key` @0xfffffe0009cdfc38 n'écrit QUE l'en-tête IPC (0x54) + `__word`(ctx+0x50=état) +
+  `__lword`(ctx+0x58=u64) — **aucun mot de longueur de blob, aucun `__blob`** (vs get_capabilities 0x64 et set_env
+  0x470) → corps = 0x54+4+8 = **0x60** (recoupe la trace). Unique appelant `effaceable_init` @0xcc6f20 passe x1=0
+  (session NULL → keybag par défaut) et x2=1 → le u64 à OOL 0x58 = **constante 1** (comme getcap/set_env). En-tête v2
+  (null_d_key suit set_env). Donc corps byte-exact = get_capabilities moins le mot de longueur de blob, en v2.
+- DÉDUIT : le handler SEP de 0x0a (dans SEPOS, non disponible) n'est pas inspectable ; mais macOS répond PARAM 0xff
+  (DATA 0) et le kext ne décode aucun corps de réponse sur PARAM ≠ 0 (§1.6.4) → PARAM 0xff = « pas de d-key », bénin.
+- J9c (allow_sks=4) : getcap (txn1) + set_env (txn2, inchangés) ; PUIS, set_env ACCEPTÉ, UN `null_d_key`
+  `> 0x12 TAG 0x0a TYPE 0x03 PARAM 0 DATA 0x00600000` (TYPE 3 : sans trou, perform_operation sautés), porte noyau
+  `NulldkeyGate` + `check_nulldkey` (constantes, condensé v2 recalculé, forme cdhash). Verdict « RÉPONDU (PARAM …) /
+  SILENCE / NON ENVOYÉ ». Attendu : RÉPONDU PARAM 0xff = comme macOS ⇒ perform_operation NON prérequis, on avance.
+- Vecteur de test indépendant (Python/hashlib) : condensé16 `d51461e0ab398833f4f0e23b6ce34b18`, sha256 requête
+  `e90ebe700cacdeb3a9081f10ecdf433ce0984a45cb2c4cbd77bc4f09d103dbfa` (ts 0x1122334455667788, uniqueid 0, uid 0,
+  cdhash sha1(8×0), v2, u64 1) ; l'encodeur Rust et l'outil `sks_setenv build-nulldkey` le reproduisent.
+- Build/tests : `build.sh` OK, clippy `CLIPPY=1` propre ; `cargo test` sep-proto (64, dont 7 sks_nulldkey) + sks-setenv
+  (7) verts. Binaires `~/kbuild/j11` (vermagic 7.2.12-3-1-ARCH) :
+  sep_native.ko `4a5858a317274922adfa10b4293969c2c555a2981f9ea90c8db027f177182b49` (allow_sks=4),
+  sks_setenv `c81a45473926be0b03cb6a69f50a40baccbb87a90dafcbf5623b5dae373658e9` ;
+  sepd `6ad1992f12b0d300b37b6b20ba2e9e3c0cc44d4e02bd7b74ce031cc958e37f4a`,
+  sep_native_ovl.ko `02c1fcc2fb9b19363a89a8ad818422411eb968110720d039d3b822029ad517cd`,
+  sep-native.dtbo `8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771` (= j10).
+- Classe neuve (3e type EP 0x12) ET ordre neuf (perform_operation sautés) → 1er run = « go » d'Albert. Rien lancé.
