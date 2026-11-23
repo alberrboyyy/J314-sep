@@ -3026,3 +3026,27 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   « si une étape coince, arrête-toi, ne contourne pas » → **je n'ai PAS** installé apfs-fuse ni cherché de clé AEA.
   Prochaine étape propre : remonter apfs-fuse/ipsw-fs pour sortir ces deux démons, + mapper `sExternalMethods` @0xcd0844
   (sélecteur → méthode C++ → TAG fil) pour prouver octet-près la correspondance sélecteur↔TAG.
+## 2026-11-23 — Claude (session PC, Opus 4.8) — reverse du démon applekeystored : séquence identité keybag + verdict Q4
+- Extraction SANS apfs-fuse : `ipsw extract --remote --ranged --files --device MacBookPro18,4` sur l'IPSW public
+  27.2.1 (URL CDN résolue via `ipsw download --urls`) → lecteur APFS natif, ~1,97 Go de PLAGES d'octets (pas de
+  montage, AEA géré par ipsw). Sortis : `/usr/libexec/applekeystored` + `LocalAuthentication/Support/coreauthd`
+  (Mach-O universels, slice arm64e). Gardés en scratchpad (volatils, hors repo). Rien lancé, aucun secret/uuid extrait.
+- `applekeystored` = démon Swift mince (symboles strippés ; logique AKSIdentity partagée avec AppleKeyStore.framework).
+  Analyse = chaînes + surface XPC `identity_*`. Livrable neuf : **`docs/applekeystored_identity.md`**.
+- **Q1 UUID (VU)** : relu/parsé (`CFUUIDCreateFromString`/`WithBytes`), JAMAIS généré (`uuid_generate`/`arc4random`
+  absents sur l'uuid). Source = user-uuid de compte/volume (`APFSVolumeListUUIDsOfUnlockRecords`, `set.user_uuid`,
+  dslocal `/var/db/dslocal`). → identifiant de compte FOURNI, pas une constante d'appareil ni un aléatoire keystore.
+- **Q2 (VU)** : pile client→XPC `service_identity_create_keybag`→démon→AKSIdentity Swift→aks_create_bag(0x2)/load_bag(0x6)/
+  make_system_keybag. `…_with_hash` exige hash+itérations valides (épinglé). type(+0x64)≤−10 (kext) ; valeurs num.
+  exactes INCONNU (méthodes Swift non désassemblées). OTI **désactivé** sur ce build (« OTI disabled ») → keybag legacy actif.
+- **Q3 persistance (VU)** : blobs FICHIERS — keybags `/var/keybags`, plists user `/var/db/users`+dslocal, KEK/OTI
+  committés par user-uuid sur volume **Preboot** (`identity_commit_oti`/`commit_user_plist`/`update_blobs_on_disk`) ;
+  rechargés au boot (`identity_load_from_disk_or_migrate_if_necessary`). Scellement SEP xART présent (`aks_delete_xart_leak`,
+  stash). → **persiste au reboot** (enrôlement durable ; blob re-fourni par l'hôte, confirme keybag_native_path §2).
+- **Q4 VERDICT FRANC** : **pas de mur cryptographique pour CRÉER**. POUR (VU) : création à neuf = chemin réel (« we will
+  just create a new one »), aucun secret macOS requis (SEP a la clé ; make_system_keybag blob vide), uuid fourni par
+  l'hôte, persistance = simple fichier. CONTRE (INCONNU) : objet lié à un compte (dslocal/APFS) ; garde d'unicité
+  (« Can't create when already exists ») ; scellé au SEP+clé d'appareil → **le seul verrou = POLITIQUE SEP** : le SEP
+  enrôle-t-il Touch ID contre une identité forgée par Linux, ou exige-t-il l'identité/génération posée par macOS ?
+  → **matériel uniquement, classe neuve → go d'Albert**. Le test décisif n'est plus « créer le keybag » (OK) mais
+  « le SEP accepte-t-il l'enrôlement contre lui ».
