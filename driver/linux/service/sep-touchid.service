@@ -1,0 +1,30 @@
+# sep-touchid.service : démarre le SEP et initialise le capteur Touch ID au boot (docs/service.md).
+# Installé par pending/install_sep_touchid_service.sh, NON activé par défaut (option --enable).
+# Désactiver pour un boot : ajouter « sep_touchid=off » à la ligne de commande du noyau,
+# ou créer /etc/sep-touchid/disabled.
+[Unit]
+Description=SEP (Secure Enclave) + capteur Touch ID, boot chaîné natif (sep-touchid)
+Documentation=file:///usr/local/lib/sep-touchid/service.md
+After=local-fs.target systemd-udevd.service systemd-udev-trigger.service systemd-modules-load.service
+ConditionPathExists=!/etc/sep-touchid/disabled
+ConditionKernelCommandLine=!sep_touchid=off
+
+[Service]
+# simple : le démarrage du service ne retarde pas le boot ; le script reste en avant-plan tant que sepd sert le xART.
+Type=simple
+ExecStart=/usr/local/lib/sep-touchid/sep-touchid-boot.sh boot
+# Jamais de relance automatique : un 2e essai dans le même boot est refusé (le SEP a déjà été touché).
+Restart=no
+# Statut lisible dans « systemctl status » (systemd-notify --status depuis le script).
+NotifyAccess=all
+# SIGTERM au script seul : il arrête sepd et éteint le capteur lui-même, puis le reste est tué.
+KillMode=mixed
+TimeoutStopSec=20
+SyslogIdentifier=sep-touchid
+StandardOutput=journal
+StandardError=journal
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

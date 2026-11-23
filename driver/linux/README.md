@@ -1,5 +1,8 @@
 # driver/linux : « bonjour » au capteur Touch ID depuis Linux
 
+> Service de démarrage (SEP + capteur au boot, chemin J8) : `service/`, doc `docs/service.md`,
+> installeur `pending/install_sep_touchid_service.sh`. Préparé le 2026-11-23, jamais lancé.
+
 État : **préparé hors ligne, jamais lancé sur le Mac sous Linux.** La même séquence a été vérifiée 2 fois depuis m1n1
 (`tools/mesa_hello.sh`, `docs/verification_status.md` SPI-3). Rien ici ne parle au SEP.
 

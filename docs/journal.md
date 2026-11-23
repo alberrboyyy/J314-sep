@@ -2656,3 +2656,21 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Décompil : le sous-agent en-tête OOL / get_capabilities a été arrêté par le filtre de sécurité (pas de contournement) →
   en-tête toujours inconnu. Le DER, lui, est relu sur 27.2.1 (complément de l'agent, §2 de sks_protocol.md) : racine SET
   (0x31, pas SEQUENCE comme kext §15.3), paires SEQUENCE{UTF8 clé, valeur} triées par clé, sélecteur `o` = UTF8String.
+
+## 2026-11-23 — agent driver (session ALARM) — brique « SEP + capteur au boot » préparée (service systemd), RIEN installé ni lancé
+- Source : chemin VÉRIFIÉ J8 (00:30 et 00:58, n=2). `driver/linux/service/sep-touchid-boot.sh` = j8 → j5c `UPTO=pass2` → j5
+  (`SBIO_OPEN=1`, `allow_sbio_params=3`) sans variables de test ; mêmes paramètres insmod que J8. Unité `sep-touchid.service`
+  (`Type=simple`, `Restart=no`, `KillMode=mixed`, non activée par défaut). Installeur `pending/install_sep_touchid_service.sh`.
+- Ajouts par rapport à j5 : store fixe `/var/lib/sepd` ; copie horodatée avant chaque démarrage (10 gardées) ; sha256 des
+  binaires (`SHA256SUMS` = `~/kbuild/j5` du jour, sepd `6ad1992f…`, sep_native.ko `ff799c11…`, sbiod `29ed5e7c…`) ; vermagic ;
+  store vide → refus (seal frais = `fresh-seal --erase-enrollment`, manuel) ; compteur de génération (état hors store +
+  marqueur dans le store) → refus d'un store plus ancien ou modifié ; attente que la mailbox et la DART du SEP soient liées
+  avant l'insmod (sinon probe différé possible = SEP démarré hors script, sans sepd).
+- Vu en préparant : `/var/lib/sepd` existe déjà et contient un VIEUX store (J4, 2026-11-22 18:38) ; l'installeur le renomme
+  (`.ancien-avant-service-<date>`), ne le sert pas. Le `sepd` de J8 n=2 (pid 3389) tourne encore : l'installeur refuse tant
+  qu'un sepd tourne.
+- Vérifié hors matériel : `bash -n` (script, installeur) ; `systemd-analyze verify` (seul message : ExecStart pas encore
+  installé) ; logique anti-retour testée sur un faux store dans le scratchpad (cas normal, SAVE, vieille sauvegarde refusée,
+  marqueur en retard réparé, contenu modifié refusé, accept-store, store vide). Pas de shellcheck sur la machine.
+- Textes périmés « power-cycle requis entre deux runs » (un reboot suffit) : signalés dans le rapport, non modifiés.
+- 1er boot avec le service = script neuf → « go » d'Albert ; installation sur la partition principale = Albert.
