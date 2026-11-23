@@ -124,3 +124,10 @@ passer aux tâches hors hardware (analyse, outillage).
   verificateur, et corriger jusqu'à ce qu'ils ne signalent plus rien.
 - Quand Albert corrige quelque chose, ajouter la règle correspondante
   (avec exemple) dans STYLE.md.
+
+## Sous-agents (modèle)
+
+- Les sous-agents, surtout pour le **désassemblage / reverse** (kexts, IPSW, SKS, biométrie), tournent en **Opus 4.8**
+  (défaut sous-agents réglé par Albert le 2026-11-23) : les modèles plus récents se font arrêter par le filtre de
+  sécurité « cyber » sur ce type de tâche. Opus 4.8 passe. Le reste de la discipline est inchangé (aucune clé/secret,
+  protocole uniquement, écriture SEP = `pending/` + go d'Albert).
