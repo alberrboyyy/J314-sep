@@ -52,15 +52,20 @@ pub fn keybag_fields(ts_us: u64, uniqueid: u64, uid: u32, mode: CdhashMode) -> K
     KeybagFields { ts_us, uniqueid, uid, cdhash: cdhash(uniqueid, mode) }
 }
 
-/// The THREE userland values of the J10 device-identity keybag path (`docs/keybag_native_path.md` § J10.1): none has
-/// a default, all are REQUIRED on the command line. The real values are unknown (reversed on the PC); the tool only
-/// transports whatever the caller supplies. `loaded_handle` is NOT here: it is the handle `load_keybag` returns, read
+/// The userland values of the J10 device-identity keybag path (`docs/applekeystored_identity.md` §6): the real values
+/// are unknown (reversed on the PC); the tool only transports whatever the caller supplies. REQUIRED (no default):
+/// `uuid`, `class`, `keybag_type`. With a default: `handle_y` (0 — a fresh create has no parent session handle) and
+/// `field2` (0 — the 2nd ambiguous u32). `loaded_handle` is NOT here: it is the handle `create_keybag` returns, read
 /// at run time and plugged in by the kernel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KeybagUserland {
-    /// `load_keybag` blob, exactly 16 bytes (VU length constraint).
+    /// `make_system_keybag` blob, exactly 16 bytes (VU length constraint on the `identity_load` OSData).
     pub uuid: [u8; UUID_LEN],
-    /// Parent/session keybag handle (OOL 0x58 of both frames).
+    /// `create_keybag` first u32 scalar (OOL 0x60). §6 does not pin which u32 is the class enum: coded as the class.
+    pub class: u32,
+    /// `create_keybag` second u32 scalar (OOL 0x64); the other of the ambiguous pair. Default 0.
+    pub field2: u32,
+    /// u64 at OOL 0x58 of both frames (parent/session handle; 0 for a fresh create). Default 0.
     pub handle_y: u64,
     /// Keybag type (OOL 0x64 of make_system_keybag; VU constraint: <= -10).
     pub keybag_type: i32,
@@ -298,14 +303,15 @@ pub fn describe_nulldkey_verdict(v: &NulldkeyVerdict, raw: u64, snap: &[u8]) -> 
     s
 }
 
-/// Human description of a load_keybag request (after the same check as the kernel gate).
-pub fn describe_loadkeybag(b: &[u8]) -> Result<String, String> {
-    let r = sks_keybag::check_loadkeybag(b).map_err(|e| format!("load_keybag refusé par la porte (identique au noyau) : {e}"))?;
+/// Human description of a create_keybag request (after the same check as the kernel gate).
+pub fn describe_createkeybag(b: &[u8]) -> Result<String, String> {
+    let r = sks_keybag::check_createkeybag(b).map_err(|e| format!("create_keybag refusé par la porte (identique au noyau) : {e}"))?;
     let k = sks_ipc::cdhash_kind(&GetcapFields { ts_us: r.fields.ts_us, uniqueid: r.fields.uniqueid, uid: r.fields.uid, cdhash: r.fields.cdhash });
     let mut s = String::new();
-    let _ = writeln!(s, "load_keybag ({:#x} o) — mot > EP 0x12 TAG 0x03 TYPE 0x03 PARAM 0 DATA {:#010x}", b.len(), sks_keybag::LKB_DATA);
+    let _ = writeln!(s, "create_keybag ({:#x} o) — mot > EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0 DATA {:#010x}", b.len(), sks_keybag::CKB_DATA);
     let _ = writeln!(s, "  en-tête v2 ; 0x04 condensé v2 = {}", hex(&b[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN]));
-    let _ = writeln!(s, "  état 0 ; handle_y {:#018x} (USERLAND) ; blob 0x10 o : uuid {} (USERLAND)", r.handle_y, hex(&r.uuid));
+    let _ = writeln!(s, "  état 0 ; handle_y {:#018x} (USERLAND, défaut 0) ; class {:#010x} (USERLAND, 0x60) ; field2 {:#010x} (USERLAND, 0x64) ; 3 blobs vides ; flag 0", r.handle_y, r.class, r.field2);
+    let _ = writeln!(s, "  AMBIGU (§6.2/§6.4) : lequel de 0x60/0x64 est la classe n'est PAS tranché au binaire — si refus matériel, échanger --class/--field2");
     let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", r.fields.ts_us, r.fields.uniqueid, r.fields.uid, hex(&r.fields.cdhash), cdhash_label(k));
     s.push_str(&dump(b));
     Ok(s)
@@ -318,15 +324,16 @@ pub fn describe_mskb(b: &[u8]) -> Result<String, String> {
     let mut s = String::new();
     let _ = writeln!(s, "make_system_keybag ({:#x} o) — mot > EP 0x12 TAG 0x0d TYPE 0x04 PARAM 0 DATA {:#010x}", b.len(), sks_keybag::MSKB_DATA);
     let _ = writeln!(s, "  en-tête v2 ; 0x04 condensé v2 = {}", hex(&b[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN]));
-    let _ = writeln!(s, "  état 1 (const) ; handle_y {:#018x} (USERLAND) ; handle chargé {:#010x} (0 = placeholder, posé par le noyau) ; type {} (USERLAND{}) ; blob vide ; flag 0", r.handle_y, r.loaded_handle, r.keybag_type, if sks_keybag::type_in_vu_range(r.keybag_type) { "" } else { ", HORS plage VU type<=-10" });
+    let _ = writeln!(s, "  état 1 (const) ; handle_y {:#018x} (USERLAND) ; handle chargé {:#010x} (0 = placeholder, posé par le noyau) ; type {} (USERLAND{}) ; blob 0x10 o : uuid {} (USERLAND) ; flag 0", r.handle_y, r.loaded_handle, r.keybag_type, if sks_keybag::type_in_vu_range(r.keybag_type) { "" } else { ", HORS plage VU type<=-10" }, hex(&r.uuid));
+    let _ = writeln!(s, "  DÉDUIT : §6.3 montre le blob du corps make_system VIDE ; l'uuid est une entrée d'identity_load dont le placement IPC n'est pas épinglé — à confirmer matériel");
     let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", r.fields.ts_us, r.fields.uniqueid, r.fields.uid, hex(&r.fields.cdhash), cdhash_label(k));
     s.push_str(&dump(b));
     Ok(s)
 }
 
-/// Verdict of the load_keybag transaction: RÉPONDU with the SEP handle (PARAM 0) or REFUS.
+/// Verdict of the create_keybag transaction: RÉPONDU with the SEP handle (PARAM 0) or REFUS.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LoadkeybagVerdict {
+pub enum CreatekeybagVerdict {
     NotSent,
     Silence,
     /// PARAM 0: the SEP returned a keybag handle (read at OOL B +0x6c, offset DEDUCED).
@@ -343,23 +350,23 @@ pub enum MskbVerdict {
     Refus(String),
 }
 
-pub fn loadkeybag_verdict(rec: &[u8]) -> Result<(LoadkeybagVerdict, u64, Vec<u8>), String> {
-    let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement load_keybag illisible : {e}"))?;
+pub fn createkeybag_verdict(rec: &[u8]) -> Result<(CreatekeybagVerdict, u64, Vec<u8>), String> {
+    let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement create_keybag illisible : {e}"))?;
     let snap = snap.to_vec();
     let v = match kind {
-        sks_ipc::OUT_NOT_SENT => LoadkeybagVerdict::NotSent,
-        sks_ipc::OUT_SILENCE => LoadkeybagVerdict::Silence,
+        sks_ipc::OUT_NOT_SENT => CreatekeybagVerdict::NotSent,
+        sks_ipc::OUT_SILENCE => CreatekeybagVerdict::Silence,
         _ => {
             let w = Word::decode(raw);
             let rw = sks_keybag::reply_word(&w);
-            if !sks_keybag::is_loadkeybag_reply(&w) {
-                LoadkeybagVerdict::Refus(format!("mot {raw:#018x} non apparié (EP/TAG bit 7/TYPE 0x03)"))
+            if !sks_keybag::is_createkeybag_reply(&w) {
+                CreatekeybagVerdict::Refus(format!("mot {raw:#018x} non apparié (EP/TAG bit 7/TYPE 0x03)"))
             } else if rw.status != 0 {
-                LoadkeybagVerdict::Refus(format!("PARAM {} = statut signé ≠ 0", rw.status))
+                CreatekeybagVerdict::Refus(format!("PARAM {} = statut signé ≠ 0", rw.status))
             } else {
                 match sks_keybag::reply_handle(&snap) {
-                    Ok(h) => LoadkeybagVerdict::Handle(h),
-                    Err(e) => LoadkeybagVerdict::Refus(format!("handle illisible à +0x6c : {e}")),
+                    Ok(h) => CreatekeybagVerdict::Handle(h),
+                    Err(e) => CreatekeybagVerdict::Refus(format!("handle illisible à +0x6c : {e}")),
                 }
             }
         }
@@ -388,19 +395,19 @@ pub fn mskb_verdict(rec: &[u8]) -> Result<(MskbVerdict, u64, Vec<u8>), String> {
     Ok((v, raw, snap))
 }
 
-pub fn describe_loadkeybag_verdict(v: &LoadkeybagVerdict, raw: u64, snap: &[u8]) -> String {
+pub fn describe_createkeybag_verdict(v: &CreatekeybagVerdict, raw: u64, snap: &[u8]) -> String {
     let mut s = String::new();
     match v {
-        LoadkeybagVerdict::NotSent => s.push_str("VERDICT sks loadkeybag : NON ENVOYÉ (aucun mot load_keybag vers 0x12)\n"),
-        LoadkeybagVerdict::Silence => s.push_str("VERDICT sks loadkeybag : REFUS/SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03)\n"),
-        LoadkeybagVerdict::Handle(h) => {
-            let _ = writeln!(s, "VERDICT sks loadkeybag : handle={h:#010x} (PARAM 0 ; lu à OOL B +0x6c, offset DÉDUIT) mot {raw:#018x}");
+        CreatekeybagVerdict::NotSent => s.push_str("VERDICT sks create_keybag : NON ENVOYÉ (aucun mot create_keybag vers 0x12)\n"),
+        CreatekeybagVerdict::Silence => s.push_str("VERDICT sks create_keybag : REFUS/SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03)\n"),
+        CreatekeybagVerdict::Handle(h) => {
+            let _ = writeln!(s, "VERDICT sks create_keybag : handle={h:#010x} (PARAM 0 ; lu à OOL B +0x6c, offset DÉDUIT) mot {raw:#018x}");
         }
-        LoadkeybagVerdict::Refus(reason) => {
-            let _ = writeln!(s, "VERDICT sks loadkeybag : REFUS ({reason}) mot {raw:#018x}");
+        CreatekeybagVerdict::Refus(reason) => {
+            let _ = writeln!(s, "VERDICT sks create_keybag : REFUS ({reason}) mot {raw:#018x}");
         }
     }
-    if !matches!(v, LoadkeybagVerdict::NotSent) {
+    if !matches!(v, CreatekeybagVerdict::NotSent) {
         s.push_str("instantané de B12 (0x80 o) :\n");
         s.push_str(&dump(snap));
     }
@@ -410,7 +417,7 @@ pub fn describe_loadkeybag_verdict(v: &LoadkeybagVerdict, raw: u64, snap: &[u8])
 pub fn describe_mskb_verdict(v: &MskbVerdict, raw: u64, snap: &[u8]) -> String {
     let mut s = String::new();
     match v {
-        MskbVerdict::NotSent => s.push_str("VERDICT sks make_system_keybag : NON ENVOYÉ (load_keybag sans handle, ou valeurs userland manquantes)\n"),
+        MskbVerdict::NotSent => s.push_str("VERDICT sks make_system_keybag : NON ENVOYÉ (create_keybag sans handle, ou valeurs userland manquantes)\n"),
         MskbVerdict::Silence => s.push_str("VERDICT sks make_system_keybag : SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x04)\n"),
         MskbVerdict::MarkedSystem => {
             let _ = writeln!(s, "VERDICT sks make_system_keybag : marqué system (PARAM 0) mot {raw:#018x}");
@@ -496,24 +503,24 @@ mod tests {
 
     #[test]
     fn keybag_build_describe_and_outcomes() {
-        // ARBITRARY example values — PAS les vraies (uuid/handle/type inconnus, reversés sur le PC).
+        // ARBITRARY example values — PAS les vraies (uuid/class/type inconnus, reversés sur le PC).
         let uuid: [u8; UUID_LEN] = core::array::from_fn(|i| i as u8);
-        let lkb = sks_keybag::encode_loadkeybag(&keybag_fields(123, 0, 0, CdhashMode::Sha1), 0x4242, &uuid);
-        assert!(describe_loadkeybag(&lkb).is_ok());
-        let mskb = sks_keybag::encode_mskb(&keybag_fields(123, 0, 0, CdhashMode::Sha1), 0x4242, 0, -16);
+        let ckb = sks_keybag::encode_createkeybag(&keybag_fields(123, 0, 0, CdhashMode::Sha1), 0x4242, 2, 0);
+        assert!(describe_createkeybag(&ckb).is_ok());
+        let mskb = sks_keybag::encode_mskb(&keybag_fields(123, 0, 0, CdhashMode::Sha1), 0x4242, 0, -16, &uuid);
         assert!(describe_mskb(&mskb).is_ok());
 
-        // load_keybag reply PARAM 0 with a handle at OOL B +0x6c.
+        // create_keybag reply PARAM 0 with a handle at OOL B +0x6c.
         let mut snap = [0u8; OUT_SNAP];
         snap[sks_keybag::OFF_RESP_HANDLE..sks_keybag::OFF_RESP_HANDLE + 4].copy_from_slice(&0x0abc_def0u32.to_le_bytes());
-        let raw = 0x0010_0000_0003_8312u64; // TAG 0x83 TYPE 0x03 PARAM 0
-        let (v, _, _) = loadkeybag_verdict(&encode_outcome(OUT_REPLIED, raw, &snap)).unwrap();
-        assert_eq!(v, LoadkeybagVerdict::Handle(0x0abc_def0));
+        let raw = 0x0010_0000_0003_8112u64; // TAG 0x81 TYPE 0x03 PARAM 0
+        let (v, _, _) = createkeybag_verdict(&encode_outcome(OUT_REPLIED, raw, &snap)).unwrap();
+        assert_eq!(v, CreatekeybagVerdict::Handle(0x0abc_def0));
         // PARAM 0xff → REFUS.
-        let refus = 0x0000_0000_ff03_8312u64;
-        assert!(matches!(loadkeybag_verdict(&encode_outcome(OUT_REPLIED, refus, &[0; OUT_SNAP])).unwrap().0, LoadkeybagVerdict::Refus(_)));
-        assert_eq!(loadkeybag_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, LoadkeybagVerdict::Silence);
-        assert_eq!(loadkeybag_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, LoadkeybagVerdict::NotSent);
+        let refus = 0x0000_0000_ff03_8112u64;
+        assert!(matches!(createkeybag_verdict(&encode_outcome(OUT_REPLIED, refus, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Refus(_)));
+        assert_eq!(createkeybag_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Silence);
+        assert_eq!(createkeybag_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::NotSent);
 
         // make_system_keybag reply PARAM 0 → marqué system ; PARAM != 0 → REFUS.
         let ok = 0x0000_0000_0000_8d12u64 | (0x04u64 << 16); // TAG 0x8d TYPE 0x04 PARAM 0

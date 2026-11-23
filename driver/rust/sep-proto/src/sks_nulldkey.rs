@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn reply_match_and_decode() {
         // macOS c12 L187 shape, with our TYPE 0x03: `< 0x12 TAG 0x8a TYPE 0x03 PARAM 0xff DATA 0`.
-        let w = Word::decode(0x0000_0000_03_8a_12 | (0xffu64 << 24));
+        let w = Word::decode(0x0000_0000_0003_8a12 | (0xffu64 << 24));
         assert_eq!(w, Word::new(0x12, 0x8a, 0x03, 0xff, 0x0000_0000));
         assert!(is_nulldkey_reply(&w));
         let rw = reply_word(&w);

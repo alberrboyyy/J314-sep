@@ -3143,3 +3143,39 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   → pas besoin de refaire le téléchargement byte-ranges (~2 Go) pour la suite (reverse ACMLib = après preuve J10 matériel).
 - Reprise prévue : si create_keybag rend un handle → investir ACMLib (emballage jeton d'enrôlement, sks_unlock_token §5.3) ;
   s'il refuse → mur confirmé côté SEP, aviser.
+
+## 2026-11-23 — Claude (session ALARM, Opus 4.8) — J13 : squelette J10 recodé `load_keybag` → `create_keybag` (allow_sks=5)
+
+Préparation seulement : rien chargé, rien envoyé au SEP, rien commité. Suite au verdict du reverse d'`applekeystored`
+(`docs/applekeystored_identity.md` §6 : la vraie voie « create a new one » pour un hôte non-macOS est `create_keybag`
+TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
+
+- **Ce qui change** : `load_keybag` (TAG 0x03) **retiré** de `sep-proto`, de l'outil `sks_setenv` et du noyau
+  `sep_native` (allow_sks=5), remplacé par **`create_keybag` (TAG fil 0x01, TYPE 0x03)**. `make_system_keybag` (TAG
+  0x0d) conservé. L'uuid 16 o **se déplace** de `load_keybag` vers le **blob de `make_system_keybag`** (create ne porte
+  pas d'uuid, il prend une classe).
+- **Frames** (gabarits VU, `source: kext` 27.2.1, codec `_code_ipc_create_keybag` @0xcde0e4) : create_keybag = **0x7c o**
+  (`DATA 0x007c0000`) = état 0 + handle_y(0x58) + class(0x60) + field2(0x64) + 3 blobs vides(0x68/0x6c/0x70) + flag(0x74)
+  ; make_system_keybag = **0x84 o** (`DATA 0x00840000`) = état 1 + handle_y(0x58) + handle chargé(0x60) + type(0x64) +
+  blob{0x10, uuid}(0x68/0x6c) + flag(0x7c). Réponses : create TAG **0x81**, make_system TAG 0x8d. Le noyau lit le handle
+  rendu (OOL B +0x6c) et le pose dans make_system via `finalize_mskb` (recalcule le condensé v2) — jamais inventé.
+- **Entrées à fournir** (reversées sur le PC, INCONNUES, `docs/sks_userland_values.md` du PC) : REQUISES = **uuid** (16 o,
+  blob make_system), **class** (u32, create 0x60), **type** (i32, 0x64 make_system, VU ≤ −10). DÉFAUT 0 = **field2**
+  (u32, create 0x64) et **handle_y** (u64, 0x58 — create neuf sans handle parent). L'outil et `pending/j10_...sh`
+  REFUSENT sans les requises ; rien n'est envoyé au SEP.
+- **Offsets DÉDUIT restants (à confirmer matériel)** : (a) handle rendu lu à **OOL B +0x6c** (OOL du create jamais
+  capturé) ; (b) **affectation class↔0x60** AMBIGUË (§6.2/§6.4 ne tranche pas lequel des deux u32 est la classe — si
+  refus matériel, échanger `--class`/`--field2`) ; (c) **uuid dans le blob de make_system** DÉDUIT (§6.3 montre ce blob
+  VIDE dans le corps IPC, l'uuid étant une entrée d'`identity_load` dont le placement IPC exact n'est pas épinglé).
+- **Tests** : `cargo test` vert (sep-proto `sks_keybag` 10 tests, sks-setenv) ; condensés **relus contre une construction
+  Python/hashlib indépendante** (`/tmp/kbvec/vec.py`) sur valeurs d'EXEMPLE arbitraires (PAS les vraies) : create condensé
+  `578eef9c…4c32`, sha256 `40575643…87f4` ; make_system(0) condensé `d186ead7…8e29` ; `finalize(0xdeadbeef)` condensé
+  `c5fd8496…391d`. `clippy` propre (userland + `.ko` via `CLIPPY=1`) ; `.ko` bâti via `driver/rust/build.sh` contre
+  `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`.
+- **Binaires** (`~/kbuild/j13`, SHA256SUMS) : `sep_native.ko`
+  `1e82f721935a99ef17ba4fac8532518b9db4fa97f1d04eccbb36f16427dc8a34` (allow_sks=5), `sks_setenv`
+  `663595cfa1e8379adf7baf0175f90fc25b95fd6957ce7f6489604f213cfc17ca` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo`
+  copiés de `~/kbuild/j12` (inchangés). Script : `pending/j10_sks_create_keybag_chained.sh` adapté (uuid/class/type ;
+  refuse si une requise manque). Doc : `docs/sks_native_plan.md` §9 réécrite.
+- **Rien lancé.** Classes de message neuves (create_keybag + make_system_keybag) ET ordre neuf (perform_operation ET
+  null_d_key sautés) → **1er run = « go » d'Albert** ; power-cycle = Albert.
