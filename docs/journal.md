@@ -2757,3 +2757,22 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - ⇒ (n=1) le SEP accepte un get_capabilities d'un hôte non macOS avec des champs processus neutres (uniqueid/uid 0, cdhash
   dérivé) ; il ne rejette ni sur l'horodatage ni sur le cdhash. La disposition §1.6 (c9) est confirmée sur matériel ;
   « theirs » = 2 (était INCONNU). Le protocole SKS v2 est négociable depuis Linux.
+
+## 2026-11-23 — Claude (session PC, Opus 4.8) — set_env (TAG 0x2a) octet par octet + en-tête v2 → sks_protocol.md §1.7
+- Suite de la mission SKS (après J9a qui a confirmé §1.6 sur matériel : get_capabilities accepté, theirs=2, cdhash/uid 0
+  non rejetés). **PC uniquement, rien vers le Mac.** source: kext (13.5, `macos/kernel.macho`), capstone, non vérifié matériel.
+- Désassemblé : `set_env` (@…9954248), `__ipc_set_env` (@…9963ebc), `_code_ipc_set_env` (@…996ec44),
+  `_gen_ipc_header` (@…99751a0), `__ipc_msg_process_extended_header` (@…9975440).
+- VU — requête `> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000` : en-tête v2 (0x54 o) **identique en disposition à v1** ;
+  seules différences v1→v2 = version=2 et le condensé couvre 0x28 o de bloc processus (OOL 0x4c inclus) au lieu de 0x20.
+  En-tête étendu (bit1) : **effacé à l'encodage même en v2, rien écrit** (branche encode de `__ipc_msg_process_extended_header`).
+  Chiffrement (bit0) : non utilisé. Corps = état(0) + u64(**1**, même constante que get_capabilities) + blob(len 0x40c).
+- VU — blob d'environnement (0x40c) construit par `set_env` : {+0x00 u32=1 (version struct), +0x04 u32=`cpx-encryption-mode`
+  lu dans `IODeviceTree:/defaults` (0 si absent), +0x08 u32=4 (6 si arg vrai ; bring-up = `set_env(false)` → 4), +0x0c
+  0x400 o de zéro}. Total 0x54+4+8+4+0x40c = 0x470 ✓.
+- VU — réponse `< TAG 0xaa TYPE 0x02 DATA 0x00580000` : 0x58 = en-tête(0x54) + état(4), sans u64 ni blob ; le kext exige
+  état=0 + longueur exacte ; `init_sep_endpoint` ignore le code de retour de set_env.
+- Pas de secret dans le corps set_env (un entier de mode de protection de contenu + constantes + zéro) — signalé §1.7.5.
+  (perform_operation §2, lui, transporte du DER pouvant contenir des clés scellées : règle « aucun secret » maintenue.)
+- INCONNU : sens du u64=1 ; sens 4/6 et cpx côté SEP ; si le SEP vérifie le blob (non observable). OOL 0x12 jamais capturé
+  → J9b (un seul set_env) tranchera, classe neuve → go d'Albert.

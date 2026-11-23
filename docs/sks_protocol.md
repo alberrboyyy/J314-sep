@@ -233,6 +233,83 @@ Puis `init_sep_endpoint` : `négociée = min(theirs, 2)`, `ours = 2`. **La valeu
 
 ---
 
+## 1.7 `set_env` (TAG 0x2a), 2e transaction du bring-up, en-tête v2 — source: kext 13.5 (capstone) ; **non confirmé matériel**
+
+Dérivé cette session (2026-11-23) de `macos/kernel.macho` (13.5), capstone : `AppleKeyStore::set_env` (@…9954248),
+`__ipc_set_env` (@…9963ebc), `_code_ipc_set_env` (@…996ec44), `_gen_ipc_header` (@…99751a0),
+`__ipc_msg_process_extended_header` (@…9975440). Trace : c12 L180-181 `> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000`
+→ `< TAG 0xaa TYPE 0x02 PARAM 0 DATA 0x00580000`. **Aucune clé ni secret** (le corps = un entier de mode lu dans le
+device-tree + des constantes + du zéro ; signalé en 1.7.5). Statut VU / DÉDUIT / INCONNU par ligne.
+
+### 1.7.0 Qui l'appelle, quand — VU
+`init_sep_endpoint` appelle `set_env(false)` **juste après** la négociation `get_capabilities` (cf. §1.4 et
+`sks_ipc_negotiation.md` §6). C'est donc la 2e transaction du bring-up, envoyée avec le gabarit NULL → **en-tête à la
+version négociée = v2** (puisque `get_capabilities` a rendu theirs ≥ 2 ; confirmé matériel J9a : theirs = 2).
+
+### 1.7.1 En-tête v2 — disposition (Q1) — VU
+**La disposition octet des 0x54 o d'en-tête est IDENTIQUE à §1.6.2** (u32 longueur = 0x50, puis 0x50 o : condensé 16,
+version, horodatage, drapeaux, champ+0x20, bloc processus, 8 o à 0x4c). Deux seules différences v1→v2 :
+- **version** (OOL 0x14) = **2** au lieu de 1 ;
+- **base du condensé** (ce que couvre le SHA-256/16, `__payload_hash`, VU §1.6.3) : en v2 le bloc processus haché fait
+  **0x28 o** (ctx+0x28..0x50 = OOL 0x2c..0x54) au lieu de 0x20 → les **8 o de OOL 0x4c** (= 0 ici) entrent dans le
+  condensé. Autrement dit v2 hache **tout l'en-tête** (version..0x54) + la charge ; v1 s'arrête à OOL 0x4c.
+
+**En-tête étendu (bit 1 des drapeaux)** — VU (`__ipc_msg_process_extended_header`) : à l'**encodage**, même en v2, le
+code fait `flags &= ~2` et **n'écrit rien** (branche `mode≠0` : `and w8,w8,#0xfffffffd ; str`). L'en-tête étendu
+n'est lu qu'au **décodage d'une réponse** dont le bit 1 est posé (état batterie « invalid charging/soc »). → notre
+requête part donc **drapeaux = 0** (bit0 chiffrement = 0, bit1 ext = 0).
+**Chiffrement (bit 0)** — VU : non utilisé ici (chemin chiffré = erreur -0xd, §1.6.3) ; `set_env` encode en clair.
+
+### 1.7.2 Corps de la requête (0x470 − 0x54 d'en-tête) — VU
+`__ipc_set_env` remplit le contexte (ctxsize 0x70, VU table) puis appelle le codeur. Corps = **même structure
+générique** que §1.6 : état (u32) + u64 + blob.
+
+| offset OOL | taille | champ | valeur | statut |
+|---|---|---|---|---|
+| 0x54 | 4 | état | **0** | VU, constant |
+| 0x58 | 8 | u64 | **1** (ctx+0x58 ; **même constante que `get_capabilities`**) ; sens exact | VU valeur ; INCONNU sens |
+| 0x60 | 4 | longueur du blob | **0x40c** | VU |
+| 0x64 | 0x40c | blob d'environnement (1.7.3) | construit par `set_env` | VU |
+
+Total 0x54 + 4 + 8 + 4 + 0x40c = **0x470** = DATA de la trace. ✓
+
+### 1.7.3 Le blob d'environnement (0x40c o) — VU (contenu) + DÉDUIT (sens)
+`AppleKeyStore::set_env(this, bool arg)` construit le blob sur la pile, memset 0, puis :
+
+| offset blob | taille | champ | valeur / source | statut |
+|---|---|---|---|---|
+| 0x000 | 4 | version de structure | **1** (constante) | VU |
+| 0x004 | 4 | **`cpx-encryption-mode`** | propriété lue dans `IODeviceTree:/defaults` (OF `cpx-encryption-mode`) ; **0 si absente** | VU source ; DÉDUIT sens = mode de protection de contenu (APFS/CoreCrypto) |
+| 0x008 | 4 | mode | **4** si `arg=false`, **6** si `arg=true` ; au bring-up `set_env(false)` → **4** | VU ; DÉDUIT sens (sélecteur de mode) |
+| 0x00c | 0x400 | réservé | **0** (memset) | VU |
+
+**Un hôte Linux** peut reproduire ce blob : version=1, mode=4, et `cpx-encryption-mode` = soit la valeur de son ADT
+(`/defaults` → `cpx-encryption-mode` si présente), soit **0** (le kext gère déjà l'absence par 0). Reste contextuel
+seulement `cpx-encryption-mode` ; tout le reste est constant. **Aucune clé** n'est placée dans ce blob.
+
+### 1.7.4 Réponse `< 0x12 TAG 0xaa TYPE 0x02 PARAM 0 DATA 0x00580000` (Q3) — VU
+Longueur 0x58 = en-tête (0x54) + **état (4)**, **sans u64 ni blob**. Au décodage (`_code_ipc_set_env`, mode 0) le kext :
+(1) lit l'en-tête (longueur, condensé vérifié **selon la version lue dans l'en-tête du SEP**, en-tête étendu si bit1) ;
+(2) lit l'**état u32** et exige **0** (sinon échec) ; (3) exige **octets consommés = longueur annoncée**. Mot mailbox :
+PARAM (int8 signé) ≠ 0 → la requête rend ce code sans décoder (comme §1.6.4). `set_env` ne lit **aucune** autre donnée
+de la réponse ; `init_sep_endpoint` ignore même le code de retour de `set_env` (`cmn w0,#0xa` = test d'un seul cas,
+sinon continue). Donc la réponse ne sert qu'à confirmer l'acceptation (état 0).
+
+### 1.7.5 Secret / clé ? — signalement (Q4)
+Aucun champ du corps `set_env` n'est un secret : version de structure, un **entier de mode de protection de contenu**
+(`cpx-encryption-mode`, lu du device-tree, typiquement 0/1/2), un sélecteur 4/6, et 0x400 o de zéro. Rien à extraire,
+rien à protéger. (À distinguer de `perform_operation` §2, qui transporte des blobs DER pouvant contenir des clés
+scellées `rk` — là, la règle « aucun secret extrait » s'applique pleinement.)
+
+### 1.7.6 Points ouverts
+1. Sens exact du u64 = **1** (commun à `get_capabilities` et `set_env`) : INCONNU (hyp. : sélecteur de version/capacité).
+2. Sens du sélecteur **4 vs 6** et de `cpx-encryption-mode` côté SEP : DÉDUIT (protection de contenu), non lu plus loin.
+3. Le SEP **vérifie-t-il** le blob (version, mode) ? Non observable au binaire (le kext ne lit de la réponse que l'état).
+4. OOL 0x12 jamais capturé : le contenu réel (nos octets vs ceux du SEP) n'est pas tracé — à confirmer par J9b (un seul
+   `set_env` après `get_capabilities`), **classe neuve → go d'Albert**.
+
+---
+
 ## 2. Schéma DER des paramètres (Q2) — source: kext (VU 27.2.1)
 
 > Confirmé/corrigé sur 27.2.1 par l'agent DER (journal 2026-11-23). Symboles : `_aks_params_get_der` @0xcbf820
