@@ -3133,3 +3133,13 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   d'un create_keybag 0x01 + make_system 0x0d émis par macOS vivant ; (2) balayage borné (go Albert) : classe {1..4},
   type {−10,−11,−12,…}. Le test create_keybag nu « rend un handle » ne dépend que de la classe.
 - Pas touché à ACMLib (consigne : après preuve J10 matériel).
+## 2026-11-23 — Claude (session PC, Opus 4.8) — ATTENTE : J10 figé, démons préservés
+- ALARM : J10 entièrement spécifié, choix de paramètres tranché au matériel (pas d'invention d'octet) :
+  **create_keybag classe = A (1)** (le codec ne valide pas +0x60) → test « le SEP rend-il un handle » ; puis
+  **make_system type depuis −10**. Plus besoin de reverse pour J10. Je me mets EN ATTENTE (pas d'ACMLib ni autre
+  reverse tant qu'ALARM ne repingue pas après le run J10 d'Albert).
+- Démons 27.2.1 PRÉSERVÉS (scratchpad volatil → arbre durable gitignoré) : `macos/extract/daemons_27.2.1/`
+  applekeystored (sha256 39a81354…) + coreauthd (sha256 2b336ba2…), slice arm64e, extraits via ipsw --remote --ranged.
+  → pas besoin de refaire le téléchargement byte-ranges (~2 Go) pour la suite (reverse ACMLib = après preuve J10 matériel).
+- Reprise prévue : si create_keybag rend un handle → investir ACMLib (emballage jeton d'enrôlement, sks_unlock_token §5.3) ;
+  s'il refuse → mur confirmé côté SEP, aviser.
