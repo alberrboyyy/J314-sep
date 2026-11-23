@@ -1,0 +1,32 @@
+sks_setenv: cpx-encryption-mode = 2 (--cpx 2)
+sks_setenv: /dev/sep_sks ouvert
+sks_setenv: get_capabilities accepté par le noyau après 10 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-145206_j9c-sks-nulldkey-chained/sks_getcap_request.bin
+sks_setenv: set_env accepté par le noyau après 1 essai(s) EAGAIN
+sks_setenv: set_env (0x470 o) — mot > EP 0x12 TAG 0x2a TYPE 0x02 PARAM 0 DATA 0x04700000
+sks_setenv:   en-tête v2 ; 0x04 condensé v2 = 32ba5657b2360a4784df306679d2d783
+sks_setenv:   état 0 ; u64 1 ; blob 0x40c o : version 1, cpx-encryption-mode 2, mode 4, 0x400 o réservés nuls
+sks_setenv:   horodatage 232783909 µs ; uniqueid 0x0 ; uid 0 ; cdhash 05fe405753166f125559e7c9ac558654f107c7e9 (SHA-1 de l'uniqueid)
+sks_setenv:   +0x000 : 50 00 00 00 32 ba 56 57 b2 36 0a 47 84 df 30 66
+sks_setenv:   +0x010 : 79 d2 d7 83 02 00 00 00 25 00 e0 0d 00 00 00 00
+sks_setenv:   +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_setenv:   +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+sks_setenv:   +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+sks_setenv:   +0x050 : 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00
+sks_setenv:   +0x060 : 0c 04 00 00 01 00 00 00 02 00 00 00 04 00 00 00
+sks_setenv:   +0x070 .. +0x470 : 0x400 o à zéro (réservé)
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-145206_j9c-sks-nulldkey-chained/sks_setenv_request.bin
+sks_setenv: null_d_key accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: null_d_key (0x60 o) — mot > EP 0x12 TAG 0x0a TYPE 0x03 PARAM 0 DATA 0x00600000
+sks_setenv:   en-tête v2 ; 0x04 condensé v2 = b46b888d8a1053aa480124ec835b4db8
+sks_setenv:   état 0 ; u64 1 ; PAS de blob (corps = en-tête + état + u64, 0x60 o ; VU au binaire)
+sks_setenv:   horodatage 232785907 µs ; uniqueid 0x0 ; uid 0 ; cdhash 05fe405753166f125559e7c9ac558654f107c7e9 (SHA-1 de l'uniqueid)
+sks_setenv:   +0x000 : 50 00 00 00 b4 6b 88 8d 8a 10 53 aa 48 01 24 ec
+sks_setenv:   +0x010 : 83 5b 4d b8 02 00 00 00 f3 07 e0 0d 00 00 00 00
+sks_setenv:   +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_setenv:   +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+sks_setenv:   +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+sks_setenv:   +0x050 : 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-145206_j9c-sks-nulldkey-chained/sks_nulldkey_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-145206_j9c-sks-nulldkey-chained/sks_nulldkey_outcome.bin
+sks_setenv rc=0 (0 = null_d_key RÉPONDU, 1 = autre verdict final, 2 = rien écrit / erreur)

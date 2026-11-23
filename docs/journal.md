@@ -2910,3 +2910,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   sep_native_ovl.ko `02c1fcc2fb9b19363a89a8ad818422411eb968110720d039d3b822029ad517cd`,
   sep-native.dtbo `8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771` (= j10).
 - Classe neuve (3e type EP 0x12) ET ordre neuf (perform_operation sautés) → 1er run = « go » d'Albert. Rien lancé.
+
+## 2026-11-23 14:52 — Albert + Claude (session ALARM) — 🎯 J9c : null_d_key répond, perform_operation CONTOURNABLES
+- Go d'Albert, `sudo pending/j9c_sks_nulldkey_chained.sh /var/lib/sepd-run-20261122-230441`. Logs : `logs/20261123-145206_j9c-sks-nulldkey-chained/`.
+  Binaires `~/kbuild/j11` (sep_native.ko `4a5858a3…`, sks_setenv `c81a4547…`).
+- VU : get_capabilities (txn1) + set_env (txn2) comme J9b, puis **perform_operation SAUTÉS** → `> 0x12 TAG 0x0a TYPE 0x03
+  PARAM 0 DATA 0x00600000` (null_d_key, corps 0x60 o VU byte-exact, en-tête v2, condensé OK) → `< 0x12 TAG 0x8a TYPE 0x03
+  PARAM 0xff DATA 0` : **RÉPONDU, PARAM 0xff = comme macOS** (« pas de d-key à annuler », bénin). 0 SAVE, store inchangé.
+- VU : 0x73 → sbio VIVANT.
+- ⇒ (n=1) les deux `perform_operation` (txn3/txn5, identité d'appareil) et toute la pile FileVault (0x32/0x48/0x41/0x18)
+  **ne sont pas un prérequis** : le SEP accepte la transaction qui les suit sans les avoir vus. Confirme le verdict des lots A/B
+  (docs/sks_keybag_unlock.md, acm_token.md). Le chemin se raccourcit : open → getcap → set_env → [sauter] → cible = ouvrir/déverrouiller un keybag.
+- PROCHAIN MUR (lots A+B) : le jeton d'enrôlement est forgé par le SEP (authentication_token_create) et exige un keybag
+  DÉVERROUILLÉ avec le passcode. Pistes : make_system_keybag (identité appareil) ; unlock keybag (verify_secret). Classe neuve → go.
