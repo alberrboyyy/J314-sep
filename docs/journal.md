@@ -2580,3 +2580,13 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   tampons DMA référencés par SEPOS, table EP perdue, réponse de SEPOS à GET_STATUS inconnue. Proposition graduée P0-P3 et
   mission kext pour c9 dans `docs/sep_reconnect.md`.
 - Incidents : aucun. Le boot courant (J8) a encore `sep_native` chargé.
+
+## 2026-11-23 00:58 — Albert + Claude (session ALARM) — J8 n=2 après un simple `reboot` : prédiction CONFIRMÉE → VÉRIFIÉ
+- Boot précédent (J8 n=1, sep_native chargé, init capteur faite) terminé par `reboot` (journalctl -b -1 : « System is
+  rebooting »), PAS de power-cycle. Boot courant : GET_STATUS #1 = DATA 0x1 → SEPOS reboote normalement. Logs bruts :
+  `logs/20261123-005805_j8-chained-sensor-n2/` (copie de `/var/log/j5-20261123-005805`).
+- VU = prédiction : 0 SAVE (store identique à sa copie d'avant J7b) ; sbio VIVANT ; patch chargé (0x29 t+43 ms) ;
+  1re passe calibrée (0x63 = macOS) ; 2e passe patch n°2 (t+56 ms), 0x63 ×2 = macOS ; « 2e passe terminée » ; rc=0.
+- ⇒ **VÉRIFIÉ (n=2, prédiction écrite avant)** : init capteur complète sur boot CHAÎNÉ natif, sans re-scellement.
+- ⇒ Le « trou » de `sep_reconnect.md` est comblé (n=1) : un `reboot` Linux après une init capteur suffit à relancer le SEP.
+  Le power-cycle n'est plus nécessaire entre deux runs sous Linux natif.
