@@ -28,6 +28,7 @@ pub mod ks_gate;
 pub mod sbio_gate;
 pub mod sensor;
 pub mod sks_ipc;
+pub mod sks_setenv;
 pub mod word;
 pub mod xart;
 pub mod xart_responder;

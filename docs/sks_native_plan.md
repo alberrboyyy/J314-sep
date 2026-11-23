@@ -204,3 +204,53 @@ reproductible) : `sep_native.ko` `145804d0b31871b0d5c6b266dce464770bb8467d963138
 si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon le store du service est périmé → décision d'Albert.
 Classe neuve (écriture EP 0x12) → **1er run = « go » d'Albert**.
 
+
+## 7. Expérience 3 codée : J9b = UN `set_env` après le `get_capabilities` (`allow_sks=3`) — 2026-11-23, rien lancé
+
+Sources : `sks_protocol.md` §1.7 (set_env octet par octet, en-tête v2, `source: kext` 13.5, **non vérifié matériel**),
+trace c12 L180-181 (`> 0x12 TAG 0x2a TYPE 0x02 PARAM 0 DATA 0x04700000` → `< TAG 0xaa TYPE 0x02 PARAM 0 DATA
+0x00580000`, 1,1 ms), J9a (get_capabilities accepté, **theirs = 2** → v2 confirmée matériel). Rien de ce qui suit
+n'est `vérifié`.
+
+**Chemin** = J9a (boot chaîné, lockers sans UUID, CNTL de skdl/sks/scrd, UN get_capabilities) puis, **seulement si le
+get_capabilities a RÉPONDU (état 0) et négocié la v2** :
+1. le noyau attend ≤ 20 s la 2e requête sur `/dev/sep_sks` (2e écriture, 0x470 o ; EAGAIN tant que la réponse du
+   get_capabilities n'est pas arrivée, EALREADY après) ;
+2. porte noyau `sep-proto::sks_setenv::check_setenv` sur les 0x470 o : longueur exacte ; constantes d'en-tête (0x50
+   @0x00, **2** @0x14, 0 @0x20, 0 @0x24, 0 @0x4c, 0 @0x54 état, 1 @0x58 u64, 0x40c @0x60 blob) ; constantes de blob
+   (version de structure 1 @0x64, mode 4 @0x6c, **0x400 o réservés nuls** @0x70) ; **condensé v2 recalculé dans le
+   noyau** (SHA-256/16, base §1.6.3 avec bloc processus 0x28 → en-tête complet 0x14..0x54 + charge, `sep-proto::hash`,
+   sans allocation) ; cdhash = zéros OU SHA-1 des 8 o de l'uniqueid. **Seul `cpx-encryption-mode` (@0x68) est
+   contextuel** (non contraint). Refus = EINVAL, rien envoyé, pas de Halted ;
+3. copie dans A12, relue ; UN mot `> 0x12 TAG 0x2a TYPE 0x02 PARAM 0 DATA 0x04700000` (porte `SetenvGate` : ce mot
+   exact, une fois par boot ; tout autre mot vers 0x12/0x17/0x0a reste refusé) ;
+4. écoute : la 1re réponse appariée comme le kext (TAG bit 7, TYPE **0x02**) → instantané de B12 (0x80 o) ; jamais de
+   réponse du pilote ;
+5. « VERDICT sks setenv : ACCEPTÉ (PARAM 0, état 0 ; L 0x50, version d'en-tête 2 …) » / « ERREUR » (PARAM ≠ 0, état ≠ 0
+   ou B12 non décodable) / « SILENCE » / « NON ENVOYÉ » ; `read` de `/dev/sep_sks` rend l'enregistrement
+   get_capabilities **suivi** de l'enregistrement set_env (2 × 0x98 o) ; puis le 0x73 sbio comme J9a.
+
+**`cpx-encryption-mode`** : le kext le lit dans `IODeviceTree:/defaults` (0 si absent). `sks_setenv run` lit
+`/proc/device-tree/defaults/cpx-encryption-mode` (cellule u32 big-endian) à l'exécution, 0 si absent, `--cpx N` pour
+forcer. L'arbre Asahi n'exporte **pas** `/defaults` → la lecture auto tombe sur 0 ; notre ADT
+(`traces/20261108-162919_adt/adt.txt`) donne **2**, donc le script de run force `--cpx 2`.
+
+**Décodage de la réponse** (`sks_setenv::decode_setenv_reply`, noyau et outil) : u32 L ; version lue à 0x14 ; état à
+4 + L arrondi ; **octets consommés = longueur annoncée (0x58, sans u64 ni blob)** ; condensé recalculé selon la version
+lue (OK/FAUX). Diffère de get_capabilities (dont la réponse porte theirs + blob).
+
+**Tests hors matériel** : `sep-proto::sks_setenv` (disposition, base du condensé v2 reconstruite champ par champ, porte
+qui refuse chaque constante modifiée / zone réservée non nulle / condensé faux / cdhash étranger, mot c12 L180, décodage
+réponse 0x58, porte un seul mot) ; `sks-setenv/tests/setenv.rs` : requête identique octet pour octet à une construction
+Python/`hashlib` indépendante (en-tête 0x70 + 0x400 o nuls, sha256 complet), relue par la porte, enregistrement
+combiné getcap+setenv décodé.
+
+**Binaires** (`~/kbuild/j10`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `59bd81ff953182ab90c04c77f75774308cb4d0bc0bf572d9bbd01a8369aa07f3`, `sks_setenv`
+`2e3cbf9f54c281d7f300ce2939f04f5bc0d7805acb3fee4fd27149224e6f439f` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo`
+= copies de `~/kbuild/j9`/`j5` (sha256 inchangés).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd`. **Après** : si 0 SAVE, `rm /etc/sep-touchid/disabled` +
+reboot ; sinon le store du service est périmé → décision d'Albert. Classe neuve (2e type de message EP 0x12) →
+**1er run = « go » d'Albert** (`pending/j9b_sks_setenv_chained.sh`).

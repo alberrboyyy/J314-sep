@@ -2776,3 +2776,31 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   (perform_operation §2, lui, transporte du DER pouvant contenir des clés scellées : règle « aucun secret » maintenue.)
 - INCONNU : sens du u64=1 ; sens 4/6 et cpx côté SEP ; si le SEP vérifie le blob (non observable). OOL 0x12 jamais capturé
   → J9b (un seul set_env) tranchera, classe neuve → go d'Albert.
+
+## 2026-11-23 — Claude (session ALARM, Opus 4.8) — J9b préparé : get_capabilities PUIS UN set_env (SKS, TAG 0x2a) ; rien lancé
+- Préparation de la 2e transaction du bring-up SKS, d'après `docs/sks_protocol.md` §1.7 (set_env v2, source: kext 13.5,
+  **non vérifié matériel**) et la trace c12 L180-181 (TYPE 0x02, req 0x470 → resp 0x58). **Rien envoyé au SEP, rien
+  chargé, aucun sudo, pas de commit.** TYPE de la 2e transaction = **0x02** (reconfirmé dans la trace c12, 2e mot EP 0x12
+  après le 0x4d). cpx-encryption-mode de l'ADT = **2** (`traces/20261108-162919_adt/adt.txt`) ; l'arbre Asahi vivant
+  n'exporte pas `/defaults` (lecture auto → 0), donc le script force `--cpx 2`.
+- Proto : nouveau `driver/rust/sep-proto/src/sks_setenv.rs` (encode/check/decode set_env, en-tête v2, porte un seul mot ;
+  réutilise `sks_ipc::frame_digest` avec la version en paramètre — base v2 = en-tête complet 0x14..0x54 + charge). 7
+  tests (disposition, base du condensé v2 reconstruite champ par champ, porte refusant chaque constante / zone réservée
+  non nulle / cdhash étranger, mot c12 L180, réponse 0x58, porte unique).
+- Noyau : `driver/rust/kmod/sep_native.rs` param `allow_sks=3` (exige allow_sbio=1, sbio_open=1, allow_sbio_relay=0,
+  comme 1/2). Chemin = J9a (get_capabilities inchangé) puis, **seulement si getcap RÉPONDU état 0 et v négociée = 2**,
+  attend une 2e écriture de 0x470 o sur `/dev/sep_sks`, recontrôle, copie dans A12, relit, envoie LE mot set_env (porte
+  `SetenvGate`), écoute la réponse 0xaa, verdict « VERDICT sks setenv : ACCEPTÉ/ERREUR/SILENCE/NON ENVOYÉ ». `read`
+  rend getcap (0x98) + setenv (0x98). Tout autre mot vers 0x12/0x17/0x0a reste refusé.
+- Outil : nouveau `driver/rust/sks-setenv/` (`sks_setenv run` = écrit getcap, puis set_env une fois la v2 négociée, lit
+  les deux verdicts ; lit `/proc/device-tree/defaults/cpx-encryption-mode`, `--cpx N` pour forcer ; sous-commandes
+  offline build-getcap/build-setenv/check-*/decode). Tests : requête identique octet pour octet à une construction
+  Python/hashlib indépendante (condensé v2 `8261049d2c7363a00481526491c593aa`, sha256 complet
+  `b911d3ea8788fce2f662814368e282b84112da3e41b5f5845b0b74336df0999a`), relue par la porte, enregistrement combiné décodé.
+- Compilé : `tools`→`driver/rust/build.sh` (vermagic `7.2.12-3-1-ARCH` = `uname -r`) + clippy noyau (CLIPPY=1) sans
+  warning ; `cargo test` + `cargo clippy` verts (sep-proto 22 tests, sks-setenv 6). Binaires dans `~/kbuild/j10` :
+  sep_native.ko `59bd81ff953182ab90c04c77f75774308cb4d0bc0bf572d9bbd01a8369aa07f3`,
+  sks_setenv `2e3cbf9f54c281d7f300ce2939f04f5bc0d7805acb3fee4fd27149224e6f439f` ; sepd/ovl/dtbo = copies de j9 (sha inchangés).
+- Prêt : `pending/j9b_sks_setenv_chained.sh` (dérivé de j9a : service désactivé requis, STORE ≠ /var/lib/sepd, copie du
+  store avant run, dit si SAVE ; STORE par défaut `/var/lib/sepd-run-20261122-230441`). Doc : `sks_native_plan.md` §7.
+  **Classe neuve (2e type de message EP 0x12) → 1er run = « go » d'Albert. JAMAIS LANCÉ.**

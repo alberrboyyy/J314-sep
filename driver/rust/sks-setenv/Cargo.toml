@@ -1,0 +1,14 @@
+[package]
+name = "sks-setenv"
+version = "0.1.0"
+edition = "2021"
+description = "J9b userspace side: builds the SKS get_capabilities (0x64) then set_env (0x470) requests for sep_native allow_sks=3 (/dev/sep_sks) and decodes both replies. Offline except `run`."
+license = "GPL-2.0-or-later OR MIT"
+publish = false
+
+[[bin]]
+name = "sks_setenv"
+path = "src/main.rs"
+
+[dependencies]
+sep-proto = { path = "../sep-proto" }
