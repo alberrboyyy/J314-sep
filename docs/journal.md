@@ -3000,3 +3000,29 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - **INCONNU résiduel** (honnête) : valeurs de scalaires (code d'état +0x60 de 0x18 ~ −501, u64 +0x58/+0x68,
   sélecteurs), contenu interne du jeton (opaque), et l'acceptation brute sur EP 0x12 / keybag recréé Linux = **matériel**
   (classe neuve → go d'Albert). Le passcode reste fourni à l'exécution, jamais stocké/extrait.
+## 2026-11-23 — Claude (session PC, Opus 4.8) — userland 27.2.1 : qui pilote le userclient keybag (sélecteurs + source des scalaires)
+- Désassemblage seul du cache dyld 27.2.1 (`macos/ipsw27/out/26B131__MacBookPro18,2/dyld_shared_cache_arm64e`, ipsw
+  v3.1.750). Rien lancé, rien `vérifié`, aucun secret/uuid/passcode extrait. Livrable neuf : **`docs/sks_userland_values.md`**.
+- Mission ALARM : fixer SANS deviner la source des scalaires de la voie keybag (gabarits fil déjà connus) + trancher la
+  question « crée-t-on un keybag neuf ou charge-t-on une identité préexistante ? ».
+- **Architecture VU (décisive)** : (a) wrappers C `aks_*` (AppleKeyStore.framework) → `IOConnectCallMethod` direct :
+  sélecteurs userclient EP 0x12 **VU** — create_bag=0x2(7 scal), load_bag=0x6(blob en struct), unlock_device=0x9(4 scal),
+  auth_token_create=0x26(4 scal + secret en struct), backup_copy_bag_uuid=0x70(lit 16 o), invalidate_sync_bags=0x42.
+  **≠ TAG fil SEP** (index de dispatch de réception @0xcd0844). (b) création d'identité `AKSIdentityCreateKeybag[WithHash]`
+  = **stub XPC vers le démon `applekeystored`** (aucun appel kext direct) → l'UUID/identité est **détenu par le démon**.
+- **auth_token_create (0x1c)** : scal {arg0=handle, arg3, arg1, arg2}, secret en struct. Le **u64 session (+0x58 kext)**
+  est **calculé côté noyau** (`[sp+0xc8]`, acm_token §2.1) → **non choisi par l'AP**. sélecteur (+0x64)=arg3 (coreauthd).
+- **device_state_transition (0x18)** : `aks_unlock_device` scal {sext(arg0), arg1, sext(arg2), 0} ; le **code d'état
+  cible (+0x60, ~ −501)** entre comme **argument de l'appelant** (MobileKeyBag/coreauthd), pas une constante du wrapper.
+- **UUID 16 o** : `aks_load_bag` prend un **blob opaque** (uuid/type DEDANS) ; `aks_backup_copy_current_bag_uuid` **relit**
+  un uuid de 16 o **déjà présent** → UUID = valeur **persistante relue**, pas générée à la volée (côté cache).
+- **Q4 (DÉDUIT fort)** : ni ex-nihilo libre, ni identité Apple obligatoire — c'est **l'identité propre de l'appareil**,
+  (re)fabriquée par le SEP (clé interne, blob vide côté kext = pas de secret macOS requis pour *fabriquer*), **médiatisée
+  par un démon** tenant un état **scellé** (Swift AKSIdentity : generation/Memento/LockState, variante `…WithHash`
+  épinglée). Pour Linux : voie prometteuse mais il faut **rejouer la séquence exacte d'`applekeystored`** (uuid/type/
+  génération/scellement) — **INCONNU tant que le démon n'est pas désassemblé**.
+- **MUR atteint (frontière, pas filtre)** : `applekeystored`/`coreauthd` sont des **exécutables disque, hors cache dyld**.
+  Les extraire = monter le DMG racine (apfs-fuse **absent**, DMG 27.x généralement AEA-chiffré). Conforme à la consigne
+  « si une étape coince, arrête-toi, ne contourne pas » → **je n'ai PAS** installé apfs-fuse ni cherché de clé AEA.
+  Prochaine étape propre : remonter apfs-fuse/ipsw-fs pour sortir ces deux démons, + mapper `sExternalMethods` @0xcd0844
+  (sélecteur → méthode C++ → TAG fil) pour prouver octet-près la correspondance sélecteur↔TAG.
