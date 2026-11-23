@@ -14,6 +14,25 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — chaîne keystore→keybag (0x32/0x48/0x41/0x18, create/make_system_keybag) → docs/sks_keybag_unlock.md
+- Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
+  envoyé au SEP, matériel non touché). source: kext. Aucune clé/secret/passcode extrait.
+- Vu : symboles C++ `AppleKeyStore::*` présents en 27.2.1. Les TAG 0x32/0x48/0x41/0x18 ne sont PAS des perform_operation
+  DER (pas de `o`/paires) : ce sont des opcodes IPC dédiés (codeurs `_code_ipc_unwrap_media_key`/`fv_get_blob_state`/
+  `fv_unwrap_vek`/`device_state_transition`), struct plate + en-tête IPC 0x54, sérialisée par les mêmes primitives
+  `__word`/`__blob` que get_capabilities/set_env. Sélecteurs submit VU (`blraa x,#0x392e`) : 0x32, 0x48, 0x41, 0x18 =
+  les TAG fil. Callers des fv_*/media_key = APFS/CoreStorage (`AppleAPFSContainer::volumeCacheKey`/`volumeUnlockRecord`,
+  `CoreStorageFamily::unlockVEKs`, `get_vek_from_placeholder_data`, `apfs_keybag_unlock_with_placeholder_data`) → blobs
+  lus du disque APFS macOS. `create_keybag`(op 0x01) = import d'un blob de keybag, appelé seulement par userclient
+  `kAppleKeyStoreKeyBagCreateWithData` (entitlement keybag.create). `make_system_keybag`(op 0x0d) appelé par
+  `identity_load`/`set_device_keybag` (chemin identité d'appareil, keybag fabriqué par le SEP, pas de blob secret AP).
+  `fv_unwrap_vek` extrait un passcode d'un blob credential/ACM (string "Failed to extract passcode f…", helper 0xcf4fa4).
+- Interprété : la chaîne 0x32/0x48/0x41/0x18 = déverrouillage d'un VOLUME FileVault APFS macOS, non rejouable sur Linux
+  (blobs+passcode du volume macOS absents/secrets). Mais probablement contournable pour Touch ID (gating bio = `sls`,
+  pas le VEK). Piste neuve : make_system_keybag/identité. Murs non tranchables au binaire : gating bio interne SEP,
+  persistance xART d'un keybag créé (hors bundle). Verdict reachability = INCERTAIN (pas via FileVault).
+- Incidents : aucun. Filtre cyber : non déclenché (Opus 4.8).
+
 ## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — perform_operation de bring-up txn3/txn5 → docs/sks_protocol.md §2.3
 - Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
   envoyé au SEP, matériel non touché). source: kext.
