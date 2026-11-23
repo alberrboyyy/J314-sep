@@ -3179,3 +3179,17 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
   refuse si une requise manque). Doc : `docs/sks_native_plan.md` §9 réécrite.
 - **Rien lancé.** Classes de message neuves (create_keybag + make_system_keybag) ET ordre neuf (perform_operation ET
   null_d_key sautés) → **1er run = « go » d'Albert** ; power-cycle = Albert.
+
+## 2026-11-23 18:44 — Albert + Claude (session ALARM) — J10 : create_keybag REFUSÉ par le SEP (PARAM -13), pas un plantage
+- Go d'Albert, `sudo pending/j10_sks_create_keybag_chained.sh … --uuid 4c494e5558…00 --class 1 --type -10`. Logs :
+  `logs/20261123-184408_j10-sks-keybag-chained/`. Binaires `~/kbuild/j13` (sep_native.ko `1e82f721…`).
+- VU : boot chaîné = J9 (8 lockers sans UUID, **0 SAVE**, store inchangé) ; getcap RÉPONDU (état 0, v2), set_env ACCEPTÉ (état 0).
+- VU : `> 0x12 TAG 0x01 (create_keybag) TYPE 0x03 DATA 0x007c0000` (handle_y 0, class 1 @0x60, field2 0 @0x64, 3 blobs
+  vides, flag 0, condensé v2 OK) → **`< 0x12 TAG 0x81 TYPE 0x03 PARAM 0xf3 DATA 0`** = **REFUS, statut signé -13** (0xf3).
+  B12 inchangé (pas de handle). make_system NON ENVOYÉ (pas de handle). 0x73 → sbio VIVANT. Pas de Halted, 0 SAVE.
+- INTERPRÉTÉ : le SEP PARLE et traite la requête (en-tête/condensé acceptés, sinon pas de réponse appariée) mais REJETTE
+  create_keybag avec -13. Causes candidates (non tranché) : (a) classe dans le mauvais champ (+0x60 vs +0x64, ambigu §6.2) ;
+  (b) un champ requis manquant (blob non vide ? handle_y ? field2 ?) ; (c) précondition/permission ; (d) -13 = « chemin
+  chiffré » attendu (sks_protocol §1.6.3 associe -0xd au flag chiffrement) — mais set_env en clair passe, donc douteux.
+- PROCHAIN : décoder au binaire ce qui fait rendre -13 à create_keybag (@0xcc6904 / __ipc_create_keybag_v4) AVANT de
+  rebalayer (éviter des runs gâchés). Puis essayer : classe en +0x64, ou le champ requis identifié.
