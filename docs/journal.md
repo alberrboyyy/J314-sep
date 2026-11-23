@@ -2804,3 +2804,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Prêt : `pending/j9b_sks_setenv_chained.sh` (dérivé de j9a : service désactivé requis, STORE ≠ /var/lib/sepd, copie du
   store avant run, dit si SAVE ; STORE par défaut `/var/lib/sepd-run-20261122-230441`). Doc : `sks_native_plan.md` §7.
   **Classe neuve (2e type de message EP 0x12) → 1er run = « go » d'Albert. JAMAIS LANCÉ.**
+
+## 2026-11-23 10:53 — Albert + Claude (session ALARM) — 🎯 J9b : 2e message SKS (set_env) ACCEPTÉ par le SEP
+- Go d'Albert (service désactivé + reboot, `sudo pending/j9b_sks_setenv_chained.sh /var/lib/sepd-run-20261122-230441`).
+  Logs bruts : `logs/20261123-105354_j9b-sks-setenv-chained/`. Binaires `~/kbuild/j10` (sep_native.ko `59bd81ff…`, sks_setenv `2e3cbf9f…`).
+- VU : boot chaîné = J7b (8 lockers sans UUID, **0 SAVE**, store inchangé) ; skdl/sks/scrd ouverts.
+- VU : get_capabilities (txn 1) RÉPONDU état 0, theirs 2 (idem J9a) ; puis **set_env** (txn 2) :
+  `> 0x12 TAG 0x2a TYPE 0x02 PARAM 0 DATA 0x04700000` (en-tête v2, blob version 1 / **cpx-encryption-mode 2** lu dans l'ADT /
+  mode 4 / 0x400 o nuls, condensé v2 recalculé OK) → **`< 0x12 TAG 0xaa TYPE 0x02 PARAM 0 DATA 0x00580000`** :
+  état 0, L = 0x50 (en-tête v2), condensé OK, drapeaux d'appel 0x0000. **ACCEPTÉ.**
+- VU : 0x73 → sbio VIVANT ; 0 SAVE ; store réactivable.
+- ⇒ (n=1) les 2 premières transactions du bring-up SKS (get_capabilities, set_env) passent depuis Linux natif avec des
+  champs processus neutres et le mode de protection de contenu de l'ADT. §1.7 (c9) confirmée sur matériel.
+  Prochaine marche : txn 3 = perform_operation (TAG 0x22, DATA 0x008c0000) — transporte du DER (kext §2) → reverse + J9c.

@@ -1,0 +1,14 @@
+STORE = /var/lib/sepd-run-20261122-230441 (servi tel quel) :
+total 52
+-rw-r--r-- 1 root root   385 Nov 22 23:04 locker_save_2438821b3dc0faf876d7aad6ca4dc668.bin
+-rw-r--r-- 1 root root   106 Nov 22 23:04 locker_save_407e94c4f60495b3f2fbf5a8a31ae719.bin
+-rw-r--r-- 1 root root    56 Nov 22 23:04 locker_save_9133c5d52d8f276460f2ff4851d26065.bin
+-rw-r--r-- 1 root root   613 Nov 22 23:04 locker_save_e01e3b5e2c38f5960968a4d52ae2b22b.bin
+-rw-r--r-- 1 root root   420 Nov 22 23:04 master_2.bin
+-rw-r--r-- 1 root root 29354 Nov 23 10:15 sepd.log
+16f6bd15973940cda61e66b8c02fcf58d96290727b9d34f6b0656bb4531be341  /var/lib/sepd-run-20261122-230441/locker_save_2438821b3dc0faf876d7aad6ca4dc668.bin
+00ee9e03e3cc9aebb38d55b62e7dfa9b3c63fa55127cc48ad35d547c88fd3639  /var/lib/sepd-run-20261122-230441/locker_save_407e94c4f60495b3f2fbf5a8a31ae719.bin
+a2cb8b94274db264b0c3446bfbc99ffd3f241f58a674c8ab3416f12e3d626b02  /var/lib/sepd-run-20261122-230441/locker_save_9133c5d52d8f276460f2ff4851d26065.bin
+5b5e8c333a004f7a7f13a7c4c8906827d9cc4642832ae9bd5449fa403572eeeb  /var/lib/sepd-run-20261122-230441/locker_save_e01e3b5e2c38f5960968a4d52ae2b22b.bin
+66a7ff3b73d36c00d8900693f22a83fce99f39ea897ae72974ae080c0e3a8d5c  /var/lib/sepd-run-20261122-230441/master_2.bin
+copie du store avant run : /var/lib/sepd-run-20261122-230441.avant-j9b-20261123-105354
