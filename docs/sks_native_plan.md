@@ -475,3 +475,61 @@ copies de `~/kbuild/j14` (sha256 inchangés).
 si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon store du service périmé → décision d'Albert. Classe/ordre
 neufs (make_system émis SEUL, create_keybag sauté) → **1er run = « go » d'Albert**
 (`pending/j11_sks_make_system_chained.sh`). **SQUELETTE : rien ne tourne avant uuid + type.**
+
+## 11. Expérience (chaînon manquant) : J12 = `load_keybag` (uuid → handle) puis `make_system_keybag` chaîné (`allow_sks=7`) — 2026-11-23, rien lancé
+
+**Pourquoi J12 (le cercle).** Les deux voies d'« identité à neuf » sont dans une impasse réciproque
+(`docs/applekeystored_identity.md` §6/§8/§9, journal 2026-11-23) : `create_keybag` (TAG fil 0x01) exige des **DONNÉES**
+(refus **−0xb** = « argument requis nul » quand le corps est vide → c'est un import-AVEC-données, pas une création à
+neuf) ; `make_system_keybag` STANDALONE (J11, TAG fil 0x0d, sans create avant) exige un **HANDLE** (refus **−0xb**).
+Chacun réclame ce que l'autre est censé produire. L'op **JAMAIS testée sur matériel** qui brise ce cercle est
+`load_keybag` (**TAG fil 0x03**) : elle prend un uuid de 16 o et **doit RENDRE un handle** (réponse **TAG 0x83**,
+PARAM 0 = OK, handle u32 à **OOL B +0x6c** — *DÉDUIT*, §6, à confirmer matériel). C'est le chaînon `uuid → handle →
+make_system`. Le gabarit est *VU au binaire* (`__ipc_load_keybag` @0xcdb934 / `_code_ipc_load_keybag` @0xcde92c) et
+**récupéré du squelette J10 initial** (git a9aadd0 : il codait déjà `load_keybag(0x03)` + `make_system` chaîné, avant le
+pivot vers `create_keybag`). Rien n'est copié d'Apple.
+
+**Ce que J12 émet.** Chemin = J9b (boot chaîné, lockers sans UUID, CNTL de skdl/sks/scrd, UN get_capabilities ACCEPTÉ
+état 0 theirs 2 → v2, UN set_env ACCEPTÉ), puis en **SAUTANT** perform_operation (TAG 0x22), null_d_key (TAG 0x0a) **ET**
+create_keybag (TAG 0x01) :
+
+1. `load_keybag` (TAG fil 0x03, **TYPE 0x03**) : `> EP 0x12 TAG 0x03 TYPE 0x03 PARAM 0 DATA 0x00740000`, OOL A12 =
+   **0x74 o** = en-tête IPC v2 + **état 0** (OOL 0x54) + **handle_y**(u64, 0x58) + **blob{len 0x10 (0x60), uuid 16 o
+   (0x64)}** + condensé SHA-256/16 v2 recalculé + cdhash neutre. Le noyau contrôle les constantes (en-tête, état 0, blob
+   0x10), le condensé et la forme du cdhash ; **uuid et handle_y sont libres** (userland, non contrôlés en valeur).
+2. **Seulement si** `load_keybag` répond **TAG 0x83 PARAM 0** : le noyau lit le handle rendu à OOL B +0x6c et le pose
+   dans `make_system_keybag` **CHAÎNÉ** (TAG 0x0d, **TYPE 0x04**, 0x84 o, `finalize_mskb` + recalcul du condensé) —
+   **exactement le make_system de `allow_sks=5`** (même porte `MskbGate`, même corps, uuid dans le blob à 0x6c, type à
+   0x64). Si load_keybag **REFUSE** (PARAM ≠ 0), make_system n'est **pas** émis.
+
+**Les deux issues (ce que ce run tranche).** (a) `load_keybag` **rend un handle** (PARAM 0) → **cercle brisé** : une
+identité d'appareil native, sans macOS, devient possible ; le make_system chaîné peut alors « marquer system ». (b)
+`load_keybag` **refuse** (not found / −0xb) → une **identité pré-existante** (keybag posté par macOS) est requise → la
+suite est une **capture sous macOS** pour voir la séquence exacte (quel uuid, quel ordre, quel create/import préalable).
+
+**Portes noyau (allow_sks=7).** `sks_ipc::GetcapGate`, `sks_setenv::SetenvGate`, `sks_keybag::LoadkeybagGate` (mot
+`> 0x12 0x03 0x03 … 0x00740000`, une fois), puis `sks_keybag::MskbGate` (TYPE 0x04, chaîné, une fois, seulement si le
+handle a été rendu). Verdicts dmesg : « VERDICT sks load_keybag : handle=0x… (PARAM 0 … cercle brisé) / REFUS (PARAM …)
+/ REFUS/SILENCE / NON ENVOYÉ » et « VERDICT sks make_system_keybag : marqué system (PARAM 0) / REFUS ». Rien d'autre vers
+0x12/0x17/0x0a (Halted sinon). Puis le 0x73 sbio comme J9b. **allow_sks=5 (create chaîné) et 6 (make_system standalone)
+restent disponibles et intacts.**
+
+**Tests hors matériel** : `sep-proto::sks_keybag` (mot `load_keybag` TYPE 0x03 / TAG 0x03 ; corps 0x74 o relu ;
+`LoadkeybagGate` un seul mot ; appariement de la réponse TAG bit 7 / TYPE 0x03) ; **requête identique octet pour octet
+à une construction Python/`hashlib` indépendante** (`scratchpad/lkbvec.py`) sur valeurs d'EXEMPLE « PAS les vraies »
+(ts 0x1122334455667788, uuid 00..0f, handle_y 0x4242424242424242 → condensé v2 `5fd02233027b4e0ab5d1197a292fcdcd`,
+sha256 `0be85f870bd1271abc5d1578efa97b62ee5aa798c371e16fcd3d81cbc8602653`) ; `sks-setenv` étendu (`run --loadkeybag`,
+`build-loadkeybag`, `check-loadkeybag`, `decode --loadkeybag` ; uuid/type **obligatoires**, pas de `--class`). `cargo
+test` vert, clippy propre (`CLIPPY=1` pour le `.ko`).
+
+**Binaires** (`~/kbuild/j16`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `145d3ee150018f517958221d91f03d7ba01e32ef8684d24d3a3bc19e69c07e62` (allow_sks=7), `sks_setenv`
+`842b89d6c3cd11ec6cf4ee0896de02ea23ab97fdb1643895a1078cd8d606463b` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo` =
+copies de `~/kbuild/j15` (sha256 inchangés).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd` ; copie du store avant run ; **uuid et type fournis**
+(`UUID=`/`TYPE=` ou `--uuid`/`--type` ; `HANDLE_Y` a un défaut 0, pas de `--class`), sinon le script refuse. **Après** :
+si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon store du service périmé → décision d'Albert. Classe neuve
+(`load_keybag` jamais émis sur matériel) → **1er run = « go » d'Albert** (`pending/j12_sks_loadkeybag_chained.sh`).
+**SQUELETTE : rien ne tourne avant uuid + type.**

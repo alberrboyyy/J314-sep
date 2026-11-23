@@ -117,6 +117,36 @@ pub const MSKB_FLAG: u64 = 0;
 /// Reply TAG of `make_system_keybag` (= request | 0x80).
 pub const MSKB_REPLY_TAG: u8 = OP_MAKE_SYSTEM_KEYBAG | 0x80; // 0x8d
 
+// --- load_keybag (TAG fil 0x03) — J12 (allow_sks=7) ----------------------------------------------------------------
+// J12 (`docs/sks_native_plan.md` §11): the op NEVER tested on hardware, the missing link of the create/make_system
+// circle. `create_keybag` (0x01) refuses a NUDE body (-0xb, needs DATA); standalone `make_system_keybag` (0x0d)
+// refuses without a HANDLE (-0xb). `load_keybag` (TAG fil 0x03) takes a 16-byte uuid and is supposed to RETURN a
+// keybag HANDLE (reply TAG 0x83, PARAM 0, handle u32 at OOL B +0x6c — DÉDUIT, §6). That handle then feeds the CHAINED
+// `make_system_keybag` (the 0x84-byte frame above, TYPE 0x04), exactly as `create_keybag` did for allow_sks=5. The
+// two outcomes: a handle rendered (circle broken, native device identity possible) OR a refusal (a pre-existing
+// identity, posted by macOS, is required → capture under macOS). Byte layout DISASSEMBLED
+// (`docs/applekeystored_identity.md` §6, `source: kext`): `__ipc_load_keybag` @0xcdb934 / `_code_ipc_load_keybag`
+// @0xcde92c — header + state(u32=0) + handle_y(u64, OOL 0x58) + blob{len 0x10 (OOL 0x60), uuid 16 (OOL 0x64)}. Recovered
+// from the J10 skeleton (git a9aadd0), NOT verified on hardware; nothing copied from Apple code.
+pub const OP_LOAD_KEYBAG: u8 = 0x03;
+/// Third transaction of J12 (get_capabilities = 1, set_env = 2, load_keybag = 3).
+pub const LKB_TXN: u8 = 0x03;
+/// Body length: header 0x54 + state 4 + handle_y 8 + blob len 4 + uuid 16 = 0x74.
+pub const LKB_LEN: usize = 0x74;
+pub const LKB_DATA: u32 = (LKB_LEN as u32) << 16;
+/// Blob length (OOL 0x60) of `load_keybag` (VU `w3 = 0x10` = the 16-byte uuid).
+pub const OFF_LKB_BLOBLEN: usize = 0x60;
+/// Uuid (OOL 0x64), 16 bytes, the `load_keybag` blob.
+pub const OFF_LKB_UUID: usize = 0x64;
+/// Constant blob length of `load_keybag` (the uuid: 0x10).
+pub const LKB_BLOBLEN: u32 = 0x10;
+/// State word of `load_keybag` (OOL 0x54): 0.
+pub const LKB_STATE: u32 = 0;
+/// Reply TAG of `load_keybag` (= request | 0x80).
+pub const LKB_REPLY_TAG: u8 = OP_LOAD_KEYBAG | 0x80; // 0x83
+
+const _: () = assert!(LKB_LEN == 0x54 + 4 + 8 + 4 + UUID_LEN);
+
 // --- make_system_keybag STANDALONE (J11 PIVOT, allow_sks=6) --------------------------------------------------------
 /// J11 PIVOT (`docs/sks_native_plan.md` §10): `make_system_keybag` sent WITHOUT `create_keybag` before it. It is then
 /// the 3rd transaction of the boot (get_capabilities = 1, set_env = 2, make_system = 3), so its transaction counter
@@ -388,6 +418,71 @@ pub fn type_in_vu_range(keybag_type: i32) -> bool {
     keybag_type <= -10
 }
 
+// =================================================================================================================
+// load_keybag (J12)
+// =================================================================================================================
+
+/// The exact `load_keybag` request word (the only one the driver may ever send for this op): TYPE 0x03.
+pub const fn loadkeybag_word() -> Word {
+    Word::new(EP_SKS, OP_LOAD_KEYBAG, LKB_TXN, 0, LKB_DATA)
+}
+
+/// Builds the 0x74 bytes of `load_keybag`. `handle_y` and `uuid` are USERLAND values (no default); the digest is
+/// computed last over the v2 base. The uuid is written verbatim (16 bytes) with its length 0x10 at OOL 0x60.
+pub fn encode_loadkeybag(f: &KeybagFields, handle_y: u64, uuid: &[u8; UUID_LEN]) -> [u8; LKB_LEN] {
+    let mut b = [0u8; LKB_LEN];
+    write_header(&mut b, f);
+    // state (0x54) = 0 (left zero).
+    b[OFF_HANDLE_Y..OFF_HANDLE_Y + 8].copy_from_slice(&handle_y.to_le_bytes());
+    b[OFF_LKB_BLOBLEN..OFF_LKB_BLOBLEN + 4].copy_from_slice(&LKB_BLOBLEN.to_le_bytes());
+    b[OFF_LKB_UUID..OFF_LKB_UUID + UUID_LEN].copy_from_slice(uuid);
+    let d = frame_digest(&b, HDR_VERSION_V2, OFF_STATE, LKB_LEN).unwrap_or([0; DIGEST_LEN]);
+    b[OFF_DIGEST..OFF_DIGEST + DIGEST_LEN].copy_from_slice(&d);
+    b
+}
+
+/// What the kernel gate reads back from a `load_keybag` request (the userland values, for the journal only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LoadkeybagReq {
+    pub fields: KeybagFields,
+    pub handle_y: u64,
+    pub uuid: [u8; UUID_LEN],
+}
+
+/// Kernel gate on the 0x74 bytes of `load_keybag`: exact length, the CONSTANT fields (header constants, state 0,
+/// blob length 0x10), the v2 digest recomputed, cdhash in one of the two documented AP forms. The userland values
+/// (handle_y, uuid) are NOT constrained (they are free, supplied by the tool). Returns them for the log.
+pub fn check_loadkeybag(b: &[u8]) -> Result<LoadkeybagReq> {
+    if b.len() != LKB_LEN {
+        return Err(Error::OutOfRange("load_keybag request length", b.len() as u64));
+    }
+    check_header_constants(b)?;
+    let state = le32(b, OFF_STATE)?;
+    if state != LKB_STATE {
+        return Err(Error::OutOfRange("load_keybag state (0x54) != 0", u64::from(state)));
+    }
+    let bloblen = le32(b, OFF_LKB_BLOBLEN)?;
+    if bloblen != LKB_BLOBLEN {
+        return Err(Error::OutOfRange("load_keybag blob length (0x60) != 0x10 (uuid)", u64::from(bloblen)));
+    }
+    let d = frame_digest(b, HDR_VERSION_V2, OFF_STATE, LKB_LEN)?;
+    if b[OFF_DIGEST..OFF_DIGEST + DIGEST_LEN] != d {
+        return Err(Error::Unexpected("load_keybag digest (0x04) != SHA-256/16 of the documented v2 base"));
+    }
+    let fields = KeybagFields { ts_us: le64(b, OFF_TS)?, uniqueid: le64(b, OFF_UNIQUEID)?, uid: le32(b, OFF_UID)?, cdhash: read_cdhash(b) };
+    if cdhash_kind(&fields.header()) == CdhashKind::Other {
+        return Err(Error::Unexpected("cdhash (0x38) neither zeros nor SHA-1 of the unique id"));
+    }
+    let mut uuid = [0u8; UUID_LEN];
+    uuid.copy_from_slice(&b[OFF_LKB_UUID..OFF_LKB_UUID + UUID_LEN]);
+    Ok(LoadkeybagReq { fields, handle_y: le64(b, OFF_HANDLE_Y)?, uuid })
+}
+
+/// `true` iff `w` is a reply to our `load_keybag` as the kext matches it: EP 0x12, TAG bit 7 set, TYPE = our txn.
+pub fn is_loadkeybag_reply(w: &Word) -> bool {
+    w.ep == EP_SKS && w.tag & 0x80 != 0 && w.ty == LKB_TXN
+}
+
 // --- send gates (one word each, once per boot) ---------------------------------------------------------------------
 
 macro_rules! one_word_gate {
@@ -424,6 +519,7 @@ macro_rules! one_word_gate {
 one_word_gate!(CreatekeybagGate, createkeybag_word());
 one_word_gate!(MskbGate, mskb_word());
 one_word_gate!(MskbStandaloneGate, mskb_word_standalone());
+one_word_gate!(LoadkeybagGate, loadkeybag_word());
 
 #[cfg(test)]
 mod tests {
@@ -616,6 +712,86 @@ mod tests {
         assert!(type_in_vu_range(-16));
         assert!(!type_in_vu_range(-9));
         assert!(!type_in_vu_range(0));
+    }
+
+    #[test]
+    fn loadkeybag_word_and_length() {
+        assert_eq!(loadkeybag_word(), Word::new(0x12, 0x03, 0x03, 0x00, 0x0074_0000));
+        assert_eq!(LKB_LEN, 0x74);
+        assert_eq!(LKB_REPLY_TAG, 0x83);
+        assert_eq!(LKB_DATA, 0x0074_0000);
+    }
+
+    #[test]
+    fn loadkeybag_layout_and_reread() {
+        let f = fields();
+        let b = encode_loadkeybag(&f, EX_HANDLE_Y, &ex_uuid());
+        assert_eq!(le32(&b, 0x00).unwrap(), 0x50);
+        assert_eq!(le32(&b, 0x14).unwrap(), 2);
+        assert_eq!(le64(&b, 0x18).unwrap(), EX_TS);
+        assert_eq!(le32(&b, 0x54).unwrap(), 0); // state 0
+        assert_eq!(le64(&b, 0x58).unwrap(), EX_HANDLE_Y); // handle_y
+        assert_eq!(le32(&b, 0x60).unwrap(), 0x10); // blob len = uuid
+        assert_eq!(&b[0x64..0x74], &ex_uuid());
+        let r = check_loadkeybag(&b).unwrap();
+        assert_eq!((r.fields, r.handle_y, r.uuid), (f, EX_HANDLE_Y, ex_uuid()));
+    }
+
+    /// Full-request fingerprint vs an independent Python/hashlib construction (session ALARM 2026-11-23,
+    /// `scratchpad/lkbvec.py`). Values are the ARBITRARY example set, NOT the real userland values.
+    #[test]
+    fn loadkeybag_matches_independent_construction() {
+        let b = encode_loadkeybag(&fields(), EX_HANDLE_Y, &ex_uuid());
+        assert_eq!(&b[0x04..0x14], &hex16("5fd02233027b4e0ab5d1197a292fcdcd"));
+        assert_eq!(sha256(&b), hex32("0be85f870bd1271abc5d1578efa97b62ee5aa798c371e16fcd3d81cbc8602653"));
+        // v2 digest base = SHA-256 of OOL bytes 0x14..end (header v2 + payload, contiguous), truncated to 16.
+        assert_eq!(&b[0x04..0x14], &sha256(&b[0x14..])[..16]);
+    }
+
+    #[test]
+    fn loadkeybag_gate_refuses_constant_changes() {
+        // header constants, state 0, blob length 0x10 are checked; handle_y and uuid are NOT.
+        let good = encode_loadkeybag(&fields(), EX_HANDLE_Y, &ex_uuid());
+        for &o in &[0x00usize, 0x14, 0x20, 0x24, 0x4c, 0x54, 0x60] {
+            let mut b = good;
+            b[o] ^= 0x01;
+            assert!(check_loadkeybag(&b).is_err(), "lkb offset {o:#x}");
+        }
+        // handle_y (0x58) and uuid (0x64) are free: changing them (and re-digesting) is accepted.
+        let other = encode_loadkeybag(&fields(), 0x99, &[0xee; UUID_LEN]);
+        let r = check_loadkeybag(&other).unwrap();
+        assert_eq!((r.handle_y, r.uuid), (0x99, [0xee; UUID_LEN]));
+        // Contextual header field changed without re-digesting → refused (digest).
+        let mut b = good;
+        b[0x18] ^= 0x01;
+        assert!(check_loadkeybag(&b).is_err());
+        assert!(check_loadkeybag(&good[..LKB_LEN - 1]).is_err());
+    }
+
+    #[test]
+    fn loadkeybag_reply_and_handle() {
+        // load_keybag reply: `< 0x12 TAG 0x83 TYPE 0x03 PARAM 0 DATA (len<<16)`, handle at OOL B +0x6c.
+        let w = Word::decode(0x0010_0000_0003_8312);
+        assert!(is_loadkeybag_reply(&w));
+        assert_eq!(reply_word(&w).status, 0);
+        assert!(!is_loadkeybag_reply(&Word::new(0x12, 0x03, 0x03, 0, 0))); // request, bit 7 clear
+        assert!(!is_loadkeybag_reply(&Word::new(0x12, 0x8d, 0x04, 0, 0))); // mskb reply (TYPE 4)
+        let mut snap = [0u8; crate::sks_ipc::OUT_SNAP];
+        snap[OFF_RESP_HANDLE..OFF_RESP_HANDLE + 4].copy_from_slice(&0x0abc_def0u32.to_le_bytes());
+        assert_eq!(reply_handle(&snap).unwrap(), 0x0abc_def0);
+    }
+
+    #[test]
+    fn loadkeybag_gate_once() {
+        let mut g = LoadkeybagGate::closed();
+        assert!(!g.admit(&loadkeybag_word()), "closed");
+        g.arm();
+        assert!(!g.admit(&Word::new(0x12, 0x03, 0x04, 0, LKB_DATA)), "wrong TYPE");
+        assert!(!g.admit(&Word::new(0x12, 0x0d, 0x03, 0, LKB_DATA)), "wrong TAG");
+        assert!(!g.admit(&Word::new(0x12, 0x03, 0x03, 0, 0x0074_0001)), "wrong DATA");
+        assert!(g.admit(&loadkeybag_word()));
+        assert!(g.used());
+        assert!(!g.admit(&loadkeybag_word()), "twice");
     }
 
     /// J11 standalone: the STANDALONE word differs from the chained one ONLY in TYPE (0x03 vs 0x04); the OOL body an

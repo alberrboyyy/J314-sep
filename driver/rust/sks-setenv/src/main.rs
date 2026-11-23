@@ -5,12 +5,17 @@
 //!   sks_setenv build-createkeybag KB [CHAMPS] [--out FILE]  builds the 0x80-byte create_keybag request (variant 4, offline)
 //!   sks_setenv build-mskb KB [CHAMPS] [--out FILE]  builds the 0x84-byte make_system_keybag request (offline);
 //!       with --mskb → the STANDALONE frame (J11, TYPE 0x03, loaded_handle = --mskb-handle); else the chained frame.
-//!   sks_setenv check-getcap|check-setenv|check-nulldkey|check-createkeybag|check-mskb [--mskb] FILE  applies the kernel gate (offline)
-//!   sks_setenv decode [--mskb] FILE                 decodes a combined outcome record from /dev/sep_sks (offline)
-//!   sks_setenv run [CHAMPS] [--cpx N] [--nulldkey | --keybag KB | --mskb MKB] [--dev P] [--wait-s N] [--out-dir DIR]
+//!   sks_setenv build-loadkeybag LKB [CHAMPS] [--out FILE]  builds the 0x74-byte load_keybag request (J12, offline)
+//!   sks_setenv check-getcap|check-setenv|check-nulldkey|check-createkeybag|check-loadkeybag|check-mskb [--mskb] FILE  applies the kernel gate (offline)
+//!   sks_setenv decode [--mskb|--loadkeybag] FILE    decodes a combined outcome record from /dev/sep_sks (offline)
+//!   sks_setenv run [CHAMPS] [--cpx N] [--nulldkey | --keybag KB | --mskb MKB | --loadkeybag LKB] [--dev P] [--wait-s N] [--out-dir DIR]
 //!       waits for /dev/sep_sks, writes get_capabilities, then set_env, then (with --nulldkey, sep_native allow_sks=4)
 //!       null_d_key, OR (with --keybag, allow_sks=5) create_keybag then make_system_keybag, OR (with --mskb,
-//!       allow_sks=6) a STANDALONE make_system_keybag, then reads/decodes verdicts.
+//!       allow_sks=6) a STANDALONE make_system_keybag, OR (with --loadkeybag, allow_sks=7) load_keybag then a
+//!       CHAINED make_system_keybag, then reads/decodes verdicts.
+//! LKB (the J12 load_keybag userland values): REQUIRED --uuid HEX32 and --type N ONLY (no create_keybag → no --class).
+//!     Optional: --handle-y N (u64, OOL 0x58, default 0). load_keybag returns a handle (reply PARAM 0) that the kernel
+//!     plugs into the chained make_system_keybag, OR refuses (PARAM != 0 → a pre-existing identity is required).
 //! CHAMPS: --clock monotonic|boottime|realtime (default monotonic) | --ts-us N ; --uniqueid N (default 0) ;
 //!         --uid N (default 0) ; --cdhash sha1|zero (default sha1)
 //! --cpx N: force cpx-encryption-mode (default = read /proc/device-tree/defaults/cpx-encryption-mode, else 0).
@@ -25,18 +30,20 @@
 //!     --handle-y N (u64, OOL 0x58, default 0). The loaded_handle is sent AS IS (the kernel does NOT finalize in J11).
 //!     AMBIGUITY (`docs/applekeystored_identity.md` §6.2/§6.4): §6 does not say which of create_keybag's two u32
 //!     (0x60/0x64) is the class enum — if the SEP rejects, swap --class and --field2.
-//! Exit code: run without --nulldkey/--keybag/--mskb → 0 = set_env ACCEPTÉ ; --nulldkey → 0 = null_d_key RÉPONDU ;
-//!            --keybag / --mskb → 0 = make_system_keybag marqué system ; 1 = any other final verdict ; 2 = usage/file/device.
+//! Exit code: run without --nulldkey/--keybag/--mskb/--loadkeybag → 0 = set_env ACCEPTÉ ; --nulldkey → 0 = null_d_key
+//!            RÉPONDU ; --keybag / --mskb / --loadkeybag → 0 = make_system_keybag marqué system ; 1 = any other final
+//!            verdict ; 2 = usage/file/device.
 use sep_proto::sks_ipc;
 use sep_proto::sks_keybag::{self as proto_kb, UUID_LEN};
 use sep_proto::sks_nulldkey as proto_nd;
 use sep_proto::sks_setenv as proto_se;
 use sks_setenv::{
     createkeybag_verdict, describe_createkeybag, describe_createkeybag_verdict, describe_getcap,
-    describe_getcap_verdict, describe_mskb, describe_mskb_standalone, describe_mskb_std_verdict, describe_mskb_verdict,
-    describe_nulldkey, describe_nulldkey_verdict, describe_setenv, describe_setenv_verdict, getcap_fields,
-    getcap_verdict, keybag_fields, mskb_std_verdict, mskb_verdict, nulldkey_fields, nulldkey_verdict, setenv_fields,
-    setenv_verdict, CdhashMode, KeybagUserland, MskbVerdict, NulldkeyVerdict, SetenvVerdict,
+    describe_getcap_verdict, describe_loadkeybag, describe_loadkeybag_verdict, describe_mskb, describe_mskb_standalone,
+    describe_mskb_std_verdict, describe_mskb_verdict, describe_nulldkey, describe_nulldkey_verdict, describe_setenv,
+    describe_setenv_verdict, getcap_fields, getcap_verdict, keybag_fields, loadkeybag_verdict, mskb_std_verdict,
+    mskb_verdict, nulldkey_fields, nulldkey_verdict, setenv_fields, setenv_verdict, CdhashMode, KeybagUserland,
+    MskbVerdict, NulldkeyVerdict, SetenvVerdict,
 };
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
@@ -102,6 +109,8 @@ struct Opts {
     keybag: bool,
     /// J11 (allow_sks=6): emit a STANDALONE make_system_keybag (no create_keybag before it). Requires only uuid+type.
     mskb: bool,
+    /// J12 (allow_sks=7): emit load_keybag (uuid → handle) then a CHAINED make_system_keybag. Requires only uuid+type.
+    loadkeybag: bool,
     uuid: Option<[u8; UUID_LEN]>,
     class: Option<u32>,
     field2: u32,
@@ -175,6 +184,7 @@ fn parse(args: &[String]) -> Result<Opts, String> {
         nulldkey: false,
         keybag: false,
         mskb: false,
+        loadkeybag: false,
         uuid: None,
         class: None,
         field2: 0,
@@ -212,6 +222,7 @@ fn parse(args: &[String]) -> Result<Opts, String> {
             "--nulldkey" => o.nulldkey = true,
             "--keybag" => o.keybag = true,
             "--mskb" => o.mskb = true,
+            "--loadkeybag" => o.loadkeybag = true,
             "--uuid" => o.uuid = Some(parse_uuid(&val()?)?),
             "--class" => o.class = Some(u32::try_from(num(&val()?)?).map_err(|_| "class > u32".to_string())?),
             "--field2" => o.field2 = u32::try_from(num(&val()?)?).map_err(|_| "field2 > u32".to_string())?,
@@ -273,6 +284,20 @@ fn build_mskb_standalone(o: &Opts) -> Result<[u8; proto_kb::MSKB_LEN], String> {
     Ok(proto_kb::encode_mskb(&keybag_fields(ts_us(o)?, o.uniqueid, o.uid, o.cdhash), o.handle_y, o.mskb_handle, keybag_type, &uuid))
 }
 
+/// J12: builds the load_keybag request (allow_sks=7). `handle_y` (OOL 0x58) defaults to 0; `uuid` (16 bytes) is the
+/// blob. Requires only --uuid (and --type, for the chained make_system that follows). No --class (no create_keybag).
+fn build_loadkeybag(o: &Opts) -> Result<[u8; proto_kb::LKB_LEN], String> {
+    let (uuid, _keybag_type) = mskb_std_userland(o)?;
+    Ok(proto_kb::encode_loadkeybag(&keybag_fields(ts_us(o)?, o.uniqueid, o.uid, o.cdhash), o.handle_y, &uuid))
+}
+
+/// J12: builds the CHAINED make_system_keybag that follows load_keybag. `loaded_handle` placeholder = 0 (the kernel
+/// plugs in the handle load_keybag returned and re-digests). Requires only --uuid/--type (no --class).
+fn build_mskb_for_loadkeybag(o: &Opts) -> Result<[u8; proto_kb::MSKB_LEN], String> {
+    let (uuid, keybag_type) = mskb_std_userland(o)?;
+    Ok(proto_kb::encode_mskb(&keybag_fields(ts_us(o)?, o.uniqueid, o.uid, o.cdhash), o.handle_y, 0, keybag_type, &uuid))
+}
+
 fn log(s: &str) {
     for l in s.lines() {
         eprintln!("sks_setenv: {l}");
@@ -324,14 +349,14 @@ fn write_request(
 
 /// `run`: returns the exit code.
 fn run(o: &Opts) -> Result<i32, String> {
-    if [o.keybag, o.nulldkey, o.mskb].iter().filter(|x| **x).count() > 1 {
-        return Err("--keybag, --nulldkey et --mskb sont exclusifs".into());
+    if [o.keybag, o.nulldkey, o.mskb, o.loadkeybag].iter().filter(|x| **x).count() > 1 {
+        return Err("--keybag, --nulldkey, --mskb et --loadkeybag sont exclusifs".into());
     }
     // Fail fast: the required userland values must all be present BEFORE touching the device.
     if o.keybag {
         keybag_userland(o)?;
     }
-    if o.mskb {
+    if o.mskb || o.loadkeybag {
         mskb_std_userland(o)?;
     }
     let t0 = Instant::now();
@@ -400,15 +425,34 @@ fn run(o: &Opts) -> Result<i32, String> {
             save(&o.out_dir, "sks_mskb_standalone_request.bin", &mskb);
         }
     }
+    // 3quater) load_keybag (--loadkeybag, allow_sks=7): once set_env was ACCEPTÉ, SKIPPING create_keybag. The kernel
+    //          reads the handle load_keybag returns and plugs it into the CHAINED make_system_keybag (+0x60) itself, so
+    //          the tool builds make_system_keybag with a placeholder (0) there.
+    if o.loadkeybag && se_accepted {
+        let lkb_accepted = write_request(&mut f, &mut || build_loadkeybag(o).map(|b| b.to_vec()), deadline, "load_keybag")?;
+        if lkb_accepted {
+            let lkb = build_loadkeybag(o)?;
+            log(&describe_loadkeybag(&lkb)?);
+            save(&o.out_dir, "sks_loadkeybag_request.bin", &lkb);
+        }
+        let mskb_accepted = write_request(&mut f, &mut || build_mskb_for_loadkeybag(o).map(|b| b.to_vec()), deadline, "make_system_keybag")?;
+        if mskb_accepted {
+            let mskb = build_mskb_for_loadkeybag(o)?;
+            log(&describe_mskb(&mskb)?);
+            save(&o.out_dir, "sks_mskb_request.bin", &mskb);
+        }
+    }
 
     // 4) Read the combined outcome record. allow_sks=5 → 4 records (getcap, set_env, create_keybag, make_system_keybag);
     //    allow_sks=4 → 3 (getcap, set_env, null_d_key); allow_sks=6 → 3 (getcap, set_env, make_system standalone); else 2.
-    let records = if o.keybag { 4 } else if o.nulldkey || o.mskb { 3 } else { 2 };
+    let records = if o.keybag || o.loadkeybag { 4 } else if o.nulldkey || o.mskb { 3 } else { 2 };
     let need = sks_ipc::OUT_SIZE * records;
     let mut rec = vec![0u8; need];
     let n = f.read(&mut rec).map_err(|e| format!("lecture du verdict : {e}"))?;
     let outname = if o.keybag {
         "sks_keybag_outcome.bin"
+    } else if o.loadkeybag {
+        "sks_loadkeybag_outcome.bin"
     } else if o.nulldkey {
         "sks_nulldkey_outcome.bin"
     } else if o.mskb {
@@ -418,7 +462,7 @@ fn run(o: &Opts) -> Result<i32, String> {
     };
     save(&o.out_dir, outname, &rec[..n]);
     if n < need {
-        let mode = if o.keybag { 5 } else if o.nulldkey { 4 } else if o.mskb { 6 } else { 3 };
+        let mode = if o.keybag { 5 } else if o.loadkeybag { 7 } else if o.nulldkey { 4 } else if o.mskb { 6 } else { 3 };
         return Err(format!("enregistrement trop court ({n} o < {need} o) : /dev/sep_sks n'est pas dans le bon mode (allow_sks={mode})"));
     }
     let (gcv, gcraw) = getcap_verdict(&rec[..sks_ipc::OUT_SIZE])?;
@@ -442,6 +486,13 @@ fn run(o: &Opts) -> Result<i32, String> {
         print!("{}", describe_mskb_verdict(&mskbv, mraw, &msnap));
         return Ok(if matches!(mskbv, MskbVerdict::MarkedSystem) { 0 } else { 1 });
     }
+    if o.loadkeybag {
+        let (lkbv, lraw, lsnap) = loadkeybag_verdict(&rec[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3])?;
+        let (mskbv, mraw, msnap) = mskb_verdict(&rec[sks_ipc::OUT_SIZE * 3..sks_ipc::OUT_SIZE * 4])?;
+        print!("{}", describe_loadkeybag_verdict(&lkbv, lraw, &lsnap));
+        print!("{}", describe_mskb_verdict(&mskbv, mraw, &msnap));
+        return Ok(if matches!(mskbv, MskbVerdict::MarkedSystem) { 0 } else { 1 });
+    }
     Ok(if matches!(sev, SetenvVerdict::Accepted(_)) { 0 } else { 1 })
 }
 
@@ -453,7 +504,7 @@ fn read_file(p: &Option<PathBuf>) -> Result<Vec<u8>, String> {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let Some(cmd) = args.get(1) else {
-        eprintln!("usage : sks_setenv build-getcap|build-setenv|build-nulldkey|build-createkeybag|build-mskb|check-getcap|check-setenv|check-nulldkey|check-createkeybag|check-mskb|decode|run … (voir l'en-tête de src/main.rs)");
+        eprintln!("usage : sks_setenv build-getcap|build-setenv|build-nulldkey|build-createkeybag|build-mskb|build-loadkeybag|check-getcap|check-setenv|check-nulldkey|check-createkeybag|check-loadkeybag|check-mskb|decode|run … (voir l'en-tête de src/main.rs)");
         exit(2);
     };
     let o = match parse(&args[2..]) {
@@ -513,7 +564,18 @@ fn main() {
             }
             Ok(0)
         }),
+        "build-loadkeybag" => build_loadkeybag(&o).and_then(|req| {
+            print!("{}", describe_loadkeybag(&req)?);
+            if let Some(p) = &o.out {
+                fs::write(p, req).map_err(|e| format!("{} : {e}", p.display()))?;
+            }
+            Ok(0)
+        }),
         "check-createkeybag" => read_file(&o.file).and_then(|b| describe_createkeybag(&b)).map(|s| {
+            print!("{s}");
+            0
+        }),
+        "check-loadkeybag" => read_file(&o.file).and_then(|b| describe_loadkeybag(&b)).map(|s| {
             print!("{s}");
             0
         }),
@@ -541,11 +603,17 @@ fn main() {
             let (sev, seraw, sesnap) = setenv_verdict(&b[sks_ipc::OUT_SIZE..sks_ipc::OUT_SIZE * 2])?;
             print!("{}", describe_getcap_verdict(&gcv, gcraw));
             print!("{}", describe_setenv_verdict(&sev, seraw, &sesnap));
-            // Four records (allow_sks=5) → create_keybag + make_system_keybag verdicts.
+            // Four records → create_keybag (allow_sks=5) OR load_keybag (allow_sks=7, with --loadkeybag) +
+            // make_system_keybag verdicts.
             if b.len() >= sks_ipc::OUT_SIZE * 4 {
-                let (ckbv, craw, csnap) = createkeybag_verdict(&b[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3])?;
                 let (mskbv, mraw, msnap) = mskb_verdict(&b[sks_ipc::OUT_SIZE * 3..sks_ipc::OUT_SIZE * 4])?;
-                print!("{}", describe_createkeybag_verdict(&ckbv, craw, &csnap));
+                if o.loadkeybag {
+                    let (lkbv, lraw, lsnap) = loadkeybag_verdict(&b[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3])?;
+                    print!("{}", describe_loadkeybag_verdict(&lkbv, lraw, &lsnap));
+                } else {
+                    let (ckbv, craw, csnap) = createkeybag_verdict(&b[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3])?;
+                    print!("{}", describe_createkeybag_verdict(&ckbv, craw, &csnap));
+                }
                 print!("{}", describe_mskb_verdict(&mskbv, mraw, &msnap));
                 return Ok(if matches!(mskbv, MskbVerdict::MarkedSystem) { 0 } else { 1 });
             }

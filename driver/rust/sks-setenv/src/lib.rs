@@ -433,6 +433,65 @@ pub fn describe_mskb_verdict(v: &MskbVerdict, raw: u64, snap: &[u8]) -> String {
     s
 }
 
+/// Human description of a load_keybag request (J12, allow_sks=7; after the same check as the kernel gate).
+pub fn describe_loadkeybag(b: &[u8]) -> Result<String, String> {
+    let r = sks_keybag::check_loadkeybag(b).map_err(|e| format!("load_keybag refusé par la porte (identique au noyau) : {e}"))?;
+    let k = sks_ipc::cdhash_kind(&GetcapFields { ts_us: r.fields.ts_us, uniqueid: r.fields.uniqueid, uid: r.fields.uid, cdhash: r.fields.cdhash });
+    let mut s = String::new();
+    let _ = writeln!(s, "load_keybag ({:#x} o) — mot > EP 0x12 TAG 0x03 TYPE 0x03 PARAM 0 DATA {:#010x}", b.len(), sks_keybag::LKB_DATA);
+    let _ = writeln!(s, "  en-tête v2 ; 0x04 condensé v2 = {}", hex(&b[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN]));
+    let _ = writeln!(s, "  état 0 (const) ; handle_y {:#018x} (USERLAND, défaut 0) ; blob 0x10 o : uuid {} (USERLAND)", r.handle_y, hex(&r.uuid));
+    let _ = writeln!(s, "  J12 : load_keybag doit RENDRE un handle (réponse TAG 0x83, PARAM 0, OOL B +0x6c DÉDUIT) → chaîné dans make_system_keybag ; sinon REFUS (identité pré-existante requise — voir docs/sks_native_plan.md §11)");
+    let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", r.fields.ts_us, r.fields.uniqueid, r.fields.uid, hex(&r.fields.cdhash), cdhash_label(k));
+    s.push_str(&dump(b));
+    Ok(s)
+}
+
+/// Verdict of the load_keybag transaction (J12): RÉPONDU with the SEP handle (PARAM 0) or REFUS. Reuses
+/// `CreatekeybagVerdict`, but matches the reply as TYPE 0x03 via `is_loadkeybag_reply`.
+pub fn loadkeybag_verdict(rec: &[u8]) -> Result<(CreatekeybagVerdict, u64, Vec<u8>), String> {
+    let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement load_keybag illisible : {e}"))?;
+    let snap = snap.to_vec();
+    let v = match kind {
+        sks_ipc::OUT_NOT_SENT => CreatekeybagVerdict::NotSent,
+        sks_ipc::OUT_SILENCE => CreatekeybagVerdict::Silence,
+        _ => {
+            let w = Word::decode(raw);
+            let rw = sks_keybag::reply_word(&w);
+            if !sks_keybag::is_loadkeybag_reply(&w) {
+                CreatekeybagVerdict::Refus(format!("mot {raw:#018x} non apparié (EP/TAG bit 7/TYPE 0x03)"))
+            } else if rw.status != 0 {
+                CreatekeybagVerdict::Refus(format!("PARAM {} = statut signé ≠ 0", rw.status))
+            } else {
+                match sks_keybag::reply_handle(&snap) {
+                    Ok(h) => CreatekeybagVerdict::Handle(h),
+                    Err(e) => CreatekeybagVerdict::Refus(format!("handle illisible à +0x6c : {e}")),
+                }
+            }
+        }
+    };
+    Ok((v, raw, snap))
+}
+
+pub fn describe_loadkeybag_verdict(v: &CreatekeybagVerdict, raw: u64, snap: &[u8]) -> String {
+    let mut s = String::new();
+    match v {
+        CreatekeybagVerdict::NotSent => s.push_str("VERDICT sks load_keybag : NON ENVOYÉ (aucun mot load_keybag vers 0x12 ; uuid manquant ?)\n"),
+        CreatekeybagVerdict::Silence => s.push_str("VERDICT sks load_keybag : REFUS/SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03)\n"),
+        CreatekeybagVerdict::Handle(h) => {
+            let _ = writeln!(s, "VERDICT sks load_keybag : handle={h:#010x} (PARAM 0 ; lu à OOL B +0x6c, offset DÉDUIT ; cercle brisé → make_system_keybag chaîné) mot {raw:#018x}");
+        }
+        CreatekeybagVerdict::Refus(reason) => {
+            let _ = writeln!(s, "VERDICT sks load_keybag : REFUS ({reason} ; une identité pré-existante [postée par macOS] est peut-être requise — voir docs/sks_native_plan.md §11) mot {raw:#018x}");
+        }
+    }
+    if !matches!(v, CreatekeybagVerdict::NotSent) {
+        s.push_str("instantané de B12 (0x80 o) :\n");
+        s.push_str(&dump(snap));
+    }
+    s
+}
+
 /// Human description of a STANDALONE make_system_keybag request (J11, allow_sks=6): same gate/body as the chained one,
 /// but the ring word is TYPE 0x03 (3rd transaction, no create_keybag before it) and the `loaded_handle` (OOL 0x60) is
 /// a USERLAND value, NOT a kernel-plugged placeholder. The handle a standalone make_system should carry is UNKNOWN.
@@ -608,6 +667,30 @@ mod tests {
         assert!(matches!(mskb_std_verdict(&encode_outcome(OUT_REPLIED, bad, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Refus(_)));
         assert_eq!(mskb_std_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Silence);
         assert_eq!(mskb_std_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::NotSent);
+    }
+
+    #[test]
+    fn loadkeybag_build_describe_and_outcomes() {
+        // ARBITRARY example values — PAS les vraies (uuid/type inconnus, reversés sur le PC).
+        let uuid: [u8; UUID_LEN] = core::array::from_fn(|i| i as u8);
+        let lkb = sks_keybag::encode_loadkeybag(&keybag_fields(123, 0, 0, CdhashMode::Sha1), 0x4242, &uuid);
+        assert!(describe_loadkeybag(&lkb).is_ok());
+        assert_eq!(sks_keybag::check_loadkeybag(&lkb).unwrap().uuid, uuid);
+
+        // load_keybag reply PARAM 0 with a handle at OOL B +0x6c (TYPE 0x03).
+        let mut snap = [0u8; OUT_SNAP];
+        snap[sks_keybag::OFF_RESP_HANDLE..sks_keybag::OFF_RESP_HANDLE + 4].copy_from_slice(&0x0abc_def0u32.to_le_bytes());
+        let raw = 0x0010_0000_0003_8312u64; // TAG 0x83 TYPE 0x03 PARAM 0
+        let (v, _, _) = loadkeybag_verdict(&encode_outcome(OUT_REPLIED, raw, &snap)).unwrap();
+        assert_eq!(v, CreatekeybagVerdict::Handle(0x0abc_def0));
+        // PARAM 0xff → REFUS.
+        let refus = 0x0000_0000_ff03_8312u64;
+        assert!(matches!(loadkeybag_verdict(&encode_outcome(OUT_REPLIED, refus, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Refus(_)));
+        // A make_system reply (TYPE 0x04) must NOT be matched by the load_keybag verdict (matcher is TYPE-based).
+        let mskb_reply = 0x0000_0000_0004_8d12u64;
+        assert!(matches!(loadkeybag_verdict(&encode_outcome(OUT_REPLIED, mskb_reply, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Refus(_)));
+        assert_eq!(loadkeybag_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Silence);
+        assert_eq!(loadkeybag_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::NotSent);
     }
 
     #[test]

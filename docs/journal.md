@@ -14,6 +14,30 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent driver, ALARM) — J12 préparé : `load_keybag` (uuid → handle) puis `make_system_keybag` chaîné (allow_sks=7) — rien lancé
+- Trace : — (préparation hors-ligne ; rien chargé/envoyé au SEP, pas de sudo, pas de commit).
+- Fait : codé la voie J12 qui brise le cercle create/make_system (create_keybag 0x01 exige des données −0xb, make_system
+  standalone 0x0d exige un handle −0xb). L'op jamais testée = `load_keybag` (TAG fil 0x03) : uuid 16 o → handle rendu à
+  OOL B +0x6c (DÉDUIT), chaîné dans `make_system_keybag` (TYPE 0x04, le noyau pose le handle + recalcule le condensé,
+  comme allow_sks=5). Récupéré le code `load_keybag`+`finalize` du squelette J10 initial (git a9aadd0). Ajouté à
+  `sep-proto::sks_keybag` : `OP_LOAD_KEYBAG`/`LKB_*`, `encode_loadkeybag`/`check_loadkeybag`/`loadkeybag_word`/
+  `is_loadkeybag_reply`/`LoadkeybagGate` (frame 0x74 o : état 0, handle_y 0x58, blob{0x10, uuid 0x64}). Dans
+  `kmod/sep_native.rs` : niveau **allow_sks=7** (LkbPhase + portes dédiées, réponse appariée, run+finish load_keybag →
+  make_system chaîné réutilisé, read 4 enregistrements). Outil `sks-setenv` : `run --loadkeybag`, `build-loadkeybag`,
+  `check-loadkeybag`, `decode --loadkeybag` (uuid+type obligatoires, pas de --class). Docs sks_native_plan.md §11.
+- Vu : `cargo test` vert (sep-proto + sks-setenv), clippy propre (y c. `CLIPPY=1` sur le `.ko`). Requête `load_keybag`
+  d'exemple identique octet pour octet à une construction Python/hashlib indépendante (`scratchpad/lkbvec.py`, valeurs
+  « PAS les vraies » : ts 0x1122334455667788, uuid 00..0f, handle_y 0x4242… → condensé v2 `5fd02233027b4e0ab5d1197a292fcdcd`,
+  sha256 `0be85f870bd1271abc5d1578efa97b62ee5aa798c371e16fcd3d81cbc8602653`). Binaires `~/kbuild/j16` : sep_native.ko
+  `145d3ee150018f517958221d91f03d7ba01e32ef8684d24d3a3bc19e69c07e62`, sks_setenv
+  `842b89d6c3cd11ec6cf4ee0896de02ea23ab97fdb1643895a1078cd8d606463b` ; sepd/ovl/dtbo = copies j15 (sha256 inchangés).
+- Interprété : deux issues possibles au run — (a) handle rendu (PARAM 0) = cercle brisé, identité native sans macOS ;
+  (b) refus (PARAM ≠ 0) = identité pré-existante postée par macOS requise → prochaine étape = capture macOS. L'offset du
+  handle (+0x6c) et le placement de l'uuid restent DÉDUITS, à confirmer matériel.
+- Incidents : aucun. `pending/j12_sks_loadkeybag_chained.sh` préparé (dérivé de j11, allow_sks=7, exige UUID/TYPE,
+  STORE ≠ /var/lib/sepd, copie du store avant run, service désactivé requis). Classe neuve (load_keybag jamais émis) →
+  **1er run = « go » d'Albert**. SQUELETTE : rien ne tourne avant uuid + type.
+
 ## 2026-11-23 — Claude (agent reverseur, ALARM) — J10b décodé : `create_keybag` v4 rend −0xb = BadArgument (pas fv_data)
 - Trace : — (désassemblage hors-ligne, kernelcache 27.2.1 `macos/kc/`, capstone ; rien lancé, rien envoyé, pas de commit).
 - Fait : remonté la cause du refus −11 (0xf5) sur `create_keybag` TAG 0x01 variante 4 (logs 19:15
@@ -3296,3 +3320,15 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
   (normalement rendu par create/load) → testé à 0. Si le SEP exige un handle valide d'abord, le standalone REFUSERA,
   ce qui CONFIRMERAIT qu'une op préalable est obligatoire (→ mur, ou capture macOS). Classe/ordre neufs → 1er run = « go »
   d'Albert + reboot ; power-cycle = Albert.
+
+## 2026-11-23 19:58 — Albert + Claude (session ALARM) — J11 : make_system_keybag standalone refusé -11 (handle requis)
+- Go d'Albert, `pending/j11_sks_make_system_chained.sh … --uuid 4c494e5558…00 --type -10`. Logs `logs/20261123-195843_j11-sks-make-system-standalone/`.
+  Binaires `~/kbuild/j15` (sep_native.ko `8a395911…`).
+- VU : getcap/set_env ACCEPTÉS ; `> 0x12 TAG 0x0d (make_system_keybag) TYPE 0x03 DATA 0x00840000` (handle_y 0, handle chargé 0,
+  type -10, blob uuid 16 o, flag 0, condensé v2 OK) → **`< TAG 0x8d PARAM 0xf5` = -11 (-0xb, BadArgument)**. 0 SAVE, sbio VIVANT.
+- ⇒ make_system_keybag STANDALONE (handle 0) est aussi rejeté -0xb → il exige un **handle valide** préalable. Confirme le
+  « cercle » : create_keybag (0x01) exige des données (blob), make_system (0x0d) exige un handle. Les deux butent sur un
+  prérequis qu'on n'a pas en natif.
+- NON ENCORE TESTÉ : **load_keybag (TAG 0x03)** — l'op qui prend un uuid 16 o et est censée RENDRE un handle (§6). Jamais
+  lancée sur matériel (le squelette initial l'avait, on a pivoté vers create avant le 1er run). C'est le candidat « chaînon
+  manquant » : uuid → handle → make_system. Si load_keybag rend « not found » pour un uuid neuf → prérequis d'identité → capture macOS.
