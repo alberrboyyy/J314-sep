@@ -353,3 +353,96 @@ getcap/set_env). Drapeaux (ctx+0x1c) **restent 0** (ne JAMAIS poser le bit0 « c
 - **field2 (ctx+0x64)** et **handle_y (ctx+0x58)** pour un create à neuf : valeurs réelles **INCONNU** (posées par
   l'appelant Swift ; §7). 0 est le pari de départ, pas une certitude.
 - **class** : toujours la même INCONNU qu'en §7.2 (A..D = 1..4 plausibles ; capturer pour certitude).
+
+---
+
+## 9. `create_keybag` −11 (0xf5, variante 4) : cause et correction — `source: kext` (27.2.1, kernelcache `macos/kc/`)
+
+Ajout 2026-11-23 (session ALARM, agent reverseur, Opus 4.8, capstone, hors-ligne). Explique le refus matériel J10b
+(journal 19:15, `logs/20261123-191540_j10-sks-keybag-chained/`) : après correction en **variante 4** (§8.5), la requête
+`> 0x12 TAG 0x01 (create_keybag) TYPE 0x03 DATA 0x00800000`, OOL = variante 4 byte-exacte, handle_y=0, class=1,
+field2=0, **3 blobs vides + fv_data vide + u64 final 0**, drapeaux 0, condensé OK → `< TAG 0x81 TYPE 0x03 **PARAM 0xf5**` =
+**−11 / −0xb**, longueur 0, pas de handle. getcap + set_env ACCEPTÉS juste avant. Convention VU/DÉDUIT/INCONNU ;
+désassemblage seul, rien lancé. **Verdict : la variante 4 est bien décodée (plus de −0xd), le SEP rejette pour un code
+SÉMANTIQUE −0xb = "argument requis NUL / hors borne" (BadArgument). Ce n'est PAS fv_data (réfuté, VU).**
+
+### 9.1 −0xb = BadArgument (argument requis NUL ou hors borne) — VU (4 sites concordants)
+Dans le kext, le littéral `mov w*,#-0xb` apparaît à **4 endroits**, toujours **juste avant un test de nullité `cbz`**
+(ou une borne de longueur), jamais comme code de cadre/codec (le codec, lui, normalise en −1, §8.1) :
+- `_encode_list_merge_dict` @0xcffd38 : `cbz x0 → mov w0,#-0xb ; ret` (dictionnaire d'entrée NUL). VU.
+- `_encode_list_cstr_add_data` @0xd00284 : `mov w0,#-0xb` puis `cbz x20` (données NUL) **ou** `cmp x2,#0x10 ; b.hi`
+  (clé > 16 o) → −0xb. VU.
+- `_fv_import` @0xcf0208 / @0xcf02ec : `mov w23,#-0xb` suivi d'une rafale de `cbz x20/x21`, `ldr x8,[x24,#8] ; cbz`,
+  `cbz x24` (pointeurs/longueurs de blobs FileVault NULs). VU.
+- `__ZN13AppleKeyStore20pf_fv_derive_vek_keyE…` @0xcf2e78 : même motif. VU.
+→ **−0xb est le code AKS « un argument/pointeur requis est NUL (ou une longueur hors borne) »** (BadArgument). Pas de
+chaîne nommée pour ce code dans le kext (table d'erreurs→texte absente) ; le nom exact d'énum reste INCONNU, le
+**comportement** est VU. (À distinguer de −0xd = cadre indécodable, §8.1, et −1 = erreur générique normalisée.)
+
+### 9.2 Le −0xb vient de SEPOS, pas de l'AP — VU
+- Le mot de réponse porte `PARAM = 0xf5` ; l'AP lit PARAM en **int8 signé** et, s'il est ≠ 0, **rend ce code sans
+  décoder le corps** (§1.6.4 de `sks_protocol.md`). Donc −11 est littéralement l'octet PARAM **émis par le SEP**.
+- Côté AP, le chemin create n'a **aucune garde −0xb** : `create_keybag` @0xcc6904 est un stub mince (réarrange les args,
+  pose le flag 0x100 si `pin`, appelle `__ipc_create_keybag_v4` @0xcf9a34, puis **soumet** `blraa`), et le dispatch
+  userclient `kAppleKeyStoreKeyBagCreateWithData` @0xcd0844 ne fait que **logger** « *Create keybag failed: %d. Retrying* »
+  avec le code renvoyé par le SEP. **La logique de création (et sa validation sémantique) tourne dans SEPOS, absente de
+  ce binaire** ; −0xb n'y est donc **pas directement traçable**. VU (stub) + DÉDUIT (SEPOS).
+
+### 9.3 Ce n'est PAS fv_data — la variante 4 de macOS a elle-même fv_data VIDE — VU (réfute la piste "fv_data requis")
+Désassemblage complet du builder `__ipc_create_keybag_v4` @0xcf9a34 (ctx = `sp+0x38`) :
+- `ctx+0x50` = **4** (discriminant, const `__const` 0x7710098 = `04 00…`), `ctx+0x54`=0. VU (recoupe §8.3).
+- `ctx+0x60` = **w3 = class**, `ctx+0x64` = **w4 = arg9** (le dernier `int` de `create_keybag`). VU.
+- `ctx+0x58` = x2 = **arg1 (u64, handle_y)**. VU.
+- `ctx+0x68/+0x70` = **blob1 {ptr,len}** = (b1, l1) ; `ctx+0x78/+0x80` = **blob2** = (b2, l2). VU.
+- `ctx+0x88/+0x90` = **blob3**, `ctx+0x98/+0xa0` = **fv_data {ptr,len}**, `ctx+0xa8` = **u64 final** : remplis depuis des
+  emplacements de pile que **l'unique appelant met à 0** (blob3/fv_data/u64 jamais alimentés par `create_keybag`). VU.
+
+**Unique appelant de `create_keybag` = `kAppleKeyStoreKeyBagCreateWithData` @0xcd0844** (site @0xcd77e0 ; `callers`, VU).
+Là, b1/b2 = **charges d'OSData fournies par le client** (via vmethods +0x160 longueur / +0x198 octets), **NUL si absentes**
+(branches `cbz → str xzr`, VU). Donc **macOS lui-même, sur un create sans données, envoie une variante 4 avec blob3 +
+fv_data + u64 final VIDES** — exactement ce que J10b a émis pour ces champs. ⇒ **fv_data vide est légitime ; la "piste la
+plus probable" annoncée (fv_data = données FileVault requises en v4) est RÉFUTÉE (VU).**
+
+### 9.4 Qu'est donc l'argument NUL que le SEP exige ? — DÉDUIT (fort) + INCONNU (byte)
+−0xb est partout un **test de pointeur NUL** (`cbz`), rarement un scalaire 0. Or J10b a laissé **les deux blobs de données
+b1/b2 VIDES** (len 0, ptr effectif nul). L'opération est littéralement « **CreateWith**Data » et son unique appelant
+transporte des **OSData**. **Hypothèse la plus forte (DÉDUIT) : le moteur create de SEPOS exige au moins un blob de
+données non vide (b1 `ctx+0x68` ou b2 `ctx+0x78`) ; nos blobs nuls déclenchent un `cbz` → −0xb.** Candidats secondaires :
+- `ctx+0x64` (**arg9**) : dans le builder frère `__ipc_make_system_keybag_v1`, `+0x64` = **type de keybag** (contrainte
+  ≤ −10, §7). Si create partage ce rôle, un **type = 0** est un BadArgument classique. Scalaire, pas pointeur → moins
+  typique d'un `cbz`, mais plausible.
+- `ctx+0x58` (**handle_y = arg1**) = 0 : moins probable (0/−1 = « aucun » usuel).
+- `ctx+0x60` (**class = 1**) : non nul → ne tombe pas sur un `cbz`, le moins probable.
+**Lequel exactement = INCONNU au binaire AP** (moteur create = SEPOS, non lisible). Ni −0xd (cadre) ni politique ici :
+c'est un BadArgument sur un **champ qu'on a mis à 0/vide**.
+
+### 9.5 Conséquence d'architecture : `create_keybag` (0x01) ≠ création d'un keybag VIDE — DÉDUIT (fort)
+`create_keybag`/0x01 n'a qu'une entrée : **CreateWith**Data (import d'un blob de keybag fourni). La **création à neuf d'un
+keybag système vide** (SEP fabrique avec sa clé d'appareil) est, elle, **`make_system_keybag` (TAG 0x0d)**, dont le
+builder `__ipc_make_system_keybag_v1` envoie un **blob VIDE** (§6.3, `keybag_native_path.md` §1). ⇒ le plan J10
+(create_keybag 0x01 nu → handle → make_system 0x0d) a probablement **mal choisi la 1re op** : pour un keybag vide, 0x01
+n'est pas le bon verbe. (DÉDUIT ; cohérent avec « CreateWithData », l'unique appelant OSData, et −0xb = BadArgument sur
+données absentes.)
+
+### 9.6 Correction à tester — ordre de probabilité (le "byte-exact" et le repli)
+1. **PIVOT d'opération (recommandé n°1)** : ne pas re-taper `create_keybag`/0x01 à vide. Tester **`make_system_keybag`
+   (TAG fil 0x0d)** nu — c'est la **vraie op de création d'un keybag vide** (blob vide, SEP fabrique). Corps VU :
+   `+0x50`=1, `+0x58`=handle, `+0x60`/`+0x64`=scalaires (**type au +0x64, ≤ −10**), `+0x68/+0x70` blob VIDE, `+0x78` flag
+   (§6.3). L'entrée d'identité (op userclient 0x78) fournit l'**uuid 16 o**, le kext dérive le type (§7.1). Changement de
+   message, pas d'octet dans la trame create.
+2. **Si on reste sur `create_keybag`/0x01 (byte-exact, 1 mot)** : poser **`ctx+0x64` (OOL 0x64) = type de keybag non nul**
+   au lieu de 0 (candidat le plus net après les blobs) — p. ex. la valeur ≤ −10 du chemin système, ou un petit positif
+   1/2 à balayer. Un mot, OOL 0x64, petit-boutien. Probabilité moindre que (1) car −0xb vise surtout un pointeur NUL.
+3. **CAPTURE (seule certitude byte)** : lire sur le fil un `create_keybag` (0x01) **et** un `make_system_keybag` (0x0d)
+   **émis par macOS vivant** → valeurs réelles de `+0x58/+0x60/+0x64` et des blobs. Le moteur create étant dans SEPOS,
+   c'est la seule source VU directe des arguments attendus.
+4. **Mur honnête** : la validation sémantique de create vit dans **SEPOS, non lisible dans ce kernelcache**. On sait
+   **quoi** (BadArgument, VU) mais pas **quel champ** avec certitude byte. La capture (3) ou le pivot (1) tranchent ;
+   toute écriture 0x12 = classe neuve → go d'Albert ; power-cycle = Albert.
+
+### 9.7 Points ouverts (honnêtes)
+- **Quel argument exactement** déclenche −0xb (blob b1/b2 ? type +0x64 ? handle +0x58 ?) : **INCONNU au binaire AP**
+  (moteur SEPOS). DÉDUIT = blob de données requis (op « WithData », −0xb = NUL-check).
+- **Nom d'énum de −0xb** : non trouvé (pas de table code→texte dans le kext). Comportement = BadArgument, VU.
+- **`make_system_keybag` acceptera-t-il un keybag vide forgé par Linux** (politique SEP d'enrôlement) : toujours INCONNU,
+  matériel uniquement (§5).

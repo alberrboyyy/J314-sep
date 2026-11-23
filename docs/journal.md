@@ -14,7 +14,22 @@ Format :
 
 ---
 
-## 2026-11-23 — Claude (agent driver, ALARM) — J10 : SQUELETTE voie identité `load_keybag` + `make_system_keybag` (`allow_sks=5`), non lançable
+## 2026-11-23 — Claude (agent reverseur, ALARM) — J10b décodé : `create_keybag` v4 rend −0xb = BadArgument (pas fv_data)
+- Trace : — (désassemblage hors-ligne, kernelcache 27.2.1 `macos/kc/`, capstone ; rien lancé, rien envoyé, pas de commit).
+- Fait : remonté la cause du refus −11 (0xf5) sur `create_keybag` TAG 0x01 variante 4 (logs 19:15
+  `logs/20261123-191540_j10-sks-keybag-chained/`). Désassemblé le builder `__ipc_create_keybag_v4` @0xcf9a34, le stub
+  `create_keybag` @0xcc6904, son unique appelant `kAppleKeyStoreKeyBagCreateWithData` @0xcd0844, et les 4 sites du
+  littéral `−0xb`. Livré docs/applekeystored_identity.md §9.
+- Vu : `−0xb` apparaît dans `_encode_list_merge_dict`/`_encode_list_cstr_add_data`/`_fv_import`/`pf_fv_derive_vek_key`,
+  **toujours juste avant un `cbz` de pointeur NUL** (ou une borne de longueur) → `−0xb` = « argument requis NUL/hors
+  borne » (BadArgument), distinct de −0xd (cadre, §8.1) et −1 (générique). Le builder v4 : `ctx+0x50`=4, `+0x60`=class,
+  `+0x64`=arg9, `+0x58`=handle_y, blob1/blob2 depuis les args, **blob3+fv_data+u64 final toujours mis à 0 par l'unique
+  appelant** → macOS aussi envoie fv_data VIDE sur un create nu. `create_keybag` (0x01) n'a qu'une entrée : CreateWithData.
+- Interprété : fv_data requis = **réfuté** (VU). −0xb = BadArgument émis par SEPOS (PARAM int8, moteur create non lisible
+  dans l'AP). Hypothèse forte : le SEP exige un **blob de données non vide** (b1/b2) qu'on a laissé vide ; candidat
+  secondaire = type au `+0x64`=0. `create_keybag`/0x01 ≠ création d'un keybag VIDE → la vraie op vide est
+  `make_system_keybag` (0x0d, blob vide). Hypothèses → docs/applekeystored_identity.md §9.4-§9.6.
+- Incidents : —
 - Trace : — (préparation hors-ligne ; rien chargé/installé/envoyé au SEP ; pas de sudo ; pas de commit).
 - Fait : codé la voie identité d'appareil à partir de `docs/keybag_native_path.md` § J10 (gabarits VU 27.2.1) et
   `docs/sks_protocol.md` §1.6/§1.7 (en-tête IPC v2 + condensé, infra réutilisée) :
