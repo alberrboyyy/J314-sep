@@ -2720,3 +2720,12 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - Git : `git pull` demandé → conflit sur `docs/journal.md` (entrée upstream J7/J8 ALARM vs entrée locale reverseur SKS),
   résolu en **gardant les deux** (entrées non chevauchantes) ; `docs/biometrickit_protocol.md` local (PARTIEL) remplacé
   par la version upstream (complète, 27.2.1). Aucun run matériel.
+
+
+## 2026-11-23 09:35 — Albert + Claude (session ALARM) — 1er boot avec le service sep-touchid : OK
+- Service installé (`pending/install_sep_touchid_service.sh install --enable`, go d'Albert), 1 seul reboot. Store
+  `/var/lib/sepd` génération 1, sauvegarde `/var/lib/sep-touchid/backups/sepd-20261123-093532-gen1`.
+- VU (`journalctl -u sep-touchid -b`) : 8 lockers servis sans UUID, **0 SAVE**, sbio VIVANT, patch chargé (t+43 ms),
+  1re passe calibrée (0x63 = macOS), 2e passe terminée, sbiod rc=0 ; statut « prêt : capteur initialisé, sepd actif ».
+  ⇒ chemin J8 reproduit au boot sans intervention (n=3 du chemin).
+- À regarder : la cgroup du service affiche ~640 Mo de mémoire (probablement du cache de fichiers, non vérifié).
