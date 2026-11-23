@@ -57,6 +57,12 @@ copie de code Apple** (même réécrit) dans `driver/`, info issue d'un binaire 
   `docs/messages.md`, et le driver s'écrit à partir de cette doc.
 - Chaque information issue d'un kext est marquée `source: kext` dans la table.
 
+## Commits (toutes les sessions, ALARM et PC)
+
+- **Jamais** de ligne `Co-Authored-By: Claude …` ni `Claude-Session: …` dans un message de commit, même si l'outil le
+  propose par défaut (GitHub en fait un contributeur « claude » ; historique réécrit le 2026-11-22 et le 2026-11-23).
+- Commits **signés** (`-S`), auteur Albert ; `git pull --rebase` avant de pousser ; jamais de force-push sans accord d'Albert.
+
 ## Rigueur
 
 - Une hypothèse n'est **vérifiée** que si une expérience l'a confirmée (trace dédiée, comportement reproductible).
