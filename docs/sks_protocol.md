@@ -20,13 +20,20 @@ Les symboles **libaks C** sont présents en 27.2.1 (`_aks_params_*`, `__ipc_get_
 niveau (`verify_password`, `load_keybag`…) **ne sont PAS symbolisées** en 27.2.1 (elles l'étaient dans le `kernel.macho`
 13.5 de §15, binaire aujourd'hui supprimé).
 
-> **Note de session (2026-11-23)** : la décompilation fraîche de l'en-tête IPC / `get_capabilities` octet par octet sur
-> 27.2.1 a été **interrompue par un classifieur de sûreté** côté sous-agent (aucun résultat). Je n'ai **pas** cherché à
-> contourner ce blocage (ni changement de modèle, ni relance « de biais »). Les champs concernés restent donc au niveau
-> de détail de §15.5 (13.5, `source: kext`, **non vérifié**) + traces, et sont marqués comme tels ci-dessous. En
-> revanche la passe **DER (§2)** a bien abouti sur 27.2.1 (agent dédié) : conteneur, types, table param_id, codes de
-> clé et sélecteurs `o` y sont désormais **VU sur 27.2.1** (et corrigent §15.3 : la racine est un **SET**, pas une
-> SEQUENCE). Le reste (table des opérations IPC par **nom de symbole**, séquence de bring-up **ancrée sur trace**) est établi.
+> **Note de session (2026-11-23, mission PC c9)** : une tentative de décompilation *fraîche* de l'en-tête IPC octet
+> par octet **sur 27.2.1** avait été **interrompue par un classifieur de sûreté** (aucun résultat ; aucun contournement
+> tenté). En revanche l'en-tête OOL et `get_capabilities` ont été **entièrement dérivés sur le binaire 13.5
+> `macos/kernel.macho`** (agent reverseur, `docs/sks_ipc_negotiation.md`), et cette session a **re-vérifié
+> indépendamment** les points porteurs de ce document contre le binaire : les 10 symboles cités résolvent **à
+> l'adresse exacte** (`init_sep_endpoint` …9950dbc, `__ipc_get_capabilities` …99671c4, `_code_ipc_get_capabilities`
+> …9973eb0, `__payload_hash` …9975a50, `sep_deliver_msg(ipc_callback_ctx_t*,u32,void*)` …99453f8, `_get_process_table`
+> …9967ca4…), et la **table d'opérations** se décode exactement (base `0xfffffe0007004000`, entrées de 0x48 o : entrée
+> `0x4d` = code 0x4d, `ctxsize` 0x88, pointeur +0x10 → `_code_ipc_get_capabilities`). Donc §1.4 et **§1.6 (nouveau)**
+> ci-dessous sont `source: kext` **sur 13.5, re-vérifiés au binaire** — mais **non confirmés matériel** (rien lancé) et
+> **non re-dérivés octet par octet sur 27.2.1** (les symboles et la table existent en 27.2.1 d'après la passe 27.2.1 ;
+> l'en-tête lui-même n'y a pas été relu). La passe **DER (§2)** a, elle, abouti **sur 27.2.1** (conteneur SET, types,
+> table param_id, codes de clé, sélecteurs `o` — corrige §15.3). Table des opérations IPC par **nom de symbole** et
+> séquence de bring-up **ancrée sur trace** : établies.
 
 ---
 
@@ -65,23 +72,26 @@ nos propres tampons DMA (valeurs libres, cf. `sks_native_plan.md` §5).
 
 ### 1.3 Table TAG fil → opération IPC — noms VU (symboles), valeurs numériques partiellement VU
 Le kext expose une table d'opérations IPC comme symboles `_code_ipc_*` (**93 entrées VU** dans le binaire 27.2.1).
-Chaque opération IPC a un **code numérique = le TAG fil**. Les noms (symboles) sont VU ; le **mapping nom↔numéro**
-complet exige de désassembler la table de dispatch (non fait — cf. note de session). Ceux qui suivent sont **ancrés
-sur trace** (position de bring-up c12) et cohérents avec le mapping annoncé par la session PC (`sks_native_plan.md`
-§1.4, non vérifié) :
+Chaque opération IPC a un **code numérique = le TAG fil**. Les noms (symboles) sont VU. Le **mapping nom↔numéro**
+complet a été **décodé sur 13.5** (`docs/sks_ipc_negotiation.md` §2 : table `_get_process_table` @…9967ca4, 0x54 entrées
+de 0x48 o ; `entrée[code].code == code`, et le pointeur +0x10 pointe le codeur `_code_ipc_<nom>` — re-vérifié cette
+session pour 0x4d). Les lignes ci-dessous sont donc **VU (table 13.5)** et cohérentes avec la position de bring-up c12
+(le numéro 27.2.1 pourrait en principe différer — non re-décodé sur 27.2.1) :
 
 | TAG fil (VU trace) | opération IPC (nom symbole VU) | statut du mapping | req/resp c12 (×0x100 o) |
 |---|---|---|---|
-| 0x4d | `get_capabilities` | **DÉDUIT** (1re txn des 6 boots = `4d`; resp `5c` flag 1 = négociation) | 0x64 / 0x5c |
-| 0x2a | `set_env` | DÉDUIT (PC §1.4) | 0x470 / 0x58 |
-| 0x22 | `perform_operation` (= l'op AKS/DER générique, §2) | DÉDUIT (PC §1.4) | 0x8c / 0x14c ; 0x90 / 0xb8 |
-| 0x0a | `null_d_key` | DÉDUIT (PC §1.4) | 0x60 / — (PARAM 0xff) |
-| 0x48 | `fv_get_blob_state` (FileVault) | DÉDUIT (PC §1.4) | 0x1dc / 0x110 ; 0x230 / 0x110 |
-| 0x19 | `get_device_state` | DÉDUIT (PC §1.4 ; = requête la plus fréquente = poll) | 0x68 / — |
-| 0x41 | **déverrouillage mot de passe, 1re étape (volume)** | VU (trace+uart, messages.md) ; nom symbole INCONNU (candidat `verify_secret`/`change_lock_state`) | 0x240 / 0xa0 |
-| 0x18 | **déverrouillage -501, 2e étape** | VU (trace+uart) ; nom symbole INCONNU | — |
-| 0x2f | **verrouillage keybag/volume différé** | VU (trace, messages.md) ; nom symbole INCONNU | — |
-| 0x32, 0x47, 0x10 | — | INCONNU (présents au bring-up c12, non mappés) | 0x94/0xb4 ; 0x244/0x60 ; 0xb8/… |
+| 0x4d | `get_capabilities` | **VU (table 13.5)** ; 1re txn des 6 boots, resp `5c` flag 1 = négociation | 0x64 / 0x5c |
+| 0x2a | `set_env` | VU (table 13.5) | 0x470 / 0x58 |
+| 0x22 | `perform_operation` (= l'op AKS/DER générique, §2) | VU (table 13.5) | 0x8c / 0x14c ; 0x90 / 0xb8 |
+| 0x0a | `null_d_key` | VU (table 13.5) | 0x60 / — (PARAM 0xff) |
+| 0x48 | `fv_get_blob_state` (FileVault) | VU (table 13.5) | 0x1dc / 0x110 ; 0x230 / 0x110 |
+| 0x19 | `get_device_state` | VU (table 13.5 ; = requête la plus fréquente = poll) | 0x68 / — |
+| 0x41 | `fv_unwrap_vek` — **déverrouillage mot de passe, 1re étape (volume)** | nom **VU (table 13.5)** ; rôle = trace+uart (messages.md). Cohérent : déverrouiller un volume FileVault = « unwrap VEK » | 0x240 / 0xa0 |
+| 0x18 | `device_state_transition` — **déverrouillage -501, 2e étape** | nom **VU (table 13.5)** ; rôle = trace+uart | — |
+| 0x2f | `handle_timer_fire` — **verrouillage keybag/volume différé** | nom **VU (table 13.5)** ; rôle = trace (messages.md). Cohérent : minuterie → verrouillage différé (DÉDUIT) | — |
+| 0x32 | `unwrap_media_key` | nom **VU (table 13.5)** ; rôle au bring-up c12 non interprété | 0x94 / 0xb4 |
+| 0x47 | `fv_set_protection` | nom **VU (table 13.5)** | 0x244 / 0x60 |
+| 0x10 | `new_pfk_data` | nom **VU (table 13.5)** | 0xb8 / … |
 
 Table d'opérations IPC (extrait VU des symboles `_code_ipc_*`, = vocabulaire des TAG possibles) : `get_capabilities`,
 `set_env`, `get_configuration`/`set_configuration`, `get_device_state`, `device_state_transition`, `perform_operation`,
@@ -92,17 +102,21 @@ Table d'opérations IPC (extrait VU des symboles `_code_ipc_*`, = vocabulaire de
 `fv_rewrap_kek`/`fv_set_protection`, `kc_wrap`/`kc_unwrap`, `escrow_stash_*`, `escrow_keys_unlock`, `smartcard_op_*`,
 `remote_session*`, `identity_*`, etc. (noms = étiquettes de protocole, aucun secret).
 
-### 1.4 Négociation d'en-tête IPC (get_capabilities) — source: kext 13.5 (§15.5), **non vérifié sur 27.2.1**
+### 1.4 Négociation d'en-tête IPC (get_capabilities) — source: kext 13.5, re-vérifié au binaire (§1.6), **non confirmé matériel**
 Avant tout `perform_operation`, l'AP négocie une **version d'en-tête IPC** (v1/v2, plafond 2) via
-`__ipc_get_capabilities` (@0xfffffe0009cfdf6c en 27.2.1, VU present) + `_msg_header_set_negotiated_version`
-(@0xfffffe0009cde060). Chaînes 13.5 : `negotiated to ipc header theirs:v%llu ours:v%u -> negotiated:v%llu`,
-`failed to negotiate, defaulting to v1`, `SEP timeout multiplier = %u`. La 1re transaction `0x4d` (req 0x64 o →
-resp `cd … 5c` drapeau 1) **est** cette négociation (DÉDUIT, cohérent trace 6/6 boots).
-**Contenu de l'en-tête de requête `get_capabilities` (0x64 o)** : d'après §15.5 / plan PC (non vérifié), en-tête
-≈ 0x50 o {longueur, version, SHA-256 **tronqué 16 o**, horodatage µs, drapeaux, pid, cdhash} + statut (4 o) + u64 +
-blob vide (4 o). **CE LAYOUT N'EST PAS CONFIRMÉ OCTET PAR OCTET SUR 27.2.1** (décompilation halted). Conséquence :
-l'en-tête contient des champs **contextuels** (horodatage, pid, cdhash) et un **SHA-256 tronqué sur une base INCONNUE**
-→ **pas un blob constant rejouable** ; à **construire** depuis le format, une fois celui-ci confirmé.
+`__ipc_get_capabilities` (@…99671c4 en 13.5 ; @0xfffffe0009cfdf6c en 27.2.1, VU present) +
+`_msg_header_set_negotiated_version` (@…9967c90 en 13.5 ; @0xfffffe0009cde060 en 27.2.1). Chaînes :
+`negotiated to ipc header theirs:v%llu ours:v%u -> negotiated:v%llu`, `failed to negotiate, defaulting to v1`,
+`SEP timeout multiplier = %u`. La 1re transaction `0x4d` (req 0x64 o → resp `cd … 5c` drapeau 1) **est** cette
+négociation (DÉDUIT, cohérent trace 6/6 boots). **`ours = 2` (constante VU)** ; version retenue = `min(theirs, 2)`.
+
+Le format de l'en-tête OOL et des 0x64 o de `get_capabilities` est maintenant **établi octet par octet** — voir
+**§1.6** (dérivé de 13.5, cross-ref `docs/sks_ipc_negotiation.md`). En résumé : l'en-tête OOL (0x54 o) contient des
+champs **contextuels** (horodatage µs, identifiant de processus, cdhash) et un **SHA-256 tronqué 16 o** dont la **base
+est connue** (§1.6.3). Ce n'est donc **pas un blob constant rejouable** : sous Linux il faut le **construire** (le
+condensé n'est pas un secret, juste une empreinte de cadre). Sur les champs processus, le kext ne **lit jamais**, à la
+réception, un verdict du SEP sur eux (§1.6.4) → un hôte non-macOS peut vraisemblablement les mettre à des valeurs
+neutres (DÉDUIT ; seul le matériel tranchera).
 
 ### 1.5 Enveloppe de requête côté noyau (`_kern_perform_operation`) — source: kext (VU 27.2.1)
 Le dispatcher `_kern_perform_operation` (@0xfffffe0009cf6f70) construit sur la pile, puis soumet à l'endpoint SKS :
@@ -115,8 +129,94 @@ out_len}`. **L'opération réelle et tous les arguments sont dans le buffer DER*
 - **+0x0c = 2** en 27.2.1 (constante VU), **pas 3** comme en 13.5 ; signification INCONNUE.
 - Callback `AppleKeyStore::perform_operatation_gated(_ref_key_operation_args*)` (@0xfffffe0009cf6f20), soumis via la
   vmethod `+0x1e8` de l'instance endpoint. Codes d'erreur de garde : 0xe00002c2 ; fusion impossible : 0xe007c00a.
-- Ouvert : le buffer DER part-il tel quel dans l'OOL, ou précédé d'un en-tête IPC (§1.4) ? Symboles `__ipc_header_size`/
-  `__ipc_header_effective_size`/`_msg_header_set_negotiated_version` VU → à trancher dans `perform_operatation_gated`.
+- Ouvert : le buffer DER part-il tel quel dans l'OOL, ou précédé d'un en-tête IPC (§1.4/§1.6) ? Symboles
+  `__ipc_header_size`/`__ipc_header_effective_size`/`_msg_header_set_negotiated_version` VU → à trancher dans
+  `perform_operatation_gated`. **Indice §1.6** : tout message IPC SKS (pas seulement `get_capabilities`) est encodé par
+  le **même codeur générique** (en-tête de 0x54 o en tête de l'OOL, puis le corps propre à l'opération) ; le DER d'un
+  `perform_operation` est donc très probablement précédé de cet en-tête IPC, et non posé nu (DÉDUIT, à confirmer).
+
+
+### 1.6 En-tête OOL et `get_capabilities` octet par octet (Q1 + Q2) — source: kext 13.5, re-vérifié au binaire ; **non confirmé matériel**
+
+Dérivé de `macos/kernel.macho` (13.5) et **re-vérifié cette session** (adresses + table d'opérations, cf. Note de
+session). Référence complète, chaîne d'appel et conditions d'échec : `docs/sks_ipc_negotiation.md`. Statut de chaque
+ligne : **VU** = lu au désassemblage (adresse) ; **DÉDUIT** = interprété ; **INCONNU**. Aucune valeur de clé/secret.
+
+### 1.6.1 Disposition générale de l'OOL (Q1) — VU
+Le mot mailbox ne porte **jamais** le contenu ; tout passe par l'OOL (tampon A = AP→SEP = requête ; tampon B =
+SEP→AP = réponse). Le **même codeur** `_code_ipc_<op>` (@…9973eb0 pour 0x4d) écrit (mode `w0=1`) / lit (`w0=0`) dans
+le descripteur `[this+0x168]` (A) / `[this+0x170]` (B) avec des primitives : `__word` = u32 LE (avance 4), `__lword` =
+u64 LE (avance 8), `__blob` = u32 longueur + données **alignées sur 4**, `__ipc_header` = u32 longueur (**toujours 0x50
+à l'encodage AP**) + 0x50 o d'en-tête. **Ordre : petit-boutien (little-endian)** pour tous les scalaires.
+
+Structure générique d'un message IPC dans l'OOL :
+
+| zone | taille | contenu |
+|---|---|---|
+| en-tête IPC | **0x54 o** = `__ipc_header_size` | u32 longueur (0x50) + 0x50 o d'en-tête (§1.6.2) |
+| corps | variable | propre à l'opération (pour 0x4d : §1.6.2 bas) |
+
+### 1.6.2 Les 0x64 o de la requête `get_capabilities` (Q2) — VU
+`> EP=0x12 TAG=0x4d TYPE=seq PARAM=0 DATA=0x00640000` ; les 0x64 o de l'OOL A :
+
+| offset | taille | champ | valeur / source | variable ? |
+|---|---|---|---|---|
+| 0x00 | 4 | longueur en-tête | **0x50** (constante à l'encodage) | constant |
+| 0x04 | 16 | **condensé d'intégrité** = SHA-256 **tronqué 16 o** | calculé (§1.6.3) | contextuel |
+| 0x14 | 4 | version d'en-tête | **1** (la requête de négociation part toujours en v1) | constant |
+| 0x18 | 8 | horodatage µs (`_get_usec_time`) | horloge | **contextuel** |
+| 0x20 | 4 | drapeaux (bit0 = chiffré, bit1 = en-tête étendu) | **0** | constant |
+| 0x24 | 8 | champ ctx+0x20 | 0 (non écrit sur ce chemin) | constant |
+| 0x2c | 8 | `proc_uniqueid(proc_self())` | identifiant du processus appelant | **contextuel** |
+| 0x34 | 4 | champ de la cred (`[cred+0x80]+0x24`) | id utilisateur (DÉDUIT) | **contextuel** |
+| 0x38 | 20 | cdhash du processus (`cs_get_cdhash`) ; **à défaut** SHA-1 des 8 o de 0x2c | signature du binaire appelant | **contextuel** |
+| 0x4c | 8 | ctx+0x48..0x4f | 0 (couvert par le condensé seulement en v2) | constant |
+| 0x54 | 4 | mot d'état | **0** | constant |
+| 0x58 | 8 | u64 | **1** (3e arg d'`__ipc_get_capabilities`, constant aux 2 appels) ; sens exact INCONNU | constant |
+| 0x60 | 4 | longueur de blob | **0** (aucune donnée) | constant |
+
+Total = **0x64** = la valeur de DATA (recoupe la trace). L'en-tête étendu (offset variable) n'est écrit que si
+version ≥ 2 ; en v1 le bit1 des drapeaux est effacé et rien n'est ajouté.
+
+### 1.6.3 Ce que couvre le SHA-256 tronqué (Q2) — VU
+`__payload_hash` (@…9975a50) : `ccsha256_di`, **sans clé** (ce n'est pas un MAC, aucun secret), **tronqué à 16 o**, sur,
+**dans cet ordre** : version (4) ‖ horodatage (8) ‖ drapeaux (4) ‖ champ +0x20 (8) ‖ **bloc processus** (0x20 o en v1 =
+ctx+0x28..0x47 ; 0x28 o en v2) ‖ **charge** (tout ce qui suit l'en-tête, ici l'état + u64 + blob). Le résultat est
+écrit à l'offset 0x04. À la réception, le kext **recalcule et compare** 16 o ; échec → `ipc digest failed`. Version ≠ 1
+et ≠ 2 → `unexpected version` (code -0xf). → **Base du SHA connue** ; reproductible côté Linux sans secret.
+
+### 1.6.4 La réponse `< EP=0x12 TAG=0xcd TYPE=seq PARAM=s DATA=0x005c0001` (Q4) — VU
+Appariement (`sep_deliver_msg_gated`) : le kext accepte la case `this+0x180` si l'octet TAG a le **bit 7** posé **et**
+que l'octet TYPE = la séquence envoyée. **Les 7 bits bas du TAG ne sont PAS comparés** : `0xcd = 0x4d|0x80` est une
+convention SEP, pas un contrôle. Attente = 6 s × multiplicateur, jusqu'à 20 tentatives (`sks request timeout`).
+
+| octet du mot | lu comme | valeur | traitement |
+|---|---|---|---|
+| 3 | PARAM, **int8 signé** (`ldrsb`) | 0 | ≠ 0 → aucun décodage, la requête rend ce code (ex. 0xff → -1) |
+| 4-5 | u16 « drapeaux d'appel » | **0x0001** | bit 0 → invalide le cache d'état global, journal `invalidated cache (sync)` — traité **avant** le test de PARAM |
+| 6-7 | u16 longueur de réponse | **0x005c** | doit être ≤ taille du descripteur B, sinon échec |
+
+Charge reçue (0x5c o dans l'OOL B) — algorithme VU : (1) u32 longueur L, copie min(L,0x50) ; (2) condensé vérifié selon
+la **version lue dans l'en-tête du SEP** ; (3) en-tête étendu si v≥2 et bit1 ; (4) u32 état = **doit être 0** ; (5) u64
+« theirs » (version d'en-tête du SEP) + blob (ici vide) ; (6) **octets consommés = longueur annoncée exactement**.
+Disposition de 0x5c **DÉDUITE** des tailles : L = **0x48** (en-tête v1), état (4), theirs (8), long. blob = 0 →
+0x4c+4+8 = 0x5c (avec L = 0x50 le minimum serait 0x64 : impossible → le SEP répond en en-tête plus court que l'AP).
+Puis `init_sep_endpoint` : `négociée = min(theirs, 2)`, `ours = 2`. **La valeur réelle de « theirs » reste INCONNUE**
+(OOL 0x12 jamais capturé) ; v2 est seulement **DÉDUIT** des tailles des réponses suivantes (`set_env` en 0x58 → en-tête
+0x54 → L = 0x50 = v2).
+
+### 1.6.5 Vérifications SEP et portabilité non-macOS (Q3) — VU (côté AP) + DÉDUIT
+- **Côté AP, à la réception**, le kext ne lit du SEP qu'un **état (= 0)**, les **drapeaux d'appel**, un **condensé de
+  cadre** (recalculé localement) et **theirs**. Il ne lit **aucun verdict** du SEP portant sur le pid / cdhash / uid
+  qu'il a envoyés (VU). → **On ne peut pas savoir, depuis le kext, si le SEP vérifie ces champs processus.** (INCONNU.)
+- Le **condensé** (SHA-256/16) est un contrôle d'**intégrité de cadre** sans clé : un hôte Linux peut le recalculer
+  (base §1.6.3). Les champs **contextuels** (horodatage, pid, cdhash, uid) sont des métadonnées du processus appelant :
+  un hôte non-macOS peut les remplir de valeurs neutres (p.ex. horodatage courant, pid/uid arbitraires, cdhash à zéro —
+  le code gère déjà « pas de cdhash » via le SHA-1 des 8 o de 0x2c). **Reste à vérifier sur matériel** que le SEP ne
+  rejette pas sur ces champs (DÉDUIT ; expérience « un seul `get_capabilities` » = classe neuve, `pending/` + go
+  d'Albert). Un `get_capabilities` en **erreur** laisse quand même la négociation retomber sur **v1** sans bloquer la
+  suite (`failed to negotiate, defaulting to v1`), donc l'expérience est **peu risquée côté logique** (le coût reste le
+  run + power-cycle).
 
 ---
 

@@ -857,6 +857,12 @@ candidats « verrouiller/déverrouiller le keybag, créer/charger/utiliser une c
 
 ### 15.8 Points ouverts (honnête)
 
+> **2026-11-22 (agent reverseur) — mise à jour : voir `docs/sks_ipc_negotiation.md`.** Points 1, 3 et 5 ci-dessous
+> levés (`source: kext`, VU) : mot mailbox 0x12 = `TAG = code IPC & 0x7f` (table de 0x54 opérations à `0x7dbda70`,
+> 0x4d = get_capabilities, 0x2a = set_env, 0x22 = perform_operation…), `TYPE` = séquence u8 (`this+0x188`, init 1),
+> `DATA = longueur OOL << 16 | drapeaux` ; réponse = bit 7 du TAG + même TYPE, PARAM = statut signé. Correction du
+> §15.1 : `sep_deliver_msg` (`0x99453f8`) est le chemin d'**envoi** (requête + attente), la réception est `sep_action`.
+
 1. **Mot mailbox 0x12 exact** : TYPE=compteur / DATA=longueur vient des traces (`messages.md`), **pas ré-dérivé**
    dans ce kext (l'encodage est dans la classe endpoint d'`AppleSEPManager`, méthode `+0x1e8` du singleton
    `globals+0x81b8`) — à décompiler côté `AppleSEPManager` pour le confirmer octet par octet.

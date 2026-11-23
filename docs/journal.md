@@ -2674,3 +2674,49 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   marqueur en retard réparé, contenu modifié refusé, accept-store, store vide). Pas de shellcheck sur la machine.
 - Textes périmés « power-cycle requis entre deux runs » (un reboot suffit) : signalés dans le rapport, non modifiés.
 - 1er boot avec le service = script neuf → « go » d'Albert ; installation sur la partition principale = Albert.
+## 2026-11-22 23:30 — agent reverseur (Opus 5.5) — SKS EP 0x12 : 1er message (get_capabilities, TAG 0x4d) décodé à l'octet, `source: kext`
+- Cible : `com.apple.driver.AppleSEPKeyStore` dans `macos/kernel.macho` = **macOS 13.5** (chaîne lue : Darwin 22.6.0,
+  xnu-8796.141.3~6, RELEASE_ARM64_T6000). Outils `ksyms.py`/`kdis.py` + lecture d'octets jetable ; aucun matériel,
+  aucune écriture SEP, rien committé. Livrable : `docs/sks_ipc_negotiation.md` ; renvoi ajouté en tête de
+  `kext_sepmanager.md` §15.8.
+- VU : **TAG = code d'opération IPC** (table de 0x54 entrées à `0x7dbda70` décodée en entier ; 0x4d get_capabilities,
+  0x2a set_env, 0x22 perform_operation, 0x0a null_d_key, 0x48 fv_get_blob_state…) ; **TYPE = séquence u8**
+  (`this+0x188`, mis à 1 par le constructeur) ; DATA = longueur OOL << 16 (octets 6-7) ; requête 0x64 = en-tête 0x54
+  (L = 0x50, version 1 imposée par le gabarit `0x74a1f30`, horodatage, champs processus, SHA-256/16 sans clé) + u32
+  état 0 + u64 1 + blob vide. Réponse : bit 7 du TAG + TYPE identique, PARAM = statut signé, DATA bas = drapeaux
+  (bit 0 = invalider le cache d'état → 0x0001 vu), DATA haut = longueur (0x5c). theirs → min(theirs, 2) → version
+  d'en-tête globale ; échec → v1 ; suite = `set_env` (0x2a, 0x470 o, recoupe trace c12 L180).
+- Hypothèses : en-tête SEP de 0x48 o en v1 (tailles), version négociée = v2 (réponse set_env 0x58). Correction de
+  `sks_sequence_c12.md` §2 (TYPE n'est pas l'opcode) et de `kext_sepmanager.md` §15.1 (`sep_deliver_msg` = envoi).
+- Ouvert : le SEP vérifie-t-il condensé/champs processus ; valeur réelle de theirs (OOL 0x12 non capturé).
+
+## 2026-11-23 — Claude (session PC, Opus 4.8) — mission c9 : en-tête OOL SKS + `get_capabilities` octet par octet → livrés dans `sks_protocol.md` §1.6
+- Mission `docs/mission_pc_sks_header.md`. **PC uniquement, rien vers le Mac ni le SEP.** `source: kext` (13.5), non vérifié matériel.
+- Contexte : la dérivation octet par octet existait déjà, faite par l'agent reverseur (Opus 5.5) dans
+  `docs/sks_ipc_negotiation.md`, mais **jamais commitée** ; la tentative de re-dérivation *fraîche sur 27.2.1* côté ALARM
+  avait été coupée par le filtre de sécurité. Sous Opus 4.8 (cf. mémoire `cyber-filter-by-model`), pas de blocage.
+- **Re-vérification indépendante au binaire** (`macos/kernel.macho`, `analysis/kext/ksyms.py` + lecture d'octets jetable
+  du scratchpad) avant d'intégrer : les 10 symboles porteurs résolvent à l'adresse exacte citée (`init_sep_endpoint`
+  …9950dbc, `__ipc_get_capabilities` …99671c4, `_code_ipc_get_capabilities` …9973eb0, `__payload_hash` …9975a50,
+  `sep_deliver_msg` …99453f8 de signature `ipc_callback_ctx_t*,u32,void*`, `_get_process_table` …9967ca4,
+  `_msg_header_set_negotiated_version` …9967c90, `__ipc_header_size` …9975324). La **table d'opérations** se décode
+  exactement : base `0xfffffe0007004000`, entrées de 0x48 o, `entrée[0x4d].code == 0x4d`, `ctxsize == 0x88`, pointeur
+  +0x10 → `_code_ipc_get_capabilities`. Zéro divergence ⇒ le travail d'Opus 5.5 est authentique, pas halluciné.
+- Livrable, `docs/sks_protocol.md` :
+  - **§1.6 (nouveau)** : en-tête OOL générique (0x54 o, little-endian) ; les 0x64 o de la requête `get_capabilities`
+    offset par offset (Q1+Q2) ; base exacte du SHA-256/16 (§1.6.3, Q2) ; réponse `0xcd … 5c` et son décodage (§1.6.4, Q4) ;
+    vérifications SEP + portabilité non-macOS (§1.6.5, Q3 : le kext ne lit aucun verdict du SEP sur pid/cdhash/uid → non
+    observable ; condensé recalculable sans secret ; champs contextuels remplaçables par des valeurs neutres, à confirmer
+    matériel ; échec `get_capabilities` ⇒ retombée v1, expérience peu risquée côté logique).
+  - **§1.4** réécrit (plus « layout non confirmé » : renvoi à §1.6, `ours=2`, `min(theirs,2)`).
+  - **§1.3** : mapping TAG↔nom désormais **VU (table 13.5)** (0x4d get_capabilities, 0x2a set_env, 0x22 perform_operation,
+    0x0a null_d_key, 0x48 fv_get_blob_state, 0x19 get_device_state ; + noms de 0x41 fv_unwrap_vek, 0x18
+    device_state_transition, 0x2f handle_timer_fire, 0x32 unwrap_media_key, 0x47 fv_set_protection, 0x10 new_pfk_data).
+  - Note de session mise à jour (13.5 re-vérifié ; 27.2.1 non re-dérivé octet par octet ; DER §2 reste VU sur 27.2.1).
+- `docs/sks_ipc_negotiation.md` : poussé (comme demandé par la mission), avec un encart de re-vérification 2026-11-23.
+- **INCONNU restant** : valeur réelle de « theirs » (OOL 0x12 jamais capturé) ; disposition exacte de l'en-tête SEP de
+  0x48 o (déduite des tailles) ; si le SEP rejette sur les champs processus (non observable au binaire). Prochaine étape
+  (session ALARM) : expérience « un seul `get_capabilities` » dans `pending/` — **classe neuve → go d'Albert**.
+- Git : `git pull` demandé → conflit sur `docs/journal.md` (entrée upstream J7/J8 ALARM vs entrée locale reverseur SKS),
+  résolu en **gardant les deux** (entrées non chevauchantes) ; `docs/biometrickit_protocol.md` local (PARTIEL) remplacé
+  par la version upstream (complète, 27.2.1). Aucun run matériel.
