@@ -14,6 +14,30 @@ Format :
 
 ---
 
+## 2026-11-23 (soir, suite) — Claude (ALARM) + reverseur — PISTE A et PISTE B investiguées jusqu'au bout : épuisées (le byte-exact create/keybag vit dans SEPOS → seule une capture macOS vivant le donne)
+- Trace : — (exploration disque LECTURE SEULE via apfs-fuse ; reverse hors-ligne ; rien émis au SEP, rien passé en `vérifié`, pas de commit avant celui-ci).
+- Fait : (1) **PISTE B** — recompilé `apfs-fuse`+`apfsutil` (scratchpad), monté en RO (Albert a tapé `sudo`) les volumes
+  APFS. (2) **PISTE A** — agent `reverseur` (Opus 4.8) a reversé le DER des `perform_operation` (TAG 0x22) du bring-up →
+  `applekeystored_identity.md` §10.
+- Vu (PISTE B, disque) : conteneur `nvme0n1p1` = volumes NON chiffrés `iSCPreboot`/`xART`/`Hardware`/`Recovery`.
+  **`nvme0n1p2` (système/Data macOS 27.2.1) = chiffré FileVault** (« KeyManager failed » → inatteignable sans la clé).
+  Volume `xART` = un seul fichier `74980DEE-…-.gl` (6 291 456 o) = **identique à notre capture du 17/11** (sha `8c5498a4…`,
+  déjà dans `traces/20261117-224724_xart_read/`). Preboot = `LocalPolicy` (img4/im4m), `sep-firmware.img4`, `apticket.der`.
+  Hardware = FactoryData, MobileActivation, plist `com.apple.cltm.<même UUID>`.
+- Vu (PISTE A, binaire, §10) : `osc`/`ogss` n'ont AUCUN builder dans le kernelcache (bâtis en userland → byte-exact
+  INCONNU) ; `oska` PORTE un `rk` (atteste une clé existante → PAS à froid, réfute la ligne handoff « oska sans rk ») ;
+  seules ops identité émettables à froid ET lisibles = `oskc2`/`oskgp`, mais `skt`/`skg`/`skcs` = runtime userland INCONNU ;
+  ordre d'émission INCONNU (zéro appelant kext = KPI libaks). Côté AP : les builders keybag ne lisent AUCUN global où
+  `_aks_system_key_*` range son résultat → création keybag **indépendante** de la pré-séquence (VU).
+- Interprété : **PISTE B épuisée** — `/var/keybags` (Data) chiffré ; le `.gl` = charges SCELLÉES par le SEP (pas de keybag
+  en clair réinjectable), déjà en main, et §9.3 a RÉFUTÉ que des données externes (fv_data/blob) soient la pièce manquante.
+  **PISTE A épuisée comme chaînon** — AP indépendant (VU) ; dépendance SEPOS = hypothèse non vérifiable ; le reverse penche
+  CONTRE (−0xb = pointeur nul de CE message create, pas « état absent »). **Convergence des 3 sessions de reverse (§7/§8/§9/§10)** :
+  le moteur sémantique create/make/load et les valeurs byte-exactes (class, type, quel blob, skt/skg) vivent dans **SEPOS,
+  illisible depuis tout binaire AP** → **seule source byte-exacte = capturer un `create_keybag`/`make_system_keybag` émis par
+  macOS VIVANT** (hyperviseur traçable = 13.5/14.8.3, qu'on n'a plus → DFU + install). Décision sweep-aveugle vs DFU = Albert.
+- Incidents : — (apfs-fuse RO uniquement ; aucun power-cycle ; aucune écriture SEP).
+
 ## 2026-11-23 — Claude (agent driver, ALARM) — J12 préparé : `load_keybag` (uuid → handle) puis `make_system_keybag` chaîné (allow_sks=7) — rien lancé
 - Trace : — (préparation hors-ligne ; rien chargé/envoyé au SEP, pas de sudo, pas de commit).
 - Fait : codé la voie J12 qui brise le cercle create/make_system (create_keybag 0x01 exige des données −0xb, make_system

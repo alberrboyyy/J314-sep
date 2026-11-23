@@ -1,4 +1,28 @@
-# ▶️ COMMENCE ICI — 2026-11-23 (soir) — 🧱 MUR KEYBAG : 3 ops SKS refusent (-0xb) ; 2 PISTES SANS DFU à tenter AVANT le DFU
+# ▶️ COMMENCE ICI — 2026-11-23 (nuit) — 🧱 MUR KEYBAG : PISTES A & B ÉPUISÉES (investiguées à fond) → DÉCISION sweep-aveugle vs DFU-capture = ALBERT
+
+**MISE À JOUR 2026-11-23 nuit (lis d'abord ce bloc, puis le bloc « soir » ci-dessous conservé pour le détail) :**
+Les 2 pistes sans DFU ont été menées jusqu'au bout (journal « soir, suite ») :
+- **PISTE B — ÉPUISÉE.** `apfs-fuse` recompilé, volumes montés en RO. `nvme0n1p2` (Data macOS) = **chiffré FileVault**
+  → `/var/keybags` inatteignable. Le volume `xART` ne contient que `74980DEE…gl` (6 MiB) = **identique à notre capture
+  du 17/11** (sha `8c5498a4…`, déjà dans `traces/`), faite de **charges SCELLÉES** (pas de keybag en clair réinjectable).
+  Et §9.3 avait déjà RÉFUTÉ (VU) que des données externes soient la pièce manquante (macOS envoie fv_data vide). ⇒ le
+  disque n'apporte aucune munition.
+- **PISTE A — ÉPUISÉE comme chaînon manquant.** Reverseur → `applekeystored_identity.md` §10 : `osc`/`ogss` sans builder
+  kext (userland, byte INCONNU) ; `oska` porte un `rk` (PAS à froid) ; seules `oskc2`/`oskgp` émettables à froid mais
+  `skt`/`skg`/`skcs` runtime INCONNU ; côté AP la création keybag est **indépendante** de la pré-séquence (VU). Le reverse
+  **penche contre** A (−0xb = pointeur nul de CE message, pas « état absent »).
+- **CONVERGENCE (§7/§8/§9/§10)** : le moteur sémantique create/make/load **vit dans SEPOS, illisible** ; les valeurs
+  byte-exactes (class, type, quel blob non nul, skt/skg) ne sont **nulle part dans les binaires AP**. **Seule source
+  byte-exacte = capturer un `create_keybag`/`make_system_keybag` ÉMIS PAR macOS VIVANT** (exige un invité hyperviseur
+  traçable 13.5/14.8.3, qu'on n'a plus → DFU + réinstall).
+- **DÉCISION À PRENDRE PAR ALBERT** (posée en séance) : (1) **sweep aveugle borné** au SEP (create+1 blob non nul / champ
+  +0x64 non nul / pré-séquence oskc2 avec skt-skg balayés) = pas cher par run mais **zéro vérité terrain**, odds faibles,
+  chaque run = go + reboot ; vs (2) **DFU + macOS traçable → capture réelle → rejeu** = gros chantier, EFFACE le disque,
+  mais **seule voie certaine** selon le reverse. Albert a dit « macOS sacrifiable, je peux DFU ». Rien lancé.
+
+---
+
+# (bloc du soir, conservé) — 🧱 MUR KEYBAG : 3 ops SKS refusent (-0xb) ; 2 PISTES SANS DFU à tenter AVANT le DFU
 
 **Contexte neuf / après /clear : LIS CE BANDEAU EN ENTIER, puis `docs/sks_native_plan.md`, `docs/applekeystored_identity.md`
 (§6-9), `docs/sks_protocol.md`, `docs/keybag_native_path.md`, `docs/acm_token.md`, et le haut de `docs/journal.md`

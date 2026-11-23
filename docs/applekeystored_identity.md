@@ -446,3 +446,142 @@ données absentes.)
 - **Nom d'énum de −0xb** : non trouvé (pas de table code→texte dans le kext). Comportement = BadArgument, VU.
 - **`make_system_keybag` acceptera-t-il un keybag vide forgé par Linux** (politique SEP d'enrôlement) : toujours INCONNU,
   matériel uniquement (§5).
+
+---
+
+## 10. `perform_operation` bring-up (DER exact) — PISTE A instruite — `source: kext` (27.2.1, kernelcache `macos/kc/`)
+
+Ajout 2026-11-23 (session ALARM, agent reverseur, Opus 4.8, capstone, hors-ligne). **But** : extraire le DER octet-près
+des `perform_operation` (TAG fil **0x22**) « d'identité système » que PISTE A veut émettre après `set_env` — sélecteurs
+`osc` (sik_collection), `ogss` (get_sik_status), `oska` (system_key). **Protocole uniquement ; aucune clé/seed/secret
+extrait ; aucun code Apple copié.** Désassemblage seul, rien lancé, rien `vérifié`. Convention VU/DÉDUIT/INCONNU.
+
+> **Résultat net (à lire d'abord) :** la trame DER de chaque op `perform_operation` est **fabriquée par libaks** (famille
+> `_aks_*` → `__create_operation_list` → `_encode_list_*` → `__aks_operation` → `_kern_perform_operation`). La **grammaire
+> et les octets de clés/sélecteurs sont VU** (ci-dessous, byte-exact). Mais **deux corrections dures** à la prémisse de
+> PISTE A, VU au binaire :
+> 1. **`osc` (sik_collection) et `ogss` (get_sik_status) n'ont AUCUN builder dans le kernelcache.** Leurs constantes DER
+>    existent mais ne sont référencées **que par le décodeur** `_ref_key_op_der_to_enum` (@0xd0155c) — **jamais par un
+>    constructeur**. Ces deux ops sont émises **exclusivement par le userland** (libaks dans applekeystored/dyld cache).
+>    Leur composition exacte **n'est pas dans le kernelcache** (et le dyld cache n'était pas déchiffrable cette session :
+>    `ipsw` absent, fichiers `dsc/` en decmpfs).
+> 2. **`oska` (system_key_attest) N'EST PAS « à froid » : il PORTE un `rk`** (il atteste un ref_key **existant**). Donc il
+>    n'est **pas** émettable avant qu'une clé système ait été créée. (VU, §10.3.)
+>
+> Les seules ops « identité système » **réellement émettables sans `rk` ni `acmh`** (handle −1) et **entièrement lisibles
+> au binaire** sont **`oskc2` (system_key_collect) et `oskgp` (system_key_get_public)** — PAS celles nommées dans la
+> consigne. (VU, §10.2.)
+
+### 10.1 Enveloppe commune sur le fil — VU (recoupe `sks_protocol.md` §1.6/§2.3.2)
+Tout `perform_operation` part en : `> EP=0x12 TAG=0x22 TYPE=seq PARAM=0 DATA=(len_total<<16)`. L'OOL A contient, dans
+l'ordre : en-tête IPC `0x54` o (u32 longueur=0x50 + 0x50 o : condensé SHA-256/16, version, horodatage µs, drapeaux=0,
+bloc processus — §1.6 de `sks_protocol.md`) **puis** `état u32 = 0` **puis** `u64 = 1` **puis** `u32 longueur DER` **puis
+le DER**. Donc **DER = len_total − 0x64**. Le DER est un **SET (`0x31`)** de paires **SEQUENCE (`0x30`){ UTF8String clé,
+valeur }**, triées par **longueur de clé puis `memcmp`** (VU, §2 de `sks_protocol.md`). Le mot mailbox ne porte aucun
+contenu. La réponse `< TAG 0xa2 TYPE seq PARAM statut DATA (len<<16|flag)` (PARAM int8 : 0=OK, sinon code rendu brut).
+
+### 10.1b Octets exacts des briques DER — VU (`___der_key_*`, lus au binaire)
+Sélecteurs (valeur du champ `o`, chaque constante = UTF8String DER pré-encodé) :
+
+| op | octets du sélecteur (valeur de `o`) | builder kext ? |
+|---|---|---|
+| sik_collection `osc` | `0c 03 6f 73 63` | **NON** (userland seul) |
+| sik_attest `osa` | `0c 03 6f 73 61` | oui (`__op_attest`, porte `rk`) |
+| get_sik_status `ogss` | `0c 04 6f 67 73 73` | **NON** (userland seul) |
+| gid_attest `oga` | `0c 03 6f 67 61` | oui |
+| system_key_attest `oska` | `0c 04 6f 73 6b 61` | oui (**porte `rk`**) |
+| system_key_collect `oskc2` | `0c 05 6f 73 6b 63 32` | **oui, à froid (handle −1)** |
+| system_key_get_public `oskgp` | `0c 05 6f 73 6b 67 70` | **oui, à froid (handle −1)** |
+| system_key_operate `osko` | `0c 04 6f 73 6b 6f` | oui |
+| system_key_sign `osks` | `0c 04 6f 73 6b 73` | oui |
+
+Clés de paires (nom → octets → type de valeur, VU) : `o`=`0c 01 6f` (UTF8) ; `skt`=`0c 03 73 6b 74` (INTEGER, type de
+clé système) ; `skg`=`0c 03 73 6b 67` (INTEGER, génération) ; `skcs`=`0c 04 73 6b 63 73` (OCTET STRING, client_seed) ;
+`sko`=`0c 03 73 6b 6f` ; `skos`=`0c 04 73 6b 6f 73` ; `skni`=`0c 04 73 6b 6e 69` ; `rk`=`0c 02 72 6b` (ref_key, **DER
+brut recopié**). Une paire = `30 <len> <clé> <valeur>` ; p. ex. `o=oskc2` → `30 0a 0c 01 6f 0c 05 6f 73 6b 63 32`.
+
+### 10.2 Les DEUX ops « à froid » lisibles au binaire — VU (composition complète)
+Désassemblés cette session (capstone, `_OUTLINED_FUNCTION_*` expansés) :
+
+**`oskc2` system_key_collect — `_aks_system_key_collection` @0xfffffe0009cefb74 — VU :**
+```
+op = oskc2            (chargé via GOT auth [0xcbb8a38] → ___der_key_op_system_key_collect)
+__create_operation_list(op)                         → liste (SET)
+si arg2 != 0 :  _encode_list_merge_dict(liste, arg2, len)   # fusionne un dict OPTIONNEL (c'est là que skcs irait)
+_encode_list_add_number(liste, "skt", arg0)         # skt = INTEGER(arg0)
+_encode_list_add_number(liste, "skg", arg1)         # skg = INTEGER(arg1)   (clé via GOT [0xcbb8a78] = generation)
+_encode_list_dict(liste) → (ptr, len)
+__aks_operation(handle = -1, ptr, len, …)           # handle −1 = AUCUN keybag  →  _kern_perform_operation (TAG 0x22)
+(résultat rangé dans un global AP @0x8297930)
+```
+→ **Trame DER = `SET { o=oskc2, [dict fusionné optionnel], skt=INTEGER(arg0), skg=INTEGER(arg1) }`**. **PAS de `rk`,
+PAS de `acmh`, handle −1.** Émettable sans keybag ni auth. (VU.)
+
+**`oskgp` system_key_get_public — `_aks_system_key_get_public` @0xfffffe0009cefd68 — VU :** **structure IDENTIQUE** à
+oskc2 (mêmes helpers, même `arg2` dict optionnel, mêmes `skt`/`skg`, même `handle = -1`), seul l'op change (`oskgp` via
+GOT [0xcbb8a40]). → `SET { o=oskgp, [dict opt], skt=INTEGER(arg0), skg=INTEGER(arg1) }`.
+
+**Ce que « arg0/arg1/arg2 » valent = RUNTIME, posés par l'appelant userland (INCONNU au binaire)** : `skt` (type de clé
+système, petit entier), `skg` (génération, petit entier), et le **dict `arg2`** optionnel — **c'est très probablement là
+que vit `skcs` (client_seed)**, l'OCTET STRING de ~16–20 o déduit en `sks_protocol.md` §2.3.2. **Si `skcs` est une
+constante → trame rejouable ; si c'est un nonce → non rejouable. INDÉTERMINÉ ici** (le binaire kext ne fixe aucune de ces
+valeurs ; elles arrivent par les arguments de la KPI). Aucune clé/seed extraite.
+
+### 10.3 `oska` (system_key_attest) PORTE un `rk` — VU (correction de PISTE A)
+`_aks_system_key_attest` @0xfffffe0009cbff50 (capstone) déréférence son arg ref_key `x23` : `[x23]`/`[x23+0x10]` = blob
+de clé scellée, `[x23+0x28]` = handle. Il fait `__get_merged_params(ref_key,…)`, **retire puis ré-ajoute `rk`**
+(`_encode_list_remove_key` + `_encode_list_add_der(rk, [x23], [x23+0x10])`), puis `skt=INTEGER(arg0)`,
+`skg=INTEGER(arg1)`, et soumet avec `handle = [x23+0x28]`. → `SET { o=oska, <params fusionnés du ref_key>, rk=DER_brut,
+skt=INTEGER, skg=INTEGER }`. **`oska` ne peut donc PAS être émise à froid : elle atteste une clé système DÉJÀ créée.**
+(Idem `osa`/sik_attest via `__op_attest` @0xfffffe0009cefa88 : porte `rk`.) **Ceci réfute la ligne « oska … SANS rk donc
+à froid » du handoff** (VU).
+
+### 10.4 `osc` / `ogss` : userland uniquement — VU (preuve d'absence)
+- Table GOT des pointeurs d'op @0xcbb8a00 décodée (rebase `cible = 0xfffffe0007004000 + offset`, VU) : slot **a10 →
+  `osc`**, **a20 → `ogss`**. Un scan exhaustif des `adrp+add` du bundle AppleSEPKeyStore montre que **a10 et a20 ne sont
+  chargés que par `_ref_key_op_der_to_enum`** (@0xd0155c, le **décodeur** chaîne→énum) — **par aucun constructeur**.
+- Énumération de **tous** les appelants de `__create_operation_list` (@0xcbf828) dans le kext : on retrouve la famille
+  ref_key (encrypt/decrypt/sign/wrap/unwrap/delete/…), `osa`/`oga` (attest), et `oska`/`oskc2`/`oskgp`/`osko`/`osks` —
+  **jamais `osc` ni `ogss`**. (VU.)
+- ⇒ **Les trames `osc` et `ogss` ne sont pas reconstructibles depuis le kernelcache.** Elles sont bâties par **libaks
+  en userland** (applekeystored / dyld shared cache). Par analogie de source (même libaks), leur forme est
+  vraisemblablement `SET { o=osc }` / `SET { o=ogss }` éventuellement + `skcs`/`skt` — **DÉDUIT, NON VU** ; byte-exact
+  **INCONNU** tant que libaks userland n'est pas lu (dyld cache non déchiffré cette session).
+
+### 10.5 Émetteur du bring-up : HORS kext — VU (confirme `sks_protocol.md` §2.3.4)
+Scan global de **tout le kernelcache** (tous les bundles) : **zéro `bl`/`b`** vers `_aks_system_key_collection`,
+`_aks_system_key_attest`, `_aks_sik_attest`, `_aks_system_key_operate/_get_public/_sign`. Ces builders sont une **KPI
+libaks** appelée depuis l'**espace utilisateur** (applekeystored via l'userclient → `perform_operation`), pas depuis le
+kext. Donc **le mapping txn3↔sélecteur / txn5↔sélecteur et les valeurs (`skt`/`skg`/`skcs`) restent INCONNU** : ils
+vivent dans le runtime du démon + SEPOS. (VU côté absence d'appelant ; mapping INCONNU.)
+
+### 10.6 La création du keybag dépend-elle de cette pré-séquence ? — VERDICT
+- **Côté AP : INDÉPENDANT (VU).** Les builders keybag (`__ipc_create_keybag_v4` 0xcf9a34, `__ipc_make_system_keybag_v1`
+  0xcdbce4, `__ipc_load_keybag` 0xcdb934 ; §6-9) **ne lisent aucun** des globaux où `_aks_system_key_*` rangent leur
+  résultat (0x8297930 / 0x82979f0 / 0x8297970), et **n'appellent aucun** builder system_key/sik. Chaque `0x22` est
+  **autonome sur le fil**. Rien dans le kext n'impose d'émettre `osc`/`oskc2`/… **avant** `create_keybag`/`make_system`.
+- **Côté SEPOS : HYPOTHÈSE, non vérifiable au binaire.** Que le SEP **exige** que son identité d'appareil / SIK / clé
+  système soit établie (par un `oskc2`/`osc` antérieur) avant d'accepter de forger un keybag est une **politique
+  interne au firmware SEP, illisible** dans tout binaire AP. Rien ne l'étaie ni ne l'infirme ici.
+- **Nuance qui penche CONTRE la piste A comme chaînon manquant (DÉDUIT) :** le refus observé est **−0xb = BadArgument =
+  `cbz` d'un pointeur requis NUL** (§9), c.-à-d. « un **argument de CE message** manque », pas un code « précondition/
+  état absent » (le SEP a d'autres codes pour ça). Un `cbz` sur un argument de la trame create colle **mieux** à un
+  champ qu'on a mis à 0/vide (§9.4) qu'à une pré-séquence sautée. **DÉDUIT, non prouvé.**
+
+**→ Réponse à la question d'Albert :** *la création du keybag dépend-elle de la pré-séquence `perform_operation` ?*
+**Côté AP, NON (indépendant, VU).** Une dépendance côté **SEPOS reste possible mais c'est une HYPOTHÈSE non vérifiable
+au binaire** ; et le reverse **ne la soutient pas** (le −0xb pointe vers un argument manquant dans NOTRE trame create,
+pas vers un état préalable). **PISTE A est donc jouable mais spéculative**, et sa prémisse est **à corriger** : les ops
+réellement émettables à froid sont **`oskc2`/`oskgp`** (pas `oska` qui exige un `rk`, pas `osc`/`ogss` absents du kext),
+et leurs **valeurs (`skt`/`skg`/`skcs`) sont RUNTIME/INCONNU** — il faudrait les **capturer sur un macOS vivant** (ou
+lire libaks du dyld cache déchiffré) avant de pouvoir émettre une trame byte-exacte.
+
+### 10.7 Points ouverts (honnêtes)
+- **Valeurs `skt`/`skg`/`skcs`** des ops de bring-up : **INCONNU** (runtime userland / SEPOS). Décident à elles seules de
+  la rejouabilité (constante vs nonce). Seule source VU directe = capture OOL 0x12 sur matériel, ou libaks userland.
+- **Trame byte-exacte de `osc`/`ogss`** : **INCONNU** au kernelcache (builders userland ; dyld cache non déchiffré —
+  `ipsw` absent, `dsc/` en decmpfs). Reconstructible seulement en lisant libaks userland.
+- **Mapping txn3/txn5 ↔ sélecteur** : **INCONNU** (émetteur userland non identifié ; §10.5).
+- **Dépendance keybag ↔ pré-séquence côté SEPOS** : **HYPOTHÈSE non vérifiable au binaire** ; le reverse penche contre
+  (§10.6). Trancher = expérience matériel (émettre `oskc2`/`oskgp` après `set_env`, puis re-tenter create — classe neuve
+  → go d'Albert ; valeurs `skt`/`skg` à balayer ou capturer), **ou** capture macOS vivant de la séquence réelle.
