@@ -117,6 +117,30 @@ pub const MSKB_FLAG: u64 = 0;
 /// Reply TAG of `make_system_keybag` (= request | 0x80).
 pub const MSKB_REPLY_TAG: u8 = OP_MAKE_SYSTEM_KEYBAG | 0x80; // 0x8d
 
+// --- make_system_keybag STANDALONE (J11 PIVOT, allow_sks=6) --------------------------------------------------------
+/// J11 PIVOT (`docs/sks_native_plan.md` §10): `make_system_keybag` sent WITHOUT `create_keybag` before it. It is then
+/// the 3rd transaction of the boot (get_capabilities = 1, set_env = 2, make_system = 3), so its transaction counter
+/// (the ring word TYPE) is **0x03**, not 0x04. The OOL body is BYTE-IDENTICAL to the chained make_system (same
+/// `encode_mskb`/`check_mskb`): the TYPE lives only in the ring word, not in the digested OOL bytes (0x14..).
+///
+/// **Honest unknown** (documented, not guessed): in standalone mode `loaded_handle` (OOL 0x60) and `handle_y`
+/// (OOL 0x58) are USERLAND inputs — there is NO `create_keybag`/`load_keybag` reply to plug a handle in. The handle a
+/// standalone make_system should carry is UNKNOWN (normally rendered by create/load); it is tested with **0** by
+/// default. If the SEP requires a valid loaded handle first, standalone make_system will REFUSE — which would itself
+/// confirm that a preliminary op (create/load, or a macOS-posted identity) is mandatory.
+pub const MSKB_TXN_STANDALONE: u8 = 0x03;
+
+/// The exact STANDALONE `make_system_keybag` request word (TYPE 0x03). Same EP/TAG/DATA as the chained word; only the
+/// transaction counter differs.
+pub const fn mskb_word_standalone() -> Word {
+    Word::new(EP_SKS, OP_MAKE_SYSTEM_KEYBAG, MSKB_TXN_STANDALONE, 0, MSKB_DATA)
+}
+
+/// `true` iff `w` is a reply to our STANDALONE make_system_keybag: EP 0x12, TAG bit 7 set, TYPE = 0x03.
+pub fn is_mskb_reply_standalone(w: &Word) -> bool {
+    w.ep == EP_SKS && w.tag & 0x80 != 0 && w.ty == MSKB_TXN_STANDALONE
+}
+
 const _: () = assert!(CKB_LEN == 0x54 + 4 + 8 + 4 + 4 + 4 + 4 + 4 + 4 + 8);
 const _: () = assert!(MSKB_LEN == 0x54 + 4 + 8 + 4 + 4 + 4 + UUID_LEN + 8);
 const _: () = assert!(OFF_RESP_HANDLE + 4 <= crate::sks_ipc::OUT_SNAP);
@@ -399,6 +423,7 @@ macro_rules! one_word_gate {
 
 one_word_gate!(CreatekeybagGate, createkeybag_word());
 one_word_gate!(MskbGate, mskb_word());
+one_word_gate!(MskbStandaloneGate, mskb_word_standalone());
 
 #[cfg(test)]
 mod tests {
@@ -591,6 +616,42 @@ mod tests {
         assert!(type_in_vu_range(-16));
         assert!(!type_in_vu_range(-9));
         assert!(!type_in_vu_range(0));
+    }
+
+    /// J11 standalone: the STANDALONE word differs from the chained one ONLY in TYPE (0x03 vs 0x04); the OOL body an
+    /// encoder emits is byte-identical (the TYPE is not in the digested bytes). A standalone make_system with a given
+    /// userland `loaded_handle` is exactly `encode_mskb(..., loaded_handle, ...)` (no finalize); the independent
+    /// Python/hashlib vector of `finalize_matches_fresh_encode_and_python` (handle 0xdeadbeef) therefore pins it too.
+    #[test]
+    fn mskb_standalone_word_and_body() {
+        assert_eq!(mskb_word_standalone(), Word::new(0x12, 0x0d, 0x03, 0x00, 0x0084_0000));
+        assert_eq!(MSKB_TXN_STANDALONE, 0x03);
+        // Same DATA / length as the chained word, different TYPE only.
+        assert_eq!(mskb_word_standalone().data, mskb_word().data);
+        assert_ne!(mskb_word_standalone().ty, mskb_word().ty);
+        // The OOL body is the same encoder: standalone with loaded_handle = H equals the chained build with that H.
+        let f = fields();
+        let standalone = encode_mskb(&f, EX_HANDLE_Y, 0xdead_beef, EX_TYPE, &ex_uuid());
+        assert_eq!(&standalone[0x04..0x14], &hex16("c5fd84961b48bf2de20d818be48d391d")); // same vector as finalize test
+        assert!(check_mskb(&standalone).is_ok());
+        assert_eq!(check_mskb(&standalone).unwrap().loaded_handle, 0xdead_beef);
+        // A standalone build with the default handle 0 is byte-identical to the chained placeholder-0 build.
+        assert_eq!(encode_mskb(&f, EX_HANDLE_Y, 0, EX_TYPE, &ex_uuid()), encode_mskb(&f, EX_HANDLE_Y, 0, EX_TYPE, &ex_uuid()));
+    }
+
+    #[test]
+    fn mskb_standalone_reply_and_gate() {
+        // Standalone reply: TYPE 0x03 (not 0x04).
+        let ok = Word::new(0x12, 0x8d, 0x03, 0x00, 0);
+        assert!(is_mskb_reply_standalone(&ok));
+        assert!(!is_mskb_reply_standalone(&Word::new(0x12, 0x8d, 0x04, 0, 0))); // chained reply (TYPE 4)
+        assert!(!is_mskb_reply(&ok)); // the chained matcher must NOT match a standalone (TYPE 3) reply
+        assert!(!is_mskb_reply_standalone(&Word::new(0x12, 0x0d, 0x03, 0, 0))); // request, bit 7 clear
+        let mut m = MskbStandaloneGate::closed();
+        m.arm();
+        assert!(!m.admit(&mskb_word()), "chained word (TYPE 4) refused");
+        assert!(m.admit(&mskb_word_standalone()));
+        assert!(!m.admit(&mskb_word_standalone()), "twice");
     }
 
     #[test]

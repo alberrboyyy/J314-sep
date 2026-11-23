@@ -52,6 +52,15 @@
 //! setenv : ACCEPTÉ (état …) / ERREUR / SILENCE / NON ENVOYÉ ». `read` de /dev/sep_sks rend alors l'enregistrement
 //! get_capabilities SUIVI de l'enregistrement set_env. Puis le 0x73 comme 1. Aucun autre mot vers 0x12/0x17/0x0a.
 //!
+//! Avec `allow_sks=4/5/6` (après getcap+set_env, en SAUTANT les perform_operation) : 4 (J9c) = UN `null_d_key` ;
+//! 5 (J10, `docs/sks_native_plan.md` §9) = `create_keybag` (TAG 0x01, TYPE 0x03) PUIS `make_system_keybag` (TAG 0x0d,
+//! TYPE 0x04), le noyau insérant dans le 2e le handle rendu par le 1er ; 6 (J11 PIVOT, §10) = UN SEUL
+//! `make_system_keybag` STANDALONE (TAG 0x0d, **TYPE 0x03**, 3e transaction), en sautant AUSSI `create_keybag` : le
+//! `loaded_handle` (0x60) et `handle_y` (0x58) deviennent des entrées userland (pas de handle préalable à insérer —
+//! INCONNU, testé à 0), aucun `finalize` ni recalcul de condensé côté noyau. Verdict « marqué system (PARAM 0) / REFUS
+//! (PARAM …) / handle si rendu ». Dans tous ces cas, `read` de /dev/sep_sks rend la suite des enregistrements et rien
+//! d'autre n'est envoyé à 0x12/0x17/0x0a ; puis le 0x73.
+//!
 //! Avec `allow_sbio_bio=1` (exige `allow_sbio_params=3`) : E-ENROLL-START (J6a, `docs/j6_enroll_match_protocol.md`
 //! §6) — après la dernière étape de la 2e passe (2e 0x63), UN seul `0x03` commandStartEnroll, charge FIXE de 68 octets
 //! à zéro (`sbio_gate::ENROLL_INDATA_MIN`, contenu réel inconnu), puis ÉCOUTE seule : la réponse au 0x03 (quelle
@@ -151,7 +160,7 @@ kernel::module_platform_driver! {
         },
         allow_sks: u32 {
             default: 0,
-            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; 5 (J10, device-identity keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation AND null_d_key, ONE sks create_keybag (> 0x12 TAG 0x01 TYPE 0x03 DATA 0x00800000, 0x80-byte A12, 4th write, VARIANT 4; checked: header constants, discriminant 4, three empty blobs, fv_data length 0, final u64 0, v2 digest, cdhash form; class(u32 0x60), field2(u32 0x64) and handle_y(u64 0x58) are FREE userland values, NOT checked), read back the SEP handle at OOL B +0x6c, then ONE sks make_system_keybag (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12, 5th write; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; handle_y/type/uuid FREE userland, loaded_handle plugged in by the kernel from the create_keybag reply then re-digested), listen, VERDICTs (create_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; NOT RUNNABLE without the required userland values (uuid, class, type); nothing else ever to 0x12/0x17/0x0a",
+            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; 5 (J10, device-identity keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation AND null_d_key, ONE sks create_keybag (> 0x12 TAG 0x01 TYPE 0x03 DATA 0x00800000, 0x80-byte A12, 4th write, VARIANT 4; checked: header constants, discriminant 4, three empty blobs, fv_data length 0, final u64 0, v2 digest, cdhash form; class(u32 0x60), field2(u32 0x64) and handle_y(u64 0x58) are FREE userland values, NOT checked), read back the SEP handle at OOL B +0x6c, then ONE sks make_system_keybag (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12, 5th write; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; handle_y/type/uuid FREE userland, loaded_handle plugged in by the kernel from the create_keybag reply then re-digested), listen, VERDICTs (create_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; 6 (J11 PIVOT, standalone make_system_keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation, null_d_key AND create_keybag, ONE sks make_system_keybag STANDALONE (> 0x12 TAG 0x0d TYPE 0x03 DATA 0x00840000, 0x84-byte A12, 3rd transaction; same OOL body as allow_sks=5's make_system but loaded_handle (0x60) and handle_y (0x58) are USERLAND inputs — no create reply to plug in, UNKNOWN handle tested with 0 by default; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; uuid/type/loaded_handle/handle_y FREE userland), listen, VERDICT (marqué system/REFUS/handle), then the 0x73; NOT RUNNABLE without the required userland values (uuid, class, type; allow_sks=6 needs only uuid, type); nothing else ever to 0x12/0x17/0x0a",
         },
         allow_sbio_bio: u32 {
             default: 0,
@@ -167,7 +176,7 @@ mod drv {
     use crate::sks_ipc::{self, GetcapGate};
     use crate::sks_setenv::{self, SetenvGate};
     use crate::sks_nulldkey::{self, NulldkeyGate};
-    use crate::sks_keybag::{self, CreatekeybagGate, MskbGate};
+    use crate::sks_keybag::{self, CreatekeybagGate, MskbGate, MskbStandaloneGate};
     use crate::sbio_gate::{self, EvtHdr, Step, EVT_HDR, EVT_MAX, KIND_BIO_REPLY, KIND_NOTIFY, KIND_REPLY, KIND_SPONT, MAX_REPLY};
     use crate::word::{Dir, Msg, Word};
     use crate::xart::{is_save, EP_XART, OP_EP_ANNOUNCE, OP_FWBOOT};
@@ -685,6 +694,9 @@ mod drv {
         /// Requête make_system_keybag validée (`sks_keybag::check_mskb`), copiée dans A12 ; le noyau y place le handle.
         sks_mskb_req: [u8; sks_keybag::MSKB_LEN],
         sks_mskb_gate: MskbGate,
+        /// J11 (allow_sks=6) : porte du make_system_keybag STANDALONE (mot TYPE 0x03). Distincte de `sks_mskb_gate`
+        /// (TYPE 0x04, chaîné) ; une seule des deux est armée selon allow_sks. Partage l'état `sks_mskb`.
+        sks_mskb_std_gate: MskbStandaloneGate,
         /// Mot de réponse apparié (EP 0x12, TAG bit 7, TYPE 0x04) et instantané de B12 pris à sa réception.
         sks_mskb_reply: Option<u64>,
         sks_mskb_snap: [u8; sks_ipc::OUT_SNAP],
@@ -763,6 +775,7 @@ mod drv {
                 sks_mskb: MskbPhase::Off,
                 sks_mskb_req: [0; sks_keybag::MSKB_LEN],
                 sks_mskb_gate: MskbGate::closed(),
+                sks_mskb_std_gate: MskbStandaloneGate::closed(),
                 sks_mskb_reply: None,
                 sks_mskb_snap: [0; sks_ipc::OUT_SNAP],
                 sks_mskb_rx_after: 0,
@@ -1133,10 +1146,12 @@ mod drv {
                     );
                 }
             }
-            // J10 : réponse au make_system_keybag (TAG bit 7, TYPE 0x04) → instantané de B12. Idem.
+            // J10 (allow_sks=5) : réponse au make_system_keybag chaîné (TYPE 0x04) ; J11 (allow_sks=6) : réponse au
+            // make_system_keybag STANDALONE (TYPE 0x03). Même état `sks_mskb` ; l'appariement dépend du mode.
             if w.ep == EP_SKS && core.sks_mskb == MskbPhase::Sent {
                 core.sks_mskb_rx_after = core.sks_mskb_rx_after.saturating_add(1);
-                if core.sks_mskb_reply.is_none() && sks_keybag::is_mskb_reply(&w) {
+                let matched = if param_allow_sks() == 6 { sks_keybag::is_mskb_reply_standalone(&w) } else { sks_keybag::is_mskb_reply(&w) };
+                if core.sks_mskb_reply.is_none() && matched {
                     if let Some(bufs) = self.ks_ool.as_ref() {
                         let mut snap = [0u8; sks_ipc::OUT_SNAP];
                         self.read_b8(&bufs[KS_SKS].1, &mut snap);
@@ -1507,6 +1522,7 @@ mod drv {
                             || (param_allow_sks() == 4 && core.sks_ndk == NdkPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_ndk_gate.admit(&w))
                             || (param_allow_sks() == 5 && core.sks_ckb == CkbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_ckb_gate.admit(&w))
                             || (param_allow_sks() == 5 && core.sks_mskb == MskbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_mskb_gate.admit(&w))
+                            || (param_allow_sks() == 6 && core.sks_mskb == MskbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_mskb_std_gate.admit(&w))
                     }
                     ep => core.xarm == Some(ep) && core.xart_open,
                 };
@@ -1683,6 +1699,7 @@ mod drv {
                 self.sks_nulldkey_finish(&mut core);
                 self.sks_createkeybag_finish(&mut core);
                 self.sks_mskb_finish(&mut core);
+                self.sks_mskb_std_finish(&mut core);
                 r?;
                 Instant::<Monotonic>::now()
             } else {
@@ -1906,6 +1923,11 @@ mod drv {
             // perform_operation ET null_d_key.
             if param_allow_sks() == 5 {
                 self.sks_keybag_run(core, &bufs[KS_SKS].0, &bufs[KS_SKS].1)?;
+            }
+            // J11 PIVOT : make_system_keybag STANDALONE, une fois le set_env ACCEPTÉ ; on SAUTE perform_operation,
+            // null_d_key ET create_keybag (pas de handle préalable : loaded_handle/handle_y sont userland, défaut 0).
+            if param_allow_sks() == 6 {
+                self.sks_mskb_std_run(core, &bufs[KS_SKS].0, &bufs[KS_SKS].1)?;
             }
             dev_info!(
                 self.dev,
@@ -2750,6 +2772,179 @@ mod drv {
                 }
             }
             self.cv.notify_all();
+        }
+
+        /// J11 PIVOT : `make_system_keybag` STANDALONE (allow_sks=6). Lancée seulement si le set_env a été ACCEPTÉ ;
+        /// on SAUTE perform_operation, null_d_key ET create_keybag. Aucun handle rendu par une op préalable : le
+        /// `loaded_handle` (OOL 0x60) et `handle_y` (OOL 0x58) sont des valeurs USERLAND (défaut 0) ; le noyau N'insère
+        /// PAS de handle et NE recalcule PAS le condensé (contrairement au chemin chaîné) — il envoie la requête telle
+        /// que l'espace utilisateur l'a fournie (condensé userland déjà contrôlé par la porte). Mot TYPE 0x03.
+        fn sks_mskb_std_run(&self, core: &mut MutexGuard<'_, Core>, a12: &Ool, b12: &Ool) -> Result {
+            if !core.se_accepted_ok {
+                dev_info!(self.dev, "sks make_system_keybag (standalone) : set_env non ACCEPTÉ (état 0) : rien envoyé à 0x12\n");
+                self.sks_mskb_std_finish(core);
+                return Ok(());
+            }
+            core.sks_mskb = MskbPhase::WaitReq;
+            self.cv.notify_all();
+            dev_info!(self.dev, "sks make_system_keybag (standalone) : /dev/sep_sks attend la requête ({:#x} o, {} ms max ; uuid+type userland, handle chargé+handle_y userland défaut 0 — handle INCONNU, testé à 0)\n", sks_keybag::MSKB_LEN, KS_REQ_WAIT_MS);
+            let t0 = Instant::<Monotonic>::now();
+            while core.sks_mskb == MskbPhase::WaitReq {
+                if core.state != State::Running {
+                    return Err(EIO);
+                }
+                if t0.elapsed().as_millis() >= KS_REQ_WAIT_MS {
+                    dev_info!(self.dev, "sks make_system_keybag (standalone) : aucune requête valide en {} ms : rien envoyé à 0x12\n", KS_REQ_WAIT_MS);
+                    self.sks_mskb_std_finish(core);
+                    return Ok(());
+                }
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_warn!(self.dev, "signal pendant l'attente de la requête make_system_keybag (standalone) : rien envoyé à 0x12\n");
+                    self.sks_mskb_std_finish(core);
+                    return Err(EINTR);
+                }
+            }
+            if core.sks_mskb != MskbPhase::ReqReady {
+                return Err(EIO);
+            }
+            // Requête userland validée, ENVOYÉE TELLE QUELLE (pas de finalize : le handle chargé est userland).
+            let req = core.sks_mskb_req;
+            let f = match sks_keybag::check_mskb(&req) {
+                Ok(f) => f,
+                Err(_) => {
+                    self.halt(core, "requête make_system_keybag (standalone) invalide au moment de l'envoi (bug)", None);
+                    return Err(EIO);
+                }
+            };
+            if a12.len() < sks_keybag::MSKB_LEN {
+                return Err(EINVAL);
+            }
+            let mut back = [0u8; sks_keybag::MSKB_LEN];
+            // SAFETY: cf. `sks_keybag_run` ; on écrit/relit `MSKB_LEN <= a12.len()` octets ; set_env a déjà répondu.
+            unsafe {
+                let dst = a12.as_mut_ptr().cast::<u8>();
+                core::ptr::copy_nonoverlapping(req.as_ptr(), dst, req.len());
+                for (i, x) in back.iter_mut().enumerate() {
+                    *x = core::ptr::read_volatile(dst.add(i));
+                }
+            }
+            if back != req || sks_keybag::check_mskb(&back).is_err() {
+                self.halt(core, "A12 relu ≠ requête make_system_keybag (standalone) validée", None);
+                return Err(EIO);
+            }
+            let d = &req[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN];
+            let hi = u64::from_be_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]);
+            let lo = u64::from_be_bytes([d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]]);
+            dma_wmb();
+            core.sks_mskb_std_gate.arm();
+            self.send_running(core, sks_keybag::mskb_word_standalone(), "sks make_system_keybag STANDALONE (TAG 0x0d, TYPE 0x03)")?;
+            core.sks_mskb = MskbPhase::Sent;
+            dev_info!(
+                self.dev,
+                "sks make_system_keybag STANDALONE > EP 0x12 TAG 0x0d TYPE 0x03 PARAM 0x00 DATA 0x00840000 ; A12 = {:#x} o (handle_y {:#018x} USERLAND, handle chargé {:#010x} USERLAND [INCONNU, défaut 0], type {}, blob uuid 0x10 o [uuid[0..4]={:02x}{:02x}{:02x}{:02x}…], flag 0, condensé v2 {:016x}{:016x}) ; aucun autre mot vers 0x12\n",
+                sks_keybag::MSKB_LEN, f.handle_y, f.loaded_handle, f.keybag_type, f.uuid[0], f.uuid[1], f.uuid[2], f.uuid[3], hi, lo
+            );
+            let t0 = Instant::<Monotonic>::now();
+            let mut seen = core.sks_mskb_rx_after;
+            let mut dumps = 0u32;
+            while t0.elapsed().as_millis() < KS_LISTEN_MS && core.state == State::Running && core.sks_mskb_reply.is_none() {
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_warn!(self.dev, "signal pendant l'écoute du make_system_keybag (standalone) : écoute écourtée\n");
+                    break;
+                }
+                if core.sks_mskb_rx_after != seen && dumps < KS_DUMP_LIMIT {
+                    seen = core.sks_mskb_rx_after;
+                    dumps += 1;
+                    self.dump_ool(b12, "B12 après un mot (make_system_keybag standalone)", "sks ");
+                }
+            }
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            self.dump_ool(b12, "B12 en fin d'écoute (make_system_keybag standalone)", "sks ");
+            self.sks_mskb_std_finish(core);
+            Ok(())
+        }
+
+        /// J11 : verdict du make_system_keybag STANDALONE (idempotent), enregistrement pour /dev/sep_sks. Verdict
+        /// « marqué system (PARAM 0) / REFUS (PARAM …) » ; sur PARAM 0, lit aussi un éventuel handle à OOL B +0x6c
+        /// (offset DÉDUIT : on ne sait pas si un make_system standalone rend un handle — rapporté « si rendu »).
+        fn sks_mskb_std_finish(&self, core: &mut Core) {
+            if param_allow_sks() != 6 || core.sks_mskb == MskbPhase::Done {
+                return;
+            }
+            let sent = core.sks_mskb == MskbPhase::Sent;
+            let (kind, raw) = match (sent, core.sks_mskb_reply) {
+                (false, _) => (sks_ipc::OUT_NOT_SENT, 0),
+                (true, None) => (sks_ipc::OUT_SILENCE, 0),
+                (true, Some(r)) => (sks_ipc::OUT_REPLIED, r),
+            };
+            core.mskb_out = sks_ipc::encode_outcome(kind, raw, &core.sks_mskb_snap);
+            core.sks_mskb = MskbPhase::Done;
+            match kind {
+                sks_ipc::OUT_NOT_SENT => dev_info!(self.dev, "VERDICT sks make_system_keybag (standalone) : NON ENVOYÉ (set_env non ACCEPTÉ, ou valeurs userland manquantes)\n"),
+                sks_ipc::OUT_SILENCE => dev_info!(
+                    self.dev,
+                    "VERDICT sks make_system_keybag (standalone) : SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03 en {} ms ; {} mot(s) 0x12 après l'envoi)\n",
+                    KS_LISTEN_MS, core.sks_mskb_rx_after
+                ),
+                _ => {
+                    let snap = core.sks_mskb_snap;
+                    let u = |o: usize| u32::from_le_bytes([snap[o], snap[o + 1], snap[o + 2], snap[o + 3]]);
+                    for o in (0..sks_ipc::OUT_SNAP).step_by(16) {
+                        dev_info!(self.dev, "  B12 make_system_keybag standalone (instantané à la réponse) +{:#05x} : {:08x} {:08x} {:08x} {:08x}\n", o, u(o), u(o + 4), u(o + 8), u(o + 12));
+                    }
+                    let w = Word::decode(raw);
+                    let rw = sks_keybag::reply_word(&w);
+                    if rw.status == 0 {
+                        let handle = sks_keybag::reply_handle(&snap).unwrap_or(0);
+                        dev_info!(
+                            self.dev,
+                            "VERDICT sks make_system_keybag (standalone) : marqué system (PARAM 0 ; handle=0x{:08x} si rendu [OOL B +0x6c, DÉDUIT ; un make_system ne rend normalement PAS de handle] ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x}\n",
+                            handle, rw.len, rw.call_flags, w.tag, raw
+                        );
+                    } else {
+                        dev_info!(
+                            self.dev,
+                            "VERDICT sks make_system_keybag (standalone) : REFUS (PARAM {} = statut signé ≠ 0 ; un handle valide est peut-être requis AVANT — voir docs/sks_native_plan.md §10 ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x}\n",
+                            rw.status, rw.len, rw.call_flags, w.tag, raw
+                        );
+                    }
+                }
+            }
+            self.cv.notify_all();
+        }
+
+        /// J11 : écriture de /dev/sep_sks du make_system_keybag STANDALONE (0x84 o) pour allow_sks=6. Acceptée seulement
+        /// en `MskbPhase::WaitReq`, après la porte complète ; refus = rien envoyé, pas de Halted. EAGAIN tant qu'elle
+        /// n'est pas attendue ; EALREADY une fois finie.
+        fn sks_submit_mskb_std(&self, req: &[u8]) -> Result {
+            let mut core = self.core.lock();
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            if param_allow_sks() != 6 {
+                return Err(EINVAL);
+            }
+            if core.sks_mskb == MskbPhase::WaitReq {
+                let f = match sks_keybag::check_mskb(req) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        dev_err!(self.dev, "sks make_system_keybag (standalone) : requête refusée par la porte ({}) : rien envoyé\n", why(&e));
+                        return Err(EINVAL);
+                    }
+                };
+                core.sks_mskb_req.copy_from_slice(req);
+                core.sks_mskb = MskbPhase::ReqReady;
+                dev_info!(self.dev, "sks make_system_keybag (standalone) : requête acceptée (handle_y {:#018x}, handle chargé {:#010x}, type {}, horodatage {} µs)\n", f.handle_y, f.loaded_handle, f.keybag_type, f.fields.ts_us);
+                self.cv.notify_all();
+                return Ok(());
+            }
+            if core.sks_mskb == MskbPhase::Done {
+                Err(EALREADY)
+            } else {
+                Err(EAGAIN)
+            }
         }
 
         /// J10 : 4e/5e écriture de /dev/sep_sks (create_keybag 0x80 variante 4 puis make_system_keybag 0x84 ; la phase du
@@ -3630,11 +3825,13 @@ mod drv {
         //               (toujours atteint, même si une transaction n'est pas envoyée).
         // allow_sks=5 : lecture = get_capabilities, set_env, create_keybag, make_system_keybag (4 × OUT_SIZE), prêt en
         //               `MskbPhase::Done` (toujours atteint).
+        // allow_sks=6 : lecture = get_capabilities, set_env, make_system_keybag STANDALONE (3 × OUT_SIZE), prêt en
+        //               `MskbPhase::Done` (le 3e enregistrement est make_system standalone, ndk_out/ckb_out jamais remplis).
         fn read_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterDest<'_>) -> Result<usize> {
             let me = kiocb.file();
             let records = match param_allow_sks() {
                 5 => 4,
-                4 => 3,
+                4 | 6 => 3,
                 3 => 2,
                 _ => 1,
             };
@@ -3648,7 +3845,7 @@ mod drv {
                     return Err(EIO);
                 }
                 let ready = match param_allow_sks() {
-                    5 => core.sks_mskb == MskbPhase::Done,
+                    5 | 6 => core.sks_mskb == MskbPhase::Done,
                     4 => core.sks_ndk == NdkPhase::Done,
                     3 => core.sks_se == SePhase::Done,
                     _ => core.sks_gc == GcPhase::Done,
@@ -3659,10 +3856,13 @@ mod drv {
                     if records >= 2 {
                         rec[sks_ipc::OUT_SIZE..sks_ipc::OUT_SIZE * 2].copy_from_slice(&core.se_out);
                     }
-                    // allow_sks=4 : le 3e enregistrement est null_d_key ; allow_sks=5 : c'est create_keybag puis
-                    // make_system_keybag (ndk_out n'est jamais rempli en 5).
-                    if records == 3 {
+                    // allow_sks=4 : le 3e enregistrement est null_d_key ; allow_sks=6 : c'est make_system_keybag
+                    // standalone ; allow_sks=5 : create_keybag puis make_system_keybag (ndk_out jamais rempli en 5/6).
+                    if param_allow_sks() == 4 {
                         rec[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3].copy_from_slice(&core.ndk_out);
+                    }
+                    if param_allow_sks() == 6 {
+                        rec[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3].copy_from_slice(&core.mskb_out);
                     }
                     if records == 4 {
                         rec[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3].copy_from_slice(&core.ckb_out);
@@ -3691,7 +3891,8 @@ mod drv {
             let setenv = n == sks_setenv::SETENV_LEN && param_allow_sks() >= 3;
             let nulldkey = n == sks_nulldkey::NULLDKEY_LEN && param_allow_sks() == 4;
             let keybag = (n == sks_keybag::CKB_LEN || n == sks_keybag::MSKB_LEN) && param_allow_sks() == 5;
-            if !(getcap || setenv || nulldkey || keybag) {
+            let mskb_std = n == sks_keybag::MSKB_LEN && param_allow_sks() == 6;
+            if !(getcap || setenv || nulldkey || keybag || mskb_std) {
                 return Err(EINVAL);
             }
             let mut buf = KVec::with_capacity(n, GFP_KERNEL)?;
@@ -3704,6 +3905,8 @@ mod drv {
                 me.sks_submit_setenv(&buf)?;
             } else if nulldkey {
                 me.sks_submit_nulldkey(&buf)?;
+            } else if mskb_std {
+                me.sks_submit_mskb_std(&buf)?;
             } else {
                 me.sks_submit_keybag(&buf)?;
             }
@@ -3848,6 +4051,7 @@ mod drv {
                                 // moment. Échec de création → le fil du probe n'aura aucune requête : rien envoyé à 0x12.
                                 if param_allow_sks() >= 2 {
                                     let tool = match param_allow_sks() {
+                                        6 => "sks_setenv run --mskb --uuid … --type … (J11 : make_system_keybag STANDALONE)",
                                         5 => "sks_setenv run --keybag --uuid … --class … --type … (J10 : create_keybag puis make_system_keybag)",
                                         4 => "sks_setenv run (J9c : null_d_key en 3e écriture)",
                                         3 => "sks_setenv run",
@@ -3878,6 +4082,7 @@ mod drv {
                                     data.sks_nulldkey_finish(&mut c);
                                     data.sks_createkeybag_finish(&mut c);
                                     data.sks_mskb_finish(&mut c);
+                                    data.sks_mskb_std_finish(&mut c);
                                 }
                             }
                             Err(e) => dev_err!(dev, "0x13 non servi : {:?} (état {:?})\n", e, data.state()),
@@ -3900,10 +4105,10 @@ mod drv {
             pdev: &'bound platform::Device<device::Core<'_>>,
             _info: Option<&'bound Self::IdInfo>,
         ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
-            if param_allow_sks() > 5
+            if param_allow_sks() > 6
                 || (param_allow_sks() != 0 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
             {
-                dev_err!(pdev, "allow_sks vaut 0, 1, 2, 3, 4 ou 5 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
+                dev_err!(pdev, "allow_sks vaut 0, 1, 2, 3, 4, 5 ou 6 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
                 return Err(EINVAL);
             }
             if (param_allow_xart() && param_allow_boot() == 0)

@@ -415,3 +415,63 @@ le script refuse. **Après** : si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboo
 décision d'Albert. Classes neuves (create_keybag + make_system_keybag) **ET ordre neuf** (perform_operation ET null_d_key
 sautés) → **1er run = « go » d'Albert** (`pending/j10_sks_create_keybag_chained.sh`). **SQUELETTE : rien ne peut tourner
 avant les valeurs userland requises.**
+
+## 10. Expérience (PIVOT) : J11 = `make_system_keybag` STANDALONE, sans `create_keybag` (`allow_sks=6`) — 2026-11-23, rien lancé
+
+**Pourquoi le pivot.** J10b (journal 2026-11-23, `docs/applekeystored_identity.md` §8/§9) a montré que `create_keybag`
+(TAG fil 0x01) est un **import-AVEC-données** : il refuse −0xb (« argument requis nul ») quand les trois blobs sont
+vides. Ce n'est donc **PAS** la création d'un keybag vide. La **vraie création à neuf** — le SEP fabrique le keybag
+système avec sa **clé d'appareil**, blob VIDE — est **`make_system_keybag` (TAG fil 0x0d)** via `identity_load`
+(selector 0x78). J11 l'émet **SEUL** (sans `create_keybag` avant) pour voir ce que le SEP répond. Le validateur réel
+est dans SEPOS (non lisible) : seul le matériel tranche.
+
+**Ce que J11 émet.** Chemin = J9b (boot chaîné, lockers sans UUID, CNTL de skdl/sks/scrd, UN get_capabilities ACCEPTÉ,
+UN set_env ACCEPTÉ) puis, en SAUTANT perform_operation, null_d_key ET create_keybag, **UN SEUL**
+`make_system_keybag` : `> EP 0x12 TAG 0x0d TYPE 0x03 PARAM 0 DATA 0x00840000`, OOL A12 = **0x84 o**, **corps
+byte-identique** au make_system chaîné de §9 (état 1 + handle_y u64 @0x58 + handle chargé u32 @0x60 + type u32 @0x64 +
+blob{len 0x10, uuid} @0x68 + flag u64 0 @0x7c, condensé v2). **La seule différence avec §9 est le compteur de
+transaction** : make_system est ici la **3e** transaction (getcap=1, set_env=2, make_system=3), donc le mot porte
+**TYPE 0x03** (et non 0x04) ; le TYPE n'est pas dans les octets condensés. Réponse appariée TAG 0x8d **TYPE 0x03**.
+
+**Les entrées (userland).** `uuid` (16 o, blob) et `type` (i32, contrainte VU type ≤ −10) sont **requis** (inconnus,
+reversés sur le PC). **Avec défaut 0** : `handle_y` (u64 @0x58) et surtout le **handle chargé** (u32 @0x60). Dans la
+version chaînée (§9), ce handle venait de la réponse `create_keybag` (le noyau le posait via `finalize_mskb`). **En
+standalone il n'y a pas d'op préalable : le handle chargé et `handle_y` deviennent des entrées userland** ; le noyau
+n'insère RIEN et **ne recalcule pas** le condensé — il envoie la requête telle que l'outil l'a construite (condensé
+userland déjà contrôlé par la porte `sks_keybag::check_mskb` : longueur, en-tête, état 1, blob len 0x10, flag 0,
+condensé v2 ; uuid/type/handle chargé/handle_y **libres**, non contrôlés). Porte d'envoi : `MskbStandaloneGate` (ce mot
+exact — TYPE 0x03 —, une fois ; tout autre mot vers 0x12/0x17/0x0a reste refusé → Halted).
+
+**L'INCONNUE du handle (honnête, pas tranchée).** Un make_system standalone porte normalement un handle de keybag
+**rendu par create/load**. Ici il n'y en a pas : on teste avec **0**. Deux issues possibles, toutes deux
+informatives : (a) **marqué system** (PARAM 0) = le SEP crée le keybag système à partir de sa seule clé d'appareil, sans
+handle préalable → la voie identité native s'ouvre ; (b) **REFUS** (PARAM ≠ 0) = un handle valide (ou une op préalable)
+est requis d'abord → ça **confirme** qu'il faut une op avant (→ mur, ou capture macOS pour lire la séquence exacte).
+Sur PARAM 0, le verdict lit aussi un éventuel handle à OOL B +0x6c (« handle=0x… si rendu », offset DÉDUIT ; un
+make_system ne rend normalement PAS de handle).
+
+**Déroulé `allow_sks=6`** : getcap (txn1) → set_env (txn2) → make_system_keybag STANDALONE (txn3). `read` de
+`/dev/sep_sks` rend getcap **puis** set_env **puis** make_system standalone (**3 × 0x98 o**). Verdict dmesg « VERDICT sks
+make_system_keybag (standalone) : marqué system (PARAM 0 ; handle=0x… si rendu) / REFUS (PARAM …) / SILENCE / NON
+ENVOYÉ ». Rien d'autre vers 0x12/0x17/0x0a (Halted sinon). Puis le 0x73 sbio comme J9b. **allow_sks=5 (create_keybag
+chaîné) reste disponible et intact.**
+
+**Tests hors matériel** : `sep-proto::sks_keybag` (mot standalone TYPE 0x03 vs 0x04 chaîné ; corps identique à
+`encode_mskb` ; appariement de la réponse 0x8d TYPE 0x03 ; `MskbStandaloneGate` un seul mot) ; **requête identique octet
+pour octet à une construction Python/`hashlib` indépendante** sur valeurs d'EXEMPLE « PAS les vraies » (ts
+0x1122334455667788, uuid 00..0f, type −16, handle_y 0x4242424242424242, handle chargé 0xdeadbeef → condensé
+`c5fd84961b48bf2de20d818be48d391d`, sha256 `7cb9ba6138cf7464950f27feea9265f296123245f19c61eb5ae48f0bb2000018`) ;
+`sks-setenv` étendu (`run --mskb`, `build-mskb --mskb`, `check-mskb --mskb`, `decode --mskb` ; uuid/type **obligatoires**).
+`cargo test` vert, clippy propre (`CLIPPY=1` pour le `.ko`).
+
+**Binaires** (`~/kbuild/j15`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `8a395911a83d0e7faf8c452fa08b6bdd3cfe14f4327a049e6111c9e1c400bfe6` (allow_sks=6), `sks_setenv`
+`c7b722ddcb5d8550cb72a16fd5cc629f4991c1ab97118bb412ebb751648f18f0` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo` =
+copies de `~/kbuild/j14` (sha256 inchangés).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd` ; copie du store avant run ; **uuid et type fournis**
+(`UUID=`/`TYPE=` ou `--uuid`/`--type` ; `MSKB_HANDLE`/`HANDLE_Y` ont un défaut 0), sinon le script refuse. **Après** :
+si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon store du service périmé → décision d'Albert. Classe/ordre
+neufs (make_system émis SEUL, create_keybag sauté) → **1er run = « go » d'Albert**
+(`pending/j11_sks_make_system_chained.sh`). **SQUELETTE : rien ne tourne avant uuid + type.**

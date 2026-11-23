@@ -3256,3 +3256,43 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
   create_keybag et le rejette pour une raison SÉMANTIQUE (-0xb). Progrès net. 0 SAVE, store inchangé, sbio VIVANT.
 - PROCHAIN : décoder -0xb (0xf5) pour create_keybag au binaire (valeur de classe ? champ requis handle_y/field2 ? précondition ?
   politique ?). Puis ajuster un champ. make_system toujours NON ENVOYÉ (pas de handle).
+
+## 2026-11-23 (session ALARM, agent driver, Opus 4.8) — J11 PIVOT : make_system_keybag STANDALONE codé (allow_sks=6), compilé, prêt
+- PRÉPARATION seulement (rien chargé/installé/envoyé au SEP, pas de sudo, rien commité). Travail dans `~/kbuild/j15`.
+  Suite du décode -0xb (HEAD) : create_keybag 0x01 = **import-AVEC-données** (refus -0xb « argument requis nul » si blobs
+  vides), PAS la création d'un keybag vide ; la **vraie création à neuf** (le SEP fabrique avec sa clé d'appareil, blob
+  VIDE) = **make_system_keybag (TAG fil 0x0d)** via identity_load (selector 0x78). J11 = l'émettre **SEUL**.
+- FAIT (sans copier de code Apple ; depuis `docs/applekeystored_identity.md` §6/§8/§9, `source: kext`) :
+  - `sep-proto::sks_keybag` — ajout du chemin **standalone** : `MSKB_TXN_STANDALONE = 0x03` (3e transaction :
+    getcap=1, set_env=2, make_system=3, donc mot **TYPE 0x03**, pas 0x04), `mskb_word_standalone()`,
+    `is_mskb_reply_standalone()` (apparie TYPE 0x03), porte `MskbStandaloneGate`. Le **corps OOL est IDENTIQUE** au
+    make_system chaîné (`encode_mskb`/`check_mskb` réutilisés) : le TYPE n'est que dans le mot de l'anneau, pas dans les
+    octets condensés (0x14..). En standalone, `loaded_handle` (0x60) et `handle_y` (0x58) sont des ENTRÉES userland
+    (pas de create/load avant) ; le handle est **INCONNU**, testé à 0. Tests verts (mot/corps, appariement, porte).
+  - `kmod/sep_native.rs` — nouveau niveau **allow_sks=6** (mêmes préconditions que 5 : allow_sbio=1, sbio_open=1,
+    allow_sbio_relay=0). Après getcap+set_env (inchangés), SAUTE create_keybag et émet UN SEUL make_system_keybag
+    standalone (porte `sks_mskb_std_gate`), **sans finalize ni recalcul de condensé** (envoyé tel quel). Verdict dmesg
+    « VERDICT sks make_system_keybag (standalone) : marqué system (PARAM 0 ; handle=0x… si rendu) / REFUS (PARAM …) /
+    SILENCE / NON ENVOYÉ ». `read` de /dev/sep_sks = 3 enregistrements (getcap, setenv, make_system standalone). Rien
+    d'autre vers 0x12/0x17/0x0a (Halted sinon). Puis le 0x73 sbio. **allow_sks=5 (create_keybag) laissé intact.**
+  - outil `sks-setenv` — sous-commande `run --mskb --uuid <hex16> --type <i32> [--mskb-handle <u32>=0]
+    [--handle-y <u64>=0]` (uuid+type obligatoires) ; `build-mskb --mskb`, `check-mskb --mskb`, `decode --mskb` adaptés
+    à l'émission standalone (TYPE 0x03, loaded_handle userland envoyé tel quel).
+- TESTS (hors matériel) : `cargo test` vert (sep-proto 13 tests keybag dont 2 standalone + suites ; sks-setenv lib + 4
+  intégration). **Condensé Python/hashlib INDÉPENDANT** (`scratchpad/mskb_std_vec.py`) sur valeurs d'EXEMPLE (« PAS les
+  vraies » : ts 0x1122334455667788, uuid 00..0f, type -16, handle_y 0x4242424242424242, mskb-handle 0xdeadbeef) →
+  digest `c5fd84961b48bf2de20d818be48d391d`, sha256 `7cb9ba6138cf7464950f27feea9265f296123245f19c61eb5ae48f0bb2000018`,
+  identiques à l'encodeur ET au binaire release `sks_setenv build-mskb --mskb`. clippy propre (userspace + `CLIPPY=1` .ko).
+- BINAIRES `~/kbuild/j15` + `SHA256SUMS` : `sep_native.ko`
+  `8a395911a83d0e7faf8c452fa08b6bdd3cfe14f4327a049e6111c9e1c400bfe6` (allow_sks=6), `sks_setenv`
+  `c7b722ddcb5d8550cb72a16fd5cc629f4991c1ab97118bb412ebb751648f18f0` ; `sepd`
+  `6ad1992f12b0d300b37b6b20ba2e9e3c0cc44d4e02bd7b74ce031cc958e37f4a`, `sep_native_ovl.ko`
+  `02c1fcc2fb9b19363a89a8ad818422411eb968110720d039d3b822029ad517cd`, `sep-native.dtbo`
+  `8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771` = copies de j14 (inchangées).
+- FAIT : `pending/j11_sks_make_system_chained.sh` (dérivé de j10 ; en-tête but/risque/résultat, allow_sks=6, exige
+  UUID/TYPE sinon refus, service désactivé requis, STORE≠/var/lib/sepd, copie du store avant run, dit si SAVE) ; `bash -n`
+  OK. `docs/sks_native_plan.md` §10 ajouté. **Pas commité.**
+- INCONNUE À DOCUMENTER (pas une hypothèse résolue) : le handle chargé (0x60) d'un make_system standalone est INCONNU
+  (normalement rendu par create/load) → testé à 0. Si le SEP exige un handle valide d'abord, le standalone REFUSERA,
+  ce qui CONFIRMERAIT qu'une op préalable est obligatoire (→ mur, ou capture macOS). Classe/ordre neufs → 1er run = « go »
+  d'Albert + reboot ; power-cycle = Albert.

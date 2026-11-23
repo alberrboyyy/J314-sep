@@ -433,6 +433,64 @@ pub fn describe_mskb_verdict(v: &MskbVerdict, raw: u64, snap: &[u8]) -> String {
     s
 }
 
+/// Human description of a STANDALONE make_system_keybag request (J11, allow_sks=6): same gate/body as the chained one,
+/// but the ring word is TYPE 0x03 (3rd transaction, no create_keybag before it) and the `loaded_handle` (OOL 0x60) is
+/// a USERLAND value, NOT a kernel-plugged placeholder. The handle a standalone make_system should carry is UNKNOWN.
+pub fn describe_mskb_standalone(b: &[u8]) -> Result<String, String> {
+    let r = sks_keybag::check_mskb(b).map_err(|e| format!("make_system_keybag (standalone) refusé par la porte (identique au noyau) : {e}"))?;
+    let k = sks_ipc::cdhash_kind(&GetcapFields { ts_us: r.fields.ts_us, uniqueid: r.fields.uniqueid, uid: r.fields.uid, cdhash: r.fields.cdhash });
+    let mut s = String::new();
+    let _ = writeln!(s, "make_system_keybag STANDALONE ({:#x} o) — mot > EP 0x12 TAG 0x0d TYPE 0x03 PARAM 0 DATA {:#010x}", b.len(), sks_keybag::MSKB_DATA);
+    let _ = writeln!(s, "  en-tête v2 ; 0x04 condensé v2 = {}", hex(&b[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN]));
+    let _ = writeln!(s, "  état 1 (const) ; handle_y {:#018x} (USERLAND, défaut 0) ; handle chargé {:#010x} (USERLAND, défaut 0 — pas de create/load avant : handle INCONNU) ; type {} (USERLAND{}) ; blob 0x10 o : uuid {} (USERLAND) ; flag 0", r.handle_y, r.loaded_handle, r.keybag_type, if sks_keybag::type_in_vu_range(r.keybag_type) { "" } else { ", HORS plage VU type<=-10" }, hex(&r.uuid));
+    let _ = writeln!(s, "  J11 PIVOT : envoyé TEL QUEL (pas de finalize côté noyau) ; si le SEP exige un handle valide avant, REFUS attendu (voir docs/sks_native_plan.md §10)");
+    let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", r.fields.ts_us, r.fields.uniqueid, r.fields.uid, hex(&r.fields.cdhash), cdhash_label(k));
+    s.push_str(&dump(b));
+    Ok(s)
+}
+
+/// Verdict of the STANDALONE make_system_keybag (J11). Reuses `MskbVerdict`, but matches the reply as TYPE 0x03.
+pub fn mskb_std_verdict(rec: &[u8]) -> Result<(MskbVerdict, u64, Vec<u8>), String> {
+    let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement make_system_keybag (standalone) illisible : {e}"))?;
+    let snap = snap.to_vec();
+    let v = match kind {
+        sks_ipc::OUT_NOT_SENT => MskbVerdict::NotSent,
+        sks_ipc::OUT_SILENCE => MskbVerdict::Silence,
+        _ => {
+            let w = Word::decode(raw);
+            let rw = sks_keybag::reply_word(&w);
+            if !sks_keybag::is_mskb_reply_standalone(&w) {
+                MskbVerdict::Refus(format!("mot {raw:#018x} non apparié (EP/TAG bit 7/TYPE 0x03)"))
+            } else if rw.status == 0 {
+                MskbVerdict::MarkedSystem
+            } else {
+                MskbVerdict::Refus(format!("PARAM {} = statut signé ≠ 0", rw.status))
+            }
+        }
+    };
+    Ok((v, raw, snap))
+}
+
+pub fn describe_mskb_std_verdict(v: &MskbVerdict, raw: u64, snap: &[u8]) -> String {
+    let mut s = String::new();
+    match v {
+        MskbVerdict::NotSent => s.push_str("VERDICT sks make_system_keybag (standalone) : NON ENVOYÉ (set_env non ACCEPTÉ, ou valeurs userland manquantes)\n"),
+        MskbVerdict::Silence => s.push_str("VERDICT sks make_system_keybag (standalone) : SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03)\n"),
+        MskbVerdict::MarkedSystem => {
+            let handle = sks_keybag::reply_handle(snap).unwrap_or(0);
+            let _ = writeln!(s, "VERDICT sks make_system_keybag (standalone) : marqué system (PARAM 0 ; handle=0x{handle:08x} si rendu [OOL B +0x6c, DÉDUIT ; un make_system ne rend normalement PAS de handle]) mot {raw:#018x}");
+        }
+        MskbVerdict::Refus(reason) => {
+            let _ = writeln!(s, "VERDICT sks make_system_keybag (standalone) : REFUS ({reason} ; un handle valide est peut-être requis AVANT — voir docs/sks_native_plan.md §10) mot {raw:#018x}");
+        }
+    }
+    if !matches!(v, MskbVerdict::NotSent) {
+        s.push_str("instantané de B12 (0x80 o) :\n");
+        s.push_str(&dump(snap));
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -528,6 +586,28 @@ mod tests {
         let bad = ok | (0xffu64 << 24);
         assert!(matches!(mskb_verdict(&encode_outcome(OUT_REPLIED, bad, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Refus(_)));
         assert_eq!(mskb_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::NotSent);
+    }
+
+    #[test]
+    fn mskb_standalone_build_describe_and_outcomes() {
+        // ARBITRARY example values — PAS les vraies (uuid/type inconnus, reversés sur le PC).
+        let uuid: [u8; UUID_LEN] = core::array::from_fn(|i| i as u8);
+        // Standalone: loaded_handle is a USERLAND value (here 0xdeadbeef), NOT a placeholder; no finalize.
+        let mskb = sks_keybag::encode_mskb(&keybag_fields(123, 0, 0, CdhashMode::Sha1), 0x4242, 0xdead_beef, -16, &uuid);
+        assert!(describe_mskb_standalone(&mskb).is_ok());
+        assert_eq!(sks_keybag::check_mskb(&mskb).unwrap().loaded_handle, 0xdead_beef);
+
+        // Standalone reply is TYPE 0x03: `< 0x12 TAG 0x8d TYPE 0x03 PARAM 0` → marqué system.
+        let ok = 0x0000_0000_0000_8d12u64 | (0x03u64 << 16);
+        assert_eq!(mskb_std_verdict(&encode_outcome(OUT_REPLIED, ok, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::MarkedSystem);
+        // A TYPE 0x04 reply (chained) must NOT be matched by the standalone verdict.
+        let chained = 0x0000_0000_0000_8d12u64 | (0x04u64 << 16);
+        assert!(matches!(mskb_std_verdict(&encode_outcome(OUT_REPLIED, chained, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Refus(_)));
+        // PARAM != 0 → REFUS.
+        let bad = ok | (0xffu64 << 24);
+        assert!(matches!(mskb_std_verdict(&encode_outcome(OUT_REPLIED, bad, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Refus(_)));
+        assert_eq!(mskb_std_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Silence);
+        assert_eq!(mskb_std_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::NotSent);
     }
 
     #[test]
