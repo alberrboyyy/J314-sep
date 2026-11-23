@@ -3103,3 +3103,20 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - **with_hash** = variante épinglée au hash du passcode (VU : exige hash+itérations valides) → **PAS** sur le chemin
   sans passcode. J10 « sans passcode » = create_keybag NU (0x01) + make_system_keybag (0x0d).
 - Test J10 = voir si create_keybag nu rend un handle (il le doit, VU). Écriture 0x12 classe neuve → go d'Albert ; power-cycle = Albert.
+## 2026-11-23 — Claude (session PC, Opus 4.8) — valeurs J10 (type/classe) + coreauthd (secret du jeton)
+- Désassemblage kext (macos/kc/) + chaînes coreauthd (extrait). docs/applekeystored_identity.md §7 + docs/sks_unlock_token.md §5. Rien lancé, aucun secret/uuid extrait.
+- **type (make_system +0x64) = RÉSOLU PAR LE KEXT, pas choisi par l'hôte** (VU, découverte) : l'op d'identité = userclient
+  **sélecteur 0x78** (cas @0xcd4078) ; exige 1 struct-input (uuid 16 o), 0 scalaire ; le type est écrit par
+  `effective_bag_handle_actual` @0xccfd20 (→ résolveur `0xccff20(sel, input0=1er mot de l'uuid)`) dans [sp+0xf0], relu
+  en w3 d'identity_load (qui rejette si > −10). ⇒ **pas de balayage de type** : émettre 0x78 + uuid, le kext pose le type.
+  Valeur numérique exacte = résolveur multi-branches non entièrement évalué (INCONNU précis, non bloquant).
+- **classe (create_keybag arg2)** = champ codec **+0x60** (DÉDUIT positionnel ; +0x64 = param secondaire) ; valeur =
+  scalaire userland (pas constante kext) → INCONNU précis ; A..D (1..4) plausibles ; capture macOS ou balayage borné.
+- **J10 minimal** = create_keybag nu (sél 0x2 → TAG 0x01) rend un handle sans passcode (VU) ; seule valeur = la classe.
+- **coreauthd (secret du jeton 0x1c)** : démon client **AppleCredentialManager (ACM)** ; entitlements keystore.device/
+  device.verify + applekeystored ; lie AppleKeyStoreUserClient. Le secret = **credential ACM passphrase** (passcode →
+  `PassphraseCredentialWithPurpose`/`ACMContextAddCredential` → `ACMContextGetExternalForm`), **PAS le passcode brut**.
+  Format octet du blob (+0x68/+0x70) = interne ACMLib → INCONNU précis (reverse ACMLib ou capture). Sélecteur (+0x64) =
+  arg3 de aks_auth_token_create, valeur appelant INCONNU précis.
+- Conséquence : le test d'enrôlement (après J10) bute sur l'emballage ACM du secret (mur analogue au jeton SEP-forgé) ;
+  J10 (create keybag nu) n'en dépend pas. Écriture 0x12 classe neuve → go d'Albert.

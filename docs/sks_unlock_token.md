@@ -133,3 +133,45 @@ Les seuls blancs sont (a) des **valeurs de scalaires** fixées par l'appelant (c
 session), (b) le **contenu opaque du jeton** (hors binaire AP, interne SEP), (c) des questions **100 % matériel**
 (le SEP accepte-t-il ces ops brutes sur EP 0x12, sur un keybag recréé par Linux ?) — classe neuve, **go d'Albert**.
 Le passcode/secret d'Albert reste fourni **à l'exécution**, jamais stocké ni extrait.
+
+---
+
+## 5. coreauthd — le secret/credential du jeton `authentication_token_create` (0x1c) — source: userland
+
+Ajout 2026-11-23 (session PC), PRIORITÉ 2 de la mission J10 (pièce du test d'enrôlement suivant). Binaire `coreauthd`
+(`/System/Library/Frameworks/LocalAuthentication.framework/Support/coreauthd`, slice arm64e) extrait de l'IPSW public
+via `ipsw --remote --ranged` (byte-ranges, sans fuse). Démon strippé → analyse par **chaînes + entitlements + symboles
+ACM importés**. `source: userland`. Rien lancé, aucun secret/passcode extrait.
+
+### 5.1 coreauthd parle bien au keystore (VU)
+Entitlements (VU, Info.plist embarqué) : `com.apple.keystore.device`, `com.apple.keystore.device.verify`,
+`com.apple.private.applekeystored`, `com.apple.keystore.filevault`, `com.apple.keystore.access-keychain-keys` ; lie
+`AppleKeyStoreUserClient`. (Note : `com.apple.keystore.auth-token`, que `acm_token.md` §2.1 donnait comme requis pour
+auth_token_create, **n'est pas** dans coreauthd ici — il porte `device`/`device.verify` ; le détenteur exact de
+`auth-token` reste à confirmer, possiblement un autre client LA.)
+
+### 5.2 Le secret = un **credential ACM**, pas le passcode brut (VU symboles + DÉDUIT flot)
+coreauthd est un client **AppleCredentialManager (ACM)** / LocalAuthenticationCredentialServices (VU : lib `ACMLib.c`,
+entitlements `com.apple.private.applecredentialmanager.*`, userclient `AppleCredentialManagerUserClient`). Chaîne de
+fabrication du credential (VU symboles) :
+1. **Saisie passcode** → `LACMutablePasscodeVerificationRequest` (LocalAuthentication).
+2. **Credential passphrase ACM** : `PassphraseCredentialWithPurpose`, `ACMContextAddCredential[WithScope]`,
+   type `ACMCredentialDataPassphraseEntered` / `…Extractable`, posé dans un **contexte ACM**.
+3. **Sérialisation** : `ACMContextGetExternalForm` / `ACMContextCreateWithExternalForm`, `ACMContextCopyData`/
+   `GetData`/`SetData` → une **external-form** (représentation portable du contexte ACM qui traverse les frontières).
+→ **DÉDUIT fort** : le **blob secret** passé à `authentication_token_create` (kext `secretFromInput`, ≤ 0x1000 o,
+corps OOL **+0x68/+0x70**, cf. §2.3) **n'est pas le passcode en clair** : c'est un **credential/contexte ACM dérivé du
+passcode** (passphrase credential, éventuellement sous external-form). Le passcode entre dans l'ACM ; ce qui sort vers
+le SEP est du **matériel ACM**.
+
+### 5.3 Ce qui reste INCONNU (binaire) → à capturer/approfondir
+- **Format octet exact du blob secret (+0x68/+0x70)** : interne à AppleCredentialManager (ACMLib) — **INCONNU précis**
+  (opaque ; soit la credential passphrase sérialisée, soit l'external-form du contexte). À trancher en désassemblant
+  `ACMLib`/`LibCall_ACMContext*` (non fait cette passe) ou par **capture** d'un appel macOS vivant.
+- **Sélecteur / arg3 (corps OOL +0x64)** : = `arg3` de `aks_auth_token_create` (`sks_userland_values.md` §1.1), **valeur
+  fournie par l'appelant** (coreauthd/LA) → **INCONNU précis** (site d'appel exact non isolé dans ce démon strippé).
+- **Conséquence pour le test d'enrôlement (suivant J10)** : un hôte Linux **ne peut pas** passer le passcode brut comme
+  secret — il doit **reproduire un credential/contexte ACM** (format ACM, évalué par le SEP). C'est un **mur analogue**
+  à celui du jeton forgé par le SEP (`acm_token.md` §5) : la **saisie du passcode d'Albert** reste nécessaire **à
+  l'exécution**, mais son **emballage ACM** est une pièce à reverser (ACMLib) ou à capturer avant ce test. J10 (create
+  keybag nu) **n'en dépend pas** ; c'est le **test d'après** (enrôlement/jeton) qui bute dessus.

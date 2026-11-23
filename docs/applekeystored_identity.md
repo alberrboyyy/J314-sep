@@ -190,3 +190,47 @@ make_system_keybag 0x0d (handle + uuid 16 o + type ≤ −10, blob vide)`. **Byt
 (§1.6 `sks_protocol.md`, déjà en Rust J9c), les gabarits OOL. **À fournir/balayer au matériel** : la valeur de `classe`,
 la valeur de `type` (≤ −10), l'uuid (celui de l'hôte). **Test J10 = voir si `create_keybag` nu rend un handle** (il le
 doit, VU) — **classe neuve en écriture 0x12 → go d'Albert** ; power-cycle = Albert. Rien lancé ici.
+
+---
+
+## 7. Valeurs J10 (type / classe) — ce que le binaire fixe vraiment
+
+Ajout 2026-11-23 (session PC), réponse à la PRIORITÉ 1 (fixer type/classe sans balayage). `source: kext` (27.2.1).
+
+### 7.1 `type` (make_system_keybag +0x64) = **RÉSOLU PAR LE KEXT, pas choisi par l'hôte** — VU (découverte)
+Le chemin d'identité (make_system via `identity_load`) est l'**op userclient sélecteur 0x78** (VU : cas jump-table
+@0xcd4078 ; `handleUserClientSelector` @0xcd0840). Dans ce cas (VU @0xcd4078-0xcd411c) :
+- entrée exigée : **1 struct-input** (`[x19,#0x28]==1`) = l'**uuid 16 o** ; **0 scalaire** (`[x19,#0x50]==0`).
+- le **type n'est PAS un scalaire userspace** : le kext le **calcule** —
+  `effective_bag_handle_actual(this, sel=0x78, input0=premier mot de l'uuid, int* out=&type)` @0xccfd20, qui appelle
+  le résolveur `0xccff20(sel, input0)`, puis **écrit le type dans `[sp+0xf0]`** ; ce `[sp+0xf0]` devient `w3` d'
+  `identity_load` (VU @0xcd4110 `ldr w3,[sp,#0xf0]`). `identity_load` rejette alors si **type > −10** (VU `cmn w21,#0xa ; b.gt`).
+- **Conséquence J10 (importante)** : l'hôte **ne devine pas** le type. Il **sélectionne l'op 0x78 et fournit l'uuid** ;
+  le **kext dérive le type** (≤ −10) de (0x78, uuid). → **pas de balayage de type nécessaire** : rejouer l'op 0x78 avec
+  un uuid 16 o, exactement comme macOS.
+- **Valeur numérique exacte** : produite par le résolveur `0xccff20` (multi-branches : masque de bits sur le sélecteur
+  pour sel ≤ 0x23 ; pour 0x78 un chemin dépendant de `input0`/uuid) — **non réduite à une constante unique dans cette
+  passe** (trace symbolique profonde). Les constantes voisines vues (−1/−2/−3/−6) sont **> −10** donc **pas** le type
+  d'identité ; le type ≤ −10 vient d'une branche non entièrement évaluée. **INCONNU précis** (mécanisme VU). Pour J10,
+  ce n'est **pas bloquant** : on émet 0x78+uuid et le kext pose le type. Si on veut la valeur écrite, option = finir la
+  trace de `0xccff20` pour (0x78, input0), ou **capturer** sur macOS vivant.
+
+### 7.2 `classe` (create_keybag arg2) — champ VU, valeur userland
+- **Quel u32 du codec** : `create_keybag(this, u64 arg1, u32 CLASSE, …)` (VU sig @0xcc6904) ; le wrapper passe arg1→
+  ctx+0x58 (u64), **arg2 (classe) → ctx+0x60 (u32)** (DÉDUIT positionnel, cohérent avec les autres codecs) ; l'autre
+  u32 **+0x64** = l'argument suivant (un sous-type/flags du create). → **+0x60 = classe**, **+0x64 = param secondaire**.
+- **Valeur** : le cas create (sélecteur 0x2 @0xcd3334) lit des **scalaires userspace** (`[x19,#0x50]`) → la classe est
+  **fournie par l'appelant userland**, pas une constante kext. **Valeur exacte INCONNU** (posée par AKSIdentity/MKB).
+  Classes de protection AKS usuelles = A/B/C/D (1..4) ; pour un keybag « système/device » la valeur précise reste à
+  **capturer** (macOS vivant) ou **balayer en borné** (go d'Albert). Le `flag 0x100` (si `pin!=0`) est le seul autre
+  champ non nul du create nu.
+
+### 7.3 Récap décision J10
+- **create_keybag nu (sélecteur 0x2 → TAG fil 0x01)** : rend un handle **sans passcode** (VU). Seule valeur à fournir =
+  la **classe** (+0x60) → **INCONNU précis**, mais un create avec une classe plausible (ou balayage A..D borné) suffit
+  pour le **test « le SEP rend-il un handle »**. C'est le test minimal J10.
+- **make_system_keybag via op 0x78** : fournir **uuid 16 o** (struct-input) ; le **type est posé par le kext** (pas à
+  deviner). → pas de balayage de type.
+- **Reste INCONNU au binaire** (ALARM : balayage/capture matériel autorisé) : la **valeur de classe** du create système,
+  et la **valeur numérique** du type écrit par `0xccff20` (non bloquant pour émettre l'op). Rien lancé ; écriture 0x12
+  classe neuve → go d'Albert ; power-cycle = Albert.
