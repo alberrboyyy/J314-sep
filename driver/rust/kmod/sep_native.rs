@@ -107,6 +107,9 @@ mod sks_ipc;
 #[path = "../sep-proto/src/sks_setenv.rs"]
 #[allow(dead_code, unreachable_pub)]
 mod sks_setenv;
+#[path = "../sep-proto/src/sks_nulldkey.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod sks_nulldkey;
 
 kernel::module_platform_driver! {
     type: drv::SepNative,
@@ -145,7 +148,7 @@ kernel::module_platform_driver! {
         },
         allow_sks: u32 {
             default: 0,
-            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; nothing else ever to 0x12/0x17/0x0a",
+            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; nothing else ever to 0x12/0x17/0x0a",
         },
         allow_sbio_bio: u32 {
             default: 0,
@@ -160,6 +163,7 @@ mod drv {
     use crate::ks_gate::{self, OpenGate, KS_EPS, KS_SCRD, KS_SKDL, KS_SKS};
     use crate::sks_ipc::{self, GetcapGate};
     use crate::sks_setenv::{self, SetenvGate};
+    use crate::sks_nulldkey::{self, NulldkeyGate};
     use crate::sbio_gate::{self, EvtHdr, Step, EVT_HDR, EVT_MAX, KIND_BIO_REPLY, KIND_NOTIFY, KIND_REPLY, KIND_SPONT, MAX_REPLY};
     use crate::word::{Dir, Msg, Word};
     use crate::xart::{is_save, EP_XART, OP_EP_ANNOUNCE, OP_FWBOOT};
@@ -468,6 +472,18 @@ mod drv {
         Done,
     }
 
+    /// J9c (allow_sks=4) : avancement du null_d_key, lancé seulement après que le set_env a été ACCEPTÉ (état 0) ; on
+    /// SAUTE les deux perform_operation. Mêmes états : seul `WaitReq` accepte la 3e écriture de /dev/sep_sks, seul
+    /// `ReqReady` arme la porte `NulldkeyGate` pour UN mot ; `Done` = résultat lisible.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum NdkPhase {
+        Off,
+        WaitReq,
+        ReqReady,
+        Sent,
+        Done,
+    }
+
     /// Commande du relais en vol (une seule à la fois).
     struct Txn {
         step: &'static Step,
@@ -608,6 +624,20 @@ mod drv {
         sks_se_rx_after: u32,
         /// Enregistrement set_env rendu par `read` de /dev/sep_sks (valide en `SePhase::Done`).
         se_out: [u8; sks_ipc::OUT_SIZE],
+        // --- J9c (allow_sks=4), null_d_key ---
+        /// Le set_env a été ACCEPTÉ (état 0) : le null_d_key n'est tenté que dans ce cas.
+        se_accepted_ok: bool,
+        sks_ndk: NdkPhase,
+        /// Requête null_d_key validée (`sks_nulldkey::check_nulldkey`), copiée dans A12 au moment de l'envoi.
+        sks_ndk_req: [u8; sks_nulldkey::NULLDKEY_LEN],
+        sks_ndk_gate: NulldkeyGate,
+        /// Mot de réponse apparié (EP 0x12, TAG bit 7, TYPE 0x03) et instantané de B12 pris à sa réception.
+        sks_ndk_reply: Option<u64>,
+        sks_ndk_snap: [u8; sks_ipc::OUT_SNAP],
+        /// Mots EP 0x12 reçus après l'envoi du null_d_key.
+        sks_ndk_rx_after: u32,
+        /// Enregistrement null_d_key rendu par `read` de /dev/sep_sks (valide en `NdkPhase::Done`).
+        ndk_out: [u8; sks_ipc::OUT_SIZE],
     }
 
     impl Core {
@@ -660,6 +690,14 @@ mod drv {
                 sks_se_snap: [0; sks_ipc::OUT_SNAP],
                 sks_se_rx_after: 0,
                 se_out: [0; sks_ipc::OUT_SIZE],
+                se_accepted_ok: false,
+                sks_ndk: NdkPhase::Off,
+                sks_ndk_req: [0; sks_nulldkey::NULLDKEY_LEN],
+                sks_ndk_gate: NulldkeyGate::closed(),
+                sks_ndk_reply: None,
+                sks_ndk_snap: [0; sks_ipc::OUT_SNAP],
+                sks_ndk_rx_after: 0,
+                ndk_out: [0; sks_ipc::OUT_SIZE],
                 relay: Relay {
                     next: 0,
                     txn: None,
@@ -984,6 +1022,26 @@ mod drv {
                     dev_info!(
                         self.dev,
                         "sks setenv < réponse appariée : TAG {:#04x} TYPE {:#04x} PARAM {} DATA {:#010x} (longueur {:#x}, drapeaux d'appel {:#06x}) : {:#018x}\n",
+                        w.tag, w.ty, rw.status, w.data, rw.len, rw.call_flags, raw
+                    );
+                }
+            }
+            // J9c : réponse au null_d_key (TAG bit 7, TYPE = notre 3e transaction) → instantané de B12. Idem : jamais de
+            // réponse du pilote, jamais de Halted. macOS répond PARAM 0xff (DATA 0, pas de corps) : on le journalise tel
+            // quel, sans exiger PARAM 0.
+            if w.ep == EP_SKS && core.sks_ndk == NdkPhase::Sent {
+                core.sks_ndk_rx_after = core.sks_ndk_rx_after.saturating_add(1);
+                if core.sks_ndk_reply.is_none() && sks_nulldkey::is_nulldkey_reply(&w) {
+                    if let Some(bufs) = self.ks_ool.as_ref() {
+                        let mut snap = [0u8; sks_ipc::OUT_SNAP];
+                        self.read_b8(&bufs[KS_SKS].1, &mut snap);
+                        core.sks_ndk_snap = snap;
+                    }
+                    core.sks_ndk_reply = Some(raw);
+                    let rw = sks_nulldkey::reply_word(&w);
+                    dev_info!(
+                        self.dev,
+                        "sks null_d_key < réponse appariée : TAG {:#04x} TYPE {:#04x} PARAM {} DATA {:#010x} (longueur {:#x}, drapeaux d'appel {:#06x}) : {:#018x}\n",
                         w.tag, w.ty, rw.status, w.data, rw.len, rw.call_flags, raw
                     );
                 }
@@ -1340,7 +1398,8 @@ mod drv {
                     // (requête validée et copiée dans A12). Rien d'autre vers 0x12.
                     EP_SKS => {
                         (param_allow_sks() >= 2 && core.sks_gc == GcPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_gate.admit(&w))
-                            || (param_allow_sks() == 3 && core.sks_se == SePhase::ReqReady && core.ks_open[KS_SKS] && core.sks_se_gate.admit(&w))
+                            || (param_allow_sks() >= 3 && core.sks_se == SePhase::ReqReady && core.ks_open[KS_SKS] && core.sks_se_gate.admit(&w))
+                            || (param_allow_sks() == 4 && core.sks_ndk == NdkPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_ndk_gate.admit(&w))
                     }
                     ep => core.xarm == Some(ep) && core.xart_open,
                 };
@@ -1510,10 +1569,11 @@ mod drv {
             // J7a : skdl, sks, scrd ouverts (CNTL seul) puis écoute passive, AVANT le 0x73. Erreur → pas de 0x73.
             let quiet_start = if param_allow_sks() != 0 {
                 let r = self.run_keystore(&mut core);
-                // J9a/J9b : verdicts (et résultat de /dev/sep_sks) aussi sur les chemins d'erreur ; sans effet s'ils sont
-                // déjà donnés.
+                // J9a/J9b/J9c : verdicts (et résultat de /dev/sep_sks) aussi sur les chemins d'erreur ; sans effet s'ils
+                // sont déjà donnés.
                 self.sks_getcap_finish(&mut core);
                 self.sks_setenv_finish(&mut core);
+                self.sks_nulldkey_finish(&mut core);
                 r?;
                 Instant::<Monotonic>::now()
             } else {
@@ -1702,7 +1762,7 @@ mod drv {
             // kext macOS l'envoie 0,8 ms après, c12 L179-180). J9a garde l'écoute complète de 10 s.
             while t0.elapsed().as_millis() < KS_LISTEN_MS
                 && core.state == State::Running
-                && !(param_allow_sks() == 3 && core.sks_reply.is_some())
+                && !(param_allow_sks() >= 3 && core.sks_reply.is_some())
             {
                 if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
                     dev_warn!(self.dev, "signal pendant l'écoute keystore : écoute écourtée, pas de 0x73\n");
@@ -1725,9 +1785,13 @@ mod drv {
                 }
             }
             self.sks_getcap_finish(core);
-            // J9b : la 2e transaction, set_env, une fois le get_capabilities RÉPONDU et la v2 négociée.
-            if param_allow_sks() == 3 {
+            // J9b/J9c : la 2e transaction, set_env, une fois le get_capabilities RÉPONDU et la v2 négociée.
+            if param_allow_sks() >= 3 {
                 self.sks_setenv_run(core, &bufs[KS_SKS].0, &bufs[KS_SKS].1)?;
+            }
+            // J9c : la 3e transaction, null_d_key, une fois le set_env ACCEPTÉ ; on SAUTE les deux perform_operation.
+            if param_allow_sks() == 4 {
+                self.sks_nulldkey_run(core, &bufs[KS_SKS].0, &bufs[KS_SKS].1)?;
             }
             dev_info!(
                 self.dev,
@@ -2005,7 +2069,7 @@ mod drv {
 
         /// J9b : verdict du set_env une seule fois (idempotent), enregistrement pour /dev/sep_sks, réveil d'un lecteur.
         fn sks_setenv_finish(&self, core: &mut Core) {
-            if param_allow_sks() != 3 || core.sks_se == SePhase::Done {
+            if param_allow_sks() < 3 || core.sks_se == SePhase::Done {
                 return;
             }
             let sent = core.sks_se == SePhase::Sent;
@@ -2041,6 +2105,7 @@ mod drv {
                         match sks_setenv::decode_setenv_reply(&snap, usize::from(rw.len)) {
                             Ok(r) => {
                                 let ok = r.state == 0;
+                                core.se_accepted_ok = ok;
                                 dev_info!(
                                     self.dev,
                                     "VERDICT sks setenv : {} (PARAM 0, état {:#x} ; L {:#x}, version d'en-tête {}, condensé {} ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x}\n",
@@ -2067,7 +2132,7 @@ mod drv {
             if core.state != State::Running {
                 return Err(EIO);
             }
-            if param_allow_sks() != 3 {
+            if param_allow_sks() < 3 {
                 return Err(EINVAL);
             }
             match core.sks_se {
@@ -2089,6 +2154,192 @@ mod drv {
                 self.dev,
                 "sks setenv : requête acceptée (horodatage {} µs, uniqueid {:#x}, uid {}, cpx-encryption-mode {})\n",
                 f.ts_us, f.uniqueid, f.uid, f.cpx
+            );
+            self.cv.notify_all();
+            Ok(())
+        }
+
+        /// J9c : la 3e transaction, null_d_key. Lancée seulement si le set_env a été ACCEPTÉ (état 0) ; on SAUTE les
+        /// deux perform_operation. Attend la requête de /dev/sep_sks (3e écriture, 0x60 o), la recontrôle, la copie dans
+        /// A12 (relue), envoie LE mot `> 0x12 TAG 0x0a TYPE 0x03 PARAM 0 DATA 0x00600000` (porte `NulldkeyGate`, une fois
+        /// par boot), écoute la réponse, puis verdict. Si le set_env n'a pas été ACCEPTÉ : rien envoyé (NON ENVOYÉ).
+        fn sks_nulldkey_run(&self, core: &mut MutexGuard<'_, Core>, a12: &Ool, b12: &Ool) -> Result {
+            if !core.se_accepted_ok {
+                dev_info!(self.dev, "sks null_d_key : set_env non ACCEPTÉ (état 0) : rien envoyé à 0x12 (null_d_key)\n");
+                self.sks_nulldkey_finish(core);
+                return Ok(());
+            }
+            core.sks_ndk = NdkPhase::WaitReq;
+            self.cv.notify_all();
+            dev_info!(self.dev, "sks null_d_key : /dev/sep_sks attend la requête null_d_key ({:#x} o, {} ms max)\n", sks_nulldkey::NULLDKEY_LEN, KS_REQ_WAIT_MS);
+            let t0 = Instant::<Monotonic>::now();
+            while core.sks_ndk == NdkPhase::WaitReq {
+                if core.state != State::Running {
+                    return Err(EIO);
+                }
+                if t0.elapsed().as_millis() >= KS_REQ_WAIT_MS {
+                    dev_info!(self.dev, "sks null_d_key : aucune requête valide en {} ms : rien envoyé à 0x12 (null_d_key)\n", KS_REQ_WAIT_MS);
+                    self.sks_nulldkey_finish(core);
+                    return Ok(());
+                }
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_warn!(self.dev, "signal pendant l'attente de la requête null_d_key : rien envoyé à 0x12 (null_d_key)\n");
+                    self.sks_nulldkey_finish(core);
+                    return Err(EINTR);
+                }
+            }
+            if core.sks_ndk != NdkPhase::ReqReady {
+                return Err(EIO);
+            }
+            let req = core.sks_ndk_req;
+            let f = match sks_nulldkey::check_nulldkey(&req) {
+                Ok(f) => f,
+                Err(_) => {
+                    self.halt(core, "requête null_d_key invalide au moment de l'envoi (bug)", None);
+                    return Err(EIO);
+                }
+            };
+            if a12.len() < sks_nulldkey::NULLDKEY_LEN {
+                return Err(EINVAL);
+            }
+            let mut back = [0u8; sks_nulldkey::NULLDKEY_LEN];
+            // SAFETY: `a12` est une allocation cohérente de `a12.len()` (0x8000) octets, vivante (tenue par `self`) ;
+            // on écrit puis relit `NULLDKEY_LEN <= a12.len()` octets (contrôlé ci-dessus). Le SEP ne lit A12 qu'après le
+            // mot envoyé ci-dessous ; seul ce fil écrit A12, sous `core`. Le set_env (0x470 o) a déjà répondu, donc
+            // réécrire A12 ici est sûr.
+            unsafe {
+                let dst = a12.as_mut_ptr().cast::<u8>();
+                core::ptr::copy_nonoverlapping(req.as_ptr(), dst, req.len());
+                for (i, x) in back.iter_mut().enumerate() {
+                    *x = core::ptr::read_volatile(dst.add(i));
+                }
+            }
+            if back != req || sks_nulldkey::check_nulldkey(&back).is_err() {
+                self.halt(core, "A12 relu ≠ requête null_d_key validée", None);
+                return Err(EIO);
+            }
+            let d = &req[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN];
+            let hi = u64::from_be_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]);
+            let lo = u64::from_be_bytes([d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]]);
+            dma_wmb();
+            core.sks_ndk_gate.arm();
+            self.send_running(core, sks_nulldkey::nulldkey_word(), "sks null_d_key (TAG 0x0a)")?;
+            core.sks_ndk = NdkPhase::Sent;
+            dev_info!(
+                self.dev,
+                "sks null_d_key > EP 0x12 TAG 0x0a TYPE 0x03 PARAM 0x00 DATA 0x00600000 ; A12 = {:#x} o (horodatage {} µs, uniqueid {:#x}, uid {}, condensé v2 {:016x}{:016x}) ; perform_operation SAUTÉS ; aucun autre mot vers 0x12\n",
+                sks_nulldkey::NULLDKEY_LEN, f.ts_us, f.uniqueid, f.uid, hi, lo
+            );
+            // Écoute de la réponse (écourtée dès qu'elle arrive).
+            let t0 = Instant::<Monotonic>::now();
+            let mut seen = core.sks_ndk_rx_after;
+            let mut dumps = 0u32;
+            while t0.elapsed().as_millis() < KS_LISTEN_MS && core.state == State::Running && core.sks_ndk_reply.is_none() {
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_warn!(self.dev, "signal pendant l'écoute du null_d_key : écoute écourtée\n");
+                    break;
+                }
+                if core.sks_ndk_rx_after != seen && dumps < KS_DUMP_LIMIT {
+                    seen = core.sks_ndk_rx_after;
+                    dumps += 1;
+                    self.dump_ool(b12, "B12 après un mot (null_d_key)", "sks ");
+                }
+            }
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            self.dump_ool(b12, "B12 en fin d'écoute (null_d_key)", "sks ");
+            self.sks_nulldkey_finish(core);
+            Ok(())
+        }
+
+        /// J9c : verdict du null_d_key une seule fois (idempotent), enregistrement pour /dev/sep_sks, réveil d'un
+        /// lecteur. À la différence de getcap/setenv, un PARAM ≠ 0 n'est PAS une erreur ici : macOS répond PARAM 0xff
+        /// (pas de d-key à annuler, bénin). Le verdict RÉPONDU rapporte donc le PARAM tel quel ; c'est l'interprétation
+        /// (perform_operation prérequis ou non) qui se fait à la lecture.
+        fn sks_nulldkey_finish(&self, core: &mut Core) {
+            if param_allow_sks() != 4 || core.sks_ndk == NdkPhase::Done {
+                return;
+            }
+            let sent = core.sks_ndk == NdkPhase::Sent;
+            let (kind, raw) = match (sent, core.sks_ndk_reply) {
+                (false, _) => (sks_ipc::OUT_NOT_SENT, 0),
+                (true, None) => (sks_ipc::OUT_SILENCE, 0),
+                (true, Some(r)) => (sks_ipc::OUT_REPLIED, r),
+            };
+            core.ndk_out = sks_ipc::encode_outcome(kind, raw, &core.sks_ndk_snap);
+            core.sks_ndk = NdkPhase::Done;
+            match kind {
+                sks_ipc::OUT_NOT_SENT => dev_info!(self.dev, "VERDICT sks null_d_key : NON ENVOYÉ (aucun mot null_d_key vers 0x12)\n"),
+                sks_ipc::OUT_SILENCE => dev_info!(
+                    self.dev,
+                    "VERDICT sks null_d_key : SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03 en {} ms ; {} mot(s) 0x12 après l'envoi)\n",
+                    KS_LISTEN_MS, core.sks_ndk_rx_after
+                ),
+                _ => {
+                    let snap = core.sks_ndk_snap;
+                    let u = |o: usize| u32::from_le_bytes([snap[o], snap[o + 1], snap[o + 2], snap[o + 3]]);
+                    for o in (0..sks_ipc::OUT_SNAP).step_by(16) {
+                        dev_info!(self.dev, "  B12 null_d_key (instantané à la réponse) +{:#05x} : {:08x} {:08x} {:08x} {:08x}\n", o, u(o), u(o + 4), u(o + 8), u(o + 12));
+                    }
+                    let w = Word::decode(raw);
+                    let rw = sks_nulldkey::reply_word(&w);
+                    // PARAM ≠ 0 (ex. 0xff de macOS) : pas de corps à décoder (DATA 0). RÉPONDU avec le PARAM rapporté.
+                    if rw.status != 0 {
+                        let like_macos = if rw.status == -1 { "PARAM 0xff = comme macOS" } else { "PARAM ≠ 0xff (≠ macOS)" };
+                        dev_info!(
+                            self.dev,
+                            "VERDICT sks null_d_key : RÉPONDU (PARAM {} = statut signé ; pas de corps ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x} ; {}\n",
+                            rw.status, rw.len, rw.call_flags, w.tag, raw, like_macos
+                        );
+                    } else {
+                        match sks_nulldkey::decode_nulldkey_reply(&snap, usize::from(rw.len)) {
+                            Ok(r) => dev_info!(
+                                self.dev,
+                                "VERDICT sks null_d_key : RÉPONDU (PARAM 0, état {:#x} ; L {:#x}, version d'en-tête {}, condensé {} ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x}\n",
+                                r.state, r.hlen, r.version, if r.digest_ok { "OK" } else { "FAUX" }, rw.len, rw.call_flags, w.tag, raw
+                            ),
+                            Err(e) => dev_info!(
+                                self.dev,
+                                "VERDICT sks null_d_key : RÉPONDU (PARAM 0 mais B12 non décodable : {} ; longueur {:#x}, drapeaux d'appel {:#06x}) : {:#018x}\n",
+                                why(&e), rw.len, rw.call_flags, raw
+                            ),
+                        }
+                    }
+                }
+            }
+            self.cv.notify_all();
+        }
+
+        /// J9c : 3e écriture de /dev/sep_sks (null_d_key, contexte processus). Acceptée seulement en `NdkPhase::WaitReq`
+        /// (après l'acceptation du set_env), après contrôle complet ; refus = rien envoyé, pas de Halted.
+        fn sks_submit_nulldkey(&self, req: &[u8]) -> Result {
+            let mut core = self.core.lock();
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            if param_allow_sks() != 4 {
+                return Err(EINVAL);
+            }
+            match core.sks_ndk {
+                // Off = le null_d_key n'est pas encore (ou pas du tout) attendu : le set_env n'a pas fini.
+                NdkPhase::Off => return Err(EAGAIN),
+                NdkPhase::WaitReq => {}
+                _ => return Err(EALREADY),
+            }
+            let f = match sks_nulldkey::check_nulldkey(req) {
+                Ok(f) => f,
+                Err(e) => {
+                    dev_err!(self.dev, "sks null_d_key : requête refusée par la porte ({}) : rien envoyé\n", why(&e));
+                    return Err(EINVAL);
+                }
+            };
+            core.sks_ndk_req.copy_from_slice(req);
+            core.sks_ndk = NdkPhase::ReqReady;
+            dev_info!(
+                self.dev,
+                "sks null_d_key : requête acceptée (horodatage {} µs, uniqueid {:#x}, uid {})\n",
+                f.ts_us, f.uniqueid, f.uid
             );
             self.cv.notify_all();
             Ok(())
@@ -2920,12 +3171,17 @@ mod drv {
         }
 
         // allow_sks=2 : lecture = l'enregistrement get_capabilities (OUT_SIZE), prêt en `GcPhase::Done`.
-        // allow_sks=3 : lecture = l'enregistrement get_capabilities SUIVI de l'enregistrement set_env (2 × OUT_SIZE),
-        //               prêt en `SePhase::Done` (toujours atteint, même si le set_env n'est pas envoyé).
+        // allow_sks=3 : lecture = get_capabilities SUIVI de set_env (2 × OUT_SIZE), prêt en `SePhase::Done`.
+        // allow_sks=4 : lecture = get_capabilities, set_env, PUIS null_d_key (3 × OUT_SIZE), prêt en `NdkPhase::Done`
+        //               (toujours atteint, même si une transaction n'est pas envoyée).
         fn read_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterDest<'_>) -> Result<usize> {
             let me = kiocb.file();
-            let three = param_allow_sks() == 3;
-            let need = if three { sks_ipc::OUT_SIZE * 2 } else { sks_ipc::OUT_SIZE };
+            let records = match param_allow_sks() {
+                4 => 3,
+                3 => 2,
+                _ => 1,
+            };
+            let need = sks_ipc::OUT_SIZE * records;
             if iov.len() < need {
                 return Err(EINVAL);
             }
@@ -2934,12 +3190,19 @@ mod drv {
                 if core.state == State::Halted {
                     return Err(EIO);
                 }
-                let ready = if three { core.sks_se == SePhase::Done } else { core.sks_gc == GcPhase::Done };
+                let ready = match param_allow_sks() {
+                    4 => core.sks_ndk == NdkPhase::Done,
+                    3 => core.sks_se == SePhase::Done,
+                    _ => core.sks_gc == GcPhase::Done,
+                };
                 if ready {
-                    let mut rec = [0u8; sks_ipc::OUT_SIZE * 2];
+                    let mut rec = [0u8; sks_ipc::OUT_SIZE * 3];
                     rec[..sks_ipc::OUT_SIZE].copy_from_slice(&core.sks_out);
-                    if three {
-                        rec[sks_ipc::OUT_SIZE..].copy_from_slice(&core.se_out);
+                    if records >= 2 {
+                        rec[sks_ipc::OUT_SIZE..sks_ipc::OUT_SIZE * 2].copy_from_slice(&core.se_out);
+                    }
+                    if records >= 3 {
+                        rec[sks_ipc::OUT_SIZE * 2..sks_ipc::OUT_SIZE * 3].copy_from_slice(&core.ndk_out);
                     }
                     let rec = &rec[..need];
                     if iov.copy_to_iter(rec) != rec.len() {
@@ -2953,21 +3216,27 @@ mod drv {
             }
         }
 
-        // write : get_capabilities (0x64 o) → `sks_submit` ; set_env (0x470 o, allow_sks=3 seulement) → `sks_submit_setenv`.
+        // write : get_capabilities (0x64 o) → `sks_submit` ; set_env (0x470 o, allow_sks>=3) → `sks_submit_setenv` ;
+        //         null_d_key (0x60 o, allow_sks=4) → `sks_submit_nulldkey`. Longueurs distinctes : aucune ambiguïté.
         fn write_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterSource<'_>) -> Result<usize> {
             let me = kiocb.file();
             let n = iov.len();
-            if n != sks_ipc::GETCAP_LEN && !(n == sks_setenv::SETENV_LEN && param_allow_sks() == 3) {
+            let getcap = n == sks_ipc::GETCAP_LEN;
+            let setenv = n == sks_setenv::SETENV_LEN && param_allow_sks() >= 3;
+            let nulldkey = n == sks_nulldkey::NULLDKEY_LEN && param_allow_sks() == 4;
+            if !(getcap || setenv || nulldkey) {
                 return Err(EINVAL);
             }
             let mut buf = KVec::with_capacity(n, GFP_KERNEL)?;
             if iov.copy_from_iter_vec(&mut buf, GFP_KERNEL)? != n {
                 return Err(EFAULT);
             }
-            if n == sks_ipc::GETCAP_LEN {
+            if getcap {
                 me.sks_submit(&buf)?;
-            } else {
+            } else if setenv {
                 me.sks_submit_setenv(&buf)?;
+            } else {
+                me.sks_submit_nulldkey(&buf)?;
             }
             Ok(n)
         }
@@ -3109,7 +3378,11 @@ mod drv {
                                 // J9a/J9b : /dev/sep_sks existe avant l'ouverture de sks ; il n'accepte les requêtes qu'au bon
                                 // moment. Échec de création → le fil du probe n'aura aucune requête : rien envoyé à 0x12.
                                 if param_allow_sks() >= 2 {
-                                    let tool = if param_allow_sks() == 3 { "sks_setenv run" } else { "sks_getcap run" };
+                                    let tool = match param_allow_sks() {
+                                        4 => "sks_setenv run (J9c : null_d_key en 3e écriture)",
+                                        3 => "sks_setenv run",
+                                        _ => "sks_getcap run",
+                                    };
                                     match register_sks_dev(&data) {
                                         Ok(()) => dev_info!(dev, "/dev/sep_sks prêt (lancer {})\n", tool),
                                         Err(e) => dev_err!(dev, "/dev/sep_sks non créé : {:?} (rien ne sera envoyé à 0x12)\n", e),
@@ -3132,6 +3405,7 @@ mod drv {
                                     let mut c = data.core.lock();
                                     data.sks_getcap_finish(&mut c);
                                     data.sks_setenv_finish(&mut c);
+                                    data.sks_nulldkey_finish(&mut c);
                                 }
                             }
                             Err(e) => dev_err!(dev, "0x13 non servi : {:?} (état {:?})\n", e, data.state()),
@@ -3154,10 +3428,10 @@ mod drv {
             pdev: &'bound platform::Device<device::Core<'_>>,
             _info: Option<&'bound Self::IdInfo>,
         ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
-            if param_allow_sks() > 3
+            if param_allow_sks() > 4
                 || (param_allow_sks() != 0 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
             {
-                dev_err!(pdev, "allow_sks vaut 0, 1, 2 ou 3 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
+                dev_err!(pdev, "allow_sks vaut 0, 1, 2, 3 ou 4 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
                 return Err(EINVAL);
             }
             if (param_allow_xart() && param_allow_boot() == 0)

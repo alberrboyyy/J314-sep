@@ -17,6 +17,7 @@
 //! if the node is absent (the Asahi device-tree does not export `/defaults`); `--cpx N` forces a value. Our ADT shows
 //! `cpx-encryption-mode = 2` (`traces/20261108-162919_adt/adt.txt`), so the run script forces `--cpx 2`.
 use sep_proto::sks_ipc::{self, CdhashKind, GetcapFields, GetcapReply};
+use sep_proto::sks_nulldkey::{self, NulldkeyFields, NulldkeyReply};
 use sep_proto::sks_setenv::{self, SetenvFields, SetenvReply};
 use sep_proto::word::Word;
 use std::fmt::Write as _;
@@ -40,6 +41,10 @@ pub fn getcap_fields(ts_us: u64, uniqueid: u64, uid: u32, mode: CdhashMode) -> G
 
 pub fn setenv_fields(ts_us: u64, uniqueid: u64, uid: u32, mode: CdhashMode, cpx: u32) -> SetenvFields {
     SetenvFields { ts_us, uniqueid, uid, cdhash: cdhash(uniqueid, mode), cpx }
+}
+
+pub fn nulldkey_fields(ts_us: u64, uniqueid: u64, uid: u32, mode: CdhashMode) -> NulldkeyFields {
+    NulldkeyFields { ts_us, uniqueid, uid, cdhash: cdhash(uniqueid, mode) }
 }
 
 pub fn hex(b: &[u8]) -> String {
@@ -79,6 +84,22 @@ pub fn describe_setenv(b: &[u8]) -> Result<String, String> {
     let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", f.ts_us, f.uniqueid, f.uid, hex(&f.cdhash), cdhash_label(k));
     s.push_str(&dump(&b[..0x70]));
     let _ = writeln!(s, "  +0x070 .. +0x470 : {:#x} o à zéro (réservé)", sks_setenv::BLOB_RESERVED_LEN);
+    Ok(s)
+}
+
+/// Human description of the null_d_key request (after the same check as the kernel gate).
+pub fn describe_nulldkey(b: &[u8]) -> Result<String, String> {
+    let f = sks_nulldkey::check_nulldkey(b).map_err(|e| format!("null_d_key refusé par la porte (identique au noyau) : {e}"))?;
+    let k = {
+        let h = GetcapFields { ts_us: f.ts_us, uniqueid: f.uniqueid, uid: f.uid, cdhash: f.cdhash };
+        sks_ipc::cdhash_kind(&h)
+    };
+    let mut s = String::new();
+    let _ = writeln!(s, "null_d_key ({:#x} o) — mot > EP 0x12 TAG 0x0a TYPE 0x03 PARAM 0 DATA {:#010x}", b.len(), sks_nulldkey::NULLDKEY_DATA);
+    let _ = writeln!(s, "  en-tête v2 ; 0x04 condensé v2 = {}", hex(&b[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN]));
+    let _ = writeln!(s, "  état 0 ; u64 1 ; PAS de blob (corps = en-tête + état + u64, 0x60 o ; VU au binaire)");
+    let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", f.ts_us, f.uniqueid, f.uid, hex(&f.cdhash), cdhash_label(k));
+    s.push_str(&dump(b));
     Ok(s)
 }
 
@@ -193,6 +214,71 @@ pub fn describe_setenv_verdict(v: &SetenvVerdict, raw: u64, snap: &[u8]) -> Stri
     s
 }
 
+/// Verdict of the null_d_key transaction. Unlike getcap/setenv, PARAM != 0 is NOT an error here: macOS answers
+/// PARAM 0xff (no d-key to null), which is the benign, expected result. `Replied` therefore reports the signed
+/// status as is (with the decoded body only when PARAM == 0, which is not expected).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NulldkeyVerdict {
+    NotSent,
+    Silence,
+    Replied { status: i8, len: u16, call_flags: u16, body: Option<NulldkeyReply> },
+    Error(String),
+}
+
+/// Decodes the null_d_key outcome record (0x98 bytes).
+pub fn nulldkey_verdict(rec: &[u8]) -> Result<(NulldkeyVerdict, u64, Vec<u8>), String> {
+    let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement null_d_key illisible : {e}"))?;
+    let snap = snap.to_vec();
+    let v = match kind {
+        sks_ipc::OUT_NOT_SENT => NulldkeyVerdict::NotSent,
+        sks_ipc::OUT_SILENCE => NulldkeyVerdict::Silence,
+        _ => {
+            let w = Word::decode(raw);
+            let rw = sks_nulldkey::reply_word(&w);
+            if !sks_nulldkey::is_nulldkey_reply(&w) {
+                NulldkeyVerdict::Error(format!("mot {raw:#018x} non apparié (EP/TAG bit 7/TYPE 0x03)"))
+            } else {
+                // PARAM != 0 (e.g. 0xff) → paired reply, no body. PARAM == 0 → decode the header+status body.
+                let body = if rw.status == 0 { sks_nulldkey::decode_nulldkey_reply(&snap, usize::from(rw.len)).ok() } else { None };
+                NulldkeyVerdict::Replied { status: rw.status, len: rw.len, call_flags: rw.call_flags, body }
+            }
+        }
+    };
+    Ok((v, raw, snap))
+}
+
+pub fn describe_nulldkey_verdict(v: &NulldkeyVerdict, raw: u64, snap: &[u8]) -> String {
+    let mut s = String::new();
+    match v {
+        NulldkeyVerdict::NotSent => s.push_str("VERDICT null_d_key : NON ENVOYÉ (aucun mot null_d_key vers 0x12)\n"),
+        NulldkeyVerdict::Silence => s.push_str("VERDICT null_d_key : SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x03)\n"),
+        NulldkeyVerdict::Replied { status, len, call_flags, body } => {
+            let interp = if *status == -1 {
+                "PARAM 0xff = comme macOS (« pas de d-key à annuler ») → les perform_operation (txn3/txn5) N'ÉTAIENT PAS un prérequis"
+            } else if body.is_some() {
+                "PARAM 0 avec corps (le SEP a décodé un corps : cas non vu sous macOS)"
+            } else {
+                "PARAM ni 0xff ni 0 : réponse appariée différente de macOS (à interpréter)"
+            };
+            let _ = writeln!(
+                s,
+                "VERDICT null_d_key : RÉPONDU (PARAM {status} = statut signé ; longueur {len:#x}, drapeaux d'appel {call_flags:#06x}) mot {raw:#018x}\n  interprétation : {interp}"
+            );
+            if let Some(r) = body {
+                let _ = writeln!(s, "  corps : L {:#x}, version d'en-tête {}, état {:#x}, condensé {}", r.hlen, r.version, r.state, if r.digest_ok { "OK" } else { "FAUX" });
+            }
+        }
+        NulldkeyVerdict::Error(reason) => {
+            let _ = writeln!(s, "VERDICT null_d_key : ERREUR ({reason}) mot {raw:#018x}");
+        }
+    }
+    if !matches!(v, NulldkeyVerdict::NotSent | NulldkeyVerdict::Silence) {
+        s.push_str("instantané de B12 (0x80 o) :\n");
+        s.push_str(&dump(snap));
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +322,29 @@ mod tests {
         assert!(matches!(setenv_verdict(&encode_outcome(OUT_REPLIED, err, &[0; OUT_SNAP])).unwrap().0, SetenvVerdict::Error(_)));
         assert_eq!(setenv_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, SetenvVerdict::Silence);
         assert_eq!(setenv_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, SetenvVerdict::NotSent);
+    }
+
+    #[test]
+    fn nulldkey_build_describe_and_outcomes() {
+        for mode in [CdhashMode::Sha1, CdhashMode::Zero] {
+            let nd = sks_nulldkey::encode_nulldkey(&nulldkey_fields(123, 0, 0, mode));
+            assert!(describe_nulldkey(&nd).is_ok());
+            assert_eq!(sks_nulldkey::check_nulldkey(&nd).unwrap(), nulldkey_fields(123, 0, 0, mode));
+        }
+        // macOS c12 L187 shape with our TYPE 0x03: `< 0x12 TAG 0x8a TYPE 0x03 PARAM 0xff DATA 0`.
+        let raw = 0x0000_0000_ff03_8a12u64;
+        let (v, _, _) = nulldkey_verdict(&encode_outcome(OUT_REPLIED, raw, &[0; OUT_SNAP])).unwrap();
+        match v {
+            NulldkeyVerdict::Replied { status, body, .. } => {
+                assert_eq!(status, -1);
+                assert!(body.is_none());
+            }
+            x => panic!("{x:?}"),
+        }
+        assert_eq!(nulldkey_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, NulldkeyVerdict::Silence);
+        assert_eq!(nulldkey_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, NulldkeyVerdict::NotSent);
+        // Non-paired word → Error.
+        assert!(matches!(nulldkey_verdict(&encode_outcome(OUT_REPLIED, 0x0000_0000_0003_0a12, &[0; OUT_SNAP])).unwrap().0, NulldkeyVerdict::Error(_)));
     }
 
     #[test]

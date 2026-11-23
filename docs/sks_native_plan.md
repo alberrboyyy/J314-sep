@@ -254,3 +254,67 @@ combiné getcap+setenv décodé.
 (`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd`. **Après** : si 0 SAVE, `rm /etc/sep-touchid/disabled` +
 reboot ; sinon le store du service est périmé → décision d'Albert. Classe neuve (2e type de message EP 0x12) →
 **1er run = « go » d'Albert** (`pending/j9b_sks_setenv_chained.sh`).
+
+## 8. Expérience 4 codée : J9c = UN `null_d_key` en SAUTANT les deux `perform_operation` (`allow_sks=4`) — 2026-11-23, rien lancé
+
+**Question centrale** : peut-on sauter les deux `perform_operation` (TAG 0x22, txn3/txn5 du bring-up macOS c12) et
+envoyer directement `null_d_key` (TAG 0x0a, txn4) ? Si le SEP y répond quand même (apparié, en particulier PARAM 0xff
+comme macOS), ces deux ops **ne sont pas un prérequis** et on peut avancer sans avoir à élucider leur DER (le « mur »
+de `sks_protocol.md` §2.3.4). Sinon, elles le sont (ou l'ordre compte).
+
+**Corps `null_d_key` = ÉTABLI AU BINAIRE (VU, PAS une hypothèse).** Kernelcache 27.2.1
+(`macos/kc/26B131__MacBookPro18,4/kernelcache.release.*`, bundle `com.apple.driver.AppleSEPKeyStore`) :
+- `__ipc_null_d_key` @0xfffffe0009cdbbd0 : construit un ctx sur la pile avec `ctx+0x50 = 0` (état) et `ctx+0x58 = arg2`,
+  op code `w1 = 0xa` ; soumet via la routine de l'endpoint, puis **bzero 0x60 o** du tampon de requête.
+- `_code_ipc_null_d_key` @0xfffffe0009cdfc38 : le codec générique écrit **uniquement** l'en-tête IPC (helper
+  @0xcff530), puis un u32 depuis `ctx+0x50` (`__word` @0xcff1c0 = état) et un u64 depuis `ctx+0x58` (`__lword`
+  @0xcff38c). **Aucun `__word` de longueur de blob, aucun `__blob`** — contrairement à `get_capabilities` (qui ajoute
+  un mot de longueur de blob → 0x64) et à `set_env` (qui ajoute un blob → 0x470). Donc corps = en-tête (0x54) +
+  état(4) + u64(8) = **0x60**, qui recoupe la trace c12 L186 (`> 0x12 TAG 0x0a TYPE 0x04 DATA 0x00600000`).
+- Unique appelant `AppleKeyStore::effaceable_init(bool)` @0xfffffe0009cc6f20 : passe `x1 = 0` (session NULL → le SEP
+  prend le handle de keybag par défaut d'un global) et `x2 = 1` → le u64 à OOL 0x58 est la **constante 1** (même valeur
+  que get_capabilities et set_env). VU.
+
+`null_d_key` étant la transaction qui suit `set_env`, son en-tête est en **version négociée v2** ; le corps est donc
+**get_capabilities MOINS le mot de longueur de blob, en v2**. Dans J9c le compteur de transaction vaut : getcap = 1,
+set_env = 2, **null_d_key = 3** (sur le fil macOS c'était 4, parce que les deux perform_operation prenaient 3 et 5 ;
+ici ils sont sautés, le compteur n'a donc pas de trou : 1, 2, 3). TYPE de la réponse = 0x03.
+
+**Chemin** = J9b (boot chaîné, getcap, set_env) puis, **seulement si le set_env a été ACCEPTÉ (état 0)** :
+1. le noyau attend ≤ 20 s la 3e requête sur `/dev/sep_sks` (3e écriture, 0x60 o ; EAGAIN avant, EALREADY après) ;
+2. porte noyau `sep-proto::sks_nulldkey::check_nulldkey` sur les 0x60 o : longueur exacte ; constantes (0x50 @0x00,
+   **2** @0x14, 0 @0x20, 0 @0x24, 0 @0x4c, 0 @0x54 état, **1** @0x58 u64) ; **condensé v2 recalculé dans le noyau**
+   (SHA-256/16, base = en-tête complet 0x14..0x54 + charge 0x54..0x60) ; cdhash = zéros OU SHA-1 des 8 o de l'uniqueid.
+   Aucun champ contextuel autre que l'en-tête (pas de blob, pas de cpx). Refus = EINVAL, rien envoyé, pas de Halted ;
+3. copie dans A12, relue ; UN mot `> 0x12 TAG 0x0a TYPE 0x03 PARAM 0 DATA 0x00600000` (porte `NulldkeyGate` : ce mot
+   exact, une fois par boot ; tout autre mot vers 0x12/0x17/0x0a reste refusé) ; **aucun perform_operation jamais** ;
+4. écoute : la 1re réponse appariée (TAG bit 7, TYPE **0x03**) → instantané de B12 (0x80 o) ; jamais de réponse du
+   pilote ;
+5. « VERDICT sks null_d_key : **RÉPONDU** (PARAM … ; macOS répond PARAM 0xff = -1, DATA 0, bénin « pas de d-key ») » —
+   PARAM ≠ 0 n'est **PAS** une erreur ici (le kext macOS ne décode aucun corps sur PARAM ≠ 0, §1.6.4) — / « SILENCE »
+   / « NON ENVOYÉ » (set_env non ACCEPTÉ). `read` de `/dev/sep_sks` rend getcap **puis** set_env **puis** null_d_key
+   (3 × 0x98 o). Puis le 0x73 sbio comme J9b.
+
+**Verdict attendu** : RÉPONDU avec PARAM 0xff = comme macOS ⇒ les perform_operation N'ÉTAIENT PAS un prérequis, on
+peut avancer. RÉPONDU avec un autre PARAM apparié, SILENCE, ou Halted ⇒ ils le sont (ou l'ordre compte). Le PARAM 0xff
+de macOS (`< 0x8a PARAM 0xff`, c12 L187) suggère que le SEP décode peu ou pas le corps de 0x0a ; notre corps étant de
+toute façon celui de macOS (byte-exact, hors champs processus neutres), le test reste fidèle.
+
+**Tests hors matériel** : `sep-proto::sks_nulldkey` (disposition et relecture par la porte ; base du condensé v2
+reconstruite champ par champ ; **requête identique octet pour octet à une construction Python/`hashlib` indépendante**
+— condensé `d51461e0ab398833f4f0e23b6ce34b18`, sha256 complet `e90ebe700cacdeb3a9081f10ecdf433ce0984a45cb2c4cbd77bc4f09d103dbfa` pour
+ts=0x1122334455667788, uniqueid 0, uid 0, cdhash=sha1(8×0) ; mot c12 avec TYPE 0x03 ; porte qui refuse chaque constante
+modifiée / condensé faux / cdhash étranger / longueur fausse ; appariement de la réponse PARAM 0xff ; porte un seul
+mot) ; `sks-setenv` étendu (`build-nulldkey`, `check-nulldkey`, `run --nulldkey`, `decode` à 3 enregistrements ;
+`NulldkeyVerdict`).
+
+**Binaires** (`~/kbuild/j11`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `4a5858a317274922adfa10b4293969c2c555a2981f9ea90c8db027f177182b49` (allow_sks=4), `sks_setenv`
+`c81a45473926be0b03cb6a69f50a40baccbb87a90dafcbf5623b5dae373658e9` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo` =
+copies de `~/kbuild/j10`/`j9`/`j5` (sha256 inchangés).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd` ; copie du store avant run. **Après** : si 0 SAVE,
+`rm /etc/sep-touchid/disabled` + reboot ; sinon le store du service est périmé → décision d'Albert. Classe neuve (3e
+type EP 0x12 : null_d_key) **ET ordre neuf** (perform_operation sautés) → **1er run = « go » d'Albert**
+(`pending/j9c_sks_nulldkey_chained.sh`).
