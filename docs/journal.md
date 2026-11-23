@@ -2947,3 +2947,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   (docs/sks_keybag_unlock.md, acm_token.md). Le chemin se raccourcit : open → getcap → set_env → [sauter] → cible = ouvrir/déverrouiller un keybag.
 - PROCHAIN MUR (lots A+B) : le jeton d'enrôlement est forgé par le SEP (authentication_token_create) et exige un keybag
   DÉVERROUILLÉ avec le passcode. Pistes : make_system_keybag (identité appareil) ; unlock keybag (verify_secret). Classe neuve → go.
+## 2026-11-23 — Claude (session PC, Opus 4.8) — kernelcache 27.2.1 extrait sur le PC (pour les prochains reverses SKS/keystore)
+- Outillage PC, pas de SEP ni matériel. `macos/` gitignoré (vérifié `git check-ignore`) → rien commité du binaire.
+- L'IPSW public 27.2.1 était **déjà téléchargé** (`~/mac-dfu/UniversalMac_27.2.1_26B131_Restore.ipsw`, 25.6 Go) → pas
+  de re-download (disque à 96 %, 84 Go libres). Outil `ipsw` (blacktop) v3.1.750 déjà installé, build `26b65938…`.
+- `ipsw extract --kernel -o macos/kc <ipsw>` (3,4 s) → `macos/kc/26B131__MacOS/kernelcache.release.*`. Le fileset pour
+  MacBookPro18,4 = **`kernelcache.release.Mac13,1_2_MacBookPro18,1_2_3_4`** (ipsw nomme le dossier `26B131__MacOS`, pas
+  `26B131__MacBookPro18,4` comme la consigne — même fichier). Mach-O arm64e MH_FILESET (filetype 12), déjà décompressé,
+  124 Mo. **sha256 = `4bf084db6847069542a2a5500d0281676eab753d5170dc1d9c8812700a4bf10f`** (à recouper avec celui du Mac).
+- Version lue : `Darwin Kernel Version 27.2.0 … root:xnu-13432.41.4~25/RELEASE_ARM64_T6000` = macOS 27.2.1 (26B131), T6000.
+  Symboles SKS présents : `__ipc_get_capabilities` @0xfffffe0009cfdf6c (= l'adresse 27.2.1 déjà citée §1.4), aussi
+  `_code_ipc_get_capabilities`/`__ipc_set_env`/`_code_ipc_set_env`/`_get_process_table`/`__payload_hash`.
+- Le dyld_shared_cache 27.2.1 est déjà extrait (`macos/ipsw27/out/26B131__MacBookPro18,2/`, session biometrickit) pour
+  un éventuel reverse userland (montage apfs-fuse). IPSW conservé.
