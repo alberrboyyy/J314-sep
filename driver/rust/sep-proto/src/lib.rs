@@ -28,6 +28,7 @@ pub mod ks_gate;
 pub mod sbio_gate;
 pub mod sensor;
 pub mod sks_ipc;
+pub mod sks_keybag;
 pub mod sks_nulldkey;
 pub mod sks_setenv;
 pub mod word;

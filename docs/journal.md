@@ -14,6 +14,37 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent driver, ALARM) — J10 : SQUELETTE voie identité `load_keybag` + `make_system_keybag` (`allow_sks=5`), non lançable
+- Trace : — (préparation hors-ligne ; rien chargé/installé/envoyé au SEP ; pas de sudo ; pas de commit).
+- Fait : codé la voie identité d'appareil à partir de `docs/keybag_native_path.md` § J10 (gabarits VU 27.2.1) et
+  `docs/sks_protocol.md` §1.6/§1.7 (en-tête IPC v2 + condensé, infra réutilisée) :
+  - `sep-proto/src/sks_keybag.rs` (neuf) : `load_keybag` (TAG 0x03, 0x74 o : état 0 + handle_y u64 + blob{0x10,uuid}) et
+    `make_system_keybag` (TAG 0x0d, 0x74 o : état 1 + handle_y + handle chargé u32 + type u32 + blob vide + flag 0),
+    encodeurs/portes (`check_*`), appariement des réponses 0x83/0x8d, `reply_handle` (OOL B +0x6c, DÉDUIT),
+    `finalize_mskb` (le noyau place le handle rendu par 0x03 et recalcule le condensé). 10 tests.
+  - `kmod/sep_native.rs` : `allow_sks=5` — après getcap+set_env (inchangés), load_keybag puis (si handle rendu)
+    make_system_keybag ; portes d'envoi un mot chacune ; verdicts dmesg « VERDICT sks loadkeybag : handle=0x… / REFUS »
+    et « VERDICT sks make_system_keybag : marqué system / REFUS (PARAM …) » ; `/dev/sep_sks` rend 4 enregistrements ;
+    rien d'autre vers 0x12/0x17/0x0a (Halted sinon), puis le 0x73 sbio comme J9c.
+  - `sks-setenv` étendu : `build-loadkeybag`/`build-mskb`/`check-loadkeybag`/`check-mskb`/`decode` (4 rec.) et
+    `run --keybag --uuid <hex16> --handle <u64> --type <i32>`. Les **trois valeurs userland sont obligatoires, sans
+    défaut** ; refus clair « valeurs userland à fournir — voir docs/sks_userland_values.md du PC » si une manque.
+  - `pending/j10_sks_create_keybag_chained.sh` (dérivé de j9c) : exige UUID/HANDLE/TYPE (env ou args) et refuse sinon ;
+    service désactivé requis, STORE ≠ /var/lib/sepd (défaut /var/lib/sepd-run-20261122-230441), copie du store avant
+    run, dit si SAVE ; en-tête but/risque/résultat ; classe neuve → go d'Albert.
+- Vu : `cargo test` vert (sep-proto + sks-setenv), `cargo clippy` propre (sauf 1 warning pré-existant non lié dans
+  sks_nulldkey.rs), `build.sh` et `build.sh CLIPPY=1` OK (0 erreur ; seules des « unreachable `pub` » du macro de porte,
+  bénignes). Requêtes recoupées octet pour octet par une construction Python/hashlib indépendante (valeurs d'exemple
+  arbitraires « PAS les vraies »). Le script et l'outil refusent bien de tourner sans les trois valeurs.
+- Interprété : voie identité byte-connue pour le GABARIT ; **message incomplet** tant que uuid/handle_y/type manquent
+  (INCONNU, reversés sur le PC). INCONNU décisif (matériel) : le SEP importe-t-il un uuid neuf, persiste-t-il, re-scelle-
+  t-il en xART ? (`docs/keybag_native_path.md` § J10.6). L'offset du handle de réponse (+0x6c) est DÉDUIT (OOL jamais
+  capturé) → à confirmer matériel.
+- Incidents : aucun (rien envoyé au SEP).
+- Binaires : `~/kbuild/j12` — `sep_native.ko` sha256 a2d9e2eed2f8decfb995f3cf3f93688f9fac033e53384612c76397aff860f5b8
+  (allow_sks=5) ; `sks_setenv` e162e0289f9ca6ea448840a0b46d985f924cb9e556dcbdcaecca109fd2d33831 ; `sepd`,
+  `sep_native_ovl.ko`, `sep-native.dtbo` = copies j11 (sha256 inchangés). **Squelette, non lançable sans les 3 valeurs.**
+
 ## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — J10 : make_system_keybag byte-exact (voie identité) → docs/keybag_native_path.md §J10
 - Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
   envoyé au SEP, matériel non touché). source: kext. Aucune clé/secret/passcode extrait.

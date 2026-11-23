@@ -318,3 +318,67 @@ copies de `~/kbuild/j10`/`j9`/`j5` (sha256 inchangés).
 `rm /etc/sep-touchid/disabled` + reboot ; sinon le store du service est périmé → décision d'Albert. Classe neuve (3e
 type EP 0x12 : null_d_key) **ET ordre neuf** (perform_operation sautés) → **1er run = « go » d'Albert**
 (`pending/j9c_sks_nulldkey_chained.sh`).
+
+## 9. Expérience 5 codée (SQUELETTE) : J10 = la voie identité `load_keybag` puis `make_system_keybag` (`allow_sks=5`) — 2026-11-23, NON LANÇABLE
+
+**But** : après `get_capabilities` + `set_env` (chemin `allow_sks=3` réutilisé tel quel), en **sautant**
+`perform_operation` ET `null_d_key`, enchaîner les **deux** transactions de la voie identité d'appareil
+(`docs/keybag_native_path.md` § J10, `source: kext` 27.2.1, gabarits VU) :
+
+1. **`load_keybag` (TAG fil 0x03)** — `> EP 0x12 TAG 0x03 TYPE 0x03 PARAM 0 DATA 0x00740000`, OOL A12 = **0x74 o** :
+   en-tête IPC v2 + **état u32 = 0** + **handle_y u64** (OOL 0x58) + **blob {len 0x10, uuid 16 o}** (OOL 0x60/0x64).
+   Importe le blob de 16 o et **REND un handle** (réponse TAG 0x83, PARAM 0 = OK ; handle u32 lu à **OOL B +0x6c**,
+   offset **DÉDUIT**, OOL 0x12 jamais capturé → à confirmer matériel).
+2. **`make_system_keybag` (TAG fil 0x0d)** — `> EP 0x12 TAG 0x0d TYPE 0x04 PARAM 0 DATA 0x00740000`, OOL A12 = **0x74 o** :
+   en-tête IPC v2 + **état u32 = 1** (const, le codec prend la branche état==1) + **handle_y u64** (0x58) +
+   **handle chargé u32** (0x60, = la sortie de `load_keybag`) + **type u32** (0x64) + **blob VIDE** (len 0, 0x68) +
+   **flag u64 = 0** (0x6c). Marque le keybag « system » (réponse TAG 0x8d ; PARAM 0 = marqué system OK, PARAM ≠ 0 =
+   refus). **Aucun handle rendu** (le handle vient de 0x03).
+
+**Trois valeurs userland, INCONNUES, obligatoires** (`docs/keybag_native_path.md` § J10.1) : **uuid** (16 o, le blob de
+`load_keybag`), **handle_y** (u64, 0x58 des deux ops), **type** (i32, 0x64 de `make_system_keybag` ; contrainte VU
+**type ≤ -10**). Elles ne sont **pas** dérivables du binaire (politique userland absente du kernelcache) → le squelette
+les prend comme **entrées obligatoires sans défaut** ; l'outil et le script **refusent de tourner** si l'une manque. À
+brancher quand le PC les aura (**`docs/sks_userland_values.md` du PC**). Le champ **handle chargé** (0x60 de
+`make_system_keybag`) n'est **pas** userland : c'est le handle rendu par `load_keybag`, **lu à l'exécution** et placé par
+le noyau (`sks_keybag::finalize_mskb`, qui recalcule aussi le condensé v2) — jamais inventé.
+
+**Porte noyau** (`sks_keybag::check_loadkeybag` / `check_mskb`) : longueur exacte, **champs constants** (en-tête ; état 0
+pour load_keybag, état 1 + blob vide + flag 0 pour make_system_keybag ; blob len 0x10 pour load_keybag), **condensé v2
+recalculé**, forme du cdhash. **NON contrôlés** (libres) : uuid, handle_y, type (et le handle chargé, dynamique). Envoi :
+`load_keybag` d'abord ; `make_system_keybag` **seulement** si `load_keybag` a RÉPONDU PARAM 0 et rendu un handle.
+
+**Déroulé `allow_sks=5`** : getcap (txn1) → set_env (txn2) → load_keybag (txn3) → make_system_keybag (txn4). `read` de
+`/dev/sep_sks` rend getcap **puis** set_env **puis** load_keybag **puis** make_system_keybag (**4 × 0x98 o**). Verdicts
+dmesg : « VERDICT sks loadkeybag : **handle=0x…** / REFUS » et « VERDICT sks make_system_keybag : **marqué system** /
+REFUS (PARAM …) ». Rien d'autre vers 0x12/0x17/0x0a (Halted sinon). Puis le 0x73 sbio comme J9b.
+
+**Verdict attendu** : load_keybag **RÉPONDU avec un handle** = le SEP accepte d'importer l'uuid candidat (la voie
+identité s'ouvre) ; **REFUS** (« keybag not found », PARAM ≠ 0) = il exige une identité déjà enregistrée, ou l'uuid ne
+convient pas. make_system_keybag **marqué system** = le keybag devient le system keybag. SILENCE / figé = l'ordre ou la
+voie ne passent pas. **INCONNU décisif** (non tranchable au binaire, `docs/keybag_native_path.md` § J10.6) : le SEP
+crée-t-il à la volée depuis un uuid neuf, persiste-t-il, re-scelle-t-il en xART ?
+
+**Tests hors matériel** : `sep-proto::sks_keybag` (disposition et relecture par la porte des deux frames ; base du
+condensé v2 ; **requêtes identiques octet pour octet à une construction Python/`hashlib` indépendante** sur des valeurs
+d'**exemple arbitraires** « PAS les vraies » — load_keybag condensé `5fd02233027b4e0ab5d1197a292fcdcd`, sha256
+`0be85f870bd1271abc5d1578efa97b62ee5aa798c371e16fcd3d81cbc8602653` ; make_system_keybag (handle placeholder 0) condensé
+`1dd1815887a6cbb6bcde7f7ba1e025a6` ; après `finalize_mskb(handle=0xdeadbeef)` condensé `6199ea7f49ef764522e9077999ca9885`,
+pour ts=0x1122334455667788, uniqueid 0, uid 0, cdhash=sha1(8×0), handle_y 0x4242424242424242, uuid 00..0f, type -16 ;
+porte qui refuse chaque constante modifiée / condensé faux / longueur fausse, accepte les valeurs userland libres ;
+appariement des réponses 0x83/0x8d et lecture du handle à +0x6c ; portes un seul mot) ; `sks-setenv` étendu
+(`build-loadkeybag`, `build-mskb`, `check-loadkeybag`, `check-mskb`, `run --keybag --uuid … --handle … --type …`,
+`decode` à 4 enregistrements ; `LoadkeybagVerdict`, `MskbVerdict` ; les trois valeurs **obligatoires**, erreur claire si
+absentes). `cargo test` vert, clippy propre.
+
+**Binaires** (`~/kbuild/j12`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `a2d9e2eed2f8decfb995f3cf3f93688f9fac033e53384612c76397aff860f5b8` (allow_sks=5), `sks_setenv`
+`e162e0289f9ca6ea448840a0b46d985f924cb9e556dcbdcaecca109fd2d33831` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo` =
+copies de `~/kbuild/j11` (sha256 inchangés).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd` ; copie du store avant run ; **les trois valeurs userland
+fournies** (`UUID=`/`HANDLE=`/`TYPE=` ou `--uuid`/`--handle`/`--type`), sinon le script refuse. **Après** : si 0 SAVE,
+`rm /etc/sep-touchid/disabled` + reboot ; sinon store du service périmé → décision d'Albert. Classes neuves (load_keybag
++ make_system_keybag) **ET ordre neuf** (perform_operation ET null_d_key sautés) → **1er run = « go » d'Albert**
+(`pending/j10_sks_create_keybag_chained.sh`). **SQUELETTE : rien ne peut tourner avant les trois valeurs.**
