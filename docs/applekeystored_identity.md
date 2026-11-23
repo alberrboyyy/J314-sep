@@ -258,3 +258,98 @@ Deux options pour J10, par ordre de propreté :
 2. **BALAYAGE BORNÉ** (go d'Albert) : classe ∈ {1,2,3,4} (A..D) ; type ∈ {−10, −11, −12, …} en partant de −10. Petit
    espace. Le test « le SEP rend-il un handle » sur `create_keybag` nu ne dépend **que de la classe** (make_system/type
    vient en 2e). Fail-closed à la 1re incohérence ; power-cycle = Albert.
+
+---
+
+## 8. `create_keybag` −13 (0xf3) : cause et correction — `source: kext` (27.2.1, kernelcache `macos/kc/`)
+
+Ajout 2026-11-23 (session ALARM, Opus 4.8, capstone, hors-ligne). Explique le refus matériel J10 (journal 18:44,
+`logs/20261123-184408_j10-sks-keybag-chained/`) : `> 0x12 TAG 0x01 (create_keybag) TYPE 0x03 DATA 0x007c0000` →
+`< TAG 0x81 TYPE 0x03 PARAM 0xf3` = statut signé **−13 / −0xd**, longueur 0, pas de handle. Convention VU/DÉDUIT/INCONNU.
+Désassemblage seul, rien lancé. **Verdict : ce n'est PAS une politique SEP ni un secret manquant — c'est un
+DISCRIMINANT DE VERSION faux dans le corps du message (mauvais gabarit).**
+
+### 8.1 Ce qu'est −0xd dans la couche IPC AKS — VU
+Dans le kext, **−0xd est le code d'erreur générique du codec IPC** (pas une politique). Il est renvoyé par les
+primitives de (dé)sérialisation du corps, **à chaque fois qu'un champ ne tient pas dans le tampon annoncé** (VU) :
+- `__word` @0xcff1c0 → `mov w0,#-0xd` si moins de 4 o restants (`subs w10,w2,w10 ; b.lo` et `cmp w10,#4 ; b.lo`).
+- `__blob` @0xcff218 → −0xd si le préfixe de longueur (aligné sur 4) dépasse le reste du tampon.
+- `__lword` @0xcff38c (u64) et `__fv_data` @0xcff3e4 (= un `__blob` {ptr,len}) → −0xd même logique.
+- `__ipc_msg_protect` @0xcecc84 → −0xd si `ctx` nul **ou** si **le bit0 « chiffré » des drapeaux (ctx+0x1c) est posé**
+  (VU `ldrb w8,[x20,#0x1c] ; tbnz w8,#0 → -0xd`) : le codec **n'implémente pas** le canal chiffré. (C'est ce que
+  `sks_protocol.md` §1.6.3/§1.7.1 appelait « chemin chiffré = −0xd ». Ici non pertinent : on envoie drapeaux = 0.)
+- `__ipc_msg_process_header` @0xcecc70 → −0xd si son `x1` est nul.
+
+**Nuance importante (VU)** : le codec AP `_code_ipc_create_keybag` **normalise toute erreur interne en −1** à sa fin
+(`csinv w0,w8,wzr,ne` @0xcde6ec : succès → nb d'octets consommés ; échec → −1). Donc le −0xd **ne sort pas sur le fil
+par CE binaire AP**. Le −0xd reçu est produit par **SEPOS** (sa propre copie du même code AKS), qui — DÉDUIT — propage
+le −0xd brut de sa primitive de décodage sans cette normalisation. ⇒ **−0xd = « le corps du message ne se décode pas »
+côté SEP** (cadre/longueur/version), pas un verdict d'autorisation.
+
+### 8.2 `create_keybag` est un message VERSIONNÉ ; le discriminant est à ctx+0x50 — VU
+`_code_ipc_create_keybag` @0xcde0e4 : après l'en-tête IPC (0x54 o), il (dé)code **un u32 à ctx+0x50** puis **branche sur
+sa valeur** (VU @0xcde1b0 `ldur w8,[x21,#0x50]`, `switch(0..5)`, défaut → erreur). **Ce u32 n'est PAS « état = 0 » comme
+pour `get_capabilities`/`set_env`** (codecs simples sans switch) : c'est le **numéro de variante/version du corps
+`create_keybag`**. Gabarits VU (champs dans l'ordre fil, blobs = `__blob` préfixe u32 aligné 4) :
+
+| ctx+0x50 | corps (après le u32 discriminant lui-même) |
+|---|---|
+| 0 | handle_y(u64 @0x58) + word(@0x60) + word(@0x64) + **1 blob**(@0x68) |
+| 1 | … + **2 blobs**(@0x68,@0x78) |
+| 3 | … + **3 blobs**(@0x68,@0x78,@0x88) |
+| **4** | … + **3 blobs** + **`__fv_data` blob**(@0x98) + **u64**(@0xa8) |
+| 5 | encore plus (fv_data + lwords @0xa8/@0xb0 + blob @0xb8) |
+
+### 8.3 La variante que macOS émet = **4** — VU (constante)
+Le sélecteur userclient 0x2 (`aks_create_bag`) → handler `AppleKeyStore::create_keybag` @0xcc6904 → builder
+**`__ipc_create_keybag_v4`** @0xcf9a34. Ce builder **écrit le discriminant ctx+0x50 depuis une constante** :
+`adrp x8,#0x7710000 ; ldr d0,[x8,#0x98] ; str d0,[sp,#0x88]` (@0xcf9aa8). Les 8 o lus à `__const` **0x7710098** =
+`04 00 00 00 00 00 00 00` (VU) → **ctx+0x50 = 4**, ctx+0x54 = 0. (Les 8 o suivants `05 00 00 00…` servent à
+`__ipc_create_keybag_v5` @0xcf9ba4 → variante 5.) Le builder remplit ensuite ctx+0x60/+0x64 = args w3/w4, les 3 couples
+blob (ctx+0x68/+0x78/+0x88 {ptr,len}), et pose le **flag 0x100 si `pin!=0`** (VU handler @0xcc6938). → **le
+`create_keybag` nu de macOS est un message de VARIANTE 4.**
+
+### 8.4 Pourquoi notre requête J10 a pris −0xd — DÉDUIT (fort, VU des deux côtés)
+Le pilote a posé **ctx+0x50 = 0** (cru « état ») mais a bâti un corps de **~40 o** (handle + 2 words + **3 blobs** +
+un « flag »), soit un corps de **forme variante 3/4**. Le SEP décode selon le discriminant **= 0** → gabarit **variante
+0** (1 seul blob, ~24 o de corps). Le reste du tampon ne correspond à aucun champ attendu de la variante 0 → la
+primitive de décodage bute (longueur/cadre) → **−0xd**. Autrement dit : **corps d'une version, étiquette d'une autre.**
+(Le −13 « longueur 0, pas de handle » est cohérent : le SEP abandonne au décodage, avant la logique keybag.)
+
+### 8.5 Correction à tester en J10b — gabarit byte-exact VARIANTE 4
+**Un seul changement conceptuel : émettre EXACTEMENT la variante 4 de macOS** (discriminant 4 + les 2 champs de fin que
+le pilote omettait). Corps après l'en-tête IPC (OOL 0x54), petit-boutien :
+
+| OOL off | taille | champ (ctx) | valeur J10b | vs J10 |
+|---|---|---|---|---|
+| 0x54 | 4 | discriminant (ctx+0x50) | **`04 00 00 00`** | **était `00 00 00 00`** |
+| 0x58 | 8 | handle_y (ctx+0x58, u64) | 0 | inchangé |
+| 0x60 | 4 | class (ctx+0x60) | 1 (ou classe à balayer) | inchangé |
+| 0x64 | 4 | field2 (ctx+0x64) | 0 | inchangé |
+| 0x68 | 4 | blob1 len=0 (ctx+0x68) | `00 00 00 00` | inchangé |
+| 0x6c | 4 | blob2 len=0 (ctx+0x78) | `00 00 00 00` | inchangé |
+| 0x70 | 4 | blob3 len=0 (ctx+0x88) | `00 00 00 00` | inchangé |
+| 0x74 | 4 | **fv_data len=0** (ctx+0x98) | `00 00 00 00` | **NOUVEAU (remplace le « flag »)** |
+| 0x78 | 8 | **u64 de fin** (ctx+0xa8) | `00…00` | **NOUVEAU** |
+
+→ corps = **0x2c (44 o)**, message total **0x80** ⇒ **DATA = 0x00800000** (était 0x007c0000). **Recalculer le condensé
+SHA-256/16 de l'en-tête** sur le nouveau corps (base §1.6.3 de `sks_protocol.md` ; le pilote le fait déjà pour
+getcap/set_env). Drapeaux (ctx+0x1c) **restent 0** (ne JAMAIS poser le bit0 « chiffré » → sinon −0xd garanti, §8.1).
+
+**Ordre de probabilité des corrections :**
+1. **Variante 4 byte-exacte** (ci-dessus) — la seule à tester d'abord ; supprime l'ambiguïté version/cadre, qui est la
+   cause VU la plus directe de −0xd.
+2. Si −0xd persiste après la variante 4 : essayer **variante 5** (discriminant 5 + fv_data + lwords @0xa8/@0xb0 + blob
+   @0xb8 ; corps plus long) — autre gabarit « moderne ».
+3. Si −0xd persiste encore avec un corps au cadre VALIDE (décodage réussi) : alors **seulement** il s'agirait d'un code
+   **sémantique** de `create_keybag` côté **SEPOS** (classe/handle/field2 invalides, précondition, ou politique) — **non
+   lisible dans le kext AP** → mur, à trancher par capture d'un `create_keybag` macOS vivant (lire +0x50/+0x58/+0x60/
+   +0x64 et les blobs réels sur le fil).
+
+### 8.6 Points ouverts (honnêtes)
+- **−0xd vient-il du décodeur de cadre SEPOS ou de la sémantique ?** DÉDUIT = cadre (version/longueur), car −0xd est
+  partout le code du codec et notre étiquette de version était fausse. **Non prouvable sur le binaire AP** (codec AP
+  normalise en −1 ; SEPOS non lisible). La correction variante 4 tranche empiriquement (classe neuve → go d'Albert).
+- **field2 (ctx+0x64)** et **handle_y (ctx+0x58)** pour un create à neuf : valeurs réelles **INCONNU** (posées par
+  l'appelant Swift ; §7). 0 est le pari de départ, pas une certitude.
+- **class** : toujours la même INCONNU qu'en §7.2 (A..D = 1..4 plausibles ; capturer pour certitude).

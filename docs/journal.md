@@ -3193,3 +3193,21 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
   chiffré » attendu (sks_protocol §1.6.3 associe -0xd au flag chiffrement) — mais set_env en clair passe, donc douteux.
 - PROCHAIN : décoder au binaire ce qui fait rendre -13 à create_keybag (@0xcc6904 / __ipc_create_keybag_v4) AVANT de
   rebalayer (éviter des runs gâchés). Puis essayer : classe en +0x64, ou le champ requis identifié.
+
+## 2026-11-23 (session ALARM, agent reverseur, Opus 4.8) — J10 : −13 (−0xd) de create_keybag DÉCODÉ au binaire = mauvais discriminant de version
+- Hors-ligne, kernelcache 27.2.1 `macos/kc/`, kext AppleSEPKeyStore, capstone. Rien lancé, rien `vérifié`. `source: kext`.
+- VU : `create_keybag` est un message **versionné**. `_code_ipc_create_keybag` @0xcde0e4 (dé)code un u32 à **ctx+0x50**
+  puis **switch(0..5)** dessus (@0xcde1b0) → ce u32 est le **numéro de variante du corps**, PAS « état=0 ». Gabarits VU :
+  v0=1 blob, v1=2 blobs, v3=3 blobs, **v4=3 blobs + fv_data(@0x98) + u64(@0xa8)**, v5=plus.
+- VU (décisif) : le handler `create_keybag` @0xcc6904 (sélecteur 0x2) bâtit via `__ipc_create_keybag_v4` @0xcf9a34, qui
+  **écrit le discriminant depuis `__const` 0x7710098 = `04 00 00 00…`** → **ctx+0x50 = 4**. macOS émet donc la **variante 4**.
+- VU : −0xd = code générique du codec IPC (buffer trop court dans `__word`/`__blob`/`__lword`/`__fv_data` ; bit0 « chiffré »
+  de ctx+0x1c dans `__ipc_msg_protect`). Le codec AP **normalise toute erreur interne en −1** (`csinv` @0xcde6ec) → le −0xd
+  reçu vient de **SEPOS** (même code AKS, propage le −0xd brut). ⇒ −0xd = « corps indécodable », pas une politique.
+- DÉDUIT (fort) : J10 a posé ctx+0x50 = **0** (variante 0, 1 blob) mais envoyé un corps de 3 blobs (~40 o) → le SEP décode
+  en variante 0 → cadre/longueur ne correspondent pas → −0xd. **Corps d'une version, étiquette d'une autre.**
+- CORRECTION J10b (byte-exact, docs/applekeystored_identity.md §8.5) : émettre la **variante 4** — mettre le 1er mot du
+  corps (OOL 0x54) à **`04 00 00 00`** (était 00), et compléter la fin par **fv_data(len=0, 4 o)** + **u64(0, 8 o)** →
+  corps 0x2c, message **0x80**, **DATA=0x00800000**, condensé recalculé ; drapeaux restent 0 (NE PAS poser le bit chiffré).
+  Si ça persiste : v5, puis seulement alors soupçonner une sémantique SEPOS (→ mur, capture macOS vivant). Écriture 0x12
+  classe neuve → go d'Albert ; power-cycle = Albert.
