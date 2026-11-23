@@ -29,7 +29,7 @@ Format :
   d'exemple identique octet pour octet à une construction Python/hashlib indépendante (`scratchpad/lkbvec.py`, valeurs
   « PAS les vraies » : ts 0x1122334455667788, uuid 00..0f, handle_y 0x4242… → condensé v2 `5fd02233027b4e0ab5d1197a292fcdcd`,
   sha256 `0be85f870bd1271abc5d1578efa97b62ee5aa798c371e16fcd3d81cbc8602653`). Binaires `~/kbuild/j16` : sep_native.ko
-  `145d3ee150018f517958221d91f03d7ba01e32ef8684d24d3a3bc19e69c07e62`, sks_setenv
+  `2dc610b21522d3ef9902872c9704130d0d7a58579882533fb5427d6d2dfd51dc`, sks_setenv
   `842b89d6c3cd11ec6cf4ee0896de02ea23ab97fdb1643895a1078cd8d606463b` ; sepd/ovl/dtbo = copies j15 (sha256 inchangés).
 - Interprété : deux issues possibles au run — (a) handle rendu (PARAM 0) = cercle brisé, identité native sans macOS ;
   (b) refus (PARAM ≠ 0) = identité pré-existante postée par macOS requise → prochaine étape = capture macOS. L'offset du
@@ -3332,3 +3332,9 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
 - NON ENCORE TESTÉ : **load_keybag (TAG 0x03)** — l'op qui prend un uuid 16 o et est censée RENDRE un handle (§6). Jamais
   lancée sur matériel (le squelette initial l'avait, on a pivoté vers create avant le 1er run). C'est le candidat « chaînon
   manquant » : uuid → handle → make_system. Si load_keybag rend « not found » pour un uuid neuf → prérequis d'identité → capture macOS.
+
+## 2026-11-23 20:29 — Albert + Claude (session ALARM) — J12 : module refusé (allow_sks=7 hors borne) → corrigé, rien atteint le SEP
+- Run J12 : `/dev/sep_native absent` — probe -22 EINVAL : la garde du module n'acceptait que allow_sks 0..6 (l'agent j16 a
+  ajouté le niveau 7 sans élargir la borne). Rien envoyé au SEP (module non chargé). Logs `logs/20261123-202946_j12-sks-loadkeybag-chained/`.
+- Corrigé : `sep_native.rs` garde `> 6`→`> 7`, message « 0..7 ». Recompilé (build.sh). Nouveau `~/kbuild/j16/sep_native.ko`
+  sha256 `2dc610b2…51dc` (SHA256SUMS + script + §11 mis à jour). sks-setenv inchangé. J12 reste à lancer (go d'Albert).

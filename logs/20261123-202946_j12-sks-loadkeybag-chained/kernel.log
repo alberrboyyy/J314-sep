@@ -1,0 +1,10 @@
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: loading out-of-tree module taints kernel.
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: sepfw = /reserved-memory/sep-firmware [mem 0x10005e20000-0x100063cffff], phandle 0x127 ; manifestes présents
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: mboxes = 0x35 -> /soc/mbox@396408000
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: iommus = 0x36 -> /soc/iommu@3952c0000
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: power-domains = 0x37 -> /soc/power-management@28e580000/power-controller@c00
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: stream id DART = 0
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: phandle 0x131 donné (en mémoire) à /soc/sep@396400000
+Nov 23 20:29:46 alarm kernel: sep_native_ovl: overlay appliqué, ret=0 id=1
+Nov 23 20:29:46 alarm kernel: sep_native soc:sep-native: allow_sks vaut 0, 1, 2, 3, 4, 5 ou 6 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus
+Nov 23 20:29:46 alarm kernel: sep_native soc:sep-native: probe with driver sep_native failed with error -22

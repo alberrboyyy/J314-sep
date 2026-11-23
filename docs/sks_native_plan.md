@@ -523,7 +523,7 @@ sha256 `0be85f870bd1271abc5d1578efa97b62ee5aa798c371e16fcd3d81cbc8602653`) ; `sk
 test` vert, clippy propre (`CLIPPY=1` pour le `.ko`).
 
 **Binaires** (`~/kbuild/j16`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
-`sep_native.ko` `145d3ee150018f517958221d91f03d7ba01e32ef8684d24d3a3bc19e69c07e62` (allow_sks=7), `sks_setenv`
+`sep_native.ko` `2dc610b21522d3ef9902872c9704130d0d7a58579882533fb5427d6d2dfd51dc` (allow_sks=7), `sks_setenv`
 `842b89d6c3cd11ec6cf4ee0896de02ea23ab97fdb1643895a1078cd8d606463b` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo` =
 copies de `~/kbuild/j15` (sha256 inchangés).
 

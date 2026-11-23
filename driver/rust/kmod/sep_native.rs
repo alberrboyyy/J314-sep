@@ -4378,10 +4378,10 @@ mod drv {
             pdev: &'bound platform::Device<device::Core<'_>>,
             _info: Option<&'bound Self::IdInfo>,
         ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
-            if param_allow_sks() > 6
+            if param_allow_sks() > 7
                 || (param_allow_sks() != 0 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
             {
-                dev_err!(pdev, "allow_sks vaut 0, 1, 2, 3, 4, 5 ou 6 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
+                dev_err!(pdev, "allow_sks vaut 0..7 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
                 return Err(EINVAL);
             }
             if (param_allow_xart() && param_allow_boot() == 0)
