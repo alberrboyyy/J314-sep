@@ -14,6 +14,30 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — chemin natif minimal « keybag prêt pour authentication_token_create » → docs/keybag_native_path.md
+- Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
+  envoyé au SEP, matériel non touché). source: kext. Aucune clé/secret/passcode/dérivation extrait.
+- Vu : `make_system_keybag` = **TAG fil 0x0d** (VU `mov w1,#0xd ; blraa x19,#0x392e` @0xcdbdd8). Codec `_code_ipc_make_system_keybag`
+  @0xce0134 = **struct plate** (en-tête IPC 0x50 + mot d'état +0x50 + u64 handle +0x58 + 2×u32 +0x60/+0x64 + blob +0x68/+0x70
+  + u64 flag +0x78), **pas de DER** ; mêmes primitives `__ipc_header`/`__word`/`__lword`/`__blob` (@0xcec768/0xcff1c0/
+  0xcff38c/0xcff218) que getcap. Builder +0x50 = constante 1 (`__const` 0x770fec8). 2 appelants : `set_device_keybag`
+  @0xcc7c48 (blob = OSData userspace = IMPORT) et `identity_load` @0xcf79a8 (**blob VIDE x5=x6=0** @0xcf7b44 → le SEP
+  fabrique le keybag d'identité sans secret AP ; vérifie une OSData de 16 o = uuid, `cmp w0,#0x10`). Unlock par passcode
+  = `unlock_the_device` @0xcc3bc8 → `device_state_transition` **TAG 0x18** (@0xcfb108) : le passcode voyage comme **blob
+  OOL {ptr,len}** (OSData `getBytesNoCopy`/`getLength`) ; AppleSEPKeyStore **ne dérive pas** (relais brut). Retour = 2 mots
+  d'état → `handle_device_state_return`, puis état de verrouillage caché relu à **[this+0x81f4]** (`& ~0x4 == 0` =
+  déverrouillé ; sinon err 0xe00002d8) → `sls` LISIBLE côté AP. `create_keybag` = **TAG 0x01** (`mov w1,#1` @0xcf9b28).
+  Persistance observable in-kext = `tickle_system_keybag_update_port` (notify-port → userland persiste le blob sur DISQUE),
+  PAS de SAVE xART visible ici ; le stash (`commitStash`/`setStashKey`) est dans `AppleFDEKeyStore` (FileVault), autre classe.
+- Interprété : voie identité (`make_system_keybag` blob vide + 0x18 passcode) = **pas de mur crypto dur** (aucun secret
+  macOS requis pour fabriquer le keybag, le SEP a la clé), contrairement à FileVault. Murs restants = VALEURS/offsets à
+  obtenir (uuid+type de make_system_keybag, offsets corps 0x18, TAG de authentication_token_create — tous INCONNU, jamais
+  capturés) + politique bio 100 % interne SEP (non observable au-delà de `sls`) + persistance/scellement xART hors bundle.
+  Passcode d'Albert nécessaire à l'unlock 0x18 et/ou à la forge du jeton, fourni à l'exécution (jamais extrait). Suite J10
+  proposée : A `create/load_keybag` (0x01) → B `make_system_keybag` (0x0d, blob vide) → C `device_state_transition` (0x18,
+  passcode) → D `authentication_token_create`. Classe neuve → go d'Albert.
+- Incidents : aucun. Filtre cyber : non déclenché (Opus 4.8).
+
 ## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — chaîne keystore→keybag (0x32/0x48/0x41/0x18, create/make_system_keybag) → docs/sks_keybag_unlock.md
 - Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
   envoyé au SEP, matériel non touché). source: kext. Aucune clé/secret/passcode extrait.
