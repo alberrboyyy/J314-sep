@@ -17,7 +17,9 @@ objectif à terme : Touch ID sous Linux. Lis `README.md` pour le contexte et le 
   écriture d'une **classe encore JAMAIS testée sur matériel** (ex. écriture/persistance gigalocker, **SKS 0x12 en
   écriture**, enrôlement, ou le **1er run d'un script neuf**), Claude prépare le script dans `pending/` (en-tête
   but/risque/résultat), le **montre à Albert et attend son « go »**. Toujours : fail-closed, backup disque +
-  DFU en filet. Le **power-cycle physique reste Albert** (le reboot logiciel fige le PMU/SPMI).
+  DFU en filet. Le **power-cycle physique reste Albert** (le reboot logiciel **via le proxy m1n1** fige le PMU/SPMI).
+  Sous **Linux natif**, un `reboot` normal (SMC) remet le SEP en ROM : il suffit entre deux runs (VU n=7, `docs/sep_reconnect.md`,
+  journal 2026-11-23) ; le reboot reste une action d'Albert.
 - **Le hardware passe uniquement par `tools/*.sh`.** Pas d'appel direct à `m1n1/proxyclient`, pas de script Python ad hoc qui ouvre `/dev/ttyACM*`.
 - **Jamais** : `bputil`, `kmutil`, `csrutil`, `nvram`, partitionnement, `dd`, `sudo`. Boot policy et install de m1n1 = Albert, à la main.
 - **Rien ne sort de ce repo vers Asahi** (issues, PR, doc, IRC/Matrix). Projet privé.
