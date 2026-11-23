@@ -417,6 +417,112 @@ Contextuel/non rejouable = `rk` (blob scellé par le SEP, propre à chaque clé 
 
 ---
 
+## 2.3 `perform_operation` du bring-up (txn3 / txn5) — VU / DÉDUIT / INCONNU  — source: kext (27.2.1)
+
+Rédigé 2026-11-23 (agent reverseur, ALARM, Opus 4.8, capstone). **Cible** : les deux `perform_operation` (TAG 0x22)
+émis juste après `get_capabilities`+`set_env` au boot (trace c12) :
+`txn3 > 0x22 TYPE 0x03 DATA 0x008c0000 → < 0xa2 TYPE 0x03 DATA 0x014c0000` et
+`txn5 > 0x22 TYPE 0x05 DATA 0x00900000 → < 0xa2 TYPE 0x05 DATA 0x00b80000`. **Aucun octet de clé/secret extrait.**
+Question : sélecteur `o`, paires DER, besoin d'un `rk`/`acmh`, rejouabilité depuis Linux. Tout est désassemblage
+hors-ligne ; rien lancé, rien passé en `vérifié`.
+
+### 2.3.0 D'où ils NE viennent PAS — VU
+- `AppleKeyStore::init_sep_endpoint` (@0xfffffe0009cc9460, décodé octet par octet cette session) **n'émet QUE**
+  `get_capabilities` (bl `__ipc_get_capabilities` @…cfdf6c) puis `set_env(false)` (bl @…ccbdc0), puis `retab`.
+  **Il n'émet aucun `perform_operation`.** Donc txn3/txn5 viennent d'un **autre chemin**, pas de la mise en route de
+  l'endpoint. (VU.) Son appelant `0xcf8a50` (bring-up de l'endpoint) ne fait qu'allouer les descripteurs OOL et appeler
+  `init_sep_endpoint` ; pas de 0x22 non plus. (VU.)
+- Chaîne unique des `0x22` sur le fil (VU) : tout `perform_operation` passe par
+  `_aks_<op>` (builder libaks noyau) → `__aks_operation` (@…ceeb84) → `_kern_perform_operation` (@…cf6f70, **seul
+  appelant** de ce dernier) → vmethod +0x1e8 → `AppleKeyStore::perform_operatation_gated` (@…cf6f20) →
+  `AppleKeyStore::perform_operation` (@…cc7b6c) → endpoint. **Dans AppleSEPKeyStore, `perform_operation` C++ n'a que
+  deux points d'entrée** (VU, `callers`) : la méthode userclient `kAppleKeyStoreKeyBagCreateWithData` (@…cd0844) et le
+  gate `perform_operatation_gated` — tous deux **invoqués par table de dispatch** (external method / runAction), c.-à-d.
+  **pilotés par l'userland ou par un appelant KPI du noyau**, pas par une méthode de boot interne au kext.
+
+### 2.3.1 Composition DER de la famille « système sans clé » — VU (structure + constantes)
+Les builders candidats pour un `perform_operation` de tout début de boot (avant tout keybag/unlock) sont la **famille
+identité-appareil**, qui ne porte **ni `rk` utilisateur ni `acmh`** et passe un **handle de keybag = −1** (`mov w0,#-1`
+avant `__aks_operation`, VU dans `_aks_system_key_collection` @…cefb74). Sélecteurs `o` (UTF8String DER, **octets VU**
+dans `__cstring`) :
+
+| op (symbole) | valeur `o` (octets VU) | ref_key requis ? | params ajoutés (VU/§2.2) |
+|---|---|---|---|
+| sik_collection | `0c 03 6f 73 63` = `osc` | non | (à préciser — voir 2.3.3) |
+| sik_attest | `0c 03 6f 73 61` = `osa` | **oui** (atteste un ref_key existant ; `_aks_sik_attest` @…cbff2c relaie dans le helper `ref_key_attest`) | `rk` |
+| get_sik_status | `0c 04 6f 67 73 73` = `ogss` | non | statut seul |
+| gid_attest | `0c 03 6f 67 61` = `oga` | ? | ? |
+| system_key_attest | `0c 04 6f 73 6b 61` = `oska` | non | `skt` (+`skg`) |
+| system_key_collect | `0c 05 6f 73 6b 63 32` = `oskc2` | non | `skt` (+ opt.) |
+| system_key_get_public | `0c 05 6f 73 6b 67 70` = `oskgp` | non | `skt`(+`skg`) |
+
+Clés de paramètres système (octets VU) : `skt`=`0c 03 73 6b 74` (INTEGER, type), `skg`=`0c 03 73 6b 67` (INTEGER,
+génération), `sko`=`0c 03 73 6b 6f`, `skos`=`0c 04 73 6b 6f 73`, `skcs`=`0c 04 73 6b 63 73` (**client_seed**, OCTET
+STRING — contextuel), `skni`=`0c 04 73 6b 6e 69` (no_img4). Conteneur racine = **SET (0x31)**, chaque paire =
+**SEQUENCE (0x30) { UTF8 clé, valeur }**, tri des clés par longueur puis `memcmp` (§2, VU). Paire `o` =
+`30 <l> 0c 01 6f <valeur o>`.
+
+### 2.3.2 Tailles fil → tailles DER — VU (trace) + arithmétique
+Longueur fil d'un message IPC = en-tête 0x54 + état(4) + u64(8) + long_blob(4) + **DER**. Donc **DER = len − 0x64** :
+
+| txn | req fil | **DER req** | resp fil | **blob resp** |
+|---|---|---|---|---|
+| txn3 (0x22) | 0x8c | **0x28 = 40 o** | 0x14c | 0xe8 = 232 o |
+| txn5 (0x22) | 0x90 | **0x2c = 44 o** | 0xb8 | 0x54 = 84 o |
+
+Un SET minimal `{ o=oskc2, skt=INTEGER(1 o) }` ≈ **24 o** (VU par calcul DER). 40/44 o impliquent donc une **paire
+supplémentaire portant une valeur d'environ 16–20 o** (OCTET STRING) — très probablement `skcs` (client_seed) ou un
+`d`/`salt`. La grande réponse txn3 (232 o) est cohérente avec une **collecte/attestation** rendant un blob (clé
+publique + certificat/attestation) ; txn5 (84 o) avec un statut/clé plus court. **DÉDUIT**, pas VU : le mapping
+txn3↔sélecteur et txn5↔sélecteur n'est pas tranché (cf. 2.3.4).
+
+### 2.3.3 `rk` / `acmh` à ce stade du boot ? — VU (côté structure)
+- Pour la famille **collection / status / system_key** (osc, ogss, oska, oskc2, oskgp) : **PAS de `rk`** (handle −1,
+  aucun blob de clé scellée recopié) et **PAS de `acmh`** (VU : `_aks_system_key_collection` n'ajoute que `skt` via
+  `_encode_list_add_number`, pas de `acmh`). → ces ops **n'exigent ni keybag déverrouillé ni contexte d'auth** : elles
+  seraient, par nature, émettables très tôt au boot et **reproductibles avec des valeurs neutres**, SOUS RÉSERVE que la
+  paire 16–20 o (2.3.2) soit un **constant** (client_seed fixe) et non un **nonce aléatoire**. Ce point est **INCONNU**.
+- `sik_attest` (osa) atteste un **ref_key existant** → porte un `rk`. Si l'un des deux boot-ops était `osa`, il
+  faudrait un `rk` → non rejouable à froid. **Rien n'indique que txn3/txn5 soient `osa`** (voir 2.3.4).
+
+### 2.3.4 LE MUR — pourquoi l'octet exact n'est PAS tranché par ce binaire
+- **Émetteur non identifié.** Aucun `bl`/`b` de tout le kernelcache n'appelle les builders système/sik, et **aucune
+  prise d'adresse** (adrp+add / adr) ne les référence (scans exhaustifs cette session). Dans AppleSEPKeyStore,
+  `perform_operation` C++ n'est atteint que par dispatch userland/KPI (2.3.0). ⇒ l'appelant qui émet txn3/txn5 est
+  **soit l'userland très tôt au boot, soit un consommateur KPI dans un AUTRE bundle** (p. ex. identité/boot mesuré),
+  joint par **GOT authentifié (fixups chaînés)** — **non résoluble par désassemblage linéaire** de ce kext. Tant qu'on
+  ne l'a pas identifié, le **sélecteur `o` exact et les entiers (`skt`/`skg`) et seed de txn3/txn5 restent INCONNU**.
+- **OOL 0x12 jamais capturé.** Aucune trace ne contient le corps de ces messages. On n'a donc **aucune confirmation
+  fil** des octets DER.
+
+### 2.3.5 null_d_key (0x0a) et txn6 (0x32) — Q4
+- **null_d_key (TAG 0x0a, txn4)** : réponse `< 0x8a PARAM 0xff`. Par la règle d'appariement VU (§1.6.4), **PARAM (int8)
+  ≠ 0 ⇒ la requête rend ce code sans décoder de corps** (0xff = −1). Opération **bénigne** à ce stade (« pas de d-key
+  à annuler »), déjà classée connue/acquittée dans d'autres runs. Marche triviale. (VU mapping nom §1.3 ; rôle DÉDUIT.)
+- **txn6 (TAG 0x32)** = `unwrap_media_key` (nom VU table §1.3), req 0x94 / resp 0xb4 (DER req 0x30, blob resp 0x50).
+  Rôle au bring-up non interprété ; **PAS trivial** (unwrap → porte probablement des données). INCONNU.
+
+### 2.3.6 VERDICT rejouabilité (Q central) et gabarit
+- **Pas de gabarit octet-exact livrable pour J9c depuis ce binaire.** On connaît la **grammaire** (SET 0x31 ; paires
+  SEQUENCE{UTF8 clé, valeur} ; tri ; octets des sélecteurs `osc/ogss/oska/oskc2/oskgp` et des clés `skt/skg/skcs` — tout
+  VU) mais **pas** quel sélecteur ni quels entiers/seed portent txn3 et txn5.
+- **Bonne nouvelle (DÉDUIT, cohérent VU)** : si — comme le laissent penser le timing (avant tout keybag) et la grande
+  réponse (collecte/attestation) — txn3/txn5 sont de la famille **système sans clé** (osc/ogss/oska/oskc2/oskgp), alors
+  ils **n'exigent ni `rk` ni `acmh` ni unlock** : le mur « il faut d'abord déverrouiller » **ne s'applique pas** à eux.
+- **Mur restant, précis** : (a) **identifier l'émetteur** → nécessite une passe `__auth_got`/fixups sur les autres
+  bundles (p. ex. AppleSEPManager / credential / boot mesuré) pour trouver qui appelle la KPI AKS au boot, puis lire
+  **ses** arguments (sélecteur, `skt`, seed) ; **ou** (b) **capturer l'OOL 0x12** sur matériel. Tant que l'un des deux
+  n'est pas fait, le champ 16–20 o de chaque requête (2.3.2) — plausiblement `skcs` — est **INCONNU : constant
+  (rejouable) vs nonce (non rejouable)**, ce qui décide à lui seul de la rejouabilité.
+- **Piste la moins coûteuse pour trancher** : vérifier d'abord si J9c peut **sauter** txn3/txn5 (hypothèse : ce sont des
+  ops d'**identité d'appareil** indépendantes de la chaîne keybag/unlock ; le résultat est mémorisé **côté AP** —
+  `_aks_system_key_collection` **range son résultat dans un global** @0x8297930, DÉDUIT — mais chaque `0x22` est
+  autonome sur le fil, le SEP ne « retient » rien entre eux côté requête). Si le SEP accepte `null_d_key`/`0x48 fv_*`
+  **sans** avoir vu txn3/txn5, ces deux ops sont contournables et la question de leur DER devient sans objet pour le
+  bring-up. **À instruire (classe neuve → go d'Albert).**
+
+---
+
 ## 3. Séquence de bring-up macOS au boot (Q3) — VU (trace c12, chaîné) + DÉDUIT (noms)
 
 Les ~25 premières transactions sks (avant le `> 0x08 0x73` qui réveille sbio) sont **déterministes** : les 13

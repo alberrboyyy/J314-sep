@@ -14,6 +14,28 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent reverseur, ALARM, Opus 4.8) — perform_operation de bring-up txn3/txn5 → docs/sks_protocol.md §2.3
+- Trace : — (désassemblage hors-ligne du kernelcache 27.2.1 `macos/kc/26B131…`, bundle AppleSEPKeyStore, capstone ; rien
+  envoyé au SEP, matériel non touché). source: kext.
+- Vu : `init_sep_endpoint` (@…cc9460) décodé octet par octet → n'émet QUE get_capabilities + set_env, **aucun 0x22** ;
+  donc txn3/txn5 viennent d'ailleurs. Tout `0x22` passe par `_aks_<op>` → `__aks_operation` (@…ceeb84) →
+  `_kern_perform_operation` (@…cf6f70, seul appelant) → `perform_operatation_gated` (@…cf6f20) → `perform_operation`
+  C++ (@…cc7b6c), dont les 2 seuls points d'entrée (userclient `kAppleKeyStoreKeyBagCreateWithData`, gate) sont
+  **invoqués par dispatch** (userland/KPI), pas par une méthode de boot interne. Famille système sans clé (osc/osa/ogss/
+  oga/oska/oskc2/oskgp) : octets des sélecteurs `o` et des clés skt/skg/skcs lus dans `__cstring` (VU) ;
+  `_aks_system_key_collection` (@…cefb74) : handle = −1, ajoute `skt` INTEGER, **pas de rk, pas de acmh**.
+- Déduit : DER req = len−0x64 → txn3 = 40 o, txn5 = 44 o ; un SET minimal {o, skt} ≈ 24 o ⇒ chaque requête porte une
+  paire supplémentaire ~16–20 o (plausiblement `skcs` client_seed). Réponses 232 o / 84 o = collecte/attestation.
+- Mur : aucun `bl`/prise d'adresse vers ces builders dans tout le kernelcache (scans exhaustifs) → émetteur = userland
+  tôt au boot OU consommateur KPI d'un AUTRE bundle via GOT authentifié (fixups), **non résoluble par désassemblage
+  linéaire** ; OOL 0x12 jamais capturé. ⇒ **pas de gabarit octet-exact pour J9c** : sélecteur/entiers/seed de txn3/txn5
+  = INCONNU. Bonne nouvelle : SI famille système sans clé, **ni rk ni acmh ni unlock requis** (le mur « déverrouiller
+  d'abord » ne s'y applique pas). Piste la moins chère : tester si J9c peut **sauter** txn3/txn5 (ops d'identité
+  appareil, indépendantes de la chaîne keybag). null_d_key (0x0a) = bénin (PARAM 0xff, pas de corps) ; 0x32 =
+  unwrap_media_key (non trivial). Rien passé en vérifié ; rien lancé.
+
+---
+
 ## 2026-11-23 — Claude (agent driver, session ALARM) — Décompil SKS (EP 0x12) sur kernelcache 27.2.1 → docs/sks_protocol.md
 - Trace : — (désassemblage sur disque uniquement ; rien envoyé au SEP, matériel non touché).
 - Fait : nouveau `docs/sks_protocol.md` (réf. croisée `sks_native_plan.md`), répondant aux 5 questions protocole
