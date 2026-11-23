@@ -2425,6 +2425,26 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `07d59c0ee78c9471f4b73bc6c241b8bef61b3cb644685ff5f586f825a399e88e` (`.v5` = `627d2977…d4aa`), `sbiod` sha256
   `29ed5e7cde1dd20dd45a0a80aa32013933df38a7de8276807def8e014b395a7c` (`.v5` = `f9fff14d…91df`).
 
+## 2026-11-23 — Claude (session PC, exécutée sur le Mac/Linux) — IPSW public 27.2.1 : reverse enroll 0x03 / réponse d'erreur GT / xART op 0x05 — docs/biometrickit_protocol.md
+- Trace : — (IPSW public `UniversalMac_27.2.1_26B131`, outil `ipsw` v3.1.750 ; kernelcache désassemblé). `source: kext`.
+- Fait : téléchargé l'IPSW public d'Apple pour MacBookPro18,4 (= version installée, 27.2.1/26B131, SystemVersion.plist
+  confirme), déchiffré les DMG AEA avec les clés publiques `fcs-keys.json`. Extrait + désassemblé le kernelcache
+  (AppleMesaSEPDriver, AppleSEPGenericTransfer, AppleSEPManager/XART, AppleCredentialManager). Doc neuve
+  `docs/biometrickit_protocol.md`. Rien commité, aucun code Apple copié, aucune clé/secret extrait.
+- Vu (kext, 27.2.1) : (c) **`TAG 0xff` sur EP 0x08 = trame d'ERREUR de la couche GenericTransfer** — `_gt_handle_generic_transaction`
+  (@0xfffffe0009cb5148) route l'octet de type (bits 8-15) : 0xfc→read_first_packet, 0xfd→next, 0xfe→write_next,
+  **0xff→`_gt_read_error`** ; le code d'erreur = u32 à **+0x10 du gt_packet_t** du buffer OOL (en J6a B8 non réécrit → code non lu).
+  (a) `commandStartEnroll` (@0xfffffe0009a43254) relaie les **68 o `enroll_indata_v2_t` TELS QUELS** à `sepTransact(0x03, …,0x44)` ;
+  ne lit que le bit 0 de +0x00 ; **ne construit ni ne vérifie le jeton** → jeton +0x10 construit en userland. Mesa gère des
+  **unlock tokens par userID** (opcode 0x26 `dropUnlockToken`). ACM (AppleCredentialManager) expose `ACMKernContextCreate/
+  …CreateWithExternalForm/VerifyPolicy…` + codec DER. (d) xART `_handle_sep_driven_msg` **identique en 27.2.1** : op 0x05 FETCH
+  gigalocker (UUID 16 o en B → locker en A), 0x06 SAVE — cohérent avec le fait matériel VÉRIFIÉ J7b (A = B[16..] du SAVE).
+- Interprété : le mur de l'enrôlement natif = **le jeton d'autorisation à +0x10** (J6a nul → refus GT 0xff). DÉDUIT : produit
+  par la couche auth de l'AP (ACM/LocalAuthentication adossé au keybag), vérifié par le SEP. Confirmation VU userland
+  (biometrickitd/BiometricKit) **en attente** : DMG APFS en decmpfs type 14 (LZBITMAP) — 7z ne décompresse pas, apfs-fuse
+  absent, lecteur natif `ipsw --ranged` fonctionne mais très lent sur le tunnel.
+- Incidents : build apfs-fuse refusé par le garde-fou de l'agent ; extraction `--ranged` de biometrickitd très lente (tunnel).
+
 ## 2026-11-22 23:04 — Albert + Claude (session ALARM) — J6a E-ENROLL-START : le SEP répond au 0x03 par un TAG 0xff (refus ?), rien ensuite
 - Go d'Albert (power-cycle, `sudo pending/j6a_enroll_start.sh`, doigt guidé). Logs bruts : `logs/20261122-230441_j6a-enroll-start/`.
 - VU : pass2 complète à nouveau (patch n°1 t+42 ms, n°2 t+55 ms, 0x63×2 = macOS) → **pass2 n=2**.
