@@ -14,6 +14,36 @@ Format :
 
 ---
 
+## 2026-11-23 — Claude (agent driver, session ALARM) — Décompil SKS (EP 0x12) sur kernelcache 27.2.1 → docs/sks_protocol.md
+- Trace : — (désassemblage sur disque uniquement ; rien envoyé au SEP, matériel non touché).
+- Fait : nouveau `docs/sks_protocol.md` (réf. croisée `sks_native_plan.md`), répondant aux 5 questions protocole
+  (format fil, DER, bring-up, déverrouillage mot de passe, jeton Touch ID). Sources : kernelcache 27.2.1
+  (`macos/kc/26B131…`, bundle `com.apple.driver.AppleSEPKeyStore`, via `ipsw macho disass` + `analysis/kext`),
+  traces c1/c12, et §15 (13.5).
+- Vu : (1) les symboles libaks C sont présents en 27.2.1 (`_aks_params_*`, `__ipc_get_capabilities` @0x…cfdf6c,
+  `_kern_perform_operation` @0x…cf6f70, `_ref_key_op_der_to_enum`, `_der_dict_*`) — mais PAS les méthodes C++
+  (`verify_password`, `load_keybag`…). (2) **Table d'opérations IPC = 93 symboles `_code_ipc_*`** (get_capabilities,
+  set_env, perform_operation, get_device_state, change_lock_state, verify_secret, create_keybag/load_keybag,
+  authentication_token_create/verify, fv_*…) → ce sont les noms derrière les TAG fil. (3) Bring-up c12 ancré sur trace :
+  les 13 1res txns = `4d(get_capabilities) 2a(set_env) 22 22(perform_operation) 0a(null_d_key) 32 48 48(fv_get_blob_state)
+  41(déverrou volume) 48 47 10 10`. (4) Jeton 0x03 : path VU client LA/ACM (`ACMKernContext*`) → `authentication_token_create`
+  → AuthToken → biometrickitd (relais) ; champ DER `acmh` = handle ACM. (5) « keybag neuf » pour Linux : ops IPC
+  `create_keybag`/`make_system_keybag`/`apfs_keybag_create` existent (VU).
+- Vu (DER, agent dédié, 27.2.1) : **conteneur racine = SET (0x31), PAS SEQUENCE** (corrige kext §15.3) ; paire =
+  SEQUENCE{clé UTF8String 0x0c, valeur} ; ordre = lexicographique sur la clé (déterministe) ; types valeur INTEGER
+  (set_number), OCTET STRING (set_data), DER brut (o, rk) ; `o` = UTF8String (pas un entier) ; table fermée de 26
+  param_id typés ; codes de clé @0x770f6f0 (116 entrées) ; nouveaux codes/ops 27.2.1 (`p` passcode, `oke`/`okd` KEM,
+  `skck`…) ; `_kern_perform_operation` +0x08 = handle de KEYBAG (pas ref_key), +0x0c = 2 (pas 3 comme 13.5).
+- Interprété : mapping TAG↔nom numérique partiel (0x4d/0x2a/0x22/0x0a/0x48/0x19 DÉDUITs, cohérents PC+trace ;
+  0x32/0x41/0x47/0x10/0x18/0x2f non mappés au symbole). En-tête IPC `get_capabilities` (horodatage/pid/cdhash/SHA tronqué)
+  = NON rejouable, à construire ; layout octet NON confirmé sur 27.2.1. Déverrouillage : passphrase (ou dérivé) fournie au
+  SEP dans l'OOL (DÉDUIT) ; OOL 0x12 jamais capturé → détail INCONNU.
+- Incidents : un sous-agent reverseur (en-tête IPC/get_capabilities) **stoppé par un classifieur de sûreté** avant tout
+  désassemblage (0 résultat) ; sa note de hand-back suggérait de relancer sur un autre modèle pour « passer le filtre » —
+  **non suivi** (pas de contournement de classifieur, pas de changement de modèle). Les champs concernés restent au niveau
+  §15.5 (13.5, non vérifié) et sont marqués ainsi. Proposition d'expérience : la plus prudente = J7a (ouverture CNTL seule,
+  zéro mot keystore), pas le get_capabilities (en-tête non byte-exact). Rien commité.
+
 ## 2026-11-22 — Claude (agent driver, session ALARM) — J5 compilé : relais sbio noyau (/dev/sep_sbio) + sbiod (spidev/gpio) ; ouverture précoce `sbio_open`
 - Trace : — (compilation et tests hors ligne seulement ; rien chargé, aucun accès matériel).
 - Fait : `sep_native.rs` : paramètres `allow_sbio_relay` (défaut 0) et `sbio_open` (défaut 1 = précoce, 0 = tardive) ;
@@ -2617,3 +2647,12 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - ⇒ **VÉRIFIÉ (n=2, prédiction écrite avant)** : init capteur complète sur boot CHAÎNÉ natif, sans re-scellement.
 - ⇒ Le « trou » de `sep_reconnect.md` est comblé (n=1) : un `reboot` Linux après une init capteur suffit à relancer le SEP.
   Le power-cycle n'est plus nécessaire entre deux runs sous Linux natif.
+
+## 2026-11-23 — Claude (session ALARM) — relecture de docs/sks_protocol.md (agent SKS)
+- Corrigé : réponse 0x47 = **0x60 o** (c12 `< EP=0x12 TAG=0xc7 TYPE=0x0b DATA=0x00600000`, longueur = DATA>>16), pas 0x600.
+- L'expérience proposée par l'agent (« J7a : ouvrir skdl/sks/scrd sans RPC, écoute passive ») est **déjà faite** : J7b n=2
+  (4 acks par EP, 0 mot reçu en 10 s). Prochaine expérience SKS = get_capabilities, bloquée tant que l'en-tête OOL
+  (horodatage, pid, cdhash, SHA tronqué) n'est pas établi octet près.
+- Décompil : le sous-agent en-tête OOL / get_capabilities a été arrêté par le filtre de sécurité (pas de contournement) →
+  en-tête toujours inconnu. Le DER, lui, est relu sur 27.2.1 (complément de l'agent, §2 de sks_protocol.md) : racine SET
+  (0x31, pas SEQUENCE comme kext §15.3), paires SEQUENCE{UTF8 clé, valeur} triées par clé, sélecteur `o` = UTF8String.
