@@ -1,0 +1,33 @@
+WAIT_LOAD_S=1.5
+irq_seen=True irq_t=0.0
+loaded=False loaded_t=None
+t_s	irq	st8
+0.0	True	0x00
+0.055	True	0x00
+0.11	True	0x60
+0.166	False	0x00
+0.221	False	0x00
+0.277	False	0x00
+0.332	False	0x00
+0.387	False	0x00
+0.442	False	0x00
+0.498	False	0x00
+0.553	False	0x00
+0.608	False	0x00
+0.664	False	0x00
+0.719	False	0x00
+0.774	False	0x00
+0.829	False	0x00
+0.885	False	0x00
+0.94	False	0x00
+0.995	False	0x00
+1.051	False	0x00
+1.106	False	0x00
+1.162	False	0x00
+1.217	False	0x00
+1.272	False	0x00
+1.327	False	0x00
+1.383	False	0x00
+1.438	False	0x00
+1.493	False	0x00
+1.549	False	0x00
