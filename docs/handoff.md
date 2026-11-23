@@ -1,3 +1,63 @@
+# ▶️ COMMENCE ICI — 2026-11-23 (soir) — 🧱 MUR KEYBAG : 3 ops SKS refusent (-0xb) ; 2 PISTES SANS DFU à tenter AVANT le DFU
+
+**Contexte neuf / après /clear : LIS CE BANDEAU EN ENTIER, puis `docs/sks_native_plan.md`, `docs/applekeystored_identity.md`
+(§6-9), `docs/sks_protocol.md`, `docs/keybag_native_path.md`, `docs/acm_token.md`, et le haut de `docs/journal.md`
+(entrées 2026-11-23). Mémoire : commits signés, push avant test, AUCUN trailer « Claude » (CLAUDE.md § Commits).
+Sous-agents de reverse = Opus 4.8 (le défaut est réglé ; filtre « cyber » des modèles récents, cf. CLAUDE.md § Sous-agents).**
+
+## NE REFAIS PAS (déjà établi, matériel ou binaire)
+- ✅ **VÉRIFIÉ matériel** : service `sep-touchid` (capteur Touch ID initialisé à chaque boot, chemin J8) ; boot chaîné natif
+  (lockers servis **sans UUID** = défaut `sepd`) ; sbio VIVANT ; SKS **getcap (0x4d) + set_env (0x2a) + null_d_key (0x0a)**
+  ACCEPTÉS (en-tête IPC v2 + condensé SHA-256/16 OK). Reboot Linux (SMC) suffit entre runs (pas de power-cycle).
+- 🧱 **MUR (matériel, 3 ops / 3)** : création d'un keybag d'appareil. `create_keybag` (0x01), `make_system_keybag` (0x0d),
+  `load_keybag` (0x03) rejettent tous **-0xb (0xf5 = -11, BadArgument)** avec nos valeurs devinées (uuid « LINUX », class 1,
+  type -10, handle 0). `create_keybag` en variante 0 donnait -0xd (cadre indécodable) → corrigé en **variante 4** (§8) →
+  -0xb. Le SEP PARLE (getcap/set_env/sbio OK) : ce n'est PAS « Linux rejeté », c'est « il manque les VRAIES valeurs/état ».
+- Binaires : `~/kbuild/j16` (sep_native.ko `2dc610b2…`, allow_sks 0..7 ; sks_setenv `842b89d6…`). **Niveaux allow_sks** :
+  1=ouvre skdl/sks/scrd, 2=getcap, 3=+set_env, 4=+null_d_key (perform_op sautés), 5=create_keybag(var4), 6=make_system
+  standalone, 7=load_keybag→make_system. Scripts : `pending/j10..j12_*`. Tout gaté, fail-closed, défaut allow_sks=0.
+- Reverse 27.2.1 fait (kernelcache `macos/kc/`, démons `macos/extract/` + dyld `macos/extract/dsc`) :
+  `applekeystored_identity.md` §6 (séquence create), §7 (class/type = params RUNTIME, pas de constante), §8 (-0xd=variante),
+  §9 (-0xb=BadArgument, pointeur nul). `acm_token.md` (jeton d'enrôlement FORGÉ par le SEP, exige keybag DÉVERROUILLÉ).
+  `sks_unlock_token.md` (unlock 0x18, token-create TAG fil **0x1c**). `sks_keybag_unlock.md` (0x32/0x48/0x41/0x18 = FileVault
+  volume, contournables — confirmé J9c). **Conclusion reverse** : la séquence/valeurs/état exact de création vivent dans
+  **SEPOS (illisible) + le runtime du démon** → non reconstructibles depuis les binaires AP seuls.
+
+## 🎯 2 PISTES À TENTER AVANT TOUT DFU (ordre de priorité)
+
+**PISTE A — faire la VRAIE pré-séquence avant les ops keybag (la plus prometteuse).** On a toujours sauté les
+`perform_operation` (txn3/txn5 de la trace c12, = **collecte de clé système / identité d'appareil**, selecteurs `osc`
+sik_collection / `ogss` get_sik_status / `oska` system_key — SANS rk ni acmh, donc émettables à froid, cf. `sks_protocol.md`
+§2.1/§2.3). Hypothèse forte : **la création du keybag exige que l'identité/clé système soit d'abord établie dans le SEP**.
+→ Reverser le DER EXACT de ces ops `perform_operation` (TAG 0x22) du bring-up (leur émetteur est hors AppleSEPKeyStore :
+chercher dans un AUTRE bundle / via les fixups GOT, OU dans le démon `applekeystored` déjà extrait `macos/extract/`), les
+émettre après set_env, PUIS re-tenter load_keybag/create. C'est le chaînon « état préalable » qui manque le plus plausiblement.
+
+**PISTE B — REJOUER le keybag de macOS depuis le DISQUE (sans DFU, volumes présents).** `create_keybag` (0x01) est un
+**import-AVEC-données** (§9) : il veut un blob de keybag. macOS stocke ses keybags sur disque (`/var/keybags`, blobs Preboot,
+cf. `applekeystored_identity.md` §3/persistance). **Les volumes APFS de macOS 27.2.1 sont TOUJOURS sur le disque**
+(`nvme0n1p1..p8`, VU `lsblk`). → Recompiler **apfs-fuse** (scratchpad, cf. historique : `git clone sgan81/apfs-fuse`,
+cmake `-DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_CXX_FLAGS=-include cstdint`), **monter en LECTURE SEULE** le volume système/
+Preboot de macOS, lire `/var/keybags/*` + les blobs KEK/keybag, et les **fournir à create_keybag** (le blob dans un des 3
+blobs de la variante 4). Risque : le keybag sur disque est scellé à un état SEP qu'on a modifié (re-scellement xART) → peut
+être rejeté, mais c'est **cheap à tester** (lecture disque + 1 run). Lève potentiellement le mur « il faut des données ».
+
+**PISTE C (incluse dans A/B)** — reverser PRÉCISÉMENT quel champ non nul macOS met que nous zéro-ons (handle_y ? un blob ?
+une session ?), via les builders AP + le démon. Le -0xb est un `cbz` de pointeur nul : UN argument requis manque.
+
+## DERNIER RECOURS — DFU + capture (gros chantier, EFFACE LE DISQUE)
+DFU → macOS traçable (13.5/14.8.3, hyperviseur m1n1) → enrôler Touch ID → **capturer la séquence keybag réelle** → rejouer.
+⚠️ **Sauvegarde ALARM d'abord** (`alarm_p5.img` existe mais ancien). Albert a dit « macOS sacrifiable, je peux DFU ». À ne
+faire QUE si A et B échouent. Réserve : même après capture, reste l'inconnue « le SEP enrôle-t-il contre un keybag rejoué ? ».
+
+## Infra / état
+- Service `sep-touchid` INSTALLÉ + activé (mais `/etc/sep-touchid/disabled` présent → en retrait ; pour tester, laisser
+  `disabled` et rebooter ; pour revenir au Touch-ID-capteur-au-boot : `rm /etc/sep-touchid/disabled` + reboot).
+- Store chaîné = `/var/lib/sepd-run-20261122-230441` (copies `.avant-j*` à côté). 0 SAVE sur tous les runs J9-J12 (store intact).
+- PC (session c9, « Mission PC SKS header ») : a le kernelcache 27.2.1 (sha `4bf084db…` = identique Mac) + démons extraits ;
+  l'utiliser pour les reverses longs (pas de pauses de veille). Le messager inter-session peut être coupé : le repo git fait foi.
+- Reboot Mac = Albert (ssh-add après chaque reboot) ; 1er run d'une classe neuve = « go » d'Albert.
+
 # ▶️ COMMENCE ICI — 2026-11-23 (00h15) — 🎯 J7b : BOOT CHAÎNÉ NATIF COMPLET, sbio VIVANT — VÉRIFIÉ n=2
 
 - **Cause du mur « boot chaîné »** : sepd servait les lockers AVEC leurs 16 o d'UUID. Servis **sans UUID** (A = B[16..] du
