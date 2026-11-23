@@ -3081,3 +3081,25 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   enrôle-t-il Touch ID contre une identité forgée par Linux, ou exige-t-il l'identité/génération posée par macOS ?
   → **matériel uniquement, classe neuve → go d'Albert**. Le test décisif n'est plus « créer le keybag » (OK) mais
   « le SEP accepte-t-il l'enrôlement contre lui ».
+## 2026-11-23 — Claude (session PC, Opus 4.8) — J10 prep : séquence fil de création à neuf d'un keybag + TAG fil des ops
+- Désassemblage kext (macos/kc/ 27.2.1) + rappel userland. Section neuve « 6. J10 » dans docs/applekeystored_identity.md.
+  Rien lancé, aucun secret/uuid extrait. source: kext/userland.
+- **TAG fil des ops de création — VU** (immédiat submit) : create_keybag=**0x01** (`__ipc_create_keybag_v4` @0xcf9a34),
+  load_keybag=**0x03** (`__ipc_load_keybag` @0xcdb934), make_system_keybag=**0x0d** (`__ipc_make_system_keybag_v1`). =
+  recoupe ce que le Mac avait vu.
+- **Dispatch userclient** `AppleKeyStoreUserClient::handleUserClientSelector` @0xcd0840 = table de saut sur (selector−1)
+  (table @0xcd8fbc). Handler create → create_keybag @0xcc6904 (log « Create keybag failed … Retrying ») ; handler load →
+  load_keybag @0xcc6c3c. Sélecteurs userland VU (dyld) : create_bag=0x2, load_bag=0x6. Binding sélecteur↔TAG = **DÉDUIT
+  fort** (0x2→0x01, 0x6→0x03) par nom + extrémités VU ; byte-trace exact du jump-table non fait (cases entrelacées).
+- **create_keybag (0x01) VU** : sig = (u64, classe u32, 2 blobs {ptr,len}, bool→flag 0x100, int* handle_out, int).
+  → prend une CLASSE + blobs (peuvent être VIDES), **rend un HANDLE, aucun passcode obligatoire**. Codec @0xcde0e4 :
+  état +0x50, u64 +0x58, u32 +0x60/+0x64, 3 blobs +0x68/+0x78/+0x88, champs +0x98/+0xa8.
+- **Séquence création à neuf** : open 0x12 → getcap 0x4d → set_env 0x2a → create_keybag 0x01 (rend handle) →
+  make_system_keybag 0x0d (handle + uuid 16 o + type, blob vide → SEP fabrique). `identity_load` @0xcf79a8 exige une
+  **OSData de 16 o** (uuid, VU `cmp w0,#0x10`) et **type ≤ −10** (VU `cmn w21,#0xa ; b.gt`→rejet si > −10).
+- **Valeurs** : uuid 16 o = user-uuid fourni par l'hôte (VU obligatoire) ; type = contrainte ≤ −10 VU, **valeur exacte
+  INCONNU** (posée par AKSIdentity Swift ; pas de constante kext) → J10 balaie ≤ −10 ou capture macOS ; classe =
+  INCONNU précis ; génération initiale = DÉDUIT 0.
+- **with_hash** = variante épinglée au hash du passcode (VU : exige hash+itérations valides) → **PAS** sur le chemin
+  sans passcode. J10 « sans passcode » = create_keybag NU (0x01) + make_system_keybag (0x0d).
+- Test J10 = voir si create_keybag nu rend un handle (il le doit, VU). Écriture 0x12 classe neuve → go d'Albert ; power-cycle = Albert.

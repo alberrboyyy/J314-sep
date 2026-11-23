@@ -124,3 +124,69 @@ aucun secret macOS, l'uuid est choisi par l'hôte et la persistance est un fichi
 tranche** n'est donc pas « peut-on créer le keybag ? » (oui) mais « le SEP accepte-t-il d'**enrôler Touch ID** contre
 une identité forgée par Linux ? » — **politique SEP, matériel uniquement, classe neuve → go d'Albert**. Rien ici n'est
 matériel ; aucun uuid/secret extrait ; le passcode resterait fourni à l'exécution.
+
+---
+
+## 6. J10 — séquence de création à neuf : fil exact + valeurs (VU / DÉDUIT / INCONNU)
+
+Ajout 2026-11-23 (session PC) pour préparer **J10 = créer un keybag d'appareil SANS passcode, voir si le SEP rend un
+handle**. Côté kext = `source: kext` (kernelcache 27.2.1 `macos/kc/`), côté hôte = `source: userland`.
+
+### 6.1 Mapping sélecteur userclient → méthode C++ → TAG fil
+- **TAG fil des ops de création — VU** (immédiat `mov w1,#imm` juste avant le submit `mov x17,#0x392e ; blraa`) :
+  - `AppleKeyStore::create_keybag` @0xcc6904 → builder `__ipc_create_keybag_v4` @0xcf9a34 (`mov w1,#1`) → **TAG fil 0x01**.
+  - `AppleKeyStore::load_keybag` @0xcc6c3c → builder `__ipc_load_keybag` @0xcdb934 (`mov w1,#3`) → **TAG fil 0x03**.
+  - `make_system_keybag` → builder `__ipc_make_system_keybag_v1` @0xcdbce4 (`mov w1,#0xd`) → **TAG fil 0x0d**. (= ce
+    que le Mac avait vu ; recoupé.)
+- **Dispatch userclient — VU** : `AppleKeyStoreUserClient::handleUserClientSelector(selector, args)` @0xcd0840 =
+  **table de saut** sur `(selector − 1)` (`subs w28,w1,#1 ; cmp w28,#0xa8 ; ldrsw [table@0xcd8fbc + idx*4] ; br`).
+  Le handler de création appelle `create_keybag` @0xcc6904 et logge « *Create keybag failed … Retrying* » (bloc
+  @0xcd77e0) ; le handler de chargement appelle `load_keybag` @0xcc6c3c (@0xcd4dec). Les deux sont dans ce dispatch.
+- **Sélecteurs userland — VU** (dyld, `sks_userland_values.md`) : `aks_create_bag` → **0x2**, `aks_load_bag` → **0x6**.
+- **Binding sélecteur ↔ TAG — DÉDUIT fort** (par nom + les deux extrémités VU ; le byte-trace exact du jump-table
+  n'est pas fait — cases entrelacées, branches `b` en avant) :
+  **sélecteur 0x2 (create_bag) → `create_keybag` → TAG fil 0x01** ; **sélecteur 0x6 (load_bag) → `load_keybag` → TAG
+  fil 0x03**. `make_system_keybag` (0x0d) n'est pas un simple sélecteur `aks_*` : c'est l'**étape d'identité**, atteinte
+  par `AppleKeyStore::identity_load` @0xcf79a8 / `set_device_keybag` @0xcc7c48 (C++).
+
+### 6.2 Ce que `create_keybag` (TAG 0x01) prend et rend — VU
+Signature C++ (VU) : `create_keybag(this, u64 arg1, u32 classe, const u8* b1, u32 l1, const u8* b2, u32 l2, bool pin,
+int* handle_out, int arg9)`. Le wrapper pose un **flag 0x100** si `pin!=0` (`csel … #0x100`), et appelle
+`__ipc_create_keybag_v4`. → **entrées = une CLASSE (u32) + jusqu'à 2 blobs {ptr,len} (peuvent être VIDES) + un flag** ;
+**sortie = un handle** (`int*`). **Aucun passcode/secret obligatoire pour l'appel create lui-même** (le secret se pose
+plus tard via `aks_set_system`/unlock). → bon pour J10 : un `create_keybag` nu **doit rendre un handle**.
+Codec OOL `_code_ipc_create_keybag` @0xcde0e4 (requête, après en-tête IPC 0x50) : `+0x50` état=0 (u32), `+0x58` u64,
+`+0x60`/`+0x64` u32, puis **3 blocs blob** `+0x68/+0x70`, `+0x78/+0x80`, `+0x88/+0x90`, puis champs `+0x98`/`+0xa8`…
+(message riche ; pour une création neuve, scalaires + **blobs vides**).
+
+### 6.3 Séquence « créer à neuf » (le cas `/var/keybags` vide → « create a new one »)
+Après `open EP 0x12` + `get_capabilities` (0x4d) + `set_env` (0x2a) [acquis J9a/J9b] :
+1. **`create_keybag` (TAG fil 0x01)** — classe + blobs vides → **le SEP rend un handle** (VU : sortie `int*`). C'est
+   l'op que J10 veut tester nue.
+2. **`make_system_keybag` (TAG fil 0x0d)** — lie l'identité d'appareil : builder `__ipc_make_system_keybag_v1`, corps
+   VU (`keybag_native_path.md` §1) = `+0x50` const 1, `+0x58` handle, `+0x60`/`+0x64` scalaires (**type au +0x64**),
+   `+0x68/+0x70` blob **VIDE** (via `identity_load` → le SEP fabrique avec sa clé d'appareil), `+0x78` flag.
+   Entrée via `identity_load` @0xcf79a8 : **OSData de 16 o OBLIGATOIRE** (VU `cmp w0,#0x10 ; b.ne`) = l'**uuid**.
+
+### 6.4 Valeurs
+- **uuid (16 o)** — **VU obligatoire** (`identity_load` exige une OSData de 0x10). C'est un **user-uuid fourni par
+  l'hôte** (§2), pas un secret. Linux en présente un.
+- **type (`make_system` +0x64)** — **contrainte VU : ≤ −10** (`identity_load` @0xcf7a30 : `cmn w21,#0xa ; b.gt`→**rejet
+  si type > −10**). La **valeur exacte** est fournie par l'appelant Swift `AKSIdentity` (pas une constante kext) →
+  **INCONNU précis**. Pour J10 : **balayer des valeurs ≤ −10**, ou **capturer** la valeur sur un macOS vivant. (Pas de
+  constante nommée côté kext : `___der_key_keybag_type` est le champ DER de `perform_operation`, pas cet énum.)
+- **classe (`create_keybag` arg2)** — petit énum de classe de bag ; **valeur exacte INCONNU** (posée par l'appelant).
+- **génération initiale** — **DÉDUIT 0 à la création** (`AKSIdentity.State.generation`, Swift) ; valeur exacte INCONNU.
+
+### 6.5 `create_keybag_with_hash` : sur le chemin de création à neuf ? — NON (DÉDUIT fort)
+`create_keybag_with_hash` **exige des paramètres de hash ET un nombre d'itérations VALIDES** (VU, chaînes
+`applekeystored` : « *Invalid hash parameters / Invalid iterations for creating keybag with hash* »). C'est la variante
+**épinglée à un hash dérivé du passcode**. → le chemin **SANS passcode** (J10) utilise **`create_keybag` nu (TAG 0x01)**,
+**pas** `_with_hash`. On ne pose un hash qu'au moment d'attacher un secret (étape ultérieure, hors J10).
+
+### 6.6 Synthèse J10 (pour le script `pending/`)
+`open 0x12 → getcap 0x4d → set_env 0x2a → create_keybag 0x01 (classe + blobs vides, flag) → [handle attendu] →
+make_system_keybag 0x0d (handle + uuid 16 o + type ≤ −10, blob vide)`. **Byte-connu** : tous les TAG fil, l'en-tête IPC
+(§1.6 `sks_protocol.md`, déjà en Rust J9c), les gabarits OOL. **À fournir/balayer au matériel** : la valeur de `classe`,
+la valeur de `type` (≤ −10), l'uuid (celui de l'hôte). **Test J10 = voir si `create_keybag` nu rend un handle** (il le
+doit, VU) — **classe neuve en écriture 0x12 → go d'Albert** ; power-cycle = Albert. Rien lancé ici.
