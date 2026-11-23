@@ -2979,3 +2979,24 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   `_code_ipc_get_capabilities`/`__ipc_set_env`/`_code_ipc_set_env`/`_get_process_table`/`__payload_hash`.
 - Le dyld_shared_cache 27.2.1 est déjà extrait (`macos/ipsw27/out/26B131__MacBookPro18,2/`, session biometrickit) pour
   un éventuel reverse userland (montage apfs-fuse). IPSW conservé.
+## 2026-11-23 — Claude (session PC, Opus 4.8) — reverse 27.2.1 : corps OOL de `device_state_transition` (0x18) + TAG de `authentication_token_create` (0x1c)
+- Désassemblage seul (kernelcache 27.2.1 `…Mac13,1_2_MacBookPro18,1_2_3_4`, sha256 `4bf084db…`, recoupé ALARM), bundle
+  AppleSEPKeyStore. Rien lancé, rien `vérifié`, aucun secret/passcode extrait. Livrable neuf : **`docs/sks_unlock_token.md`**.
+- Mission reçue d'ALARM (le Mac faisait `make_system_keybag` 0x0d en //) : lever les 2 `INCONNU` de `keybag_native_path.md` §C/§D.
+- **Les deux corps OOL sont byte-connus** — via les **codecs** `_code_ipc_*` (que §3 n'avait pas lus : il regardait le
+  builder PAC-wrappé). L'offset struct = l'offset fil (en-tête IPC 0x50 o).
+- **`device_state_transition` TAG 0x18** (VU, recoupé c12) — codec @0xce1da0, builder @0xcfb078, wrappers C++
+  `unlock_the_device` @0xcc3bc8 / `device_state_transition` @0xcc3b44. Requête : +0x50 état=0, +0x58 **handle keybag**(u64),
+  +0x60 code d'état cible(u32), +0x64 rés=0(u32), +0x68 u64(sens INCONNU), **+0x70/+0x78 blob {ptr,len}=passcode brut**
+  (relayé, pas de PBKDF2 ici). Réponse : +0x80/+0x88 = deux mots d'état (`sls`/`ss`).
+- **`authentication_token_create` TAG fil = 0x1c** (VU, submit `mov w1,#0x1c` @0xcfb594) — la session Mac l'avait
+  marqué INCONNU (`acm_token.md` §6) car elle cherchait la table de **réception** ; le TAG vit dans le builder
+  d'**émission** @0xcfb52c. Codec @0xce2644, C++ @0xcc709c. Requête : +0x50 état=0, +0x58 u64 session(INCONNU),
+  +0x60 **handle keybag**(u32), +0x64 sélecteur(INCONNU), **+0x68/+0x70 blob = secret/credential**. Réponse :
+  **+0x78/+0x80 blob = jeton** (opaque, forgé+revérifié par le SEP, non calculable hors SEP).
+- Validation croisée du mécanisme « immédiat submit = TAG fil » : le builder voisin de 0x18 soumet `w1=0x19` =
+  `get_device_state` (conforme table §1.3). Pas de collision 0x1c : le `0x1c` de §2.1 (`oke`) est un énum d'op interne
+  du champ `o` de `perform_operation`, autre namespace.
+- **INCONNU résiduel** (honnête) : valeurs de scalaires (code d'état +0x60 de 0x18 ~ −501, u64 +0x58/+0x68,
+  sélecteurs), contenu interne du jeton (opaque), et l'acceptation brute sur EP 0x12 / keybag recréé Linux = **matériel**
+  (classe neuve → go d'Albert). Le passcode reste fourni à l'exécution, jamais stocké/extrait.
