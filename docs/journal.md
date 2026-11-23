@@ -3120,3 +3120,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   arg3 de aks_auth_token_create, valeur appelant INCONNU précis.
 - Conséquence : le test d'enrôlement (après J10) bute sur l'emballage ACM du secret (mur analogue au jeton SEP-forgé) ;
   J10 (create keybag nu) n'en dépend pas. Écriture 0x12 classe neuve → go d'Albert.
+## 2026-11-23 — Claude (session PC, Opus 4.8) — J10 valeurs type/classe : paramètres runtime, pas des constantes (verdict franc)
+- Reverse kext (macos/kc/) + daemon. docs/applekeystored_identity.md §7.4. Rien lancé, aucun secret extrait.
+- Pour le chemin NATIF, on pose +0x60 (classe) et +0x64 (type) soi-même. Verdict : **ni l'un ni l'autre n'est une
+  constante statique** — ce sont des paramètres runtime. VU : les 2 appelants de make_system passent le type en variable
+  (identity_load x4=x21 ; set_device_keybag x4=x19=scalaire userspace) ; aucun `mov w4,#const`. Contrainte dure VU :
+  type ≤ −10 (identity_load `cmn w21,#0xa ; b.gt`). Op identité (sél 0x78) : type résolu dynamiquement par
+  effective_bag/0xccff20 (−1/−2/−3/−6 pour bag existant ; branche ≤ −10 data-dépendante, non réductible à un littéral).
+- Classe (create +0x60) : scalaire userspace (cas sél 0x2 lit [x19,#0x50]) ; codec create ne valide aucune valeur ;
+  daemon ne nomme que les classes de protection A/B/C/D → DÉDUIT classe = A..D (1..4), pas de constante « system » figée.
+- ⇒ indéterminables au binaire comme constantes uniques. Options : (1) CAPTURE recommandée — lire +0x60/+0x64 sur le fil
+  d'un create_keybag 0x01 + make_system 0x0d émis par macOS vivant ; (2) balayage borné (go Albert) : classe {1..4},
+  type {−10,−11,−12,…}. Le test create_keybag nu « rend un handle » ne dépend que de la classe.
+- Pas touché à ACMLib (consigne : après preuve J10 matériel).

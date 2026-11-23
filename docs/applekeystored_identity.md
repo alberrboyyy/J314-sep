@@ -234,3 +234,27 @@ Le chemin d'identité (make_system via `identity_load`) est l'**op userclient s�
 - **Reste INCONNU au binaire** (ALARM : balayage/capture matériel autorisé) : la **valeur de classe** du create système,
   et la **valeur numérique** du type écrit par `0xccff20` (non bloquant pour émettre l'op). Rien lancé ; écriture 0x12
   classe neuve → go d'Albert ; power-cycle = Albert.
+
+### 7.4 Valeurs exactes pour le chemin NATIF (on pose +0x60 et +0x64 nous-mêmes) — verdict honnête
+Pour le pilote natif (on émet le mot SEP brut, on EST le kext), il faut poser **classe (+0x60)** et **type (+0x64)**
+nous-mêmes. Résultat du reverse : **ni l'un ni l'autre n'est une constante statique du binaire — ce sont des PARAMÈTRES
+runtime.** Preuves VU :
+- **type (+0x64)** : les **deux** appelants de make_system le passent en **variable** — `identity_load` (x4=x21, le type
+  qu'il a reçu) et `set_device_keybag` (x4=x19, un **scalaire userspace** du userclient). Aucun `mov w4,#<const>`. La
+  seule contrainte dure est **VU : ≤ −10** (`identity_load` @0xcf7a30 `cmn w21,#0xa ; b.gt`→rejet si > −10). Côté op
+  d'identité (sélecteur 0x78), le type est **résolu dynamiquement** par `effective_bag_handle_actual`/`0xccff20`
+  (petits négatifs −1/−2/−3/−6 pour un bag EXISTANT ; la branche « neuf » ≤ −10 est data-dépendante, **pas réductible à
+  un littéral unique**).
+- **classe (+0x60)** : le cas create (sélecteur 0x2 @0xcd3334) lit la classe d'un **scalaire userspace** (`[x19,#0x50]`,
+  scalaire-count==1) ; le codec `_code_ipc_create_keybag` **ne valide aucune valeur** de +0x60 (pas de `cmp`). Le daemon
+  ne nomme que les **classes de protection données A/B/C/D** (chaînes VU « CLASS A..D »). DÉDUIT : classe = classe de
+  protection (A..D = 1..4) ; **aucune constante « system » dédiée** figée dans ces binaires.
+
+**→ Verdict (franc, comme autorisé)** : **type et classe sont indéterminables au binaire comme constantes uniques.**
+Deux options pour J10, par ordre de propreté :
+1. **CAPTURE** (recommandé) : lire les mots **+0x60 (classe)** et **+0x64 (type)** directement **sur le fil** d'un
+   `create_keybag` (0x01) et d'un `make_system_keybag` (0x0d) **émis par macOS vivant** (trace SEP). Source VU directe,
+   zéro devinette.
+2. **BALAYAGE BORNÉ** (go d'Albert) : classe ∈ {1,2,3,4} (A..D) ; type ∈ {−10, −11, −12, …} en partant de −10. Petit
+   espace. Le test « le SEP rend-il un handle » sur `create_keybag` nu ne dépend **que de la classe** (make_system/type
+   vient en 2e). Fail-closed à la 1re incohérence ; power-cycle = Albert.
