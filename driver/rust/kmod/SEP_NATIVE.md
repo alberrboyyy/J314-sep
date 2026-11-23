@@ -132,6 +132,16 @@ précoce (`sbio_open=1`) et le niveau 3 (2e passe, point 12) : **compilés et te
    Porte CNTL resserrée au passage (toutes valeurs) : SECMODE et tampons PARAM 0x13 seulement avant la fin de l'ouverture
    de 0x13, pong PARAM 0 DATA 0 ; avant, tout TYPE de la liste passait quel que soit PARAM (aucun chemin ne l'exploitait).
 
+14. **J9a, UN `get_capabilities` SKS (`allow_sks=2`)** — `docs/sks_native_plan.md` §6. Comme le point 13, puis, si
+   skdl/sks/scrd sont TOUS ouverts : `/dev/sep_sks` (créé au probe) accepte pendant ≤ 20 s UNE écriture de exactement
+   0x64 o (EAGAIN avant, EALREADY après), contrôlée par `sep-proto::sks_ipc::check_getcap` (constantes de §1.6.2,
+   condensé SHA-256/16 recalculé, cdhash = zéros ou SHA-1 de l'uniqueid ; refus = EINVAL, rien envoyé). Copie dans A12
+   (relue), puis UN mot `> 0x12 TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000` (porte `sks_ipc::GetcapGate` : ce mot exact,
+   une fois par boot ; tout autre mot vers 0x12, et tout mot vers 0x17/0x0a, reste refusé → Halted). Écoute 10 s : la
+   1re réponse appariée comme le kext (TAG bit 7, TYPE 0x01) est journalisée avec un instantané de B12 (0x80 o), jamais
+   répondue ; « VERDICT sks getcap : RÉPONDU / ERREUR / SILENCE / NON ENVOYÉ » ; `read` de /dev/sep_sks rend
+   l'enregistrement `sks_ipc::encode_outcome` (0x98 o). Puis le 0x73 du point 13. Outil : `sks-getcap/` (`sks_getcap run`).
+
 ## Paramètres (u32, défaut 0 sauf `sbio_open`, absents de sysfs : figés au chargement)
 
 | Paramètre | Effet |
@@ -143,7 +153,7 @@ précoce (`sbio_open=1`) et le niveau 3 (2e passe, point 12) : **compilés et te
 | `sbio_open` | **défaut 1** = ouverture PRÉCOCE de sbio (point 9) ; 0 = TARDIVE (point 8, éprouvée après scellement frais). Autre valeur → EINVAL. Sans effet si `allow_sbio=0`. |
 | `allow_sbio_relay` | 1 = relais J5 (point 10) : `/dev/sep_sbio` après un 0x73 VIVANT. Exige `allow_sbio=1` (sinon EINVAL). |
 | `allow_sbio_params` | J5c (points 11-12) : 0 = rien après 0x5f ; 1 = 0x5d … 2e 0x32 ; 2 = en plus 0x5b (calibration) et 0x63 ; 3 = en plus 0x19 et la 2e passe jusqu'au 2e 0x63 (⚠️ classe neuve : 0x19 + 2e session capteur). Exige `allow_sbio_relay=1`. |
-| `allow_sks` | J7a (point 13) : 1 = après l'ouverture précoce de 0x08, ouverture CNTL SEULE de skdl 0x17, sks 0x12, scrd 0x0a puis écoute passive 10 s, puis le 0x73. Exige `allow_sbio=1 sbio_open=1 allow_sbio_relay=0` ; valeur > 1 → EINVAL. ⚠️ classe neuve. |
+| `allow_sks` | J7a (point 13) : 1 = après l'ouverture précoce de 0x08, ouverture CNTL SEULE de skdl 0x17, sks 0x12, scrd 0x0a puis écoute passive 10 s, puis le 0x73. 2 = J9a (point 14) : en plus UN `get_capabilities` vers 0x12 (⚠️ écriture SKS, classe neuve). Exige `allow_sbio=1 sbio_open=1 allow_sbio_relay=0` ; valeur > 2 → EINVAL. ⚠️ classe neuve. |
 
 ## États
 

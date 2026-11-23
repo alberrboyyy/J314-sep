@@ -2730,3 +2730,16 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   1re passe calibrée (0x63 = macOS), 2e passe terminée, sbiod rc=0 ; statut « prêt : capteur initialisé, sepd actif ».
   ⇒ chemin J8 reproduit au boot sans intervention (n=3 du chemin).
 - À regarder : la cgroup du service affiche ~640 Mo de mémoire (probablement du cache de fichiers, non vérifié).
+
+## 2026-11-23 — agent driver (session ALARM) — J9a préparé : UN get_capabilities SKS (EP 0x12) sur boot chaîné ; RIEN lancé
+- Source : `sks_protocol.md` §1.6 + `sks_ipc_negotiation.md` (`source: kext` 13.5, non vérifié matériel), c12 L178-179,
+  J7b n=2. Rien chargé, rien installé, aucun mot au SEP, service `sep-touchid` et `/var/lib/sepd` non touchés.
+- Code : `sep-proto/src/hash.rs` (SHA-256/SHA-1 sans allocation, vecteurs FIPS), `sep-proto/src/sks_ipc.rs` (codeur 0x64 o,
+  porte `check_getcap`, décodage de la réponse, `GetcapGate`), `sep_native` `allow_sks=2` + `/dev/sep_sks`, outil
+  `driver/rust/sks-getcap` (`sks_getcap build|check|decode|run`). Requête identique octet pour octet à une construction
+  Python/hashlib indépendante. cargo test (sep-proto 50+22, sks-getcap 3, sbiod, sepd) verts ; clippy 0 ; module : 0 avertissement (CLIPPY=1).
+- Binaires `~/kbuild/j9` : `sep_native.ko` `145804d0b31871b0d5c6b266dce464770bb8467d9631384ed362ef5cb796f334`,
+  `sks_getcap` `c25a6193938b308dfafdde6e2f74382d1a7d1336aed83e68b247cc39ad0715c9` ; sepd/ovl/dtbo = j5 (`6ad1992f…`, `02c1fcc2…`, `8adbcb08…`).
+- `pending/j9a_sks_getcap_chained.sh STORE` (dérivé de J7b) : refuse si service actif, sepd lancé, `/etc/sep-touchid/disabled`
+  absent ou STORE = `/var/lib/sepd`. Ouvert/INCONNU : horloge de `_get_usec_time` (choix : CLOCK_MONOTONIC µs), forme du
+  cdhash pour un appel noyau (choix : SHA-1 de l'uniqueid 0). Classe neuve (écriture 0x12) → 1er run = go d'Albert.

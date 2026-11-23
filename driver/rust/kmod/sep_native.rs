@@ -33,6 +33,15 @@
 //! ET son annonce 0x1d acquittée ; puis écoute passive 10 s (mots journalisés, dumps de B, jamais de réponse), puis le
 //! 0x73. **Aucun mot n'est jamais envoyé AUX EP 0x17/0x12/0x0a** (porte d'envoi) : ni ping skdl, ni RPC sks.
 //!
+//! Avec `allow_sks=2` (J9a, mêmes exigences que 1, `docs/sks_native_plan.md` §6) : comme 1, mais une fois skdl, sks
+//! et scrd ouverts, `/dev/sep_sks` (créé au probe) accepte UNE requête `get_capabilities` de 0x64 o écrite par l'espace
+//! utilisateur (`sks_getcap`), contrôlée par `sks_ipc::check_getcap` (champs constants, condensé SHA-256/16 recalculé,
+//! cdhash = zéros ou SHA-1 de l'uniqueid) ; elle est copiée dans A12 et UN SEUL mot part vers 0x12 :
+//! `TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000` (porte `sks_ipc::GetcapGate`). Écoute 10 s : la réponse (TAG bit 7,
+//! TYPE 0x01) est journalisée avec un instantané de B12 (0x80 o), jamais répondue ; « VERDICT sks getcap : RÉPONDU /
+//! SILENCE / ERREUR / NON ENVOYÉ » ; `read` de /dev/sep_sks rend ce résultat. Puis le 0x73 comme 1. Aucun autre mot
+//! vers 0x12, aucun vers 0x17/0x0a.
+//!
 //! Avec `allow_sbio_bio=1` (exige `allow_sbio_params=3`) : E-ENROLL-START (J6a, `docs/j6_enroll_match_protocol.md`
 //! §6) — après la dernière étape de la 2e passe (2e 0x63), UN seul `0x03` commandStartEnroll, charge FIXE de 68 octets
 //! à zéro (`sbio_gate::ENROLL_INDATA_MIN`, contenu réel inconnu), puis ÉCOUTE seule : la réponse au 0x03 (quelle
@@ -79,6 +88,12 @@ mod sbio_gate;
 #[path = "../sep-proto/src/ks_gate.rs"]
 #[allow(dead_code, unreachable_pub)]
 mod ks_gate;
+#[path = "../sep-proto/src/hash.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod hash;
+#[path = "../sep-proto/src/sks_ipc.rs"]
+#[allow(dead_code, unreachable_pub)]
+mod sks_ipc;
 
 kernel::module_platform_driver! {
     type: drv::SepNative,
@@ -117,7 +132,7 @@ kernel::module_platform_driver! {
         },
         allow_sks: u32 {
             default: 0,
-            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC)",
+            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; nothing else ever to 0x12/0x17/0x0a",
         },
         allow_sbio_bio: u32 {
             default: 0,
@@ -130,6 +145,7 @@ mod drv {
     use crate::discovery::{self, EpInfo};
     use crate::gt::{self, CounterChecker, OOL_HDR};
     use crate::ks_gate::{self, OpenGate, KS_EPS, KS_SCRD, KS_SKDL, KS_SKS};
+    use crate::sks_ipc::{self, GetcapGate};
     use crate::sbio_gate::{self, EvtHdr, Step, EVT_HDR, EVT_MAX, KIND_BIO_REPLY, KIND_NOTIFY, KIND_REPLY, KIND_SPONT, MAX_REPLY};
     use crate::word::{Dir, Msg, Word};
     use crate::xart::{is_save, EP_XART, OP_EP_ANNOUNCE, OP_FWBOOT};
@@ -234,6 +250,10 @@ mod drv {
     const KS_DUMP_LIMIT: u32 = 4;
     /// Lignes de journal des mots keystore reçus (compte gardé au-delà).
     const KS_LOG_LIMIT: u32 = 128;
+    // --- J9a (allow_sks=2), `docs/sks_native_plan.md` §6 -------------------------------------------------------
+    /// Attente de la requête get_capabilities sur /dev/sep_sks une fois skdl/sks/scrd ouverts ; au-delà, rien n'est
+    /// envoyé à 0x12 (« NON ENVOYÉ »), l'écoute passive et le 0x73 suivent comme allow_sks=1.
+    const KS_REQ_WAIT_MS: i64 = 20_000;
 
     // --- sbio (allow_sbio=1), `docs/j3_sbio_open.md` (vérifié c9) et `pending/sep_native_sbio.sh` -----------
     /// Taille de A8 et de B8 (comme macOS et le harnais m1n1).
@@ -318,7 +338,7 @@ mod drv {
         *crate::module_parameters::allow_sbio_bio.value()
     }
 
-    /// J7a : 0 ou 1 (autre valeur refusée au probe ; exige allow_sbio=1, sbio_open=1, allow_sbio_relay=0).
+    /// J7a : 0, 1 ou 2 (J9a) ; autre valeur refusée au probe ; ≥ 1 exige allow_sbio=1, sbio_open=1, allow_sbio_relay=0.
     fn param_allow_sks() -> u32 {
         *crate::module_parameters::allow_sks.value()
     }
@@ -409,6 +429,17 @@ mod drv {
         HelloSent,
         /// allow_sbio_relay=1 et sbio VIVANT : /dev/sep_sbio sert le relais.
         Relay,
+    }
+
+    /// J9a (allow_sks=2) : avancement du get_capabilities. Seul `WaitReq` accepte l'écriture de /dev/sep_sks, seul
+    /// `ReqReady` (fil du probe) arme la porte `GetcapGate` pour UN mot ; `Done` = résultat lisible sur /dev/sep_sks.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum GcPhase {
+        Off,
+        WaitReq,
+        ReqReady,
+        Sent,
+        Done,
     }
 
     /// Commande du relais en vol (une seule à la fois).
@@ -523,6 +554,18 @@ mod drv {
         /// Mots reçus sur l'EP (tout état).
         ks_rx: [u32; 3],
         ks_logged: u32,
+        // --- J9a (allow_sks=2) ---
+        sks_gc: GcPhase,
+        /// Requête validée (`sks_ipc::check_getcap`), copiée dans A12 au moment de l'envoi.
+        sks_req: [u8; sks_ipc::GETCAP_LEN],
+        sks_gate: GetcapGate,
+        /// Mot de réponse apparié (EP 0x12, TAG bit 7, TYPE 0x01) et instantané de B12 pris à sa réception.
+        sks_reply: Option<u64>,
+        sks_snap: [u8; sks_ipc::OUT_SNAP],
+        /// Mots EP 0x12 reçus après l'envoi (réponse comprise).
+        sks_rx_after: u32,
+        /// Enregistrement rendu par `read` de /dev/sep_sks (valide en `Done`).
+        sks_out: [u8; sks_ipc::OUT_SIZE],
     }
 
     impl Core {
@@ -559,6 +602,13 @@ mod drv {
                 ks_open: [false; 3],
                 ks_rx: [0; 3],
                 ks_logged: 0,
+                sks_gc: GcPhase::Off,
+                sks_req: [0; sks_ipc::GETCAP_LEN],
+                sks_gate: GetcapGate::closed(),
+                sks_reply: None,
+                sks_snap: [0; sks_ipc::OUT_SNAP],
+                sks_rx_after: 0,
+                sks_out: [0; sks_ipc::OUT_SIZE],
                 relay: Relay {
                     next: 0,
                     txn: None,
@@ -642,6 +692,8 @@ mod drv {
         opened: Atomic<u32>,
         /// Un seul ouvreur de /dev/sep_sbio.
         sbio_opened: Atomic<u32>,
+        /// Un seul ouvreur de /dev/sep_sks (allow_sks=2).
+        sks_opened: Atomic<u32>,
         #[pin]
         core: Mutex<Core>,
         /// Seule mailbox d'envoi. Verrou pris APRÈS `core` (jamais l'inverse). La mailbox tient une référence sur
@@ -846,6 +898,25 @@ mod drv {
                 );
             } else if core.ks_logged == KS_LOG_LIMIT + 1 {
                 dev_info!(self.dev, "keystore : journal coupé au-delà de {} mots (compte gardé)\n", KS_LOG_LIMIT);
+            }
+            // J9a : 1re réponse appariée comme le kext (bit 7 du TAG, TYPE = notre transaction) → instantané de B12.
+            // Jamais de réponse du pilote, jamais de Halted.
+            if w.ep == EP_SKS && core.sks_gc == GcPhase::Sent {
+                core.sks_rx_after = core.sks_rx_after.saturating_add(1);
+                if core.sks_reply.is_none() && sks_ipc::is_getcap_reply(&w) {
+                    if let Some(bufs) = self.ks_ool.as_ref() {
+                        let mut snap = [0u8; sks_ipc::OUT_SNAP];
+                        self.read_b8(&bufs[KS_SKS].1, &mut snap);
+                        core.sks_snap = snap;
+                    }
+                    core.sks_reply = Some(raw);
+                    let rw = sks_ipc::reply_word(&w);
+                    dev_info!(
+                        self.dev,
+                        "sks getcap < réponse appariée : TAG {:#04x} ({}) TYPE {:#04x} PARAM {} DATA {:#010x} (longueur {:#x}, drapeaux d'appel {:#06x}) : {:#018x}\n",
+                        w.tag, if rw.tag_is_cd { "= 0xcd" } else { "≠ 0xcd, bit 7 seul" }, w.ty, rw.status, w.data, rw.len, rw.call_flags, raw
+                    );
+                }
             }
             self.cv.notify_all();
         }
@@ -1139,7 +1210,6 @@ mod drv {
         fn send_running(&self, core: &mut Core, w: Word, what: &'static str) -> Result {
             let allowed = core.state == State::Running
                 && param_allow_xart()
-                && w.ep != EP_SKS
                 && w.ep != EP_SKDL
                 && w.ep != EP_SCRD
                 && match w.ep {
@@ -1152,7 +1222,7 @@ mod drv {
                     // CNTL PARAM 0x17/0x12/0x0a (J7a) : seulement l'EP en cours d'ouverture, et exactement le mot suivant
                     // des 4 de `ks_gate::open_steps` (TYPE, PARAM, DATA = taille ou IOVA de NOS tampons), une fois chacun.
                     discovery::EP_CNTL if ks_gate::ks_index(w.param).is_some() => {
-                        param_allow_sks() == 1
+                        param_allow_sks() != 0
                             && core.ks_opening == Some(w.param)
                             && core.ks_gate.admit(w.ty, w.param, w.data)
                     }
@@ -1194,6 +1264,11 @@ mod drv {
                         _ => false,
                     },
                     EP_SBIO => false,
+                    // sks (J9a, allow_sks=2) : exactement `TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000`, une fois par boot,
+                    // seulement quand le fil du probe a armé la porte (requête validée et copiée dans A12).
+                    EP_SKS => {
+                        param_allow_sks() == 2 && core.sks_gc == GcPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_gate.admit(&w)
+                    }
                     ep => core.xarm == Some(ep) && core.xart_open,
                 };
             if !allowed {
@@ -1360,8 +1435,11 @@ mod drv {
             core.sbio = SbioPhase::Open;
             dev_info!(self.dev, "0x08 ouvert ; mots sbio reçus jusqu'ici : {}\n", core.sbio_rx);
             // J7a : skdl, sks, scrd ouverts (CNTL seul) puis écoute passive, AVANT le 0x73. Erreur → pas de 0x73.
-            let quiet_start = if param_allow_sks() == 1 {
-                self.run_keystore(&mut core)?;
+            let quiet_start = if param_allow_sks() != 0 {
+                let r = self.run_keystore(&mut core);
+                // J9a : verdict (et résultat de /dev/sep_sks) aussi sur les chemins d'erreur ; sans effet s'il est déjà donné.
+                self.sks_getcap_finish(&mut core);
+                r?;
                 Instant::<Monotonic>::now()
             } else {
                 start
@@ -1410,7 +1488,7 @@ mod drv {
                 if alive { "VIVANT" } else { "MUET" },
                 b0, b14, core.sbio_rx_after, if core.sbio_alive_msg { "oui" } else { "non" }
             );
-            if param_allow_sks() == 1 {
+            if param_allow_sks() != 0 {
                 dev_info!(
                     self.dev,
                     "keystore (bilan) : ouverts skdl {} sks {} scrd {} ; mots reçus skdl {} sks {} scrd {}\n",
@@ -1529,10 +1607,18 @@ mod drv {
                 core.ks_open[i] = true;
                 dev_info!(self.dev, "keystore : '{}' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : {}\n", e.name_str(), core.ks_rx[i]);
             }
+            // J9a : UN get_capabilities (si les 3 EP sont ouverts et que l'espace utilisateur fournit la requête à
+            // temps) ; l'écoute de 10 s ci-dessous est alors celle de sa réponse.
+            if param_allow_sks() == 2 {
+                self.sks_getcap_send(core, &bufs[KS_SKS].0)?;
+            }
+            let gc_sent = core.sks_gc == GcPhase::Sent;
             dev_info!(
                 self.dev,
-                "keystore : écoute passive {} ms (rien envoyé à 0x17/0x12/0x0a) ; ouverts skdl {} sks {} scrd {}\n",
-                KS_LISTEN_MS, core.ks_open[KS_SKDL], core.ks_open[KS_SKS], core.ks_open[KS_SCRD]
+                "keystore : écoute {} ms ({}) ; ouverts skdl {} sks {} scrd {}\n",
+                KS_LISTEN_MS,
+                if gc_sent { "après UN get_capabilities vers 0x12 ; rien d'autre envoyé à 0x17/0x12/0x0a" } else { "passive, rien envoyé à 0x17/0x12/0x0a" },
+                core.ks_open[KS_SKDL], core.ks_open[KS_SKS], core.ks_open[KS_SCRD]
             );
             let t0 = Instant::<Monotonic>::now();
             let mut seen = core.ks_rx;
@@ -1558,6 +1644,7 @@ mod drv {
                     self.dump_ool(&bufs[i].1, "B keystore en fin d'écoute", e.name_str());
                 }
             }
+            self.sks_getcap_finish(core);
             dev_info!(
                 self.dev,
                 "VERDICT keystore : skdl {} sks {} scrd {} ; mots reçus pendant/avant l'écoute : skdl {} sks {} scrd {} ; puis 0x73\n",
@@ -1566,6 +1653,167 @@ mod drv {
                 if core.ks_open[KS_SCRD] { "OUVERT" } else { "non ouvert" },
                 core.ks_rx[KS_SKDL], core.ks_rx[KS_SKS], core.ks_rx[KS_SCRD]
             );
+            Ok(())
+        }
+
+        /// J9a : attend la requête de /dev/sep_sks (KS_REQ_WAIT_MS), la recontrôle, la copie dans A12 (relue), puis
+        /// envoie LE mot `> 0x12 TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000` (porte `GetcapGate`, une fois par boot).
+        /// Pas les 3 EP ouverts, ou pas de requête à temps → rien n'est envoyé à 0x12 (`Ok`, verdict NON ENVOYÉ).
+        fn sks_getcap_send(&self, core: &mut MutexGuard<'_, Core>, a12: &Ool) -> Result {
+            if !(core.ks_open[KS_SKDL] && core.ks_open[KS_SKS] && core.ks_open[KS_SCRD]) {
+                dev_info!(self.dev, "sks getcap : skdl/sks/scrd pas tous ouverts : rien envoyé à 0x12\n");
+                return Ok(());
+            }
+            core.sks_gc = GcPhase::WaitReq;
+            self.cv.notify_all();
+            dev_info!(self.dev, "sks getcap : /dev/sep_sks attend la requête get_capabilities ({:#x} o, {} ms max)\n", sks_ipc::GETCAP_LEN, KS_REQ_WAIT_MS);
+            let t0 = Instant::<Monotonic>::now();
+            while core.sks_gc == GcPhase::WaitReq {
+                if core.state != State::Running {
+                    return Err(EIO);
+                }
+                if t0.elapsed().as_millis() >= KS_REQ_WAIT_MS {
+                    dev_info!(self.dev, "sks getcap : aucune requête valide en {} ms : rien envoyé à 0x12\n", KS_REQ_WAIT_MS);
+                    self.sks_getcap_finish(core);
+                    return Ok(());
+                }
+                if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                    dev_warn!(self.dev, "signal pendant l'attente de la requête get_capabilities : rien envoyé à 0x12\n");
+                    self.sks_getcap_finish(core);
+                    return Err(EINTR);
+                }
+            }
+            if core.sks_gc != GcPhase::ReqReady {
+                return Err(EIO);
+            }
+            let req = core.sks_req;
+            let f = match sks_ipc::check_getcap(&req) {
+                Ok(f) => f,
+                Err(_) => {
+                    self.halt(core, "requête get_capabilities invalide au moment de l'envoi (bug)", None);
+                    return Err(EIO);
+                }
+            };
+            if a12.len() < sks_ipc::GETCAP_LEN {
+                return Err(EINVAL);
+            }
+            let mut back = [0u8; sks_ipc::GETCAP_LEN];
+            // SAFETY: `a12` est une allocation cohérente de `a12.len()` (0x8000) octets, vivante (tenue par `self`) ;
+            // on écrit puis relit `GETCAP_LEN <= a12.len()` octets (contrôlé ci-dessus). Le SEP ne lit A12 qu'après le
+            // mot envoyé ci-dessous ; seul ce fil écrit A12, sous `core`.
+            unsafe {
+                let dst = a12.as_mut_ptr().cast::<u8>();
+                core::ptr::copy_nonoverlapping(req.as_ptr(), dst, req.len());
+                for (i, x) in back.iter_mut().enumerate() {
+                    *x = core::ptr::read_volatile(dst.add(i));
+                }
+            }
+            if back != req || sks_ipc::check_getcap(&back).is_err() {
+                self.halt(core, "A12 relu ≠ requête get_capabilities validée", None);
+                return Err(EIO);
+            }
+            let d = &req[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN];
+            let hi = u64::from_be_bytes([d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]]);
+            let lo = u64::from_be_bytes([d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]]);
+            dma_wmb();
+            core.sks_gate.arm();
+            self.send_running(core, sks_ipc::getcap_word(), "sks get_capabilities (TAG 0x4d)")?;
+            core.sks_gc = GcPhase::Sent;
+            dev_info!(
+                self.dev,
+                "sks getcap > EP 0x12 TAG 0x4d TYPE 0x01 PARAM 0x00 DATA 0x00640000 ; A12 = {:#x} o (horodatage {} µs, uniqueid {:#x}, uid {}, cdhash {}, condensé {:016x}{:016x}) ; aucun autre mot vers 0x12\n",
+                sks_ipc::GETCAP_LEN, f.ts_us, f.uniqueid, f.uid,
+                match sks_ipc::cdhash_kind(&f) {
+                    sks_ipc::CdhashKind::Sha1OfUniqueid => "SHA-1 de l'uniqueid",
+                    sks_ipc::CdhashKind::Zero => "zéros",
+                    sks_ipc::CdhashKind::Other => "autre (impossible)",
+                },
+                hi, lo
+            );
+            Ok(())
+        }
+
+        /// J9a : verdict une seule fois (idempotent), résultat pour /dev/sep_sks, réveil d'un lecteur.
+        fn sks_getcap_finish(&self, core: &mut Core) {
+            if param_allow_sks() != 2 || core.sks_gc == GcPhase::Done {
+                return;
+            }
+            let sent = core.sks_gc == GcPhase::Sent;
+            let (kind, raw) = match (sent, core.sks_reply) {
+                (false, _) => (sks_ipc::OUT_NOT_SENT, 0),
+                (true, None) => (sks_ipc::OUT_SILENCE, 0),
+                (true, Some(r)) => (sks_ipc::OUT_REPLIED, r),
+            };
+            core.sks_out = sks_ipc::encode_outcome(kind, raw, &core.sks_snap);
+            core.sks_gc = GcPhase::Done;
+            match kind {
+                sks_ipc::OUT_NOT_SENT => dev_info!(self.dev, "VERDICT sks getcap : NON ENVOYÉ (aucun mot vers 0x12)\n"),
+                sks_ipc::OUT_SILENCE => dev_info!(
+                    self.dev,
+                    "VERDICT sks getcap : SILENCE (aucune réponse appariée TAG bit 7 / TYPE 0x01 en {} ms ; {} mot(s) 0x12 après l'envoi)\n",
+                    KS_LISTEN_MS, core.sks_rx_after
+                ),
+                _ => {
+                    let snap = core.sks_snap;
+                    let u = |o: usize| u32::from_le_bytes([snap[o], snap[o + 1], snap[o + 2], snap[o + 3]]);
+                    for o in (0..sks_ipc::OUT_SNAP).step_by(16) {
+                        dev_info!(self.dev, "  B12 (instantané à la réponse) +{:#05x} : {:08x} {:08x} {:08x} {:08x}\n", o, u(o), u(o + 4), u(o + 8), u(o + 12));
+                    }
+                    let w = Word::decode(raw);
+                    let rw = sks_ipc::reply_word(&w);
+                    if rw.status != 0 {
+                        dev_info!(
+                            self.dev,
+                            "VERDICT sks getcap : ERREUR (PARAM {} = statut signé ≠ 0 ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x}\n",
+                            rw.status, rw.len, rw.call_flags, w.tag, raw
+                        );
+                    } else {
+                        match sks_ipc::decode_getcap_reply(&snap, usize::from(rw.len)) {
+                            Ok(r) => {
+                                let ok = r.state == 0;
+                                dev_info!(
+                                self.dev,
+                                "VERDICT sks getcap : {} (PARAM 0, état {:#x}, theirs {} → négociée v{} ; L {:#x}, version d'en-tête {}, condensé {}, blob {} o ; longueur {:#x}, drapeaux d'appel {:#06x}, TAG {:#04x}) : {:#018x}\n",
+                                if ok { "RÉPONDU" } else { "ERREUR" },
+                                r.state, r.theirs, r.negotiated(), r.hlen, r.version,
+                                if r.digest_ok { "OK" } else { "FAUX" }, r.blob_len, rw.len, rw.call_flags, w.tag, raw
+                                );
+                            }
+                            Err(e) => dev_info!(
+                                self.dev,
+                                "VERDICT sks getcap : ERREUR (PARAM 0 mais B12 non décodable : {} ; longueur {:#x}, drapeaux d'appel {:#06x}) : {:#018x}\n",
+                                why(&e), rw.len, rw.call_flags, raw
+                            ),
+                        }
+                    }
+                }
+            }
+            self.cv.notify_all();
+        }
+
+        /// J9a : écriture de /dev/sep_sks (contexte processus). Acceptée seulement en `WaitReq`, après contrôle
+        /// complet ; refus = rien envoyé, pas de Halted.
+        fn sks_submit(&self, req: &[u8]) -> Result {
+            let mut core = self.core.lock();
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            match core.sks_gc {
+                GcPhase::Off => return Err(EAGAIN),
+                GcPhase::WaitReq => {}
+                _ => return Err(EALREADY),
+            }
+            let f = match sks_ipc::check_getcap(req) {
+                Ok(f) => f,
+                Err(e) => {
+                    dev_err!(self.dev, "sks getcap : requête refusée par la porte ({}) : rien envoyé\n", why(&e));
+                    return Err(EINVAL);
+                }
+            };
+            core.sks_req.copy_from_slice(req);
+            core.sks_gc = GcPhase::ReqReady;
+            dev_info!(self.dev, "sks getcap : requête acceptée (horodatage {} µs, uniqueid {:#x}, uid {})\n", f.ts_us, f.uniqueid, f.uid);
+            self.cv.notify_all();
             Ok(())
         }
 
@@ -2359,6 +2607,92 @@ mod drv {
         Ok(())
     }
 
+    // --- /dev/sep_sks (allow_sks=2, J9a) --------------------------------------------------------------------
+    // write : exactement les 0x64 o de la requête get_capabilities, UNE fois, seulement quand le fil du probe l'attend
+    //         (sinon EAGAIN avant, EALREADY après) ; contrôlée par `sks_ipc::check_getcap` (refus = EINVAL, rien envoyé).
+    // read  : bloque jusqu'au verdict ; rend l'enregistrement `sks_ipc::encode_outcome` (OUT_SIZE o). EIO une fois Halted.
+    // Un seul ouvreur (EBUSY). Créé au probe si allow_sks=2, après l'ouverture de 0x13.
+
+    struct SksFile;
+
+    #[pin_data]
+    struct SksDev {
+        #[pin]
+        reg: MiscDeviceRegistration<SksFile>,
+        data: Arc<SepData>,
+    }
+
+    #[vtable]
+    impl MiscDevice for SksFile {
+        type Ptr = Arc<SepData>;
+
+        fn open(_file: &File, misc: &MiscDeviceRegistration<SksFile>) -> Result<Arc<SepData>> {
+            // SAFETY: le seul `MiscDeviceRegistration<SksFile>` enregistré est le champ `reg` d'un `SksDev` épinglé
+            // dans un `KBox` oublié (`core::mem::forget`) : jamais libéré, `container_of` reste valide.
+            let x: &SksDev = unsafe { &*kernel::container_of!(core::ptr::from_ref(misc).cast_mut(), SksDev, reg) };
+            let d = &x.data;
+            if d.sks_opened.cmpxchg(0, 1, Full).is_err() {
+                return Err(EBUSY);
+            }
+            dev_info!(d.dev, "/dev/sep_sks ouvert\n");
+            Ok(d.clone())
+        }
+
+        fn release(device: Arc<SepData>, _file: &File) {
+            device.sks_opened.store(0, Release);
+        }
+
+        fn read_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterDest<'_>) -> Result<usize> {
+            let me = kiocb.file();
+            if iov.len() < sks_ipc::OUT_SIZE {
+                return Err(EINVAL);
+            }
+            let mut core = me.core.lock();
+            loop {
+                if core.state == State::Halted {
+                    return Err(EIO);
+                }
+                if core.sks_gc == GcPhase::Done {
+                    let rec = core.sks_out;
+                    if iov.copy_to_iter(&rec) != rec.len() {
+                        return Err(EFAULT);
+                    }
+                    return Ok(rec.len());
+                }
+                if me.cv.wait_interruptible(&mut core) {
+                    return Err(ERESTARTSYS);
+                }
+            }
+        }
+
+        fn write_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterSource<'_>) -> Result<usize> {
+            let me = kiocb.file();
+            let n = iov.len();
+            if n != sks_ipc::GETCAP_LEN {
+                return Err(EINVAL);
+            }
+            let mut buf = KVec::with_capacity(n, GFP_KERNEL)?;
+            if iov.copy_from_iter_vec(&mut buf, GFP_KERNEL)? != n {
+                return Err(EFAULT);
+            }
+            me.sks_submit(&buf)?;
+            Ok(n)
+        }
+    }
+
+    fn register_sks_dev(data: &Arc<SepData>) -> Result {
+        let reg = KBox::pin_init(
+            try_pin_init!(SksDev {
+                reg <- MiscDeviceRegistration::register(MiscDeviceOptions { name: c_str!("sep_sks") }),
+                data: data.clone(),
+            }),
+            GFP_KERNEL,
+        )?;
+        // Jamais libéré (cf. `SksDev`) : `open` s'appuie dessus.
+        core::mem::forget(reg);
+        Ok(())
+    }
+
     // --- pilote ---------------------------------------------------------------------------------------------
     pub(crate) struct SepNative {
         data: Arc<SepData>,
@@ -2418,7 +2752,7 @@ mod drv {
         } else {
             None
         };
-        let ks_ool = if param_allow_sks() == 1 {
+        let ks_ool = if param_allow_sks() != 0 {
             let alloc = |i: usize| -> Result<(Ool, Ool)> {
                 let n = KS_EPS[i].size as usize;
                 let a = dma::Coherent::<u8>::zeroed_slice(dev, n, GFP_KERNEL)?;
@@ -2449,6 +2783,7 @@ mod drv {
                 ring: Ring::new(),
                 opened: Atomic::new(0),
                 sbio_opened: Atomic::new(0),
+                sks_opened: Atomic::new(0),
                 core <- new_mutex!(Core::new(bsnap, relay_buf, spont_buf)),
                 tx <- new_mutex!(None),
                 cv <- new_condvar!(),
@@ -2478,6 +2813,14 @@ mod drv {
                                     "/dev/sep_native prêt (lancer sepd) ; ACK des SAVE : {}\n",
                                     if param_allow_save_ack() { "AUTORISÉ" } else { "refusé (un SAVE → Halted)" }
                                 );
+                                // J9a : /dev/sep_sks existe avant l'ouverture de sks ; il n'accepte la requête qu'au bon moment.
+                                // Échec de création → le fil du probe n'aura aucune requête : rien envoyé à 0x12.
+                                if param_allow_sks() == 2 {
+                                    match register_sks_dev(&data) {
+                                        Ok(()) => dev_info!(dev, "/dev/sep_sks prêt (lancer sks_getcap run)\n"),
+                                        Err(e) => dev_err!(dev, "/dev/sep_sks non créé : {:?} (rien ne sera envoyé à 0x12)\n", e),
+                                    }
+                                }
                                 // Le probe (insmod) attend ici la fin de J3 ; sepd sert le xART en parallèle.
                                 if param_allow_sbio() {
                                     match data.run_sbio() {
@@ -2488,6 +2831,12 @@ mod drv {
                                         Ok(false) => {}
                                         Err(e) => dev_err!(dev, "sbio : arrêt {:?} (état {:?})\n", e, data.state()),
                                     }
+                                }
+                                // J9a : un lecteur de /dev/sep_sks a toujours un verdict (NON ENVOYÉ si on n'est jamais arrivé
+                                // jusqu'à sks) ; sans effet s'il est déjà donné.
+                                if param_allow_sks() == 2 {
+                                    let mut c = data.core.lock();
+                                    data.sks_getcap_finish(&mut c);
                                 }
                             }
                             Err(e) => dev_err!(dev, "0x13 non servi : {:?} (état {:?})\n", e, data.state()),
@@ -2510,10 +2859,10 @@ mod drv {
             pdev: &'bound platform::Device<device::Core<'_>>,
             _info: Option<&'bound Self::IdInfo>,
         ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
-            if param_allow_sks() > 1
-                || (param_allow_sks() == 1 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
+            if param_allow_sks() > 2
+                || (param_allow_sks() != 0 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
             {
-                dev_err!(pdev, "allow_sks vaut 0 ou 1 ; allow_sks=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
+                dev_err!(pdev, "allow_sks vaut 0, 1 ou 2 ; allow_sks=1 ou 2 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
                 return Err(EINVAL);
             }
             if (param_allow_xart() && param_allow_boot() == 0)

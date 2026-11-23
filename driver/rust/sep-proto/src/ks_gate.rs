@@ -117,7 +117,7 @@ impl OpenGate {
 /// Label of a word received on a keystore EP (journal only; the kernel never answers these words).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KsKind {
-    /// sks `TAG | 0x80`: an RPC reply. Unexpected here (no request is ever sent).
+    /// sks `TAG | 0x80`: an RPC reply. Expected only after the J9a get_capabilities (allow_sks=2, `sks_ipc`).
     SksReply,
     /// sks TAG 0x00: keybag lock-change « unlock » notification (DATA = handle), C8 29/29, C3 34/34.
     SksUnlock,
@@ -149,7 +149,7 @@ pub fn classify(w: &Word) -> KsKind {
 
 pub fn kind_label(k: KsKind) -> &'static str {
     match k {
-        KsKind::SksReply => "sks : réponse RPC (TAG|0x80) alors qu'aucune requête n'a été envoyée",
+        KsKind::SksReply => "sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2",
         KsKind::SksUnlock => "sks : notification lock-change TAG 0x00 (déverrouillage, DATA = handle)",
         KsKind::SksLock => "sks : notification lock-change TAG 0x01 (verrouillage, DATA = handle)",
         KsKind::Sks09 => "sks : TAG 0x09 (vu C1, rôle inconnu)",

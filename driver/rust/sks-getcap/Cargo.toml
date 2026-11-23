@@ -1,0 +1,14 @@
+[package]
+name = "sks-getcap"
+version = "0.1.0"
+edition = "2021"
+description = "J9a userspace side: builds the 0x64-byte SKS get_capabilities request for sep_native allow_sks=2 (/dev/sep_sks) and decodes the reply. Offline except `run`."
+license = "GPL-2.0-or-later OR MIT"
+publish = false
+
+[[bin]]
+name = "sks_getcap"
+path = "src/main.rs"
+
+[dependencies]
+sep-proto = { path = "../sep-proto" }

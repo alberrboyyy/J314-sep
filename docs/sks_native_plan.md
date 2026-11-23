@@ -132,7 +132,7 @@ avant le 0x73 = `< 0x12 TAG 0x99 TYPE 0x19 PARAM 0xfd` (737.461) → **`> 0x08 0
 | 0 | (fait, hors matériel) relecture J3/J3b/J3d vs seal frais | rien | sks non annoncé en chaîné natif (n=3) : §3.4 |
 | **1** | **J7a, codée** (`pending/j7a_sks_open_chained.sh`, `allow_sks=1`) : boot chaîné (store servi), CNTL 0x08 précoce (= J3d), puis CNTL **seul** de skdl, sks, scrd dans l'ordre/tailles de c12, chacun seulement annoncé au bon numéro + tailles + 0x1d acquitté (30 s max chacun), écoute passive 10 s, puis 0x73 | écriture SEP, **classe neuve** (ouverture CNTL 0x17/0x12/0x0a) → go d'Albert ; aucun mot aux EP keystore | (a) sks s'annonce-t-il en chaîné si skdl est ouvert tôt et si l'on attend 30 s ? (b) si oui, l'ouverture sans contenu suffit-elle au 0x73 (VIVANT) ? (c) le SEP parle-t-il seul sur 0x17/0x12/0x0a (notifs, B écrit) ? |
 | **1b** | **J7b, codée** (`pending/j7b_sks_open_chained_nouuid.sh STORE`, `sepd.j7b --locker-strip-uuid`) : J7a à l'identique, mais chaque locker servi SANS ses 16 o d'UUID (A = B[16..] du SAVE). Motif : J7a (n=4 chaînés, ABSENT et verbatim = même effet) | écriture SEP, **script neuf** (seul le contenu du A FETCH locker change) → go d'Albert ; SAVE possibles (store copié avant) | le SEP demande-t-il le locker suivant (9133c5d5…) puis annonce-t-il sks en FD ? sinon l'emballage n'est pas la cause |
-| 2 | **candidate (proposée par la session PC)** : J7a + UNE transaction sks `get_capabilities` (`> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000`, OOL A = 0x64 o construits d'après `sks_ipc_negotiation.md`), écoute de la réponse, rien d'autre | classe neuve (écriture 0x12) → go ; prérequis : doc PC reçu, format relu, champs non constants (horodatage, pid, cdhash, SHA tronqué) compris ; aucun secret | le SEP répond-il `cd … 5c flag 1` (négociation v2) ; débloque-t-il quoi que ce soit (FD sks déjà requis : si sks n'est pas annoncé en chaîné, à faire d'abord sur seal frais) |
+| **2** | **J9a, codée** (§6, `pending/j9a_sks_getcap_chained.sh STORE`, `allow_sks=2`) — à l'origine candidate de la session PC : J7a + UNE transaction sks `get_capabilities` (`> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000`, OOL A = 0x64 o construits d'après `sks_ipc_negotiation.md`), écoute de la réponse, rien d'autre | classe neuve (écriture 0x12) → go ; prérequis : doc PC reçu, format relu, champs non constants (horodatage, pid, cdhash, SHA tronqué) compris ; aucun secret | le SEP répond-il `cd … 5c flag 1` (négociation v2) ; débloque-t-il quoi que ce soit (FD sks déjà requis : si sks n'est pas annoncé en chaîné, à faire d'abord sur seal frais) |
 | 2b | capture macOS (`tools/boot_and_trace.sh`) avec OOL de **0x17, 0x12, 0x0a** (boot seulement, **sans login ni mot de passe**) | lecture pour nous ; mais macOS re-scelle le xART → **le store chaîné Linux devient invalide** (seal frais à refaire) ; l'OOL 0x12 peut contenir du matériel lié aux clés → à traiter comme sensible, décision d'Albert | contenu du ping skdl (gt_packet ? constant ?), contenu réel du get_capabilities (contrôle du doc PC), DER des 13 transactions déterministes, nature de la 1re (négociation IPC ?), présence d'OOL pour scrd |
 | 3 | J7b : J7a + ping skdl `0x01` puis `0x06` avec le contenu de l'exp. 2b (seulement s'il est constant sur ≥ 2 boots) | classe neuve (mot vers 0x17) → go | le ping skdl débloque-t-il les FETCH locker suivants / l'annonce de sks en chaîné ? |
 | 4 | J7c : transactions suivantes déterministes (`2a` set_env, `22` perform_operation…) | classe neuve (écriture 0x12) → go ; exige le DER (exp. 2b ou doc PC) | jusqu'où va le bring-up sans keybag utilisateur |
@@ -153,3 +153,54 @@ Exige `allow_sbio=1 sbio_open=1 allow_sbio_relay=0` (sinon probe refusé). Aprè
 3. écoute passive 10 s : chaque mot reçu sur 0x17/0x12/0x0a est journalisé (`keystore < …`, étiquette `ks_gate::classify`),
    jamais répondu, jamais de Halted ; dump de B (0x80 o + octets non nuls) après un nouveau mot (4 par EP) et en fin ;
 4. « VERDICT keystore », puis le 0x73 comme J3d (xART calme 2 s) → « VERDICT sbio : VIVANT / MUET » et bilan.
+
+## 6. Expérience 2 codée : J9a = UN `get_capabilities` sur boot chaîné (`allow_sks=2`) — 2026-11-23, rien lancé
+
+Sources : `sks_protocol.md` §1.6 et `sks_ipc_negotiation.md` §3-§4 (`source: kext` 13.5, **non vérifié matériel**),
+trace c12 L178-179 (`> 0x12 TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000` → `< TAG 0xcd TYPE 0x01 PARAM 0 DATA
+0x005c0001`, 1,25 ms), J7b n=2 (skdl/sks/scrd ouverts, 0 mot reçu en 10 s). Rien de ce qui suit n'est `vérifié`.
+
+**Chemin** = J7b (boot chaîné, lockers sans UUID, CNTL de skdl/sks/scrd) puis, si les TROIS sont ouverts :
+1. le noyau attend ≤ 20 s la requête sur `/dev/sep_sks` (créé au probe ; EAGAIN avant le bon moment, EALREADY après) ;
+2. porte noyau `sep-proto::sks_ipc::check_getcap` sur les 0x64 o : longueur exacte ; constantes 0x50 @0x00, 1 @0x14,
+   0 @0x20, 0 @0x24 (u64), 0 @0x4c (u64), 0 @0x54, 1 @0x58 (u64), 0 @0x60 ; **condensé recalculé dans le noyau**
+   (SHA-256 sans clé, `sep-proto::hash`, sans allocation) ; cdhash = zéros OU SHA-1 des 8 o de l'uniqueid (les deux
+   formes documentées côté AP ; toute autre valeur refusée). Refus = EINVAL, rien envoyé, pas de Halted ;
+3. copie dans A12, relue ; UN mot `> 0x12 TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000` (porte `GetcapGate` : ce mot
+   exact, une fois par boot ; tout autre mot vers 0x12/0x17/0x0a reste refusé) ;
+4. écoute 10 s : la 1re réponse appariée comme le kext (TAG bit 7, TYPE 0x01 ; les 7 bits bas du TAG ne sont pas
+   comparés, journalisés seulement) → instantané de B12 (0x80 o) ; jamais de réponse du pilote ;
+5. « VERDICT sks getcap : RÉPONDU (PARAM 0, état 0, theirs …) » / « ERREUR » (PARAM ≠ 0, état ≠ 0 ou B12 non
+   décodable) / « SILENCE » / « NON ENVOYÉ » ; `read` de `/dev/sep_sks` rend le même résultat (enregistrement
+   `SKG1`, 0x98 o) ; puis le 0x73 sbio comme J7b.
+Écart volontaire avec macOS (c12) : macOS envoie le get_capabilities juste après le CNTL de sks, **avant** d'ouvrir
+scrd (7,6 s plus tard) ; J9a l'envoie après les trois ouvertures (chemin J7b inchangé, seule l'étape 0x12 est ajoutée).
+
+**Valeurs des champs contextuels** (`sks_getcap`, choix documentés, rien de vérifié) :
+| champ | valeur | justification |
+|---|---|---|
+| horodatage 0x18 | CLOCK_MONOTONIC en µs (au moment de l'écriture ; `--clock`, `--ts-us`) | l'horloge de `_get_usec_time` **n'est pas documentée** (INCONNU) ; monotone = analogue Linux le plus proche d'une horloge depuis le boot. La porte noyau ne la contrôle pas |
+| uniqueid 0x2c | 0 | sous macOS la requête vient du noyau lui-même (`init_sep_endpoint`), pas d'un processus utilisateur : valeur neutre |
+| uid 0x34 | 0 | idem (identifiant d'utilisateur DÉDUIT, 0 = root) |
+| cdhash 0x38 | SHA-1(8 × 0x00) = `05fe4057…07c7e9` (`--cdhash zero` = zéros) | chemin AP « pas de processus » (§1.6.2 « à défaut ») ; l'autre chemin documenté (processus sans cdhash) = zéros. Lequel macOS prend pour un appel noyau : INCONNU (les deux documents diffèrent légèrement) |
+| condensé 0x04 | SHA-256(octets 0x14..0x4c ‖ 0x54..0x64)[0..16] | base de §1.6.3 : version ‖ horodatage ‖ drapeaux ‖ champ +0x20 ‖ bloc processus (0x20 o, v1) ‖ charge ; les 8 o à 0x4c ne sont couverts qu'en v2 |
+
+**Décodage de la réponse** (`sks_ipc::decode_getcap_reply`, noyau et outil) : u32 L ; version lue à 0x14 (1 ou 2, sinon
+erreur) ; état à 4 + L arrondi, theirs (u64) ensuite, longueur de blob ; octets consommés = longueur annoncée ; condensé
+recalculé selon la version lue (rapporté OK/FAUX). Disposition L = 0x48 pour 0x5c : **DÉDUITE** (§1.6.4).
+
+**Tests hors matériel** : `sep-proto` (hash : vecteurs FIPS SHA-256/SHA-1 + flux découpé ; `sks_ipc` : disposition,
+base du condensé reconstruite champ par champ, porte qui refuse chaque constante modifiée / condensé faux / cdhash
+étranger, mot c12 L178, décodage réponse, porte un seul mot) ; `sks-getcap/tests/getcap.rs` : requête identique octet
+pour octet à une construction Python/`hashlib` indépendante faite depuis la doc, relue par la porte, verdicts.
+
+**Binaires** (`~/kbuild/j9`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`, build
+reproductible) : `sep_native.ko` `145804d0b31871b0d5c6b266dce464770bb8467d9631384ed362ef5cb796f334`, `sks_getcap`
+`c25a6193938b308dfafdde6e2f74382d1a7d1336aed83e68b247cc39ad0715c9` ; `sepd`, `sep_native_ovl.ko`, `sep-native.dtbo`
+= copies de `~/kbuild/j5` (sha256 inchangés).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`, identique à `/var/lib/sepd` le 2026-11-23), jamais `/var/lib/sepd`. **Après** :
+si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon le store du service est périmé → décision d'Albert.
+Classe neuve (écriture EP 0x12) → **1er run = « go » d'Albert**.
+
