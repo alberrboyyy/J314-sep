@@ -142,6 +142,12 @@ Dérivé de `macos/kernel.macho` (13.5) et **re-vérifié cette session** (adres
 session). Référence complète, chaîne d'appel et conditions d'échec : `docs/sks_ipc_negotiation.md`. Statut de chaque
 ligne : **VU** = lu au désassemblage (adresse) ; **DÉDUIT** = interprété ; **INCONNU**. Aucune valeur de clé/secret.
 
+> **Re-désassemblé octet par octet cette session (2026-11-23, capstone)** pour fiabiliser J9a : `__payload_hash`
+> (@…9975a50) et `_gen_ipc_header` (@…99751a0) ont été relus. Le **range du condensé** (§1.6.3) et le **chemin cdhash**
+> (§1.6.2) sont confirmés VU. **Précision neuve** : l'horodatage vient de `_get_usec_time` (@…995f670) =
+> `mach_continuous_time()` → `absolutetime_to_nanoseconds` ÷ 1000 → **µs depuis le boot, horloge MONOTONE continue
+> (pas un temps epoch Unix)**.
+
 ### 1.6.1 Disposition générale de l'OOL (Q1) — VU
 Le mot mailbox ne porte **jamais** le contenu ; tout passe par l'OOL (tampon A = AP→SEP = requête ; tampon B =
 SEP→AP = réponse). Le **même codeur** `_code_ipc_<op>` (@…9973eb0 pour 0x4d) écrit (mode `w0=1`) / lit (`w0=0`) dans
@@ -164,7 +170,7 @@ Structure générique d'un message IPC dans l'OOL :
 | 0x00 | 4 | longueur en-tête | **0x50** (constante à l'encodage) | constant |
 | 0x04 | 16 | **condensé d'intégrité** = SHA-256 **tronqué 16 o** | calculé (§1.6.3) | contextuel |
 | 0x14 | 4 | version d'en-tête | **1** (la requête de négociation part toujours en v1) | constant |
-| 0x18 | 8 | horodatage µs (`_get_usec_time`) | horloge | **contextuel** |
+| 0x18 | 8 | horodatage (`_get_usec_time`) = `mach_continuous_time()` ÷ 1000 | **µs depuis le boot, monotone continu** (VU ; PAS epoch Unix) | **contextuel** |
 | 0x20 | 4 | drapeaux (bit0 = chiffré, bit1 = en-tête étendu) | **0** | constant |
 | 0x24 | 8 | champ ctx+0x20 | 0 (non écrit sur ce chemin) | constant |
 | 0x2c | 8 | `proc_uniqueid(proc_self())` | identifiant du processus appelant | **contextuel** |
@@ -184,6 +190,10 @@ version ≥ 2 ; en v1 le bit1 des drapeaux est effacé et rien n'est ajouté.
 ctx+0x28..0x47 ; 0x28 o en v2) ‖ **charge** (tout ce qui suit l'en-tête, ici l'état + u64 + blob). Le résultat est
 écrit à l'offset 0x04. À la réception, le kext **recalcule et compare** 16 o ; échec → `ipc digest failed`. Version ≠ 1
 et ≠ 2 → `unexpected version` (code -0xf). → **Base du SHA connue** ; reproductible côté Linux sans secret.
+**Re-désassemblé cette session (capstone)** : `__payload_hash` fait bien 5 `ccdigest_update` dans cet ordre exact
+(ctx+0x10 v=4, ctx+0x14 ts=8, ctx+0x1c fl=4, ctx+0x20 =8, ctx+0x28 bloc proc = 0x20 si version==1 sinon 0x28) puis la
+charge — confirmé VU. (Les offsets ctx sont ceux de l'OOL **moins 4** : l'OOL a en tête un u32 de longueur ; le condensé
+porte donc sur OOL 0x14..fin, pas sur le u32 de longueur ni sur les 16 o du condensé lui-même.)
 
 ### 1.6.4 La réponse `< EP=0x12 TAG=0xcd TYPE=seq PARAM=s DATA=0x005c0001` (Q4) — VU
 Appariement (`sep_deliver_msg_gated`) : le kext accepte la case `this+0x180` si l'octet TAG a le **bit 7** posé **et**
@@ -211,8 +221,11 @@ Puis `init_sep_endpoint` : `négociée = min(theirs, 2)`, `ours = 2`. **La valeu
   qu'il a envoyés (VU). → **On ne peut pas savoir, depuis le kext, si le SEP vérifie ces champs processus.** (INCONNU.)
 - Le **condensé** (SHA-256/16) est un contrôle d'**intégrité de cadre** sans clé : un hôte Linux peut le recalculer
   (base §1.6.3). Les champs **contextuels** (horodatage, pid, cdhash, uid) sont des métadonnées du processus appelant :
-  un hôte non-macOS peut les remplir de valeurs neutres (p.ex. horodatage courant, pid/uid arbitraires, cdhash à zéro —
-  le code gère déjà « pas de cdhash » via le SHA-1 des 8 o de 0x2c). **Reste à vérifier sur matériel** que le SEP ne
+  un hôte non-macOS peut les remplir de valeurs neutres. Pour l'horodatage, si le SEP en contrôle la fraîcheur il
+  faudra un **compteur monotone croissant en µs** (CLOCK_MONOTONIC ou le timebase ARM), **pas** `gettimeofday` (le kext
+  met des µs depuis le boot, §1.6.2). Le cdhash : le code remplit **toujours** les 20 o — vrai cdhash, ou à défaut
+  SHA-1 des 8 o de proc_uniqueid (OOL 0x2c) : un hôte sans cdhash a donc un comportement défini. **Reste à vérifier sur
+  matériel** que le SEP ne
   rejette pas sur ces champs (DÉDUIT ; expérience « un seul `get_capabilities` » = classe neuve, `pending/` + go
   d'Albert). Un `get_capabilities` en **erreur** laisse quand même la négociation retomber sur **v1** sans bloquer la
   suite (`failed to negotiate, defaulting to v1`), donc l'expérience est **peu risquée côté logique** (le coût reste le

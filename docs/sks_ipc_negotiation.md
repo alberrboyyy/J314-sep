@@ -11,7 +11,10 @@ la trace c12, aucune écriture SEP).
 > `sep_deliver_msg_gated` …994f360, `_get_process_table` …9967ca4, `_msg_header_set_negotiated_version` …9967c90,
 > `__ipc_header_size` …9975324. La **table d'opérations** se décode exactement : base `0xfffffe0007004000`, entrées de
 > 0x48 o, `entrée[0x4d].code == 0x4d`, `ctxsize == 0x88`, pointeur +0x10 → `_code_ipc_get_capabilities`. Aucune
-> divergence. Intégré dans `docs/sks_protocol.md` §1.3/§1.4/§1.6.
+> divergence. De plus `__payload_hash` et `_gen_ipc_header` (@…99751a0) ont été re-désassemblés (capstone) : le range
+> du condensé (§3.3) et le chemin cdhash (§3.2) sont confirmés, et **l'horodatage = `_get_usec_time` (@…995f670) =
+> `mach_continuous_time()` ÷ 1000 = µs depuis le boot, horloge MONOTONE (pas un temps epoch)** — précision ajoutée au
+> point ouvert §8-1. Intégré dans `docs/sks_protocol.md` §1.3/§1.4/§1.6.
 
 - Binaire : `macos/kernel.macho`, bundle `com.apple.driver.AppleSEPKeyStore`. Chaîne de version lue dans le binaire :
   `Darwin Kernel Version 22.6.0: Wed Jul  5 22:22:05 PDT 2023; root:xnu-8796.141.3~6/RELEASE_ARM64_T6000`
