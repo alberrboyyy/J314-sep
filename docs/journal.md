@@ -3232,3 +3232,12 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
 - RESTE DÉDUIT/INCONNU (inchangé) : valeurs réelles de **class** (+0x60), **field2** (+0x64) et **handle_y** (userland,
   non dérivables du binaire) ; ambiguïté class↔0x60 (si refus matériel, échanger `--class`/`--field2`) ; handle rendu lu
   à OOL B +0x6c (offset DÉDUIT). Classe neuve en écriture 0x12 + nouveau binaire → **attend « go » + reboot d'Albert**.
+
+## 2026-11-23 19:15 — Albert + Claude (session ALARM) — J10b : variante 4 passe le décodage (-13→-11), create_keybag refusé pour une AUTRE raison
+- Go d'Albert, même commande, binaires `~/kbuild/j14` (sep_native.ko `1c6f38be…`). Logs `logs/20261123-191540_j10-sks-keybag-chained/`.
+- VU : getcap/set_env ACCEPTÉS ; `> 0x12 TAG 0x01 create_keybag DATA 0x00800000` (variante 4, discriminant 4, class 1 @0x60,
+  field2 0, 3 blobs vides, fv_data 0, u64 final 0, condensé v2 OK) → **`< TAG 0x81 PARAM 0xf5` = -11 (-0xb)** (était -13/-0xd en J10a).
+- ⇒ la variante 4 a **franchi** l'erreur générique de cadre (-0xd « corps indécodable ») : le SEP DÉCODE maintenant notre
+  create_keybag et le rejette pour une raison SÉMANTIQUE (-0xb). Progrès net. 0 SAVE, store inchangé, sbio VIVANT.
+- PROCHAIN : décoder -0xb (0xf5) pour create_keybag au binaire (valeur de classe ? champ requis handle_y/field2 ? précondition ?
+  politique ?). Puis ajuster un champ. make_system toujours NON ENVOYÉ (pas de handle).

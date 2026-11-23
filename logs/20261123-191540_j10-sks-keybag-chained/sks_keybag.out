@@ -1,0 +1,22 @@
+VERDICT getcap : RÉPONDU (état 0, theirs 2 → négociée v2, condensé OK) mot 0x005c00010001cd12
+VERDICT setenv : ACCEPTÉ (PARAM 0, état 0 ; L 0x50, version d'en-tête 2, condensé OK) mot 0x005800000002aa12
+instantané de B12 (0x80 o) :
+  +0x000 : 50 00 00 00 44 82 5e b6 7d 35 82 a5 26 23 23 72
+  +0x010 : 4d 09 7d f6 02 00 00 00 21 af bc 00 01 00 00 00
+  +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+  +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+  +0x050 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x060 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x070 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+VERDICT sks create_keybag : REFUS (PARAM -11 = statut signé ≠ 0) mot 0x00000000f5038112
+instantané de B12 (0x80 o) :
+  +0x000 : 50 00 00 00 44 82 5e b6 7d 35 82 a5 26 23 23 72
+  +0x010 : 4d 09 7d f6 02 00 00 00 21 af bc 00 01 00 00 00
+  +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+  +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+  +0x050 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x060 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x070 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+VERDICT sks make_system_keybag : NON ENVOYÉ (create_keybag sans handle, ou valeurs userland manquantes)
