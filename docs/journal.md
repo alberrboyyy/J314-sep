@@ -3338,3 +3338,15 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
   ajouté le niveau 7 sans élargir la borne). Rien envoyé au SEP (module non chargé). Logs `logs/20261123-202946_j12-sks-loadkeybag-chained/`.
 - Corrigé : `sep_native.rs` garde `> 6`→`> 7`, message « 0..7 ». Recompilé (build.sh). Nouveau `~/kbuild/j16/sep_native.ko`
   sha256 `2dc610b2…51dc` (SHA256SUMS + script + §11 mis à jour). sks-setenv inchangé. J12 reste à lancer (go d'Albert).
+
+## 2026-11-23 20:36 — Albert + Claude (session ALARM) — J12 : load_keybag aussi refusé -11 → MUR confirmé (3 ops / 3)
+- Go d'Albert (fix module recompilé), `pending/j12_sks_loadkeybag_chained.sh … --uuid 4c494e5558…00 --type -10`.
+  Logs `logs/20261123-203631_j12-sks-loadkeybag-chained/`. getcap/set_env ACCEPTÉS.
+- VU : `> 0x12 TAG 0x03 (load_keybag) TYPE 0x03 DATA 0x00740000` (handle_y 0, blob uuid 16 o, condensé v2 OK) →
+  **`< TAG 0x83 PARAM 0xf5` = -11 (-0xb, BadArgument)**. Pas de handle. make_system NON ENVOYÉ. 0 SAVE, sbio VIVANT.
+- BILAN DES 3 OPS (toutes -0xb avec nos valeurs devinées) : create_keybag (exige des données), make_system_keybag
+  (exige un handle), load_keybag (refuse un uuid neuf). ⇒ **on ne peut pas forger une identité keybag neuve depuis les
+  binaires AP seuls** : la séquence/les valeurs/l'état préalable exacts vivent dans SEPOS + le runtime du démon macOS,
+  non reconstructibles sans **capture d'un macOS vivant** créant un keybag. Le SEP continue de nous parler (getcap/set_env/
+  sbio OK) — ce n'est pas « Linux rejeté », c'est « il manque les vraies valeurs ».
+- DÉCISION (Albert) : option capture via DFU + macOS traçable (hyperviseur) OU bilan. À trancher hors run.

@@ -1,0 +1,36 @@
+sks_setenv: cpx-encryption-mode = 2 (--cpx 2)
+sks_setenv: /dev/sep_sks ouvert
+sks_setenv: get_capabilities accepté par le noyau après 10 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-203631_j12-sks-loadkeybag-chained/sks_getcap_request.bin
+sks_setenv: set_env accepté par le noyau après 1 essai(s) EAGAIN
+sks_setenv: set_env (0x470 o) — mot > EP 0x12 TAG 0x2a TYPE 0x02 PARAM 0 DATA 0x04700000
+sks_setenv:   en-tête v2 ; 0x04 condensé v2 = e99567232b15e855df35d1eb52fc6508
+sks_setenv:   état 0 ; u64 1 ; blob 0x40c o : version 1, cpx-encryption-mode 2, mode 4, 0x400 o réservés nuls
+sks_setenv:   horodatage 57437581 µs ; uniqueid 0x0 ; uid 0 ; cdhash 05fe405753166f125559e7c9ac558654f107c7e9 (SHA-1 de l'uniqueid)
+sks_setenv:   +0x000 : 50 00 00 00 e9 95 67 23 2b 15 e8 55 df 35 d1 eb
+sks_setenv:   +0x010 : 52 fc 65 08 02 00 00 00 8d 6d 6c 03 00 00 00 00
+sks_setenv:   +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_setenv:   +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+sks_setenv:   +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+sks_setenv:   +0x050 : 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00
+sks_setenv:   +0x060 : 0c 04 00 00 01 00 00 00 02 00 00 00 04 00 00 00
+sks_setenv:   +0x070 .. +0x470 : 0x400 o à zéro (réservé)
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-203631_j12-sks-loadkeybag-chained/sks_setenv_request.bin
+sks_setenv: load_keybag accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: load_keybag (0x74 o) — mot > EP 0x12 TAG 0x03 TYPE 0x03 PARAM 0 DATA 0x00740000
+sks_setenv:   en-tête v2 ; 0x04 condensé v2 = 17bd7c65d256ea9778503566bda2451b
+sks_setenv:   état 0 (const) ; handle_y 0x0000000000000000 (USERLAND, défaut 0) ; blob 0x10 o : uuid 4c494e55580000000000000000000000 (USERLAND)
+sks_setenv:   J12 : load_keybag doit RENDRE un handle (réponse TAG 0x83, PARAM 0, OOL B +0x6c DÉDUIT) → chaîné dans make_system_keybag ; sinon REFUS (identité pré-existante requise — voir docs/sks_native_plan.md §11)
+sks_setenv:   horodatage 57440347 µs ; uniqueid 0x0 ; uid 0 ; cdhash 05fe405753166f125559e7c9ac558654f107c7e9 (SHA-1 de l'uniqueid)
+sks_setenv:   +0x000 : 50 00 00 00 17 bd 7c 65 d2 56 ea 97 78 50 35 66
+sks_setenv:   +0x010 : bd a2 45 1b 02 00 00 00 5b 78 6c 03 00 00 00 00
+sks_setenv:   +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_setenv:   +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+sks_setenv:   +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+sks_setenv:   +0x050 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_setenv:   +0x060 : 10 00 00 00 4c 49 4e 55 58 00 00 00 00 00 00 00
+sks_setenv:   +0x070 : 00 00 00 00
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-203631_j12-sks-loadkeybag-chained/sks_loadkeybag_request.bin
+sks_setenv: le noyau n'attend plus make_system_keybag (déjà fait, délai dépassé, EP non ouverts, ou getcap non RÉPONDU)
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261123-203631_j12-sks-loadkeybag-chained/sks_loadkeybag_outcome.bin
+sks_setenv rc=1 (0 = make_system_keybag marqué system, 1 = autre verdict final, 2 = rien écrit / erreur)

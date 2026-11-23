@@ -1,0 +1,22 @@
+VERDICT getcap : RÉPONDU (état 0, theirs 2 → négociée v2, condensé OK) mot 0x005c00010001cd12
+VERDICT setenv : ACCEPTÉ (PARAM 0, état 0 ; L 0x50, version d'en-tête 2, condensé OK) mot 0x005800000002aa12
+instantané de B12 (0x80 o) :
+  +0x000 : 50 00 00 00 2f 04 ea ba 0f f5 61 ec 36 3f fe 1b
+  +0x010 : 26 94 29 31 02 00 00 00 a7 ad 83 70 01 00 00 00
+  +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+  +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+  +0x050 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x060 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x070 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+VERDICT sks load_keybag : REFUS (PARAM -11 = statut signé ≠ 0 ; une identité pré-existante [postée par macOS] est peut-être requise — voir docs/sks_native_plan.md §11) mot 0x00000000f5038312
+instantané de B12 (0x80 o) :
+  +0x000 : 50 00 00 00 2f 04 ea ba 0f f5 61 ec 36 3f fe 1b
+  +0x010 : 26 94 29 31 02 00 00 00 a7 ad 83 70 01 00 00 00
+  +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+  +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+  +0x050 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x060 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x070 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+VERDICT sks make_system_keybag : NON ENVOYÉ (create_keybag sans handle, ou valeurs userland manquantes)
