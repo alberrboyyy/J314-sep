@@ -310,7 +310,7 @@ pub fn describe_createkeybag(b: &[u8]) -> Result<String, String> {
     let mut s = String::new();
     let _ = writeln!(s, "create_keybag ({:#x} o) — mot > EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0 DATA {:#010x}", b.len(), sks_keybag::CKB_DATA);
     let _ = writeln!(s, "  en-tête v2 ; 0x04 condensé v2 = {}", hex(&b[sks_ipc::OFF_DIGEST..sks_ipc::OFF_DIGEST + sks_ipc::DIGEST_LEN]));
-    let _ = writeln!(s, "  état 0 ; handle_y {:#018x} (USERLAND, défaut 0) ; class {:#010x} (USERLAND, 0x60) ; field2 {:#010x} (USERLAND, 0x64) ; 3 blobs vides ; flag 0", r.handle_y, r.class, r.field2);
+    let _ = writeln!(s, "  variante 4 (discriminant 4) ; handle_y {:#018x} (USERLAND, défaut 0) ; class {:#010x} (USERLAND, 0x60) ; field2 {:#010x} (USERLAND, 0x64) ; 3 blobs vides ; fv_data 0 ; u64 final 0", r.handle_y, r.class, r.field2);
     let _ = writeln!(s, "  AMBIGU (§6.2/§6.4) : lequel de 0x60/0x64 est la classe n'est PAS tranché au binaire — si refus matériel, échanger --class/--field2");
     let _ = writeln!(s, "  horodatage {} µs ; uniqueid {:#x} ; uid {} ; cdhash {} ({})", r.fields.ts_us, r.fields.uniqueid, r.fields.uid, hex(&r.fields.cdhash), cdhash_label(k));
     s.push_str(&dump(b));

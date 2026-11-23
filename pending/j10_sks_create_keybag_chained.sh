@@ -4,7 +4,7 @@
 #       + la VOIE IDENTITÉ d'appareil : en SAUTANT perform_operation (TAG 0x22) ET null_d_key (TAG 0x0a), DEUX
 #       transactions SKS enchaînées :
 #         1. `create_keybag`      (TAG fil 0x01, TYPE 0x03) : CRÉE un keybag NEUF à partir d'une classe (sans passcode)
-#            et REND un handle de keybag.  `> EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0 DATA 0x007c0000`, OOL A12 = 0x7c o.
+#            et REND un handle de keybag.  `> EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0 DATA 0x00800000`, OOL A12 = 0x80 o (VARIANTE 4).
 #         2. `make_system_keybag` (TAG 0x0d) : lie ce keybag à l'identité d'appareil (uuid), statut seul, pas de handle.
 #            `> EP 0x12 TAG 0x0d TYPE 0x04 PARAM 0 DATA 0x00840000`, OOL A12 = 0x84 o.
 #       CHANGEMENT 2026-11-23 (J13) : l'ancien squelette envoyait `load_keybag` (TAG 0x03, IMPORTE un keybag existant
@@ -12,9 +12,15 @@
 #       la vraie voie « create a new one » est `create_keybag` (TAG fil 0x01) NU, pas load_keybag. D'où le remplacement.
 #       Conséquence : create_keybag ne porte PAS d'uuid (il prend une classe) ; l'uuid 16 o est désormais le blob de
 #       `make_system_keybag` (identity_load exige une OSData de 16 o).
+#       CORRECTION 2026-11-23 (J14) : le J10 initial a pris -0xd (0xf3) du SEP. CAUSE décodée au binaire
+#       (docs/applekeystored_identity.md §8) : create_keybag est un message VERSIONNÉ ; le 1er mot du corps (OOL 0x54)
+#       est un DISCRIMINANT DE VARIANTE, pas un « état ». On avait posé 0 avec un corps à 3 blobs (forme variante 3/4) →
+#       le SEP décode en variante 0 (1 blob) → cadre indécodable → -0xd. macOS émet la VARIANTE 4 (discriminant 4,
+#       + fv_data len 0 + u64 final 0, corps 0x80). Correction = émettre la variante 4 byte-exacte (§8.5).
 #       Gabarits VU AU BINAIRE (kernelcache 27.2.1, `com.apple.driver.AppleSEPKeyStore`, docs/applekeystored_identity.md
-#       §6) : en-tête IPC v2 (négociée) + condensé SHA-256/16 v2 recalculé + cdhash neutre ; create_keybag = état 0 +
-#       handle_y(u64, 0x58) + 2 u32 (class 0x60 / field2 0x64) + 3 blobs VIDES + flag 0 ; make_system_keybag = état 1
+#       §6/§8) : en-tête IPC v2 (négociée) + condensé SHA-256/16 v2 recalculé + cdhash neutre ; create_keybag = VARIANTE 4
+#       (discriminant 4, 0x54) + handle_y(u64, 0x58) + 2 u32 (class 0x60 / field2 0x64) + 3 blobs VIDES + fv_data len 0
+#       (0x74) + u64 final 0 (0x78) ; make_system_keybag (INCHANGÉ) = état 1
 #       (const) + handle_y(u64) + handle chargé(u32, 0x60) + type(u32, 0x64) + blob{0x10, uuid} + flag 0. Le noyau LIT
 #       le handle rendu par create_keybag (OOL B +0x6c, offset DÉDUIT) et le place lui-même dans le champ +0x60 de
 #       make_system_keybag puis RECALCULE le condensé — il n'invente jamais de handle. make_system_keybag n'est envoyé
@@ -63,23 +69,24 @@
 #       make_system_keybag : marqué system (PARAM 0) » ou « REFUS (PARAM …) ». sks_keybag_outcome.bin = les QUATRE
 #       verdicts décodés (getcap, setenv, create_keybag, make_system_keybag) + instantanés B12 (0x80 o). Puis
 #       « VERDICT sbio : VIVANT » attendu comme J9b (si MUET : à analyser).
-# PRÉPARÉ PAR : agent driver (session ALARM), 2026-11-23 (J13). JAMAIS LANCÉ. SQUELETTE : non lançable tant que les
-#       valeurs userland requises (uuid, class, type) ne sont pas fournies. 1er run = « go » d'Albert (classes de message
-#       neuves : create_keybag + make_system_keybag, ET ordre neuf : perform_operation ET null_d_key sautés).
+# PRÉPARÉ PAR : agent driver (session ALARM), 2026-11-23 (J13 ; corrigé J14 : -13 → variante 4). JAMAIS LANCÉ.
+#       SQUELETTE : non lançable tant que les valeurs userland requises (uuid, class, type) ne sont pas fournies.
+#       1er run = « go » d'Albert (classes de message neuves : create_keybag + make_system_keybag, ET ordre neuf :
+#       perform_operation ET null_d_key sautés). Nouveau binaire (variante 4) : non encore éprouvé → go d'Albert + reboot.
 #
 # Usage (root, boot normal SANS le service : /etc/sep-touchid/disabled présent, puis reboot) :
 #   UUID=<32 hex, 16 o> CLASS=<u32> TYPE=<i32 <= -10> [FIELD2=<u32>] [HANDLE=<u64>] pending/j10_sks_create_keybag_chained.sh [STORE]
 #   (ou en arguments : pending/j10_sks_create_keybag_chained.sh [STORE] --uuid <hex> --class <u32> --type <i32>
 #    [--field2 <u32>] [--handle <u64>])
 #   STORE = store chaîné d'un seal frais réussi (défaut /var/lib/sepd-run-20261122-230441 : J7b/J8/J9a/J9b, 0 SAVE).
-# Binaires attendus ($J13 = /home/albert/kbuild/j13) :
-#   sep_native.ko     1e82f721935a99ef17ba4fac8532518b9db4fa97f1d04eccbb36f16427dc8a34 (allow_sks=5, create_keybag)
-#   sks_setenv        663595cfa1e8379adf7baf0175f90fc25b95fd6957ce7f6489604f213cfc17ca
-#   sepd              6ad1992f12b0d300b37b6b20ba2e9e3c0cc44d4e02bd7b74ce031cc958e37f4a (= j5..j12, défaut sans UUID)
-#   sep_native_ovl.ko 02c1fcc2fb9b19363a89a8ad818422411eb968110720d039d3b822029ad517cd (= j5..j12)
-#   sep-native.dtbo   8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771 (= j5..j12)
+# Binaires attendus ($J14 = /home/albert/kbuild/j14) :
+#   sep_native.ko     1c6f38bedbecdc872f608f9321994d0297d70a2a20760fc5a068943aeff5385a (allow_sks=5, create_keybag VARIANTE 4)
+#   sks_setenv        340c3f939c32bdfc33126015a8273ba3701c6cd13e10d8c8b4b6d614990eda09
+#   sepd              6ad1992f12b0d300b37b6b20ba2e9e3c0cc44d4e02bd7b74ce031cc958e37f4a (= j5..j13, défaut sans UUID)
+#   sep_native_ovl.ko 02c1fcc2fb9b19363a89a8ad818422411eb968110720d039d3b822029ad517cd (= j5..j13)
+#   sep-native.dtbo   8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771 (= j5..j13)
 set -euo pipefail
-J13=${J13:-/home/albert/kbuild/j13}
+J14=${J14:-/home/albert/kbuild/j14}
 SERVICE_STORE=/var/lib/sepd
 
 # --- Valeurs userland (env ou arguments). REQUISES : UUID, CLASS, TYPE. Avec défaut : FIELD2=0, HANDLE=0 ---
@@ -108,14 +115,14 @@ HINT="valeurs userland à fournir — voir docs/sks_userland_values.md du PC"
 
 [ "$(id -u)" = 0 ] || { echo "à lancer en root"; exit 1; }
 want() {  # want FICHIER SHA256
-  [ "$(sha256sum "$J13/$1" | cut -d' ' -f1)" = "$2" ] || { echo "$J13/$1 n'est pas le binaire relu (sha256)"; exit 1; }
+  [ "$(sha256sum "$J14/$1" | cut -d' ' -f1)" = "$2" ] || { echo "$J14/$1 n'est pas le binaire relu (sha256)"; exit 1; }
 }
-want sep_native.ko     1e82f721935a99ef17ba4fac8532518b9db4fa97f1d04eccbb36f16427dc8a34
-want sks_setenv        663595cfa1e8379adf7baf0175f90fc25b95fd6957ce7f6489604f213cfc17ca
+want sep_native.ko     1c6f38bedbecdc872f608f9321994d0297d70a2a20760fc5a068943aeff5385a
+want sks_setenv        340c3f939c32bdfc33126015a8273ba3701c6cd13e10d8c8b4b6d614990eda09
 want sepd              6ad1992f12b0d300b37b6b20ba2e9e3c0cc44d4e02bd7b74ce031cc958e37f4a
 want sep_native_ovl.ko 02c1fcc2fb9b19363a89a8ad818422411eb968110720d039d3b822029ad517cd
 want sep-native.dtbo   8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771
-modinfo -F parm "$J13/sep_native.ko" | grep -q "^allow_sks:.*5 (J10" || { echo "$J13/sep_native.ko sans allow_sks=5 (J10)"; exit 1; }
+modinfo -F parm "$J14/sep_native.ko" | grep -q "^allow_sks:.*5 (J10" || { echo "$J14/sep_native.ko sans allow_sks=5 (J10)"; exit 1; }
 # Le service ne doit PAS tenir le SEP pendant ce boot.
 [ -e /etc/sep-touchid/disabled ] || { echo "/etc/sep-touchid/disabled absent : désactiver le service (touch) puis reboot d'abord"; exit 1; }
 if systemctl is-active --quiet sep-touchid 2>/dev/null; then echo "service sep-touchid actif : refus"; exit 1; fi
@@ -150,12 +157,12 @@ echo "valeurs userland : UUID=$UUID CLASS=$CLASS FIELD2=$FIELD2 HANDLE=$HANDLE T
 echo "STORE = $STORE (servi tel quel) :" | tee "$LOG/store.txt"; ls -l "$STORE" | tee -a "$LOG/store.txt"
 sha256sum "$STORE"/*.bin >> "$LOG/store.txt"
 BAK="${STORE%/}.avant-j10-$(date +%Y%m%d-%H%M%S)"; cp -a "$STORE" "$BAK"; echo "copie du store avant run : $BAK" | tee -a "$LOG/store.txt"
-(cd "$J13" && sha256sum sep_native.ko sks_setenv sepd sep_native_ovl.ko sep-native.dtbo) > "$LOG/binaires.sha256"
-cp "$J13/sep-native.dtbo" /lib/firmware/sep-native.dtbo
+(cd "$J14" && sha256sum sep_native.ko sks_setenv sepd sep_native_ovl.ko sep-native.dtbo) > "$LOG/binaires.sha256"
+cp "$J14/sep-native.dtbo" /lib/firmware/sep-native.dtbo
 [ "$(sha256sum /lib/firmware/sep-native.dtbo | cut -d' ' -f1)" = 8adbcb089a430fa63718c90a43dd5423afe0d52c8bfd0dc7eab0d60c51119771 ] \
   || { echo "/lib/firmware/sep-native.dtbo ≠ binaire relu"; exit 1; }
-insmod "$J13/sep_native_ovl.ko"
-insmod "$J13/sep_native.ko" allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 allow_sbio_relay=0 \
+insmod "$J14/sep_native_ovl.ko"
+insmod "$J14/sep_native.ko" allow_boot=1 allow_xart=1 allow_xart_save_ack=1 allow_sbio=1 allow_sbio_relay=0 \
     sbio_open=1 allow_sks=5 &
 for i in $(seq 1 300); do [ -e /dev/sep_native ] && break; sleep 0.1; done
 if [ ! -e /dev/sep_native ]; then
@@ -163,14 +170,14 @@ if [ ! -e /dev/sep_native ]; then
     journalctl -k -b --no-pager | grep sep_native > "$LOG/kernel.log" || true
     exit 1
 fi
-"$J13/sepd" --store "$STORE" --os-uuid-file /etc/sepd/os_uuid --dev /dev/sep_native 2> "$LOG/sepd.log" &
+"$J14/sepd" --store "$STORE" --os-uuid-file /etc/sepd/os_uuid --dev /dev/sep_native 2> "$LOG/sepd.log" &
 SEPD=$!
 # sks_setenv run --keybag : attend /dev/sep_sks, écrit le get_capabilities, puis (v2 négociée) le set_env, puis
 # (set_env ACCEPTÉ) le create_keybag, puis le make_system_keybag (le noyau y place le handle rendu), lit les QUATRE
 # verdicts. cpx-encryption-mode forcé à 2 (valeur de notre ADT). Les valeurs requises (uuid, class, type) sont
 # OBLIGATOIRES : si l'une manque, sks_setenv refuse AVANT d'ouvrir /dev/sep_sks (rien envoyé au SEP).
 set +e
-"$J13/sks_setenv" run --keybag --uuid "$UUID" --class "$CLASS" --field2 "$FIELD2" --handle "$HANDLE" --type "$TYPE" \
+"$J14/sks_setenv" run --keybag --uuid "$UUID" --class "$CLASS" --field2 "$FIELD2" --handle "$HANDLE" --type "$TYPE" \
     --dev /dev/sep_sks --wait-s 300 --cpx 2 --out-dir "$LOG" > "$LOG/sks_keybag.out" 2> "$LOG/sks_keybag.log"
 SE=$?
 set -e

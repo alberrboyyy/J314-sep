@@ -2,7 +2,7 @@
 //!   sks_setenv build-getcap [CHAMPS] [--out FILE]   builds the 0x64-byte get_capabilities request (offline)
 //!   sks_setenv build-setenv [CHAMPS] [--cpx N] [--out FILE]  builds the 0x470-byte set_env request (offline)
 //!   sks_setenv build-nulldkey [CHAMPS] [--out FILE] builds the 0x60-byte null_d_key request (offline)
-//!   sks_setenv build-createkeybag KB [CHAMPS] [--out FILE]  builds the 0x7c-byte create_keybag request (offline)
+//!   sks_setenv build-createkeybag KB [CHAMPS] [--out FILE]  builds the 0x80-byte create_keybag request (variant 4, offline)
 //!   sks_setenv build-mskb KB [CHAMPS] [--out FILE]  builds the 0x84-byte make_system_keybag request (offline)
 //!   sks_setenv check-getcap|check-setenv|check-nulldkey|check-createkeybag|check-mskb FILE  applies the kernel gate (offline)
 //!   sks_setenv decode FILE                          decodes a combined outcome record from /dev/sep_sks (offline)

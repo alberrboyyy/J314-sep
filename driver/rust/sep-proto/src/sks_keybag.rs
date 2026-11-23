@@ -17,10 +17,16 @@
 //! same v2 digest function).
 //!
 //! **SKELETON — NOT RUNNABLE until the userland values exist.** Byte layout established by DISASSEMBLY
-//! (`docs/applekeystored_identity.md` §6, `source: kext` 27.2.1, bundle `com.apple.driver.AppleSEPKeyStore`), VU:
-//!   - `__ipc_create_keybag_v4` @0xcf9a34 / codec `_code_ipc_create_keybag` @0xcde0e4: header + state(u32=0) +
-//!     handle_y(u64) + two u32 scalars (class + a 2nd field) + THREE empty blobs(len=0 each) + flag(u64=0). The reply
-//!     carries the SEP-assigned handle (a u32); the AP reads it back. Create takes NO passcode (`pin` flag = 0 nude).
+//! (`docs/applekeystored_identity.md` §6/§8, `source: kext` 27.2.1, bundle `com.apple.driver.AppleSEPKeyStore`), VU:
+//!   - `__ipc_create_keybag_v4` @0xcf9a34 / codec `_code_ipc_create_keybag` @0xcde0e4: `create_keybag` is a VERSIONED
+//!     message. The u32 at OOL 0x54 (ctx+0x50) is the VARIANT DISCRIMINANT, not a "state"; macOS's nude create builder
+//!     writes it from the constant `04` (`__const` 0x7710098, VU §8.3) → VARIANT 4. Body of variant 4 (§8.5): header +
+//!     discriminant(u32=4) + handle_y(u64) + two u32 scalars (class + a 2nd field) + THREE empty blobs(len=0 each) +
+//!     `__fv_data` blob(len=0, u32) + a final u64(=0). The reply carries the SEP-assigned handle (a u32); the AP reads
+//!     it back. Create takes NO passcode. Flags (ctx+0x1c, header 0x20) stay 0 — the bit0 "encrypted" path is -0xd (§8.1).
+//!     **2026-11-23 (J14): the -0xd (0xf3) J10 refusal was a WRONG discriminant** — the old skeleton put 0 ("état") with
+//!     a 3-blob body (variant 3/4 shape), so the SEP decoded it as variant 0 (1 blob) and the frame did not fit (§8.4).
+//!     Fix = emit variant 4 byte-exact: discriminant 4, the two trailing fields (fv_data len 0 + final u64), length 0x80.
 //!   - `__ipc_make_system_keybag_v1` @0xcdbce4 / `_code_ipc_make_system_keybag` @0xce0134: header + state(u32=1,
 //!     the codec takes the state==1 branch) + handle_y(u64) + loaded_handle(u32) + type(u32) + blob{len=0x10, uuid 16} +
 //!     flag(u64=0). On the identity path the flag is 0 and the blob is the 16-byte device-identity uuid.
@@ -61,10 +67,15 @@ pub const UUID_LEN: usize = 16;
 pub const OP_CREATE_KEYBAG: u8 = 0x01;
 /// Third transaction of J10 (get_capabilities = 1, set_env = 2, create_keybag = 3).
 pub const CKB_TXN: u8 = 0x03;
-pub const CKB_LEN: usize = 0x7c;
+/// Variant-4 body length: header 0x54 + discriminant 4 + handle_y 8 + class 4 + field2 4 + 3 blob lens (4×3) +
+/// fv_data len 4 + final u64 8 = 0x80 (§8.5). Was 0x7c (the wrong-discriminant J10 skeleton omitted the two trailing
+/// variant-4 fields and carried an 8-byte "flag" at 0x74 instead).
+pub const CKB_LEN: usize = 0x80;
 pub const CKB_DATA: u32 = (CKB_LEN as u32) << 16;
-/// State word of `create_keybag` (OOL 0x54): 0 (codec `+0x50` état=0, VU §6.2).
-pub const CKB_STATE: u32 = 0;
+/// Variant discriminant of `create_keybag` (OOL 0x54 = ctx+0x50): macOS's nude create is VARIANT 4 (VU §8.3, builder
+/// writes the constant `04` from `__const` 0x7710098). This u32 is NOT a "state": `_code_ipc_create_keybag` switches on
+/// it (§8.2); a wrong value is the direct cause of the -0xd (0xf3) J10 refusal (§8.4).
+pub const CKB_DISCRIMINANT: u32 = 4;
 /// First u32 scalar (OOL 0x60). §6 does not pin down which of the two u32 is the class enum: coded here as the class.
 pub const OFF_CKB_CLASS: usize = 0x60;
 /// Second u32 scalar (OOL 0x64). The other of the ambiguous pair; a free userland value too.
@@ -73,9 +84,11 @@ pub const OFF_CKB_FIELD2: usize = 0x64;
 pub const OFF_CKB_BLOB1: usize = 0x68;
 pub const OFF_CKB_BLOB2: usize = 0x6c;
 pub const OFF_CKB_BLOB3: usize = 0x70;
-/// Flag (OOL 0x74, u64): 0 for a nude create (`pin` = 0 → the wrapper does NOT set 0x100).
-pub const OFF_CKB_FLAG: usize = 0x74;
-pub const CKB_FLAG: u64 = 0;
+/// `__fv_data` blob length (OOL 0x74, u32): 0 on a nude create. VARIANT-4 field (§8.5), replaces the former 8-byte
+/// "flag" of the wrong J10 skeleton. The bit0 "encrypted" flag lives in the HEADER (0x20) and MUST stay 0 (§8.1).
+pub const OFF_CKB_FVLEN: usize = 0x74;
+/// Final u64 of the variant-4 body (OOL 0x78): 0. VARIANT-4 field (§8.5).
+pub const OFF_CKB_FINAL: usize = 0x78;
 /// Reply TAG of `create_keybag` (= request | 0x80).
 pub const CKB_REPLY_TAG: u8 = OP_CREATE_KEYBAG | 0x80; // 0x81
 /// Offset in OOL B where the SEP-assigned handle is read back (u32). `docs/applekeystored_identity.md` §6.4 gives no
@@ -104,7 +117,7 @@ pub const MSKB_FLAG: u64 = 0;
 /// Reply TAG of `make_system_keybag` (= request | 0x80).
 pub const MSKB_REPLY_TAG: u8 = OP_MAKE_SYSTEM_KEYBAG | 0x80; // 0x8d
 
-const _: () = assert!(CKB_LEN == 0x54 + 4 + 8 + 4 + 4 + 4 + 4 + 4 + 8);
+const _: () = assert!(CKB_LEN == 0x54 + 4 + 8 + 4 + 4 + 4 + 4 + 4 + 4 + 8);
 const _: () = assert!(MSKB_LEN == 0x54 + 4 + 8 + 4 + 4 + 4 + UUID_LEN + 8);
 const _: () = assert!(OFF_RESP_HANDLE + 4 <= crate::sks_ipc::OUT_SNAP);
 
@@ -175,17 +188,17 @@ pub const fn createkeybag_word() -> Word {
     Word::new(EP_SKS, OP_CREATE_KEYBAG, CKB_TXN, 0, CKB_DATA)
 }
 
-/// Builds the 0x7c bytes of `create_keybag`. `handle_y`, `class` and `field2` are USERLAND values (no default here);
-/// the three blobs are empty (fresh create) and the flag is 0 (nude create). The digest is computed last over the v2
-/// base.
+/// Builds the 0x80 bytes of `create_keybag` (variant 4). `handle_y`, `class` and `field2` are USERLAND values (no
+/// default here); the discriminant is 4, the three blobs are empty (fresh create), the fv_data blob is empty and the
+/// final u64 is 0 (nude create). The digest is computed last over the v2 base.
 pub fn encode_createkeybag(f: &KeybagFields, handle_y: u64, class: u32, field2: u32) -> [u8; CKB_LEN] {
     let mut b = [0u8; CKB_LEN];
     write_header(&mut b, f);
-    // state (0x54) = 0 (left zero).
+    b[OFF_STATE..OFF_STATE + 4].copy_from_slice(&CKB_DISCRIMINANT.to_le_bytes()); // variant discriminant = 4
     b[OFF_HANDLE_Y..OFF_HANDLE_Y + 8].copy_from_slice(&handle_y.to_le_bytes());
     b[OFF_CKB_CLASS..OFF_CKB_CLASS + 4].copy_from_slice(&class.to_le_bytes());
     b[OFF_CKB_FIELD2..OFF_CKB_FIELD2 + 4].copy_from_slice(&field2.to_le_bytes());
-    // three blob lengths (0x68/0x6c/0x70) = 0, flag (0x74) = 0: left zero.
+    // three blob lengths (0x68/0x6c/0x70), fv_data len (0x74) and final u64 (0x78) = 0: left zero.
     let d = frame_digest(&b, HDR_VERSION_V2, OFF_STATE, CKB_LEN).unwrap_or([0; DIGEST_LEN]);
     b[OFF_DIGEST..OFF_DIGEST + DIGEST_LEN].copy_from_slice(&d);
     b
@@ -200,31 +213,33 @@ pub struct CreatekeybagReq {
     pub field2: u32,
 }
 
-/// Kernel gate on the 0x7c bytes of `create_keybag`: exact length, the CONSTANT fields (header constants, state 0,
-/// three blob lengths 0, flag 0), the v2 digest recomputed, cdhash in one of the two documented AP forms. The userland
-/// values (handle_y, class, field2) are NOT constrained (they are free, supplied by the tool). Returns them for the log.
+/// Kernel gate on the 0x80 bytes of `create_keybag` (variant 4): exact length, the CONSTANT fields (header constants,
+/// discriminant 4, three blob lengths 0, fv_data length 0, final u64 0), the v2 digest recomputed, cdhash in one of the
+/// two documented AP forms. The userland values (handle_y, class, field2) are NOT constrained (they are free, supplied
+/// by the tool). Returns them for the log.
 pub fn check_createkeybag(b: &[u8]) -> Result<CreatekeybagReq> {
     if b.len() != CKB_LEN {
         return Err(Error::OutOfRange("create_keybag request length", b.len() as u64));
     }
     check_header_constants(b)?;
-    let state = le32(b, OFF_STATE)?;
-    if state != CKB_STATE {
-        return Err(Error::OutOfRange("create_keybag state (0x54) != 0", u64::from(state)));
+    let disc = le32(b, OFF_STATE)?;
+    if disc != CKB_DISCRIMINANT {
+        return Err(Error::OutOfRange("create_keybag discriminant (0x54) != 4 (variant 4)", u64::from(disc)));
     }
     for (o, what) in [
         (OFF_CKB_BLOB1, "create_keybag blob 1 length (0x68) != 0"),
         (OFF_CKB_BLOB2, "create_keybag blob 2 length (0x6c) != 0"),
         (OFF_CKB_BLOB3, "create_keybag blob 3 length (0x70) != 0"),
+        (OFF_CKB_FVLEN, "create_keybag fv_data length (0x74) != 0"),
     ] {
         let v = le32(b, o)?;
         if v != 0 {
             return Err(Error::OutOfRange(what, u64::from(v)));
         }
     }
-    let flag = le64(b, OFF_CKB_FLAG)?;
-    if flag != CKB_FLAG {
-        return Err(Error::OutOfRange("create_keybag flag (0x74) != 0", flag));
+    let final_u64 = le64(b, OFF_CKB_FINAL)?;
+    if final_u64 != 0 {
+        return Err(Error::OutOfRange("create_keybag final u64 (0x78) != 0", final_u64));
     }
     let d = frame_digest(b, HDR_VERSION_V2, OFF_STATE, CKB_LEN)?;
     if b[OFF_DIGEST..OFF_DIGEST + DIGEST_LEN] != d {
@@ -424,9 +439,9 @@ mod tests {
 
     #[test]
     fn words_and_lengths() {
-        assert_eq!(createkeybag_word(), Word::new(0x12, 0x01, 0x03, 0x00, 0x007c_0000));
+        assert_eq!(createkeybag_word(), Word::new(0x12, 0x01, 0x03, 0x00, 0x0080_0000));
         assert_eq!(mskb_word(), Word::new(0x12, 0x0d, 0x04, 0x00, 0x0084_0000));
-        assert_eq!(CKB_LEN, 0x7c);
+        assert_eq!(CKB_LEN, 0x80);
         assert_eq!(MSKB_LEN, 0x84);
         assert_eq!(CKB_REPLY_TAG, 0x81);
         assert_eq!(MSKB_REPLY_TAG, 0x8d);
@@ -439,14 +454,15 @@ mod tests {
         assert_eq!(le32(&b, 0x00).unwrap(), 0x50);
         assert_eq!(le32(&b, 0x14).unwrap(), 2);
         assert_eq!(le64(&b, 0x18).unwrap(), EX_TS);
-        assert_eq!(le32(&b, 0x54).unwrap(), 0); // state
+        assert_eq!(le32(&b, 0x54).unwrap(), 4); // discriminant = variant 4
         assert_eq!(le64(&b, 0x58).unwrap(), EX_HANDLE_Y); // handle_y
         assert_eq!(le32(&b, 0x60).unwrap(), EX_CLASS);
         assert_eq!(le32(&b, 0x64).unwrap(), EX_FIELD2);
         assert_eq!(le32(&b, 0x68).unwrap(), 0); // blob 1 len
         assert_eq!(le32(&b, 0x6c).unwrap(), 0); // blob 2 len
         assert_eq!(le32(&b, 0x70).unwrap(), 0); // blob 3 len
-        assert_eq!(le64(&b, 0x74).unwrap(), 0); // flag
+        assert_eq!(le32(&b, 0x74).unwrap(), 0); // fv_data len (variant 4)
+        assert_eq!(le64(&b, 0x78).unwrap(), 0); // final u64 (variant 4)
         let r = check_createkeybag(&b).unwrap();
         assert_eq!((r.fields, r.handle_y, r.class, r.field2), (f, EX_HANDLE_Y, EX_CLASS, EX_FIELD2));
     }
@@ -471,8 +487,10 @@ mod tests {
     #[test]
     fn requests_match_independent_construction() {
         let ckb = encode_createkeybag(&fields(), EX_HANDLE_Y, EX_CLASS, EX_FIELD2);
-        assert_eq!(&ckb[0x04..0x14], &hex16("578eef9c567db26dec3ae75c2f6c4c32"));
-        assert_eq!(sha256(&ckb), hex32("40575643c34efbf798efc47e86327a746ea4c4eecec1c13556f39ef1808687f4"));
+        // Variant-4 body (discriminant 4, fv_data len 0, final u64 0, length 0x80), computed independently in
+        // `/tmp/claude-1000/.../scratchpad/kbvec4.py` (session ALARM 2026-11-23, J14).
+        assert_eq!(&ckb[0x04..0x14], &hex16("d0427aebdce10db55b328ee85dd5d447"));
+        assert_eq!(sha256(&ckb), hex32("982010bf12390b1c7c39070054c3ebfdc89730cebc5ad01fe5655588e9e31740"));
 
         let mskb = encode_mskb(&fields(), EX_HANDLE_Y, 0, EX_TYPE, &ex_uuid());
         assert_eq!(&mskb[0x04..0x14], &hex16("d186ead7fd1410b8151f600e73ea8e29"));
@@ -503,9 +521,10 @@ mod tests {
 
     #[test]
     fn gates_refuse_constant_changes() {
-        // create_keybag: header constants, state, three blob lengths, flag are checked; handle_y/class/field2 are NOT.
+        // create_keybag: header constants, discriminant, three blob lengths, fv_data len, final u64 are checked;
+        // handle_y/class/field2 are NOT.
         let good = encode_createkeybag(&fields(), EX_HANDLE_Y, EX_CLASS, EX_FIELD2);
-        for &o in &[0x00usize, 0x14, 0x20, 0x24, 0x4c, 0x54, 0x68, 0x6c, 0x70, 0x74] {
+        for &o in &[0x00usize, 0x14, 0x20, 0x24, 0x4c, 0x54, 0x68, 0x6c, 0x70, 0x74, 0x78] {
             let mut b = good;
             b[o] ^= 0x01;
             assert!(check_createkeybag(&b).is_err(), "ckb offset {o:#x}");
@@ -518,7 +537,7 @@ mod tests {
         let mut b = good;
         b[0x18] ^= 0x01;
         assert!(check_createkeybag(&b).is_err());
-        assert!(check_createkeybag(&good[..0x7b]).is_err());
+        assert!(check_createkeybag(&good[..CKB_LEN - 1]).is_err());
 
         // make_system_keybag: header constants, state 1, blob length 0x10, flag 0 checked; handle_y/loaded/type/uuid NOT.
         let good2 = encode_mskb(&fields(), EX_HANDLE_Y, 0, EX_TYPE, &ex_uuid());
@@ -553,6 +572,19 @@ mod tests {
         assert!(!is_mskb_reply(&Word::new(0x12, 0x81, 0x03, 0, 0))); // ckb reply (TYPE 3)
     }
 
+    /// The J14 correction (-0xd → variant 4): what WE emit must carry discriminant 4 and total length 0x80, and the
+    /// request word's DATA must be 0x00800000. Guards against regressing to the old 0 / 0x7c skeleton.
+    #[test]
+    fn create_keybag_is_variant_4_length_0x80() {
+        assert_eq!(CKB_DISCRIMINANT, 4);
+        assert_eq!(CKB_LEN, 0x80);
+        assert_eq!(CKB_DATA, 0x0080_0000);
+        let b = encode_createkeybag(&fields(), EX_HANDLE_Y, EX_CLASS, EX_FIELD2);
+        assert_eq!(b.len(), 0x80);
+        assert_eq!(le32(&b, OFF_STATE).unwrap(), 4); // discriminant we emit
+        assert_eq!(createkeybag_word().data, 0x0080_0000);
+    }
+
     #[test]
     fn type_hint() {
         assert!(type_in_vu_range(-10));
@@ -568,7 +600,7 @@ mod tests {
         g.arm();
         assert!(!g.admit(&Word::new(0x12, 0x01, 0x04, 0, CKB_DATA)), "wrong TYPE");
         assert!(!g.admit(&Word::new(0x12, 0x0d, 0x03, 0, CKB_DATA)), "wrong TAG");
-        assert!(!g.admit(&Word::new(0x12, 0x01, 0x03, 0, 0x007c_0001)), "wrong DATA");
+        assert!(!g.admit(&Word::new(0x12, 0x01, 0x03, 0, 0x0080_0001)), "wrong DATA");
         assert!(g.admit(&createkeybag_word()));
         assert!(g.used());
         assert!(!g.admit(&createkeybag_word()), "twice");

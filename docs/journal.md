@@ -3211,3 +3211,24 @@ TAG fil 0x01 NU, pas `load_keybag`), le squelette J10 a été recodé.
   corps 0x2c, message **0x80**, **DATA=0x00800000**, condensé recalculé ; drapeaux restent 0 (NE PAS poser le bit chiffré).
   Si ça persiste : v5, puis seulement alors soupçonner une sémantique SEPOS (→ mur, capture macOS vivant). Écriture 0x12
   classe neuve → go d'Albert ; power-cycle = Albert.
+
+## 2026-11-23 (session ALARM, agent driver, Opus 4.8) — J14 : correction −13 → variante 4 codée, compilée, prête pour J10b
+- PRÉPARATION seulement (rien chargé/envoyé au SEP, pas de sudo). Code depuis `docs/applekeystored_identity.md` §8
+  (`source: kext`). Suite de l'entrée reverseur ci-dessus. Travail dans `~/kbuild/j14`.
+- FAIT : `driver/rust/sep-proto/src/sks_keybag.rs` — `create_keybag` passe en **variante 4** byte-exacte (§8.5) :
+  discriminant (OOL 0x54) = **4** (était 0), le champ 0x74 devient **`__fv_data` len 0 (u32)** et un **u64 final @0x78 = 0**
+  remplacent l'ancien « flag » u64 ; `CKB_LEN 0x7c → 0x80`, `CKB_DATA 0x007c0000 → 0x00800000` ; condensé v2 recalculé.
+  Porte `check_createkeybag` : discriminant 4 attendu, 3 blobs + fv_data len 0 + u64 final 0 contrôlés. `make_system_keybag`
+  (TAG 0x0d) **INCHANGÉ**. Vecteurs condensé/sha256 d'EXEMPLE recomputés par un Python/hashlib indépendant
+  (digest `d0427aeb…d447`, sha256 `982010bf…1740`) ; test dédié `create_keybag_is_variant_4_length_0x80`.
+- FAIT : `kmod/sep_native.rs` (allow_sks=5) et l'outil `sks-setenv` (build/check/decode, run --keybag) adaptés via les
+  constantes (taille 0x80, DATA 0x00800000, textes « variante 4 ») ; verdicts et chaînage du handle inchangés.
+- COMPILÉ : `cargo test` vert (sep-proto 11/11 keybag + suites ; sks-setenv) ; clippy propre (userspace + `CLIPPY=1` .ko).
+  Binaires `~/kbuild/j14` + `SHA256SUMS` : `sep_native.ko` `1c6f38be…385a` (allow_sks=5, variante 4),
+  `sks_setenv` `340c3f93…da09` ; `sepd`/`sep_native_ovl.ko`/`sep-native.dtbo` = copies j13 (sha256 inchangés).
+- FAIT : `pending/j10_sks_create_keybag_chained.sh` MAJ (sha256 j14, en-tête variante 4 / DATA 0x00800000, cause −13,
+  `$J13`→`$J14`) ; mêmes garde-fous (refus sans UUID/CLASS/TYPE, service désactivé, store copié, dit si SAVE) ; `bash -n` OK.
+  `docs/sks_native_plan.md` §9 MAJ (variante 4). **Pas commité.**
+- RESTE DÉDUIT/INCONNU (inchangé) : valeurs réelles de **class** (+0x60), **field2** (+0x64) et **handle_y** (userland,
+  non dérivables du binaire) ; ambiguïté class↔0x60 (si refus matériel, échanger `--class`/`--field2`) ; handle rendu lu
+  à OOL B +0x6c (offset DÉDUIT). Classe neuve en écriture 0x12 + nouveau binaire → **attend « go » + reboot d'Albert**.

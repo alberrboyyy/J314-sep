@@ -319,7 +319,19 @@ copies de `~/kbuild/j10`/`j9`/`j5` (sha256 inchangés).
 type EP 0x12 : null_d_key) **ET ordre neuf** (perform_operation sautés) → **1er run = « go » d'Albert**
 (`pending/j9c_sks_nulldkey_chained.sh`).
 
-## 9. Expérience 5 recodée (SQUELETTE) : J10 = la voie identité `create_keybag` puis `make_system_keybag` (`allow_sks=5`) — 2026-11-23 (J13), NON LANÇABLE
+## 9. Expérience 5 recodée (SQUELETTE) : J10 = la voie identité `create_keybag` puis `make_system_keybag` (`allow_sks=5`) — 2026-11-23 (J13 ; corrigé J14), NON LANÇABLE
+
+**Correction J14 (2026-11-23) : `create_keybag` −13 → VARIANTE 4.** Le run J10 (journal 18:44) a pris `< TAG 0x81 PARAM
+0xf3` = **−0xd / −13**, longueur 0, pas de handle. Cause décodée au binaire (`docs/applekeystored_identity.md` **§8**,
+`source: kext`) : `create_keybag` est un message **VERSIONNÉ** ; le 1er mot du corps (OOL 0x54 = ctx+0x50) est un
+**DISCRIMINANT DE VARIANTE**, pas un « état ». Le squelette posait **0** avec un corps à 3 blobs (forme variante 3/4) →
+le SEP décode en **variante 0** (1 blob) → cadre indécodable → −0xd (ce n'est **pas** une politique SEP ni un secret
+manquant). macOS émet la **VARIANTE 4** (builder `__ipc_create_keybag_v4`, constante `04` à `__const` 0x7710098, §8.3).
+**Correction appliquée (byte-exacte, §8.5)** : discriminant **4**, + un **`__fv_data` (len 0, u32 @0x74)** et un **u64
+final (@0x78)** que le squelette omettait, à la place de l'ancien « flag » u64. Corps **0x2c (44 o)**, message **0x80**
+⇒ **DATA 0x00800000** (était 0x007c0000), condensé v2 recalculé. Drapeaux d'en-tête (0x20) restent **0** (ne JAMAIS
+poser le bit0 « chiffré » → −0xd garanti, §8.1). `make_system_keybag` **INCHANGÉ**. Si −0xd persiste après la variante
+4 avec un cadre VALIDE, c'est alors seulement une sémantique SEPOS (classe/handle) — à trancher par capture macOS (§8.5).
 
 **Changement vs la version J10 initiale (load→create).** Le squelette J10 envoyait `load_keybag` (TAG fil 0x03), qui
 **importe** un keybag existant par uuid. Le reverse d'`applekeystored` (`docs/applekeystored_identity.md` §6, `source:
@@ -333,9 +345,10 @@ OSData de 16 o, §6.3).
 `perform_operation` ET `null_d_key`, enchaîner les **deux** transactions de la voie identité d'appareil
 (`docs/applekeystored_identity.md` §6, `source: kext` 27.2.1, gabarits VU) :
 
-1. **`create_keybag` (TAG fil 0x01, TYPE 0x03)** — `> EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0 DATA 0x007c0000`, OOL A12 =
-   **0x7c o** : en-tête IPC v2 + **état u32 = 0** + **handle_y u64** (OOL 0x58) + **class u32** (0x60) + **field2 u32**
-   (0x64) + **trois blobs VIDES** (len 0 chacun, 0x68/0x6c/0x70) + **flag u64 = 0** (0x74). Crée un keybag **NEUF** à
+1. **`create_keybag` (TAG fil 0x01, TYPE 0x03, VARIANTE 4)** — `> EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0 DATA 0x00800000`,
+   OOL A12 = **0x80 o** : en-tête IPC v2 + **discriminant u32 = 4** (OOL 0x54, variante 4) + **handle_y u64** (OOL 0x58) +
+   **class u32** (0x60) + **field2 u32** (0x64) + **trois blobs VIDES** (len 0 chacun, 0x68/0x6c/0x70) + **`__fv_data`
+   len 0** (u32, 0x74) + **u64 final = 0** (0x78). Crée un keybag **NEUF** à
    partir de la classe et **REND un handle** (réponse TAG 0x81, PARAM 0 = OK ; handle u32 lu à **OOL B +0x6c**, offset
    **DÉDUIT**, OOL du create jamais capturé → à confirmer matériel). **Aucun passcode, aucun uuid** dans create.
 2. **`make_system_keybag` (TAG fil 0x0d, TYPE 0x04)** — `> EP 0x12 TAG 0x0d TYPE 0x04 PARAM 0 DATA 0x00840000`, OOL A12
@@ -360,7 +373,8 @@ l'uuid étant une entrée d'`identity_load` dont le placement IPC exact n'est pa
 (DÉDUIT) ; (c) l'affectation class↔0x60 (AMBIGU ci-dessus).
 
 **Porte noyau** (`sks_keybag::check_createkeybag` / `check_mskb`) : longueur exacte, **champs constants** (en-tête ;
-create = état 0 + trois blobs len 0 + flag 0 ; make_system = état 1 + blob len 0x10 + flag 0), **condensé v2 recalculé**,
+create = **discriminant 4** + trois blobs len 0 + fv_data len 0 + u64 final 0 ; make_system = état 1 + blob len 0x10 +
+flag 0), **condensé v2 recalculé**,
 forme du cdhash. **NON contrôlés** (libres) : uuid, class, field2, handle_y, type (et le handle chargé, dynamique).
 Envoi : `create_keybag` d'abord ; `make_system_keybag` **seulement** si `create_keybag` a RÉPONDU PARAM 0 et rendu un
 handle.
@@ -378,20 +392,21 @@ keybag/identité **forgé par Linux**, ou lie-t-il l'enrôlement à l'identité 
 
 **Tests hors matériel** : `sep-proto::sks_keybag` (disposition et relecture par la porte des deux frames ; base du
 condensé v2 ; **requêtes identiques octet pour octet à une construction Python/`hashlib` indépendante** sur des valeurs
-d'**exemple arbitraires** « PAS les vraies » — create_keybag condensé `578eef9c567db26dec3ae75c2f6c4c32`, sha256
-`40575643c34efbf798efc47e86327a746ea4c4eecec1c13556f39ef1808687f4` ; make_system_keybag (handle placeholder 0) condensé
+d'**exemple arbitraires** « PAS les vraies » — create_keybag (variante 4) condensé `d0427aebdce10db55b328ee85dd5d447`,
+sha256 `982010bf12390b1c7c39070054c3ebfdc89730cebc5ad01fe5655588e9e31740` ; make_system_keybag (handle placeholder 0) condensé
 `d186ead7fd1410b8151f600e73ea8e29` ; après `finalize_mskb(handle=0xdeadbeef)` condensé `c5fd84961b48bf2de20d818be48d391d`,
 pour ts=0x1122334455667788, uniqueid 0, uid 0, cdhash=sha1(8×0), handle_y 0x4242424242424242, class 2, field2 0, type -16,
 uuid 00..0f ; porte qui refuse chaque constante modifiée / condensé faux / longueur fausse, accepte les valeurs userland
-libres ; appariement des réponses 0x81/0x8d et lecture du handle à +0x6c ; portes un seul mot) ; `sks-setenv` étendu
+libres ; **test dédié : ce que NOUS émettons porte le discriminant 4 et la taille 0x80 / DATA 0x00800000** ;
+appariement des réponses 0x81/0x8d et lecture du handle à +0x6c ; portes un seul mot) ; `sks-setenv` étendu
 (`build-createkeybag`, `build-mskb`, `check-createkeybag`, `check-mskb`, `run --keybag --uuid … --class … --type …
 [--field2 …] [--handle …]`, `decode` à 4 enregistrements ; `CreatekeybagVerdict`, `MskbVerdict` ; uuid/class/type
 **obligatoires**, erreur claire si absents). `cargo test` vert, clippy propre (`CLIPPY=1` pour le `.ko`).
 
-**Binaires** (`~/kbuild/j13`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
-`sep_native.ko` `1e82f721935a99ef17ba4fac8532518b9db4fa97f1d04eccbb36f16427dc8a34` (allow_sks=5, create_keybag),
-`sks_setenv` `663595cfa1e8379adf7baf0175f90fc25b95fd6957ce7f6489604f213cfc17ca` ; `sepd`, `sep_native_ovl.ko`,
-`sep-native.dtbo` = copies de `~/kbuild/j12` (sha256 inchangés).
+**Binaires** (`~/kbuild/j14`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `1c6f38bedbecdc872f608f9321994d0297d70a2a20760fc5a068943aeff5385a` (allow_sks=5, create_keybag **variante 4**),
+`sks_setenv` `340c3f939c32bdfc33126015a8273ba3701c6cd13e10d8c8b4b6d614990eda09` ; `sepd`, `sep_native_ovl.ko`,
+`sep-native.dtbo` = copies de `~/kbuild/j13` (sha256 inchangés).
 
 **Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
 (`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd` ; copie du store avant run ; **les valeurs userland

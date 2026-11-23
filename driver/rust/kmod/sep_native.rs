@@ -151,7 +151,7 @@ kernel::module_platform_driver! {
         },
         allow_sks: u32 {
             default: 0,
-            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; 5 (J10, device-identity keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation AND null_d_key, ONE sks create_keybag (> 0x12 TAG 0x01 TYPE 0x03 DATA 0x007c0000, 0x7c-byte A12, 4th write; checked: header constants, state 0, three empty blobs, flag 0, v2 digest, cdhash form; class(u32 0x60), field2(u32 0x64) and handle_y(u64 0x58) are FREE userland values, NOT checked), read back the SEP handle at OOL B +0x6c, then ONE sks make_system_keybag (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12, 5th write; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; handle_y/type/uuid FREE userland, loaded_handle plugged in by the kernel from the create_keybag reply then re-digested), listen, VERDICTs (create_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; NOT RUNNABLE without the required userland values (uuid, class, type); nothing else ever to 0x12/0x17/0x0a",
+            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; 5 (J10, device-identity keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation AND null_d_key, ONE sks create_keybag (> 0x12 TAG 0x01 TYPE 0x03 DATA 0x00800000, 0x80-byte A12, 4th write, VARIANT 4; checked: header constants, discriminant 4, three empty blobs, fv_data length 0, final u64 0, v2 digest, cdhash form; class(u32 0x60), field2(u32 0x64) and handle_y(u64 0x58) are FREE userland values, NOT checked), read back the SEP handle at OOL B +0x6c, then ONE sks make_system_keybag (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12, 5th write; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; handle_y/type/uuid FREE userland, loaded_handle plugged in by the kernel from the create_keybag reply then re-digested), listen, VERDICTs (create_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; NOT RUNNABLE without the required userland values (uuid, class, type); nothing else ever to 0x12/0x17/0x0a",
         },
         allow_sbio_bio: u32 {
             default: 0,
@@ -2533,7 +2533,7 @@ mod drv {
             core.sks_ckb = CkbPhase::Sent;
             dev_info!(
                 self.dev,
-                "sks create_keybag > EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0x00 DATA 0x007c0000 ; A12 = {:#x} o (handle_y {:#018x}, class {:#010x}, field2 {:#010x} [lequel est la classe = AMBIGU §6.2], 3 blobs vides, flag 0, condensé v2 {:016x}{:016x}) ; aucun autre mot vers 0x12\n",
+                "sks create_keybag > EP 0x12 TAG 0x01 TYPE 0x03 PARAM 0x00 DATA 0x00800000 ; A12 = {:#x} o (variante 4, discriminant 4, handle_y {:#018x}, class {:#010x}, field2 {:#010x} [lequel est la classe = AMBIGU §6.2], 3 blobs vides, fv_data 0, u64 final 0, condensé v2 {:016x}{:016x}) ; aucun autre mot vers 0x12\n",
                 sks_keybag::CKB_LEN, hy, class, field2, hi, lo
             );
             let t0 = Instant::<Monotonic>::now();
@@ -2752,7 +2752,7 @@ mod drv {
             self.cv.notify_all();
         }
 
-        /// J10 : 4e/5e écriture de /dev/sep_sks (create_keybag 0x7c puis make_system_keybag 0x84 ; la phase du
+        /// J10 : 4e/5e écriture de /dev/sep_sks (create_keybag 0x80 variante 4 puis make_system_keybag 0x84 ; la phase du
         /// fil du probe les distingue). Acceptée seulement dans la bonne `WaitReq`, après contrôle complet ; refus de la
         /// porte = rien envoyé, pas de Halted. EAGAIN tant qu'aucune n'est attendue ; EALREADY une fois la voie finie.
         fn sks_submit_keybag(&self, req: &[u8]) -> Result {
@@ -3681,7 +3681,7 @@ mod drv {
         }
 
         // write : get_capabilities (0x64 o) → `sks_submit` ; set_env (0x470 o, allow_sks>=3) → `sks_submit_setenv` ;
-        //         null_d_key (0x60 o, allow_sks=4) → `sks_submit_nulldkey` ; keybag (0x7c o create_keybag OU 0x84 o
+        //         null_d_key (0x60 o, allow_sks=4) → `sks_submit_nulldkey` ; keybag (0x80 o create_keybag OU 0x84 o
         //         make_system_keybag, allow_sks=5) → `sks_submit_keybag` (la phase du fil du probe les distingue ; la
         //         porte recontrôle la longueur par op). Longueurs toutes distinctes : aucune ambiguïté.
         fn write_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterSource<'_>) -> Result<usize> {
