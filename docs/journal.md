@@ -2674,6 +2674,7 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   marqueur en retard réparé, contenu modifié refusé, accept-store, store vide). Pas de shellcheck sur la machine.
 - Textes périmés « power-cycle requis entre deux runs » (un reboot suffit) : signalés dans le rapport, non modifiés.
 - 1er boot avec le service = script neuf → « go » d'Albert ; installation sur la partition principale = Albert.
+
 ## 2026-11-22 23:30 — agent reverseur (Opus 5.5) — SKS EP 0x12 : 1er message (get_capabilities, TAG 0x4d) décodé à l'octet, `source: kext`
 - Cible : `com.apple.driver.AppleSEPKeyStore` dans `macos/kernel.macho` = **macOS 13.5** (chaîne lue : Darwin 22.6.0,
   xnu-8796.141.3~6, RELEASE_ARM64_T6000). Outils `ksyms.py`/`kdis.py` + lecture d'octets jetable ; aucun matériel,
