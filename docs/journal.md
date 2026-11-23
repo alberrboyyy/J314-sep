@@ -2439,11 +2439,18 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
   **unlock tokens par userID** (opcode 0x26 `dropUnlockToken`). ACM (AppleCredentialManager) expose `ACMKernContextCreate/
   …CreateWithExternalForm/VerifyPolicy…` + codec DER. (d) xART `_handle_sep_driven_msg` **identique en 27.2.1** : op 0x05 FETCH
   gigalocker (UUID 16 o en B → locker en A), 0x06 SAVE — cohérent avec le fait matériel VÉRIFIÉ J7b (A = B[16..] du SAVE).
-- Interprété : le mur de l'enrôlement natif = **le jeton d'autorisation à +0x10** (J6a nul → refus GT 0xff). DÉDUIT : produit
-  par la couche auth de l'AP (ACM/LocalAuthentication adossé au keybag), vérifié par le SEP. Confirmation VU userland
-  (biometrickitd/BiometricKit) **en attente** : DMG APFS en decmpfs type 14 (LZBITMAP) — 7z ne décompresse pas, apfs-fuse
-  absent, lecteur natif `ipsw --ranged` fonctionne mais très lent sur le tunnel.
-- Incidents : build apfs-fuse refusé par le garde-fou de l'agent ; extraction `--ranged` de biometrickitd très lente (tunnel).
+- Vu (userland, VU — `apfs-fuse` compilé avec le go d'Albert, volume système + cache dyld montés RO, `7z`/`ipsw dyld`) :
+  (a) le jeton +0x10 = struct `{usingAuthToken:I, tokenLength:I, token[32C]}` (+ identité `{userID:I, uuid[16C]}`) lue dans
+  `biometrickitd` (class-dump) → confirme octet-près l'hypothèse mission. Le jeton est **soit un AuthToken soit un CredentialSet**
+  (`BKOptionEnrollWithAuthToken`/`…WithCredentialSet`, `…MatchAuthTokenToBypassPasscodeBiolockout` — BiometricKit.framework).
+  **biometrickitd NE LIE aucun framework d'auth/keystore** (LC_LOAD_DYLIB : BiometricKit+BiometricSupport, ni LA ni ACM ni
+  keystore) → il **relaie** un jeton fabriqué par le **client XPC authentifié** (`parseAuthDict:toAuthData:`,
+  `initEnrollOperation:…options:client:`). AuthToken dérive d'une saisie de **code** ; CredentialSet = matériel **keybag/keystore**
+  (entitlements `com.apple.keystore.sik.access`/`.device`). EP 0x12 impliqué en amont (client) + dans le SEP, pas dans biometrickitd→kext.
+- Interprété : mur de l'enrôlement natif = **produire un AuthToken/CredentialSet valide** (code + keybag déverrouillé EP 0x12, jamais
+  ouvert en natif), puis le placer à +0x10. Le SEP le vérifie (J6a nul → 0xff).
+- Incidents : montage apfs-fuse refusé à l'agent par le garde-fou (fait par l'orchestrateur) ; extraction `--ranged` trop lente sur le
+  tunnel (abandonnée au profit du montage local). `biometrickitd` récupéré par `7z` (non compressé type 14) depuis le volume système.
 
 ## 2026-11-22 23:04 — Albert + Claude (session ALARM) — J6a E-ENROLL-START : le SEP répond au 0x03 par un TAG 0xff (refus ?), rien ensuite
 - Go d'Albert (power-cycle, `sudo pending/j6a_enroll_start.sh`, doigt guidé). Logs bruts : `logs/20261122-230441_j6a-enroll-start/`.

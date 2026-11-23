@@ -11,7 +11,10 @@ protocole/séquence/format uniquement. Aucune clé, aucun secret, aucune donnée
   `updates.cdn-apple.com`. Déposée dans `macos/` (gitignoré, `git check-ignore macos/` = OK).
 - **kernelcache** : `macos/kc/26B131__MacBookPro18,4/kernelcache.release.Mac13,1_2_MacBookPro18,1_2_3_4` (fileset
   MH_FILESET arm64e). Désassemblé avec `ipsw macho disass -t <bundle> -s <symbole>`.
-- **userland** : cache dyld (`BiometricKit.framework`, `biometrickitd`, LocalAuthentication, …) — voir §A.
+- **userland** : `biometrickitd` (volume système de l'IPSW, monté RO via `apfs-fuse` + extrait `7z`) et
+  `BiometricKit.framework` / `BiometricSupport.framework` (cache dyld monté RO via `apfs-fuse`, lus `ipsw dyld
+  macho --strings` / `class-dump`). Voir §A. (Le decmpfs type 14 / LZBITMAP du cache dyld n'est lisible qu'avec
+  `apfs-fuse` — `7z` liste mais ne décompresse pas ce type ; `apfs-fuse` compilé localement, go d'Albert.)
 
 **Convention de statut** : **VU** = lu dans le désassemblage (adresse/symbole/immédiat) ; **DÉDUIT** = interprété
 d'après noms/contexte ; **INCONNU** = non déterminé. `source: kext` (kernelcache) / `source: userland` (dyld).
@@ -81,15 +84,18 @@ jeton à +0x10 » se trouve dans le userland (§A), pas dans le kext.
 
 Structure (taille/offsets = VU en kext ; rôles des champs = `source: userland`, §A) :
 
-| offset | taille | rôle (hypothèse de départ, mission) | statut |
+| offset | taille | rôle | statut |
 |---|---|---|---|
-| +0x00 | u32 | flags (**bit 0 lu par le kext** → drapeau d'enrôlement) | VU (bit 0) |
-| +0x04 | u32 | userID | à confirmer §A |
-| +0x08 | u32 | `usingAuthToken` | à confirmer §A |
-| +0x0c | u32 | `tokenLength` | à confirmer §A |
-| +0x10 | 32 o | **jeton** (CredentialSet 1-32 o, ou AuthToken 0/16 o) | à confirmer §A |
-| +0x30 | u32 | deviceGroup.type | à confirmer §A |
-| +0x34 | 16 o | uuid | à confirmer §A |
+| +0x00 | u32 | flags (**bit 0 lu par le kext** → drapeau d'enrôlement) | VU (kext) |
+| +0x04 | u32 | `userID` | **VU** (userland, struct identité) |
+| +0x08 | u32 | `usingAuthToken` (1 = AuthToken, 0 = CredentialSet) | **VU** (userland, type encoding A.1) |
+| +0x0c | u32 | `tokenLength` | **VU** (userland, A.1) |
+| +0x10 | 32 o | **jeton** `token[32]` = AuthToken **ou** CredentialSet | **VU** (userland, A.1/A.2) |
+| +0x30 | u32 | deviceGroup / type | DÉDUIT (hors structs vues) |
+| +0x34 | 16 o | `uuid` | **VU** (userland, struct identité `{userID, uuid[16]}`) |
+
+(Les champs +0x04/+0x34 proviennent du couple `{userID:I, uuid[16C]}` (identité) et +0x08..+0x2f du couple
+`{usingAuthToken:I, tokenLength:I, token[32C]}` (authData) lus dans `biometrickitd` ; +0x30 non directement vu.)
 
 ---
 
@@ -125,46 +131,67 @@ cohérent avec ce handler (la note `messages.md` disait « kext op 0x05/0x06 non
 
 ---
 
-## A. Userland — qui produit le jeton +0x10 (état : extraction en cours)
+## A. Userland — qui produit le jeton +0x10 (VU, `source: userland`)
 
-**Statut d'extraction (honnête).** L'IPSW public a été téléchargé et déchiffré (AEA, clés publiques `fcs-keys.json`).
-Le cache dyld (`BiometricKit.framework`, LocalAuthentication, …) et `biometrickitd` vivent dans des DMG **APFS avec
-compression decmpfs type 14 (LZBITMAP, propriétaire Apple)** : `7z` (26.06) liste mais **ne décompresse pas** le
-type 14 ; le montage APFS natif d'`ipsw` exige `apfs-fuse` (absent, build non réalisé ici). Le lecteur natif
-**`ipsw extract --ranged`** (lecture APFS par plages HTTP, décompresse le decmpfs en Go) **fonctionne** mais est
-**très lent sur le lien tunnel** (latence par requête b-tree). `biometrickitd` était en cours d'extraction par cette
-voie. → **la confirmation VU du userland reste à finaliser** ; ce qui suit est **DÉDUIT** du kext + doc publique +
-session PC partielle antérieure, à **confirmer** sur le binaire.
+**Binaires** : `biometrickitd` (`/usr/libexec/biometrickitd`, extrait du volume système de l'IPSW via `apfs-fuse`
+monté RO + `7z`, Mach-O arm64e autonome) ; `BiometricKit.framework` et `BiometricSupport.framework` (lus **dans le
+cache dyld** monté RO, `ipsw dyld macho --strings` / `class-dump`). macOS 27.2.1.
 
-**Ce qui est établi (VU, kext) et oriente la réponse :**
-1. Le kext **ne construit ni ne vérifie** le jeton : il relaie 68 octets fournis par l'userspace (§a).
-2. Le SEP gère des **unlock tokens par userID** (opcode 0x26 `dropUnlockToken`, §b) → un système d'autorisation.
+**A.1 Le jeton +0x10 = un `AuthData` ou un `CredentialSet` — VU.** Encodage de type ObjC lu dans `biometrickitd`
+(`class-dump`) : `{?="usingAuthToken"I"tokenLength"I"token"[32C]}` (= `_extendEnrollmentAuthData`) et identité
+`{?="userID"I"uuid"[16C]}` (= `_extendEnrollmentIdentity`). → **confirme octet-près l'hypothèse mission** :
+`usingAuthToken` (u32), `tokenLength` (u32), `token[32]`, plus `userID` (u32) + `uuid[16]`. Ces champs composent
+`enroll_indata_v2_t` (0x44 o).
 
-**Réponse DÉDUITE à « qui produit le jeton, à partir de quoi, comment il arrive, est-il vérifié » :**
-- **Qui** : la couche d'authentification de l'AP — `biometrickitd` obtient un **contexte/credential ACM**
-  (`AppleCredentialManager`, kext VU : `ACMKernContextCreate` / `…CreateWithExternalForm` /
-  `ACMKernContextVerifyPolicyAndCopyRequirementEx`, codec DER `acm_der_*`). Le jeton +0x10 est, selon l'hypothèse de
-  la mission, soit un **CredentialSet** (1-32 o), soit un **AuthToken** (0/16 o) — forme externe d'un contexte ACM.
-  L'alternative (SKS/AppleSEPKeyStore EP 0x12 directement, ou LocalAuthentication seul) **reste à départager sur le
-  binaire** userland. `usingAuthToken` (+0x08) choisirait la forme ; `tokenLength` (+0x0c) donnerait la taille.
-- **À partir de quoi** : un **contexte d'authentification** (déverrouillage de session / politique LA), lui-même adossé
-  au keybag utilisateur — **pas** le mot de passe en clair (le SEP reçoit un jeton d'autorisation, jamais le secret).
-- **Comment il arrive** : userspace (biometrickitd) → `enroll_indata_v2_t`+0x10 → kext (relais, §a) → SEP opcode 0x03.
-- **Vérifié par le SEP ?** : **oui, DÉDUIT** — le refus `TAG 0xff` sur un 0x03 à jeton nul (J6a, §c) montre que le SEP
-  valide bien ce contenu avant d'accepter l'enrôlement. Un 0x03 **accepté** exige donc un jeton d'autorisation **non
-  nul et valide pour le contexte courant** (session déverrouillée), que seul l'AP authentifié peut produire.
+**A.2 Deux formes de jeton, choisies par option client — VU (`BiometricKit.framework`, chaînes).** Clés d'option :
+`BKOptionEnrollWithAuthToken` et `BKOptionEnrollWithCredentialSet` (enrôlement) ; `BKOptionAuthWithAuthToken` /
+`BKOptionAuthWithCredentialSet` (match) ; `BKOptionMatchAuthTokenForExtendEnrollment`,
+`BKOptionMatchCredentialSetForExtendEnrollment`, **`BKOptionMatchAuthTokenToBypassPasscodeBiolockout`**. → le jeton
+d'enrôlement est **soit un AuthToken** (jeton d'autorisation, `usingAuthToken=1`) **soit un CredentialSet** (matériel
+de credential du trousseau/keybag, `usingAuthToken=0`). VU.
 
-> À FINALISER sur le binaire userland (dès extraction) : offsets exacts de `enroll_indata_v2_t` (confirmer
-> +0x04 userID, +0x08 usingAuthToken, +0x0c tokenLength, +0x10 token[32], +0x30 deviceGroup, +0x34 uuid) ; l'API
-> précise d'où biometrickitd tire le jeton (ACM vs SKS vs LA) ; le format du `0x06` (match, 0xa7 o) et son nonce.
+**A.3 Qui produit le jeton : le CLIENT, pas biometrickitd — VU (décisif).** `biometrickitd` **ne lie AUCUN** framework
+d'authentification ni keystore (liste `LC_LOAD_DYLIB` VU : Foundation/AppKit/IOKit/OpenDirectory + **BiometricKit** +
+**BiometricSupport** + swift ; **ni** LocalAuthentication, **ni** AppleCredentialManager, **ni** Security/keystore). Il
+se borne à **parser le jeton reçu de son client XPC** : méthode `-[BiometricKitXPCServerMesa parseAuthDict:toAuthData:]`
+(VU) remplit la struct `authData` depuis le dictionnaire d'options de la requête ; `initEnrollOperation:biometricType:
+userID:options:client:` (VU) prend ce jeton dans `options`. → **le jeton est produit en amont, par le processus
+client authentifié** (couche LocalAuthentication/ACM : c'est elle qui tient `ACMKernContext*`, kext §a), **pas** par
+biometrickitd. biometrickitd/BiometricKit ne font que **relayer** le blob opaque jusqu'au kext puis au SEP.
+
+**A.4 À partir de quoi.** VU indirect : `BKOptionMatchAuthTokenToBypassPasscodeBiolockout` ⇒ l'**AuthToken dérive d'une
+saisie de code** (il « bypass » le biolockout après code). Le **CredentialSet** = matériel de credential du
+**keybag/keystore** (entitlements VU de biometrickitd : `com.apple.keystore.sik.access`, `com.apple.keystore.device`).
+Dans les deux cas, biometrickitd ne voit **jamais le mot de passe en clair**, seulement le **jeton d'autorisation**
+opaque fabriqué par la couche d'auth du client.
+
+**A.5 Comment il arrive au SEP.** client (LA/ACM, authentifié) → dict d'options XPC (`BKOptionEnrollWith…`) →
+`parseAuthDict:toAuthData:` → struct `authData` → BiometricKit/BiometricSupport assemblent `bm_cmd_t`/`enroll_indata_v2_t`
+→ kext `commandStartEnroll` (relais, §a) → **SEP opcode 0x03**.
+
+**A.6 EP 0x12 (SKS) ?** biometrickitd **ne parle pas** à SKS/keystore lui-même (aucun lien, A.3). Le **CredentialSet**
+est néanmoins du **matériel de keybag** : sa production (côté client) et la **vérification du jeton par le SEP** passent
+par le keystore/keybag — donc l'EP 0x12 est impliqué **en amont (client)** et **dans le SEP**, pas dans le trajet
+biometrickitd→kext. VU (linkage) + DÉDUIT (rôle keystore).
+
+**A.7 Vérifié par le SEP — VU (comportement) + §c.** Le refus `TAG 0xff` sur un 0x03 à jeton nul (J6a) = le SEP valide
+le jeton avant d'accepter l'enrôlement. Un 0x03 **accepté** exige un `AuthToken`/`CredentialSet` **non nul et valide
+pour le contexte courant**, que seul un client authentifié (code + keybag déverrouillé) peut fournir.
+
+> Non épluché octet-près (hors protocole) : le corps de `parseAuthDict:toAuthData:` (clés exactes du dict) et
+> l'assemblage de `enroll_indata_v2_t` dans BiometricSupport ; le `0x06` (match, 0xa7 o) utilise `acmContext`
+> (`operation.acmContext…`, `MatchModeACM`, VU) — format/nonce non détaillés ici.
 
 ---
 
 ## Ce qu'il faudrait pour un `0x03` ACCEPTÉ (synthèse, sans rien lancer)
-1. **Un jeton d'autorisation non nul à +0x10** (le J6a nul → refus GT `0xff`). C'est le vrai bloquant.
-2. Ce jeton doit être **produit par une authentification réussie de l'AP** (ACM/LocalAuthentication adossé au keybag
-   déverrouillé) — notre route native n'a **jamais** ouvert SKS/keybag (EP 0x12). → produire un jeton valide suppose
-   soit d'implémenter cette couche (SKS + ACM), soit de capturer/rejouer un contexte valide (anti-rejeu probable).
-3. Les autres champs de `enroll_indata_v2_t` (userID, deviceGroup, uuid) correctement remplis (vs 68 o nuls).
+1. **Un `AuthToken` ou un `CredentialSet` non nul et valide à +0x10** (`usingAuthToken`+`tokenLength` cohérents) — le
+   J6a nul → refus GT `0xff`. C'est le vrai bloquant (VU, §A).
+2. Ce jeton est **produit par le processus client authentifié** (LocalAuthentication/ACM), **pas** par biometrickitd :
+   l'**AuthToken** dérive d'une **saisie de code** ; le **CredentialSet** est du **matériel de keybag/keystore**. Notre
+   route native n'a **jamais** ouvert SKS/keybag (EP 0x12). → produire un jeton valide suppose soit d'implémenter cette
+   couche (keybag déverrouillé par code + ACM), soit de capturer/rejouer un jeton valide (anti-rejeu probable → risque
+   d'échec).
+3. Champs `userID`/`uuid` corrects (structs VU) ; +0x30 (deviceGroup) à caler.
 4. Préconditions fil : device Mesa présent + init capteur faite (déjà VÉRIFIÉ natif, J8) ; **aucun** opcode sbio
-   préalable requis avant 0x03 (VU). Le mur est le **jeton**, pas la séquence.
+   préalable requis avant 0x03 (VU). Le mur est le **jeton d'autorisation**, pas la séquence.
