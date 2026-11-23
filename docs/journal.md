@@ -2743,3 +2743,17 @@ projet 100% Claude → [[asahi-ban-pas-secret]]).
 - `pending/j9a_sks_getcap_chained.sh STORE` (dérivé de J7b) : refuse si service actif, sepd lancé, `/etc/sep-touchid/disabled`
   absent ou STORE = `/var/lib/sepd`. Ouvert/INCONNU : horloge de `_get_usec_time` (choix : CLOCK_MONOTONIC µs), forme du
   cdhash pour un appel noyau (choix : SHA-1 de l'uniqueid 0). Classe neuve (écriture 0x12) → 1er run = go d'Albert.
+
+## 2026-11-23 10:15 — Albert + Claude (session ALARM) — 🎯 J9a : 1er message SKS (get_capabilities) accepté par le SEP
+- Go d'Albert (service désactivé + reboot, `sudo pending/j9a_sks_getcap_chained.sh /var/lib/sepd-run-20261122-230441`).
+  Logs bruts : `logs/20261123-101503_j9a-sks-getcap-chained/`. Binaires `~/kbuild/j9` (sep_native.ko `145804d0…`, sks_getcap `c25a6193…`).
+- VU : boot chaîné = J7b (8 lockers sans UUID, **0 SAVE**, store inchangé) ; skdl/sks/scrd ouverts (4 acks chacun).
+- VU : `> 0x12 TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000` (horodatage 56643215 µs monotone, uniqueid 0, uid 0, cdhash =
+  SHA-1 de l'uniqueid) → **`< 0x12 TAG 0xcd TYPE 0x01 PARAM 0 DATA 0x005c0001`** immédiatement : PARAM 0 (pas d'erreur),
+  drapeaux d'appel 0x0001, longueur 0x5c. B12 : L = **0x48** (en-tête v1, comme DÉDUIT §1.6.4), condensé **OK** (recalculé),
+  **état 0**, **theirs = 2** (négociée v2), blob vide. En-tête du SEP : horodatage 3134119220 µs (horloge propre du SEP),
+  uniqueid 0, uid 0, et il **renvoie notre cdhash** (`05fe4057…`, B12 +0x38).
+- VU : puis 0x73 → **sbio VIVANT** (rien de cassé côté sbio).
+- ⇒ (n=1) le SEP accepte un get_capabilities d'un hôte non macOS avec des champs processus neutres (uniqueid/uid 0, cdhash
+  dérivé) ; il ne rejette ni sur l'horodatage ni sur le cdhash. La disposition §1.6 (c9) est confirmée sur matériel ;
+  « theirs » = 2 (était INCONNU). Le protocole SKS v2 est négociable depuis Linux.

@@ -1,0 +1,17 @@
+sks_getcap: /dev/sep_sks ouvert ; attente du moment où le noyau demande la requête
+sks_getcap: requête acceptée par le noyau après 10 essai(s) EAGAIN :
+sks_getcap: requête get_capabilities (0x64 o) — mot > EP 0x12 TAG 0x4d TYPE 0x01 PARAM 0 DATA 0x00640000
+sks_getcap:   0x00 longueur en-tête 0x50 ; 0x14 version 1 ; 0x20 drapeaux 0 ; 0x24 champ +0x20 0 ; 0x4c 0 ; 0x54 état 0 ; 0x58 u64 1 ; 0x60 blob 0
+sks_getcap:   0x04 condensé SHA-256/16 = 721de5a76af45a032a6255b5dc77cc7f
+sks_getcap:   0x18 horodatage = 56643215 µs ; 0x2c uniqueid = 0x0 ; 0x34 uid = 0
+sks_getcap:   0x38 cdhash = 05fe405753166f125559e7c9ac558654f107c7e9 (SHA-1 de l'uniqueid (chemin « pas de processus »))
+sks_getcap:   +0x000 : 50 00 00 00 72 1d e5 a7 6a f4 5a 03 2a 62 55 b5
+sks_getcap:   +0x010 : dc 77 cc 7f 01 00 00 00 8f 4e 60 03 00 00 00 00
+sks_getcap:   +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_getcap:   +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+sks_getcap:   +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+sks_getcap:   +0x050 : 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00
+sks_getcap:   +0x060 : 00 00 00 00
+sks_getcap: écrit /home/albert/Desktop/sep-touchid/logs/20261123-101503_j9a-sks-getcap-chained/sks_getcap_request.bin
+sks_getcap: écrit /home/albert/Desktop/sep-touchid/logs/20261123-101503_j9a-sks-getcap-chained/sks_getcap_outcome.bin
+sks_getcap rc=0 (0 = RÉPONDU, 1 = autre verdict, 2 = rien écrit / erreur)

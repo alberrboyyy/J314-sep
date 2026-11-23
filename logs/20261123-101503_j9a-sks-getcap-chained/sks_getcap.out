@@ -1,0 +1,11 @@
+VERDICT sks getcap : RÉPONDU (PARAM 0, état 0, theirs 2 → négociée v2 ; L 0x48, version d'en-tête 1, condensé OK, blob 0 o ; longueur 0x5c, drapeaux d'appel 0x0001, TAG 0xcd) mot 0x005c00010001cd12
+  en-tête du SEP : horodatage 3134119220 µs, drapeaux 0x0, uniqueid 0x0, uid 0
+instantané de B12 (0x80 o) :
+  +0x000 : 48 00 00 00 c8 d4 c2 ee 17 7a d2 36 a9 44 b9 98
+  +0x010 : b3 14 47 5c 01 00 00 00 34 dd ce ba 00 00 00 00
+  +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+  +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+  +0x050 : 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x060 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  +0x070 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
