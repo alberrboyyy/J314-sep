@@ -1,0 +1,141 @@
+sks_setenv: cpx-encryption-mode = 2 (--cpx 2)
+sks_setenv: /dev/sep_sks ouvert
+sks_setenv: get_capabilities accepté par le noyau après 10 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_getcap_request.bin
+sks_setenv: set_env accepté par le noyau après 1 essai(s) EAGAIN
+sks_setenv: set_env (0x470 o) — mot > EP 0x12 TAG 0x2a TYPE 0x02 PARAM 0 DATA 0x04700000
+sks_setenv:   en-tête v2 ; 0x04 condensé v2 = 06501be1fb1647f9f1b2b4fb6893569d
+sks_setenv:   état 0 ; u64 1 ; blob 0x40c o : version 1, cpx-encryption-mode 2, mode 4, 0x400 o réservés nuls
+sks_setenv:   horodatage 461780366 µs ; uniqueid 0x0 ; uid 0 ; cdhash 05fe405753166f125559e7c9ac558654f107c7e9 (SHA-1 de l'uniqueid)
+sks_setenv:   +0x000 : 50 00 00 00 06 50 1b e1 fb 16 47 f9 f1 b2 b4 fb
+sks_setenv:   +0x010 : 68 93 56 9d 02 00 00 00 8e 35 86 1b 00 00 00 00
+sks_setenv:   +0x020 : 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+sks_setenv:   +0x030 : 00 00 00 00 00 00 00 00 05 fe 40 57 53 16 6f 12
+sks_setenv:   +0x040 : 55 59 e7 c9 ac 55 86 54 f1 07 c7 e9 00 00 00 00
+sks_setenv:   +0x050 : 00 00 00 00 00 00 00 00 01 00 00 00 00 00 00 00
+sks_setenv:   +0x060 : 0c 04 00 00 01 00 00 00 02 00 00 00 04 00 00 00
+sks_setenv:   +0x070 .. +0x470 : 0x400 o à zéro (réservé)
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_setenv_request.bin
+sks_setenv: balayage create_keybag : 40 couple(s) (class, field2) à essayer, STOP au 1er PARAM 0
+sks_setenv: create_keybag balayage n°1 (class=0x00000001 field2=0xfffffff6) accepté par le noyau après 1 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_01_c00000001_ffffffff6_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_01_c00000001_ffffffff6_outcome.bin
+sks_setenv: create_keybag balayage n°2 (class=0x00000002 field2=0xfffffff6) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_02_c00000002_ffffffff6_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_02_c00000002_ffffffff6_outcome.bin
+sks_setenv: create_keybag balayage n°3 (class=0x00000003 field2=0xfffffff6) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_03_c00000003_ffffffff6_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_03_c00000003_ffffffff6_outcome.bin
+sks_setenv: create_keybag balayage n°4 (class=0x00000004 field2=0xfffffff6) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_04_c00000004_ffffffff6_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_04_c00000004_ffffffff6_outcome.bin
+sks_setenv: create_keybag balayage n°5 (class=0x00000001 field2=0xfffffff5) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_05_c00000001_ffffffff5_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_05_c00000001_ffffffff5_outcome.bin
+sks_setenv: create_keybag balayage n°6 (class=0x00000002 field2=0xfffffff5) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_06_c00000002_ffffffff5_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_06_c00000002_ffffffff5_outcome.bin
+sks_setenv: create_keybag balayage n°7 (class=0x00000003 field2=0xfffffff5) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_07_c00000003_ffffffff5_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_07_c00000003_ffffffff5_outcome.bin
+sks_setenv: create_keybag balayage n°8 (class=0x00000004 field2=0xfffffff5) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_08_c00000004_ffffffff5_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_08_c00000004_ffffffff5_outcome.bin
+sks_setenv: create_keybag balayage n°9 (class=0x00000001 field2=0xfffffff4) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_09_c00000001_ffffffff4_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_09_c00000001_ffffffff4_outcome.bin
+sks_setenv: create_keybag balayage n°10 (class=0x00000002 field2=0xfffffff4) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_10_c00000002_ffffffff4_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_10_c00000002_ffffffff4_outcome.bin
+sks_setenv: create_keybag balayage n°11 (class=0x00000003 field2=0xfffffff4) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_11_c00000003_ffffffff4_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_11_c00000003_ffffffff4_outcome.bin
+sks_setenv: create_keybag balayage n°12 (class=0x00000004 field2=0xfffffff4) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_12_c00000004_ffffffff4_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_12_c00000004_ffffffff4_outcome.bin
+sks_setenv: create_keybag balayage n°13 (class=0x00000001 field2=0xfffffff3) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_13_c00000001_ffffffff3_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_13_c00000001_ffffffff3_outcome.bin
+sks_setenv: create_keybag balayage n°14 (class=0x00000002 field2=0xfffffff3) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_14_c00000002_ffffffff3_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_14_c00000002_ffffffff3_outcome.bin
+sks_setenv: create_keybag balayage n°15 (class=0x00000003 field2=0xfffffff3) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_15_c00000003_ffffffff3_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_15_c00000003_ffffffff3_outcome.bin
+sks_setenv: create_keybag balayage n°16 (class=0x00000004 field2=0xfffffff3) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_16_c00000004_ffffffff3_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_16_c00000004_ffffffff3_outcome.bin
+sks_setenv: create_keybag balayage n°17 (class=0x00000001 field2=0x00000001) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_17_c00000001_f00000001_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_17_c00000001_f00000001_outcome.bin
+sks_setenv: create_keybag balayage n°18 (class=0x00000002 field2=0x00000001) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_18_c00000002_f00000001_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_18_c00000002_f00000001_outcome.bin
+sks_setenv: create_keybag balayage n°19 (class=0x00000003 field2=0x00000001) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_19_c00000003_f00000001_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_19_c00000003_f00000001_outcome.bin
+sks_setenv: create_keybag balayage n°20 (class=0x00000004 field2=0x00000001) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_20_c00000004_f00000001_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_20_c00000004_f00000001_outcome.bin
+sks_setenv: create_keybag balayage n°21 (class=0x00000001 field2=0x00000002) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_21_c00000001_f00000002_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_21_c00000001_f00000002_outcome.bin
+sks_setenv: create_keybag balayage n°22 (class=0x00000002 field2=0x00000002) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_22_c00000002_f00000002_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_22_c00000002_f00000002_outcome.bin
+sks_setenv: create_keybag balayage n°23 (class=0x00000003 field2=0x00000002) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_23_c00000003_f00000002_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_23_c00000003_f00000002_outcome.bin
+sks_setenv: create_keybag balayage n°24 (class=0x00000004 field2=0x00000002) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_24_c00000004_f00000002_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_24_c00000004_f00000002_outcome.bin
+sks_setenv: create_keybag balayage n°25 (class=0x00000001 field2=0x00000003) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_25_c00000001_f00000003_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_25_c00000001_f00000003_outcome.bin
+sks_setenv: create_keybag balayage n°26 (class=0x00000002 field2=0x00000003) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_26_c00000002_f00000003_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_26_c00000002_f00000003_outcome.bin
+sks_setenv: create_keybag balayage n°27 (class=0x00000003 field2=0x00000003) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_27_c00000003_f00000003_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_27_c00000003_f00000003_outcome.bin
+sks_setenv: create_keybag balayage n°28 (class=0x00000004 field2=0x00000003) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_28_c00000004_f00000003_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_28_c00000004_f00000003_outcome.bin
+sks_setenv: create_keybag balayage n°29 (class=0x00000001 field2=0x00000004) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_29_c00000001_f00000004_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_29_c00000001_f00000004_outcome.bin
+sks_setenv: create_keybag balayage n°30 (class=0x00000002 field2=0x00000004) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_30_c00000002_f00000004_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_30_c00000002_f00000004_outcome.bin
+sks_setenv: create_keybag balayage n°31 (class=0x00000003 field2=0x00000004) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_31_c00000003_f00000004_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_31_c00000003_f00000004_outcome.bin
+sks_setenv: create_keybag balayage n°32 (class=0x00000004 field2=0x00000004) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_32_c00000004_f00000004_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_32_c00000004_f00000004_outcome.bin
+sks_setenv: create_keybag balayage n°33 (class=0x00000001 field2=0xffffffff) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_33_c00000001_fffffffff_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_33_c00000001_fffffffff_outcome.bin
+sks_setenv: create_keybag balayage n°34 (class=0x00000002 field2=0xffffffff) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_34_c00000002_fffffffff_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_34_c00000002_fffffffff_outcome.bin
+sks_setenv: create_keybag balayage n°35 (class=0x00000003 field2=0xffffffff) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_35_c00000003_fffffffff_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_35_c00000003_fffffffff_outcome.bin
+sks_setenv: create_keybag balayage n°36 (class=0x00000004 field2=0xffffffff) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_36_c00000004_fffffffff_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_36_c00000004_fffffffff_outcome.bin
+sks_setenv: create_keybag balayage n°37 (class=0x00000001 field2=0xfffffffe) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_37_c00000001_ffffffffe_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_37_c00000001_ffffffffe_outcome.bin
+sks_setenv: create_keybag balayage n°38 (class=0x00000002 field2=0xfffffffe) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_38_c00000002_ffffffffe_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_38_c00000002_ffffffffe_outcome.bin
+sks_setenv: create_keybag balayage n°39 (class=0x00000003 field2=0xfffffffe) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_39_c00000003_ffffffffe_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_39_c00000003_ffffffffe_outcome.bin
+sks_setenv: create_keybag balayage n°40 (class=0x00000004 field2=0xfffffffe) accepté par le noyau après 0 essai(s) EAGAIN
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_40_c00000004_ffffffffe_request.bin
+sks_setenv: écrit /home/albert/Desktop/sep-touchid/logs/20261124-184232_j13-sks-create-sweep/sks_sweep_40_c00000004_ffffffffe_outcome.bin
+sks_setenv: balayage terminé : tous les couples ont échoué (aucun PARAM 0) ; le noyau passe au 0x73 (aucun keybag créé)
+sks_setenv rc=1 (0 = un create_keybag a rendu un handle [PARAM 0], 1 = tous échoués, 2 = rien écrit / erreur)

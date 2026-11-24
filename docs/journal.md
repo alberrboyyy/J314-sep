@@ -14,6 +14,21 @@ Format :
 
 ---
 
+## 2026-11-24 18:42 — Albert + Claude (ALARM) — J13 : BALAYAGE create_keybag (class×field2) → 40/40 = -0xb INVARIANT ; piste « scalaire » RÉFUTÉE
+- Trace : logs/20261124-184232_j13-sks-create-sweep/ (allow_sks=8, sep_native.ko sha 6b749ee9…, boot chaîné store -230441).
+- Fait : boot chaîné natif (service désactivé, reboot d'Albert) ; getcap + set_env ACCEPTÉS (v2) ; puis 40 `create_keybag`
+  (TAG 0x01, variante 4, compteur de transaction INCRÉMENTÉ 3→0x2a) balayant class ∈ {1,2,3,4} × field2 ∈
+  {1,2,3,4, 0xfffffff6(-10), 0xfffffff5(-11), 0xfffffff4(-12), 0xfffffff3(-13), 0xffffffff(-1), 0xfffffffe(-2)}.
+  handle_y=0 et blobs VIDES sur tous (la porte `check_createkeybag` force les blobs vides). STOP au 1er PARAM 0 (jamais atteint).
+- Vu : **40/40 → PARAM=-11 (-0xb), strictement identique** quel que soit (class, field2). Jamais de SILENCE, jamais un
+  autre code. **0 SAVE** (store byte-identique au backup `.avant-j13`). sbio VIVANT ensuite (B8 +0x14=0x73). rc outil=1.
+- Interprété : **le -0xb de create_keybag est INVARIANT à class et field2 → ces scalaires ne sont PAS l'argument manquant
+  (VÉRIFIÉ par expérience, n=40).** Reste non testé : (a) `handle_y` (gardé 0 partout), (b) un **blob de données non vide**
+  (b1/b2) — la porte force les blobs vides, donc le §9.4 « il faut un blob » n'a PAS pu être testé par ce run. Cohérent
+  avec §9.5 (create_keybag 0x01 = CreateWithData, pas le créateur à-neuf ; le créateur vide = make_system 0x0d, qui exige
+  un handle). Prochaine étape cheap AVANT DFU : sonder un blob non vide (relâcher la porte pour 1 blob) ± balayer handle_y.
+- Incidents : — (aucun ; reboot préalable d'Albert, SEP en ROM ; 0 SAVE ; service réactivable).
+
 ## 2026-11-23 (soir, suite) — Claude (ALARM) + reverseur — PISTE A et PISTE B investiguées jusqu'au bout : épuisées (le byte-exact create/keybag vit dans SEPOS → seule une capture macOS vivant le donne)
 - Trace : — (exploration disque LECTURE SEULE via apfs-fuse ; reverse hors-ligne ; rien émis au SEP, rien passé en `vérifié`, pas de commit avant celui-ci).
 - Fait : (1) **PISTE B** — recompilé `apfs-fuse`+`apfsutil` (scratchpad), monté en RO (Albert a tapé `sudo`) les volumes

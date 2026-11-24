@@ -1,0 +1,906 @@
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: loading out-of-tree module taints kernel.
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: sepfw = /reserved-memory/sep-firmware [mem 0x10004b44000-0x100050f3fff], phandle 0x127 ; manifestes présents
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: mboxes = 0x35 -> /soc/mbox@396408000
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: iommus = 0x36 -> /soc/iommu@3952c0000
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: power-domains = 0x37 -> /soc/power-management@28e580000/power-controller@c00
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: stream id DART = 0
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: phandle 0x131 donné (en mémoire) à /soc/sep@396400000
+Nov 24 18:42:32 alarm kernel: sep_native_ovl: overlay appliqué, ret=0 id=1
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: trouvé : sepfw phys 0x10004b44000 taille 0x5b0000, local-policy-manifest 0xb7b o, iboot-manifest 0x15cc o
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: shmem 0x30000 o allouée, IOVA 0xfffc0000 (magic panique [67, 73, 78, 80])
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: OOL 0x13 alloués : A IOVA 0xfffb8000, B IOVA 0xfffb0000
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: OOL 0x08 alloués : A8 IOVA 0xfffac000, B8 IOVA 0xfffa8000
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: OOL 'skdl' alloués : A IOVA 0xfffa4000, B IOVA 0xfffa0000, 0x4000 o chacun
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: OOL 'sks' alloués : A IOVA 0xfff98000, B IOVA 0xfff90000, 0x8000 o chacun
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: OOL 'scrd' alloués : A IOVA 0xfff8c000, B IOVA 0xfff88000, 0x4000 o chacun
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: mailbox 'mbox' prise (réception active, rien envoyé)
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: allow_boot=1 : séquence de boot m1n1 (GET_STATUS/TZ0/GET_STATUS/IMG4+SET_SHMEM)
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: > GET_STATUS : 0x00000000000200ff
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: GET_STATUS #1 : TAG 0x00 TYPE 0x66 DATA 0x1 (OK)
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: > BOOT_TZ0 : 0x00000000000500ff
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: BOOT_TZ0 ack 0x69 : TAG 0x00 TYPE 0x69 DATA 0x0 (OK)
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: BOOT_TZ0 ack 0xD2 : TAG 0x00 TYPE 0xd2 DATA 0x2 (OK)
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: > GET_STATUS : 0x00000000000200ff
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: GET_STATUS #2 : TAG 0x00 TYPE 0x66 DATA 0x2 (OK)
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: firmware mappé : phys 0x10004b44000 taille 0x5b0000 → IOVA 0xff800000
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: > BOOT_IMG4 : 0x000ff800000600ff
+Nov 24 18:42:32 alarm kernel: sep_native soc:sep-native: > SET_SHMEM : 0x000fffc0001800fe
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: BOOT_IMG4 ack 0x6A : TAG 0x00 TYPE 0x6a DATA 0x0 (OK)
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: firmware démappé après 0x6A (comme m1n1)
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: SEPOS lancé
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x14 = 'hibe'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x14 tailles 0x01010101
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x18 = 'stac'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x18 tailles 0x02020202
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x00 = 'cntl'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x00 tailles 0x00000000
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x10 = 'xars'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x10 tailles 0x02020202
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x13 = 'xarm'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x13 tailles 0x02020202
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: xarm < seq 1 TAG 0x02 TYPE 0x0e PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x15 = 'pnon'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x15 tailles 0x05050707
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x0d (rien envoyé)
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x29 (rien envoyé)
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0e = 'hdcp'
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0e tailles 0x01010101
+Nov 24 18:42:33 alarm kernel: sep_native soc:sep-native: CNTL spontané connu TYPE 0x10 (rien envoyé)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: ouverture 0x13 : A IOVA 0xfffb8000, B IOVA 0xfffb0000, 0x8000 o chacun
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL SECMODE : 0x0000000000140100
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0x3
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A taille : 0x0000800013040200
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x8000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A adresse : 0x000fffb813020300
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfffb8
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B taille : 0x0000800013050400
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x8000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B adresse : 0x000fffb013030500
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfffb0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: 0x13 ouvert ; requêtes en attente : 1
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: /dev/sep_native prêt (lancer sepd) ; ACK des SAVE : AUTORISÉ
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: /dev/sep_sks prêt (lancer sks_setenv run --sweep (J13 : BALAYAGE create_keybag, class/field2 variés, STOP au 1er PARAM 0))
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: /dev/sep_sks ouvert
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: /dev/sep_native ouvert (1 requête(s) en attente)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010000000213
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 1 TYPE 0x00 PARAM 0x00 DATA 0x00000100 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 2 TAG 0x01 TYPE 0x13 PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000000000113
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 2 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (A 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 3 TAG 0x03 TYPE 0x00 PARAM 0x00 DATA 0x00000100 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00000101b5000313
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 3 TYPE 0x00 PARAM 0xb5 DATA 0x00000101 (A 437 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 4 TAG 0x04 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000011000413
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 4 TYPE 0x00 PARAM 0x11 DATA 0x00000000 (A 17 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 5 TAG 0x00 TYPE 0x1d PARAM 0x6f DATA 0x00736269 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073620000160013
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 5 TYPE 0x16 PARAM 0x00 DATA 0x00736200 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'sbio' acquittée (déclencheur de l'ouverture précoce)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x08 = 'sbio'
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sbio annoncé (EP 0x08) ; ouverture quand le xART sera calme
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x08 tailles 0x01010101
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sbio : ouverture PRÉCOCE (ack 0x1d 'sbio' envoyé) (0 requête(s) 0x13 en attente) ; 0x08 : A8 IOVA 0xfffac000, B8 IOVA 0xfffa8000, 0x4000 o chacun
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A8 taille : 0x0000400008040600
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x06 DATA 0x4000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A8 adresse : 0x000fffac08020700
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x07 DATA 0xfffac
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B8 taille : 0x0000400008050800
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x08 DATA 0x4000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B8 adresse : 0x000fffa808030100
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0xfffa8
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: 0x08 ouvert ; mots sbio reçus jusqu'ici : 0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 6 TAG 0x00 TYPE 0x1d PARAM 0x6c DATA 0x00736b64 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x17 = 'skdl'
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x17 tailles 0x01010101
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 7 TAG 0x00 TYPE 0x1d PARAM 0x20 DATA 0x00737365 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0c = 'sse'
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0c tailles 0x01010101
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 8 TAG 0x00 TYPE 0x1d PARAM 0x20 DATA 0x00736b73 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00736b0000160013
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 6 TYPE 0x16 PARAM 0x00 DATA 0x00736b00 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'skdl' acquittée
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : ouverture de 'skdl' (EP 0x17) : A IOVA 0xfffa4000, B IOVA 0xfffa0000, 0x4000 o chacun ; 2 requête(s) 0x13 en attente
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A17 taille : 0x0000400017040200
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x4000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A17 adresse : 0x000fffa417020300
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 9 TAG 0x00 TYPE 0x1d PARAM 0x64 DATA 0x00736372 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfffa4
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B17 taille : 0x0000400017050400
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073730000160013
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 7 TYPE 0x16 PARAM 0x00 DATA 0x00737300 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x4000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B17 adresse : 0x000fffa017030500
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfffa0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : 'skdl' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : 0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x00736b0000160013
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 8 TYPE 0x16 PARAM 0x00 DATA 0x00736b00 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'sks' acquittée
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0073630000160013
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 9 TYPE 0x16 PARAM 0x00 DATA 0x00736300 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: annonce 0x1d 'scrd' acquittée
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0a = 'scrd'
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x0a tailles 0x01010101
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 10 TAG 0x05 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x000001005a000513
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 10 TYPE 0x00 PARAM 0x5a DATA 0x00000100 (A 90 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 11 TAG 0x06 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x000001005a000613
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 11 TYPE 0x00 PARAM 0x5a DATA 0x00000100 (A 90 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 12 TAG 0x07 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010255000713
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 12 TYPE 0x00 PARAM 0x55 DATA 0x00000102 (A 597 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 13 TAG 0x08 TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010255000813
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 13 TYPE 0x00 PARAM 0x55 DATA 0x00000102 (A 597 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 14 TAG 0x09 TYPE 0x07 PARAM 0x10 DATA 0x00000000 (B 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000000000000913
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 14 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (A 0 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 15 TAG 0x0a TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010171000a13
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 15 TYPE 0x00 PARAM 0x71 DATA 0x00000101 (A 369 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 16 TAG 0x0b TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010171000b13
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 16 TYPE 0x00 PARAM 0x71 DATA 0x00000101 (A 369 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x12 = 'sks'
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: découverte : EP 0x12 tailles 0x02010201
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : ouverture de 'sks' (EP 0x12) : A IOVA 0xfff98000, B IOVA 0xfff90000, 0x8000 o chacun ; 0 requête(s) 0x13 en attente
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A12 taille : 0x0000800012040600
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x06 DATA 0x8000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A12 adresse : 0x000fff9812020700
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x07 DATA 0xfff98
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B12 taille : 0x0000800012050800
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x08 DATA 0x8000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B12 adresse : 0x000fff9012030100
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x01 DATA 0xfff90
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : 'sks' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : 0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : ouverture de 'scrd' (EP 0x0a) : A IOVA 0xfff8c000, B IOVA 0xfff88000, 0x4000 o chacun ; 0 requête(s) 0x13 en attente
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A0a taille : 0x000040000a040200
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x02 DATA 0x4000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL A0a adresse : 0x000fff8c0a020300
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x03 DATA 0xfff8c
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B0a taille : 0x000040000a050400
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x04 DATA 0x4000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > CNTL B0a adresse : 0x000fff880a030500
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: CNTL ack TAG 0x05 DATA 0xfff88
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : 'scrd' ouvert (4 acks) ; mots reçus sur cet EP jusqu'ici : 0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks getcap : /dev/sep_sks attend la requête get_capabilities (0x64 o, 20000 ms max)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks getcap : requête acceptée (horodatage 461760171 µs, uniqueid 0x0, uid 0)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks get_capabilities (TAG 0x4d) : 0x0064000000014d12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks getcap > EP 0x12 TAG 0x4d TYPE 0x01 PARAM 0x00 DATA 0x00640000 ; A12 = 0x64 o (horodatage 461760171 µs, uniqueid 0x0, uid 0, cdhash SHA-1 de l'uniqueid, condensé 544c7ad696ce2d1d834305edd0ccd91e) ; aucun autre mot vers 0x12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore : écoute 10000 ms (après UN get_capabilities vers 0x12 ; rien d'autre envoyé à 0x17/0x12/0x0a) ; ouverts skdl true sks true scrd true
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0xcd TYPE 0x01 PARAM 0x00 DATA 0x005c0001 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x4d txn 0x01 len 0x5c flag 0x1) : 0x005c00010001cd12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks getcap < réponse appariée : TAG 0xcd (= 0xcd) TYPE 0x01 PARAM 0 DATA 0x005c0001 (longueur 0x5c, drapeaux d'appel 0x0001) : 0x005c00010001cd12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B keystore après un mot : 44 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x48 total 0x6845d4a5 offset 0x2a4f91d4 opcode 0x1 fragment 0xd28027f5
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x000 : 00000048 6845d4a5 2a4f91d4 c10ad420
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x010 : b41e208e 00000001 d28027f5 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x050 : 00000002 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B keystore en fin d'écoute : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x000 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x010 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x030 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x040 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   skdl+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B keystore en fin d'écoute : 44 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x48 total 0x6845d4a5 offset 0x2a4f91d4 opcode 0x1 fragment 0xd28027f5
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x000 : 00000048 6845d4a5 2a4f91d4 c10ad420
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x010 : b41e208e 00000001 d28027f5 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x050 : 00000002 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B keystore en fin d'écoute : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x000 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x010 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x030 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x040 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   scrd+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x000 : 00000048 6845d4a5 2a4f91d4 c10ad420
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x010 : b41e208e 00000001 d28027f5 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x050 : 00000002 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 (instantané à la réponse) +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: VERDICT sks getcap : RÉPONDU (PARAM 0, état 0x0, theirs 2 → négociée v2 ; L 0x48, version d'en-tête 1, condensé OK, blob 0 o ; longueur 0x5c, drapeaux d'appel 0x0001, TAG 0xcd) : 0x005c00010001cd12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks setenv : /dev/sep_sks attend la requête set_env (0x470 o, 20000 ms max)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks setenv : requête acceptée (horodatage 461780327 µs, uniqueid 0x0, uid 0, cpx-encryption-mode 2)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks set_env (TAG 0x2a) : 0x0470000000022a12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks setenv > EP 0x12 TAG 0x2a TYPE 0x02 PARAM 0x00 DATA 0x04700000 ; A12 = 0x470 o (horodatage 461780327 µs, uniqueid 0x0, uid 0, cpx-encryption-mode 2, condensé v2 b1abe32b4363cd14d6ea5324ecbf9ced) ; aucun autre mot vers 0x12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0xaa TYPE 0x02 PARAM 0x00 DATA 0x00580000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x2a txn 0x02 len 0x58 flag 0x0) : 0x005800000002aa12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks setenv < réponse appariée : TAG 0xaa TYPE 0x02 PARAM 0 DATA 0x00580000 (longueur 0x58, drapeaux d'appel 0x0000) : 0x005800000002aa12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (set_env) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 en fin d'écoute (set_env) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   B12 setenv (instantané à la réponse) +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: VERDICT sks setenv : ACCEPTÉ (PARAM 0, état 0x0 ; L 0x50, version d'en-tête 2, condensé OK ; longueur 0x58, drapeaux d'appel 0x0000, TAG 0xaa) : 0x005800000002aa12
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag BALAYAGE : /dev/sep_sks attend des create_keybag UN PAR UN (0x80 o ; class+field2 variés) ; STOP au 1er PARAM 0 (jamais plus d'UN keybag)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0xfffffff6, horodatage 461800575 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000030112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°1 > EP 0x12 TAG 0x01 TYPE 0x03 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0xfffffff6)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x03 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x03 len 0x0 flag 0x0) : 0x00000000f5038112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x03 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5038112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0xfffffff6) → PARAM=-11 (échec ; 0x00000000f5038112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0xfffffff6, horodatage 461805444 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000040112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°2 > EP 0x12 TAG 0x01 TYPE 0x04 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0xfffffff6)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x04 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x04 len 0x0 flag 0x0) : 0x00000000f5048112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x04 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5048112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0xfffffff6) → PARAM=-11 (échec ; 0x00000000f5048112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0xfffffff6, horodatage 461810194 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000050112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°3 > EP 0x12 TAG 0x01 TYPE 0x05 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0xfffffff6)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x05 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x05 len 0x0 flag 0x0) : 0x00000000f5058112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x05 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5058112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0xfffffff6) → PARAM=-11 (échec ; 0x00000000f5058112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0xfffffff6, horodatage 461814987 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000060112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°4 > EP 0x12 TAG 0x01 TYPE 0x06 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0xfffffff6)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x06 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x06 len 0x0 flag 0x0) : 0x00000000f5068112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x06 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5068112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0xfffffff6) → PARAM=-11 (échec ; 0x00000000f5068112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0xfffffff5, horodatage 461819796 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000070112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°5 > EP 0x12 TAG 0x01 TYPE 0x07 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0xfffffff5)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x07 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x07 len 0x0 flag 0x0) : 0x00000000f5078112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x07 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5078112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0xfffffff5) → PARAM=-11 (échec ; 0x00000000f5078112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0xfffffff5, horodatage 461824605 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000080112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°6 > EP 0x12 TAG 0x01 TYPE 0x08 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0xfffffff5)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x08 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x08 len 0x0 flag 0x0) : 0x00000000f5088112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x08 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5088112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0xfffffff5) → PARAM=-11 (échec ; 0x00000000f5088112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0xfffffff5, horodatage 461829368 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000090112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°7 > EP 0x12 TAG 0x01 TYPE 0x09 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0xfffffff5)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x09 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x09 len 0x0 flag 0x0) : 0x00000000f5098112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x09 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5098112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0xfffffff5) → PARAM=-11 (échec ; 0x00000000f5098112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0xfffffff5, horodatage 461834075 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000000a0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°8 > EP 0x12 TAG 0x01 TYPE 0x0a (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0xfffffff5)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x0a PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x0a len 0x0 flag 0x0) : 0x00000000f50a8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x0a PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f50a8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0xfffffff5) → PARAM=-11 (échec ; 0x00000000f50a8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0xfffffff4, horodatage 461838709 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000000b0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°9 > EP 0x12 TAG 0x01 TYPE 0x0b (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0xfffffff4)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x0b PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x0b len 0x0 flag 0x0) : 0x00000000f50b8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x0b PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f50b8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0xfffffff4) → PARAM=-11 (échec ; 0x00000000f50b8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0xfffffff4, horodatage 461843216 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000000c0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°10 > EP 0x12 TAG 0x01 TYPE 0x0c (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0xfffffff4)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x0c PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x0c len 0x0 flag 0x0) : 0x00000000f50c8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x0c PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f50c8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0xfffffff4) → PARAM=-11 (échec ; 0x00000000f50c8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0xfffffff4, horodatage 461847536 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000000d0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°11 > EP 0x12 TAG 0x01 TYPE 0x0d (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0xfffffff4)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x0d PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x0d len 0x0 flag 0x0) : 0x00000000f50d8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x0d PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f50d8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0xfffffff4) → PARAM=-11 (échec ; 0x00000000f50d8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0xfffffff4, horodatage 461851833 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000000e0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°12 > EP 0x12 TAG 0x01 TYPE 0x0e (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0xfffffff4)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x0e PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x0e len 0x0 flag 0x0) : 0x00000000f50e8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x0e PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f50e8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0xfffffff4) → PARAM=-11 (échec ; 0x00000000f50e8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0xfffffff3, horodatage 461856188 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000000f0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°13 > EP 0x12 TAG 0x01 TYPE 0x0f (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0xfffffff3)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x0f PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x0f len 0x0 flag 0x0) : 0x00000000f50f8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x0f PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f50f8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0xfffffff3) → PARAM=-11 (échec ; 0x00000000f50f8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0xfffffff3, horodatage 461860437 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000100112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°14 > EP 0x12 TAG 0x01 TYPE 0x10 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0xfffffff3)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x10 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x10 len 0x0 flag 0x0) : 0x00000000f5108112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x10 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5108112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0xfffffff3) → PARAM=-11 (échec ; 0x00000000f5108112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0xfffffff3, horodatage 461864705 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000110112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°15 > EP 0x12 TAG 0x01 TYPE 0x11 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0xfffffff3)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x11 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x11 len 0x0 flag 0x0) : 0x00000000f5118112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x11 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5118112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0xfffffff3) → PARAM=-11 (échec ; 0x00000000f5118112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0xfffffff3, horodatage 461868962 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000120112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°16 > EP 0x12 TAG 0x01 TYPE 0x12 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0xfffffff3)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x12 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x12 len 0x0 flag 0x0) : 0x00000000f5128112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x12 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5128112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0xfffffff3) → PARAM=-11 (échec ; 0x00000000f5128112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0x00000001, horodatage 461873039 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000130112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°17 > EP 0x12 TAG 0x01 TYPE 0x13 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0x00000001)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x13 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x13 len 0x0 flag 0x0) : 0x00000000f5138112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x13 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5138112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0x00000001) → PARAM=-11 (échec ; 0x00000000f5138112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0x00000001, horodatage 461876750 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000140112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°18 > EP 0x12 TAG 0x01 TYPE 0x14 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0x00000001)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x14 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x14 len 0x0 flag 0x0) : 0x00000000f5148112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x14 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5148112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0x00000001) → PARAM=-11 (échec ; 0x00000000f5148112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0x00000001, horodatage 461880805 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000150112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°19 > EP 0x12 TAG 0x01 TYPE 0x15 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0x00000001)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x15 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x15 len 0x0 flag 0x0) : 0x00000000f5158112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x15 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5158112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0x00000001) → PARAM=-11 (échec ; 0x00000000f5158112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0x00000001, horodatage 461884899 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000160112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°20 > EP 0x12 TAG 0x01 TYPE 0x16 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0x00000001)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x16 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x16 len 0x0 flag 0x0) : 0x00000000f5168112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x16 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5168112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0x00000001) → PARAM=-11 (échec ; 0x00000000f5168112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0x00000002, horodatage 461889067 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000170112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°21 > EP 0x12 TAG 0x01 TYPE 0x17 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0x00000002)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x17 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x17 len 0x0 flag 0x0) : 0x00000000f5178112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x17 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5178112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0x00000002) → PARAM=-11 (échec ; 0x00000000f5178112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0x00000002, horodatage 461893019 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000180112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°22 > EP 0x12 TAG 0x01 TYPE 0x18 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0x00000002)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x18 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x18 len 0x0 flag 0x0) : 0x00000000f5188112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x18 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5188112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0x00000002) → PARAM=-11 (échec ; 0x00000000f5188112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0x00000002, horodatage 461899419 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000190112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°23 > EP 0x12 TAG 0x01 TYPE 0x19 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0x00000002)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x19 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x19 len 0x0 flag 0x0) : 0x00000000f5198112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x19 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5198112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0x00000002) → PARAM=-11 (échec ; 0x00000000f5198112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0x00000002, horodatage 461903474 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000001a0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°24 > EP 0x12 TAG 0x01 TYPE 0x1a (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0x00000002)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x1a PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x1a len 0x0 flag 0x0) : 0x00000000f51a8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x1a PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f51a8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0x00000002) → PARAM=-11 (échec ; 0x00000000f51a8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0x00000003, horodatage 461907371 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000001b0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°25 > EP 0x12 TAG 0x01 TYPE 0x1b (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0x00000003)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x1b PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x1b len 0x0 flag 0x0) : 0x00000000f51b8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x1b PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f51b8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0x00000003) → PARAM=-11 (échec ; 0x00000000f51b8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0x00000003, horodatage 461912009 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000001c0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°26 > EP 0x12 TAG 0x01 TYPE 0x1c (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0x00000003)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x1c PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x1c len 0x0 flag 0x0) : 0x00000000f51c8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x1c PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f51c8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0x00000003) → PARAM=-11 (échec ; 0x00000000f51c8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0x00000003, horodatage 461916137 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000001d0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°27 > EP 0x12 TAG 0x01 TYPE 0x1d (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0x00000003)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x1d PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x1d len 0x0 flag 0x0) : 0x00000000f51d8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x1d PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f51d8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0x00000003) → PARAM=-11 (échec ; 0x00000000f51d8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0x00000003, horodatage 461919719 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000001e0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°28 > EP 0x12 TAG 0x01 TYPE 0x1e (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0x00000003)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x1e PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x1e len 0x0 flag 0x0) : 0x00000000f51e8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x1e PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f51e8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0x00000003) → PARAM=-11 (échec ; 0x00000000f51e8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0x00000004, horodatage 461923384 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000001f0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°29 > EP 0x12 TAG 0x01 TYPE 0x1f (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0x00000004)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x1f PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x1f len 0x0 flag 0x0) : 0x00000000f51f8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x1f PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f51f8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0x00000004) → PARAM=-11 (échec ; 0x00000000f51f8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0x00000004, horodatage 461926963 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000200112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°30 > EP 0x12 TAG 0x01 TYPE 0x20 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0x00000004)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x20 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x20 len 0x0 flag 0x0) : 0x00000000f5208112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x20 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5208112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0x00000004) → PARAM=-11 (échec ; 0x00000000f5208112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0x00000004, horodatage 461930118 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000210112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°31 > EP 0x12 TAG 0x01 TYPE 0x21 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0x00000004)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x21 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x21 len 0x0 flag 0x0) : 0x00000000f5218112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x21 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5218112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0x00000004) → PARAM=-11 (échec ; 0x00000000f5218112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0x00000004, horodatage 461933190 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000220112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°32 > EP 0x12 TAG 0x01 TYPE 0x22 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0x00000004)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x22 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x22 len 0x0 flag 0x0) : 0x00000000f5228112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x22 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5228112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0x00000004) → PARAM=-11 (échec ; 0x00000000f5228112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0xffffffff, horodatage 461936313 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000230112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°33 > EP 0x12 TAG 0x01 TYPE 0x23 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0xffffffff)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x23 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x23 len 0x0 flag 0x0) : 0x00000000f5238112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x23 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5238112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0xffffffff) → PARAM=-11 (échec ; 0x00000000f5238112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0xffffffff, horodatage 461939377 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000240112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°34 > EP 0x12 TAG 0x01 TYPE 0x24 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0xffffffff)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x24 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x24 len 0x0 flag 0x0) : 0x00000000f5248112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x24 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5248112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0xffffffff) → PARAM=-11 (échec ; 0x00000000f5248112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0xffffffff, horodatage 461942522 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000250112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°35 > EP 0x12 TAG 0x01 TYPE 0x25 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0xffffffff)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x25 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x25 len 0x0 flag 0x0) : 0x00000000f5258112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x25 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5258112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0xffffffff) → PARAM=-11 (échec ; 0x00000000f5258112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0xffffffff, horodatage 461945643 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000260112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°36 > EP 0x12 TAG 0x01 TYPE 0x26 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0xffffffff)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x26 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x26 len 0x0 flag 0x0) : 0x00000000f5268112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x26 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5268112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0xffffffff) → PARAM=-11 (échec ; 0x00000000f5268112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000001, field2 0xfffffffe, horodatage 461948739 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000270112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°37 > EP 0x12 TAG 0x01 TYPE 0x27 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000001, field2 0xfffffffe)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x27 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x27 len 0x0 flag 0x0) : 0x00000000f5278112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x27 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5278112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000001, field2=0xfffffffe) → PARAM=-11 (échec ; 0x00000000f5278112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000002, field2 0xfffffffe, horodatage 461951868 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000280112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°38 > EP 0x12 TAG 0x01 TYPE 0x28 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000002, field2 0xfffffffe)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x28 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x28 len 0x0 flag 0x0) : 0x00000000f5288112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x28 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5288112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000002, field2=0xfffffffe) → PARAM=-11 (échec ; 0x00000000f5288112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000003, field2 0xfffffffe, horodatage 461955134 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x0080000000290112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°39 > EP 0x12 TAG 0x01 TYPE 0x29 (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000003, field2 0xfffffffe)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x29 PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x29 len 0x0 flag 0x0) : 0x00000000f5298112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x29 PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f5298112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000003, field2=0xfffffffe) → PARAM=-11 (échec ; 0x00000000f5298112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage : enregistrement accepté (class 0x00000004, field2 0xfffffffe, horodatage 461958284 µs)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > sks create_keybag (balayage) : 0x00800000002a0112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag balayage n°40 > EP 0x12 TAG 0x01 TYPE 0x2a (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = 0x80 o (class 0x00000004, field2 0xfffffffe)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: keystore < EP 0x12 'sks' TAG 0x81 TYPE 0x2a PARAM 0xf5 DATA 0x00000000 (sks : réponse RPC (TAG|0x80) ; attendue seulement après le get_capabilities d'allow_sks=2 ; EP ouvert ; champs sks op 0x01 txn 0x2a len 0x0 flag 0x0) : 0x00000000f52a8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: sks create_keybag < réponse appariée : TAG 0x81 TYPE 0x2a PARAM -11 DATA 0x00000000 (longueur 0x0, drapeaux d'appel 0x0000) : 0x00000000f52a8112
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: B12 après un mot (create_keybag balayage) : 43 octet(s) non nul(s) sur 0x8000 ; en-tête version 0x50 total 0x7feb74ba offset 0xc6f43445 opcode 0x2 fragment 0xd2879a42
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x000 : 00000050 7feb74ba c6f43445 47d21a83
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x010 : 325b6a92 00000002 d2879a42 00000003
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x030 : 00000000 00000000 5740fe05 126f1653
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x040 : c9e75955 548655ac e9c707f1 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native:   sks +0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: create sweep (class=0x00000004, field2=0xfffffffe) → PARAM=-11 (échec ; 0x00000000f52a8112) ; ré-armement pour l'enregistrement suivant
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 17 TAG 0x0c TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010028000c13
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 17 TYPE 0x00 PARAM 0x28 DATA 0x00000100 (A 40 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm < seq 18 TAG 0x0d TYPE 0x05 PARAM 0x10 DATA 0x00000100 (B 16 o)
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: > réponse xarm : 0x0000010028000d13
+Nov 24 18:42:36 alarm kernel: sep_native soc:sep-native: xarm > seq 18 TYPE 0x00 PARAM 0x28 DATA 0x00000100 (A 40 o)
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: sks create_keybag BALAYAGE : plus d'écriture en 20000 ms (liste épuisée) : terminé, 40 essai(s), aucun keybag créé
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: VERDICT keystore : skdl OUVERT sks OUVERT scrd OUVERT ; mots reçus pendant/avant l'écoute : skdl 0 sks 42 scrd 0 ; puis 0x73
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: sbio : xART calme (2000 ms sans trafic 0x13, aucune requête en attente) ; envoi du 0x73
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: B8 avant le 0x73 : 0 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x0 total 0x0 offset 0x0 opcode 0x0 fragment 0x0
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: > sbio 0x73 (poignée) : 0x000000000073fc08
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0x04 TYPE 0x00 PARAM 0x00 DATA 0x00000000 (notification TAG 0x02-0x04, après le 0x73) : 0x0000000000000408
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: sbio < TAG 0xfc TYPE 0x73 PARAM 0x00 DATA 0x00000000 (GT, après le 0x73) : 0x000000000073fc08
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native: B8 après un mot sbio : 2 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x0 offset 0x0 opcode 0x73 fragment 0x0
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000073 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:42:56 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native: B8 en fin d'écoute : 2 octet(s) non nul(s) sur 0x4000 ; en-tête version 0x1 total 0x0 offset 0x0 opcode 0x73 fragment 0x0
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x000 : 00000001 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x010 : 00000000 00000073 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x020 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x030 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x040 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x050 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x060 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   B8+0x070 : 00000000 00000000 00000000 00000000
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native: VERDICT sbio : VIVANT (B8 +0x00=0x01 +0x14=0x73 ; 2 mot(s) 0x08 après le 0x73 ; TAG 0xfc TYPE 0x73 ou TAG 0x04 : oui)
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native: keystore (bilan) : ouverts skdl true sks true scrd true ; mots reçus skdl 0 sks 42 scrd 0
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native: table de découverte : 12 EP (état Running, 0 message(s) ignoré(s))
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x14 'hibe' pages [1, 1, 1, 1]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x18 'stac' pages [2, 2, 2, 2]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x00 'cntl' pages [0, 0, 0, 0]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x10 'xars' pages [2, 2, 2, 2]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x13 'xarm' pages [2, 2, 2, 2]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x15 'pnon' pages [7, 7, 5, 5]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x0e 'hdcp' pages [1, 1, 1, 1]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x08 'sbio' pages [1, 1, 1, 1]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x17 'skdl' pages [1, 1, 1, 1]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x0c 'sse' pages [1, 1, 1, 1]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x0a 'scrd' pages [1, 1, 1, 1]
+Nov 24 18:43:02 alarm kernel: sep_native soc:sep-native:   EP 0x12 'sks' pages [1, 2, 1, 2]
