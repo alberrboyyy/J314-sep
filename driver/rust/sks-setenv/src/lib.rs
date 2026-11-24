@@ -374,6 +374,34 @@ pub fn createkeybag_verdict(rec: &[u8]) -> Result<(CreatekeybagVerdict, u64, Vec
     Ok((v, raw, snap))
 }
 
+/// J13 SWEEP verdict of one create_keybag iteration. Unlike `createkeybag_verdict`, this does NOT require the reply's
+/// TYPE to equal the fixed `CKB_TXN`: in the sweep the transaction counter INCREMENTS per create (3, 4, 5, …), and the
+/// KERNEL has already paired the reply on its current counter (only the matched reply, or silence/not-sent, reaches the
+/// outcome record). So here we only check EP 0x12 + TAG bit 7 (a reply) + the PARAM status.
+pub fn createkeybag_sweep_verdict(rec: &[u8]) -> Result<(CreatekeybagVerdict, u64, Vec<u8>), String> {
+    let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement create_keybag (balayage) illisible : {e}"))?;
+    let snap = snap.to_vec();
+    let v = match kind {
+        sks_ipc::OUT_NOT_SENT => CreatekeybagVerdict::NotSent,
+        sks_ipc::OUT_SILENCE => CreatekeybagVerdict::Silence,
+        _ => {
+            let w = Word::decode(raw);
+            let rw = sks_keybag::reply_word(&w);
+            if w.ep != sks_ipc::EP_SKS || w.tag & 0x80 == 0 {
+                CreatekeybagVerdict::Refus(format!("mot {raw:#018x} non apparié (EP/TAG bit 7)"))
+            } else if rw.status != 0 {
+                CreatekeybagVerdict::Refus(format!("PARAM {} = statut signé ≠ 0", rw.status))
+            } else {
+                match sks_keybag::reply_handle(&snap) {
+                    Ok(h) => CreatekeybagVerdict::Handle(h),
+                    Err(e) => CreatekeybagVerdict::Refus(format!("handle illisible à +0x6c : {e}")),
+                }
+            }
+        }
+    };
+    Ok((v, raw, snap))
+}
+
 pub fn mskb_verdict(rec: &[u8]) -> Result<(MskbVerdict, u64, Vec<u8>), String> {
     let (kind, raw, snap) = sks_ipc::decode_outcome(rec).map_err(|e| format!("enregistrement make_system_keybag illisible : {e}"))?;
     let snap = snap.to_vec();
@@ -645,6 +673,26 @@ mod tests {
         let bad = ok | (0xffu64 << 24);
         assert!(matches!(mskb_verdict(&encode_outcome(OUT_REPLIED, bad, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::Refus(_)));
         assert_eq!(mskb_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, MskbVerdict::NotSent);
+    }
+
+    #[test]
+    fn sweep_verdict_is_txn_agnostic() {
+        // J13: the sweep reply TYPE is the incrementing transaction counter (4, 5, …), NOT the fixed CKB_TXN (3). The
+        // ty-agnostic sweep verdict must still read the handle on PARAM 0, where `createkeybag_verdict` (ty==3) would not.
+        let mut snap = [0u8; OUT_SNAP];
+        snap[sks_keybag::OFF_RESP_HANDLE..sks_keybag::OFF_RESP_HANDLE + 4].copy_from_slice(&0x0abc_def0u32.to_le_bytes());
+        let raw_ty4 = 0x0010_0000_0004_8112u64; // TAG 0x81 TYPE 0x04 PARAM 0 (2nd swept create)
+        let (v, _, _) = createkeybag_sweep_verdict(&encode_outcome(OUT_REPLIED, raw_ty4, &snap)).unwrap();
+        assert_eq!(v, CreatekeybagVerdict::Handle(0x0abc_def0));
+        // The fixed-TYPE verdict would miss it (ty != CKB_TXN) → Refus(non apparié).
+        assert!(matches!(createkeybag_verdict(&encode_outcome(OUT_REPLIED, raw_ty4, &snap)).unwrap().0, CreatekeybagVerdict::Refus(_)));
+        // PARAM 0xff on a swept create (TYPE 0x05) → REFUS (benign failure, the sweep re-arms).
+        let refus_ty5 = 0x0000_0000_ff05_8112u64;
+        assert!(matches!(createkeybag_sweep_verdict(&encode_outcome(OUT_REPLIED, refus_ty5, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Refus(_)));
+        assert_eq!(createkeybag_sweep_verdict(&encode_outcome(OUT_SILENCE, 0, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Silence);
+        assert_eq!(createkeybag_sweep_verdict(&encode_outcome(OUT_NOT_SENT, 0, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::NotSent);
+        // A non-reply word (bit 7 clear) → Refus.
+        assert!(matches!(createkeybag_sweep_verdict(&encode_outcome(OUT_REPLIED, 0x0000_0000_0004_0112, &[0; OUT_SNAP])).unwrap().0, CreatekeybagVerdict::Refus(_)));
     }
 
     #[test]

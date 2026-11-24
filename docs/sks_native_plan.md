@@ -533,3 +533,71 @@ copies de `~/kbuild/j15` (sha256 inchangés).
 si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon store du service périmé → décision d'Albert. Classe neuve
 (`load_keybag` jamais émis sur matériel) → **1er run = « go » d'Albert** (`pending/j12_sks_loadkeybag_chained.sh`).
 **SQUELETTE : rien ne tourne avant uuid + type.**
+
+## 12. Expérience (balayage) : J13 = BALAYAGE de `create_keybag` sur (class, field2) (`allow_sks=8`) — 2026-11-24, rien lancé
+
+**Pourquoi J13.** `create_keybag` (TAG fil 0x01, variante 4) refuse **−0xb** (BadArgument) quand on lui envoie un corps
+« à neuf » (J10/J14). Deux de ses champs — les **deux u32 à OOL 0x60 (`class`) et 0x64 (`field2`)** — sont des **valeurs
+userland LIBRES** : la porte `check_createkeybag` ne les contraint pas (établi J14, `docs/applekeystored_identity.md`
+§6.2/§6.4), et leurs vraies valeurs sont **inconnues** (posées par le Swift `AKSIdentity`, absentes du kernelcache). Au
+lieu d'attendre le reverse de ces valeurs, on **balaie** un petit ensemble plausible pour voir si l'un fait passer
+`create_keybag` de **−0xb** à **PARAM 0 + handle**. Un create échoué est **bénin** (0 SAVE, état intact, VU J9-J12),
+donc le balayage est sûr tant qu'on **STOPPE au 1er succès** (un keybag CRÉÉ = classe d'écriture jamais vue).
+
+**Ce que J13 émet.** Chemin = J9b (boot chaîné, lockers sans UUID, CNTL de skdl/sks/scrd, UN get_capabilities ACCEPTÉ
+état 0 theirs 2 → v2, UN set_env ACCEPTÉ), puis en **SAUTANT** perform_operation (TAG 0x22), null_d_key (TAG 0x0a) **ET**
+load_keybag (TAG 0x03). L'outil `sks_setenv run --sweep` écrit des `create_keybag` **UN PAR UN** dans `/dev/sep_sks`,
+chacun bâti par `encode_createkeybag` avec un couple (`class`, `field2`) de la **liste de balayage** ; pour chaque
+enregistrement, le noyau valide le **corps A12** (`check_createkeybag`, identique à `allow_sks=5`), l'envoie avec le
+**compteur de transaction qui INCRÉMENTE** comme TYPE du mot mailbox (get_capabilities = 1, set_env = 2, puis chaque
+create balayé = 3, 4, 5, … modulo 256 ; VU `sks_sequence_c12.md` « il INCRÉMENTE à chaque appel ») —
+`> EP 0x12 TAG 0x01 TYPE <compteur> PARAM 0 DATA 0x00800000`, A12 = 0x80 o — via la porte d'envoi dédiée
+`CreatekeybagSweepGate` **ré-armée à neuf** au compteur courant, puis lit la **réponse appariée sur ce compteur
+courant** (instantané B12). **Le compteur n'est PAS dans le corps OOL** (il vit seulement dans le mot mailbox `ty`),
+donc l'A12 est identique d'un essai à l'autre et il n'y a **pas de re-digest**. Réutiliser un TYPE fixe aurait risqué un
+rejet anti-rejeu dès l'essai 2, confondu avec un rejet class/field2 — c'est corrigé ici. Puis selon la réponse :
+- **PARAM ≠ 0** (échec, p.ex. −0xb) **ou SILENCE** → journalise « create sweep (class=…, field2=0x…) → PARAM=… » et
+  **RÉ-ARME** (`WaitReq`) pour le couple suivant. Aucun SAVE attendu ;
+- **PARAM == 0** (SUCCÈS) → lit le handle (OOL B +0x6c), journalise « create sweep SUCCÈS class=… field2=… handle=0x… »
+  et **STOPPE** : pas de ré-armement, **pas de `make_system_keybag`** (jamais plus d'UN keybag créé). C'est le verrou
+  de sûreté clé ;
+- **liste épuisée** (plus d'écriture pendant `KS_REQ_WAIT_MS`) → `WaitReq` → terminal, aucun keybag créé.
+
+Puis le 0x73 sbio comme J9b. `create_keybag` **ne porte pas d'uuid** (il prend une classe) → **aucune valeur secrète
+requise** ; la seule entrée userland est `handle_y` (OOL 0x58, défaut 0).
+
+**Liste de balayage** (dans l'outil, pas dans le noyau) : `class ∈ {1, 2, 3, 4}` ; `field2 ∈ {0xFFFFFFF6 (−10),
+0xFFFFFFF5 (−11), 0xFFFFFFF4 (−12), 0xFFFFFFF3 (−13), 1, 2, 3, 4, 0xFFFFFFFF (−1), 0xFFFFFFFE (−2)}` (motifs négatifs
+d'abord car indice reverse « ≤ -10 », §6.4). Ordre : `field2` externe, `class` interne → **40 couples** (les field2 les
+plus probables sont essayés sur les 4 classes d'abord). Ce sont des **essais** (le sens exact des deux u32 n'est pas
+tranché au binaire) : si le matériel accepte un couple, on sait quelle valeur débloque le create.
+
+**Handshake write→send→reply→read→ré-arm** (lockstep strict sur le char device). Le noyau réutilise la machine à états
+`CkbPhase` en boucle. L'outil, pour chaque couple : **écrit** un enregistrement (accepté seulement en `WaitReq` et si le
+résultat précédent a été lu, sinon `EAGAIN`), puis **lit** UN enregistrement d'issue (`OUT_SIZE`) qui bloque jusqu'au
+verdict de CET envoi, le **consomme** (`ckb_sweep_fresh` → false, ce qui réveille le fil du balayage pour qu'il
+ré-arme), et décide : PARAM 0 → arrêt (rc 0) ; sinon couple suivant. Fin de liste ou `EALREADY` (noyau terminal) →
+arrêt (rc 1). Fail-closed à la 1re incohérence (A12 relu ≠ requête → Halted).
+
+**Portes noyau (allow_sks=8).** `sks_ipc::GetcapGate`, `sks_setenv::SetenvGate`, puis `sks_keybag::CreatekeybagSweepGate`
+**ré-armée à neuf** au compteur courant à chaque couple (mot exact `> 0x12 0x01 <compteur> … 0x00800000` ; le `.admit`
+vérifie le TYPE courant). L'appariement de la réponse se fait aussi sur le compteur courant
+(`is_createkeybag_reply_txn`). Rien d'autre vers 0x12/0x17/0x0a (Halted sinon). **allow_sks=5/6/7 restent disponibles et
+intacts** (ils utilisent `CreatekeybagGate`/`MskbGate`… à TYPE fixe, inchangés).
+
+**Tests hors matériel** : `sep-proto` étendu (`createkeybag_word_txn`, `is_createkeybag_reply_txn`,
+`CreatekeybagSweepGate` + test `sweep_word_and_gate_vary_the_txn` ; le corps A12 reste `encode_createkeybag`/
+`check_createkeybag`, inchangé) ; `sks-setenv` étendu (`run --sweep` : liste de 40 couples, builder sans secret,
+`createkeybag_sweep_verdict` ty-agnostique — le noyau a déjà apparié la réponse par compteur —, verdict par couple).
+`cargo test` (sep-proto + sks-setenv) vert, clippy propre (`CLIPPY=1` pour le `.ko`).
+
+**Binaires** (`~/kbuild/j17`, compilés contre `~/kbuild/src/linux-asahi-7.2.12-3`, vermagic `7.2.12-3-1-ARCH`) :
+`sep_native.ko` `6b749ee9cf48178156fd8bb22b938c9ce6f33e7494d677f6a33d52a8dc6f2239` (allow_sks=8, après le correctif du
+compteur de transaction), `sks_setenv` `0e1f69de3dbfcb0bf9c03ca83d164e84b37c2b077ac4156ff0574093e27152c6` ; `sepd`,
+`sep_native_ovl.ko`, `sep-native.dtbo` = copies de `~/kbuild/j16` (sources inchangées).
+
+**Avant le run** : service désactivé (`/etc/sep-touchid/disabled` + reboot) ; STORE = copie chaînée
+(`/var/lib/sepd-run-20261122-230441`), jamais `/var/lib/sepd` ; copie du store avant run. **Aucune valeur secrète à
+fournir** (`HANDLE_Y` a un défaut 0). **Après** : si 0 SAVE, `rm /etc/sep-touchid/disabled` + reboot ; sinon store du
+service périmé → décision d'Albert. **1er run = « go » d'Albert** (`pending/j13_sks_create_sweep.sh`) : script neuf, et
+un éventuel succès = création d'un keybag = classe d'écriture jamais testée. Re-runs autonomes ensuite.

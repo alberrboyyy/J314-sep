@@ -311,6 +311,20 @@ pub fn is_createkeybag_reply(w: &Word) -> bool {
     w.ep == EP_SKS && w.tag & 0x80 != 0 && w.ty == CKB_TXN
 }
 
+/// J13 SWEEP: the `create_keybag` request word with an EXPLICIT transaction counter `ty` (the global SEP transaction
+/// counter INCREMENTS at every call — get_capabilities = 1, set_env = 2, then each swept create = 3, 4, 5, … modulo
+/// 256). The OOL body (`encode_createkeybag`) is independent of `ty` (the counter lives only in this mailbox word, not
+/// in the digested bytes), so the same A12 body is reused across the sweep with a different `ty` each time.
+pub const fn createkeybag_word_txn(ty: u8) -> Word {
+    Word::new(EP_SKS, OP_CREATE_KEYBAG, ty, 0, CKB_DATA)
+}
+
+/// J13 SWEEP: `true` iff `w` is a reply to a swept `create_keybag` with transaction counter `ty`: EP 0x12, TAG bit 7
+/// set, TYPE = `ty`.
+pub fn is_createkeybag_reply_txn(w: &Word, ty: u8) -> bool {
+    w.ep == EP_SKS && w.tag & 0x80 != 0 && w.ty == ty
+}
+
 /// Reads the SEP-assigned keybag handle from a `create_keybag` reply snapshot (OOL B), at `OFF_RESP_HANDLE` (DEDUCED,
 /// never captured). Only meaningful when the reply word had PARAM 0.
 pub fn reply_handle(snap: &[u8]) -> Result<u32> {
@@ -521,6 +535,33 @@ one_word_gate!(MskbGate, mskb_word());
 one_word_gate!(MskbStandaloneGate, mskb_word_standalone());
 one_word_gate!(LoadkeybagGate, loadkeybag_word());
 
+/// J13 SWEEP send gate: admits EXACTLY one `createkeybag_word_txn(ty)` where `ty` is set when armed (the current
+/// transaction counter of the sweep). Re-armed afresh for each swept record with the next counter value, so each
+/// iteration still sends exactly ONE word and the word is the exact expected one (anti-replay counter included).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreatekeybagSweepGate {
+    armed: bool,
+    ty: u8,
+}
+
+impl CreatekeybagSweepGate {
+    pub const fn closed() -> Self {
+        CreatekeybagSweepGate { armed: false, ty: 0 }
+    }
+    /// Arms the gate for exactly one `createkeybag_word_txn(ty)`.
+    pub fn arm(&mut self, ty: u8) {
+        self.armed = true;
+        self.ty = ty;
+    }
+    pub fn admit(&mut self, w: &Word) -> bool {
+        let ok = self.armed && *w == createkeybag_word_txn(self.ty);
+        if ok {
+            self.armed = false;
+        }
+        ok
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -704,6 +745,31 @@ mod tests {
         assert_eq!(b.len(), 0x80);
         assert_eq!(le32(&b, OFF_STATE).unwrap(), 4); // discriminant we emit
         assert_eq!(createkeybag_word().data, 0x0080_0000);
+    }
+
+    #[test]
+    fn sweep_word_and_gate_vary_the_txn() {
+        // The swept word carries the given transaction counter in `ty`; DATA/length/EP/TAG are the fixed create ones.
+        assert_eq!(createkeybag_word_txn(3), createkeybag_word()); // first swept create = CKB_TXN = 3
+        assert_eq!(createkeybag_word_txn(4), Word::new(0x12, 0x01, 0x04, 0x00, 0x0080_0000));
+        assert_eq!(createkeybag_word_txn(0xff).data, 0x0080_0000);
+        // The OOL body is independent of the counter (same bytes for any ty): the counter is NOT in the digest.
+        let a = encode_createkeybag(&fields(), EX_HANDLE_Y, EX_CLASS, EX_FIELD2);
+        assert!(check_createkeybag(&a).is_ok());
+        // Reply matcher keyed on the current counter.
+        assert!(is_createkeybag_reply_txn(&Word::new(0x12, 0x84, 0x04, 0, 0), 4));
+        assert!(!is_createkeybag_reply_txn(&Word::new(0x12, 0x84, 0x03, 0, 0), 4)); // wrong counter
+        assert!(!is_createkeybag_reply_txn(&Word::new(0x12, 0x04, 0x04, 0, 0), 4)); // bit 7 clear = request
+        // Sweep gate: admits exactly the armed-counter word, once.
+        let mut g = CreatekeybagSweepGate::closed();
+        assert!(!g.admit(&createkeybag_word_txn(4)), "closed");
+        g.arm(4);
+        assert!(!g.admit(&createkeybag_word_txn(3)), "wrong counter");
+        assert!(!g.admit(&Word::new(0x12, 0x0d, 0x04, 0, CKB_DATA)), "wrong TAG");
+        assert!(g.admit(&createkeybag_word_txn(4)));
+        assert!(!g.admit(&createkeybag_word_txn(4)), "twice");
+        g.arm(5); // re-arm with the next counter for the next swept record
+        assert!(g.admit(&createkeybag_word_txn(5)));
     }
 
     #[test]

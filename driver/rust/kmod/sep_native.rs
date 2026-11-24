@@ -167,7 +167,7 @@ kernel::module_platform_driver! {
         },
         allow_sks: u32 {
             default: 0,
-            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; 5 (J10, device-identity keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation AND null_d_key, ONE sks create_keybag (> 0x12 TAG 0x01 TYPE 0x03 DATA 0x00800000, 0x80-byte A12, 4th write, VARIANT 4; checked: header constants, discriminant 4, three empty blobs, fv_data length 0, final u64 0, v2 digest, cdhash form; class(u32 0x60), field2(u32 0x64) and handle_y(u64 0x58) are FREE userland values, NOT checked), read back the SEP handle at OOL B +0x6c, then ONE sks make_system_keybag (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12, 5th write; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; handle_y/type/uuid FREE userland, loaded_handle plugged in by the kernel from the create_keybag reply then re-digested), listen, VERDICTs (create_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; 6 (J11 PIVOT, standalone make_system_keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation, null_d_key AND create_keybag, ONE sks make_system_keybag STANDALONE (> 0x12 TAG 0x0d TYPE 0x03 DATA 0x00840000, 0x84-byte A12, 3rd transaction; same OOL body as allow_sks=5's make_system but loaded_handle (0x60) and handle_y (0x58) are USERLAND inputs — no create reply to plug in, UNKNOWN handle tested with 0 by default; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; uuid/type/loaded_handle/handle_y FREE userland), listen, VERDICT (marqué system/REFUS/handle), then the 0x73; 7 (J12, load_keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation, null_d_key AND create_keybag, ONE sks load_keybag (> 0x12 TAG 0x03 TYPE 0x03 DATA 0x00740000, 0x74-byte A12, 3rd transaction; checked: header constants, state 0, blob length 0x10 = uuid, v2 digest, cdhash form; handle_y (0x58) and uuid (0x64) FREE userland), read back the SEP handle at OOL B +0x6c, then (only if load_keybag replied PARAM 0) ONE sks make_system_keybag CHAINED (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12; same gate as allow_sks=5, loaded_handle plugged in by the kernel from the load_keybag reply then re-digested), listen, VERDICTs (load_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; NOT RUNNABLE without the required userland values (uuid, class, type; allow_sks=6/7 need only uuid, type); nothing else ever to 0x12/0x17/0x0a",
+            description: "J7a (needs allow_sbio=1, sbio_open=1, allow_sbio_relay=0): 0 (default) = nothing; 1 = after the early sbio open, CNTL-open skdl 0x17 (0x4000), sks 0x12 (0x8000) and scrd 0x0a (0x4000), each only once announced and acked, in that order, then listen passively 10 s, then the 0x73. NEVER any word to 0x17/0x12/0x0a (no skdl ping, no sks RPC); 2 (J9a) = as 1, then ONE sks get_capabilities (> 0x12 TAG 0x4d TYPE 0x01 DATA 0x00640000, 0x64-byte A12 written once by userspace to /dev/sep_sks, checked: constants, SHA-256/16 digest, cdhash form), listen 10 s, VERDICT, then the 0x73; 3 (J9b) = as 2, then once the getcap reply negotiated v2, ONE sks set_env (> 0x12 TAG 0x2a TYPE 0x02 DATA 0x04700000, 0x470-byte A12 written by userspace as a 2nd write, checked: header+blob constants, v2 digest, cdhash form), listen, VERDICT, then the 0x73; 4 (J9c) = as 3, then SKIPPING the two perform_operation, ONE sks null_d_key (> 0x12 TAG 0x0a TYPE 0x03 DATA 0x00600000, 0x60-byte A12 written by userspace as a 3rd write, checked: header constants, v2 digest, cdhash form; byte layout VU in the kernelcache: header+status(0)+u64(1), no blob), listen, VERDICT (RÉPONDU PARAM/état / ERREUR / SILENCE / NON ENVOYÉ), then the 0x73; 5 (J10, device-identity keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation AND null_d_key, ONE sks create_keybag (> 0x12 TAG 0x01 TYPE 0x03 DATA 0x00800000, 0x80-byte A12, 4th write, VARIANT 4; checked: header constants, discriminant 4, three empty blobs, fv_data length 0, final u64 0, v2 digest, cdhash form; class(u32 0x60), field2(u32 0x64) and handle_y(u64 0x58) are FREE userland values, NOT checked), read back the SEP handle at OOL B +0x6c, then ONE sks make_system_keybag (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12, 5th write; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; handle_y/type/uuid FREE userland, loaded_handle plugged in by the kernel from the create_keybag reply then re-digested), listen, VERDICTs (create_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; 6 (J11 PIVOT, standalone make_system_keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation, null_d_key AND create_keybag, ONE sks make_system_keybag STANDALONE (> 0x12 TAG 0x0d TYPE 0x03 DATA 0x00840000, 0x84-byte A12, 3rd transaction; same OOL body as allow_sks=5's make_system but loaded_handle (0x60) and handle_y (0x58) are USERLAND inputs — no create reply to plug in, UNKNOWN handle tested with 0 by default; checked: header constants, state 1, blob length 0x10 = uuid, flag 0, v2 digest, cdhash form; uuid/type/loaded_handle/handle_y FREE userland), listen, VERDICT (marqué system/REFUS/handle), then the 0x73; 7 (J12, load_keybag) = as 3 (getcap+set_env), then SKIPPING perform_operation, null_d_key AND create_keybag, ONE sks load_keybag (> 0x12 TAG 0x03 TYPE 0x03 DATA 0x00740000, 0x74-byte A12, 3rd transaction; checked: header constants, state 0, blob length 0x10 = uuid, v2 digest, cdhash form; handle_y (0x58) and uuid (0x64) FREE userland), read back the SEP handle at OOL B +0x6c, then (only if load_keybag replied PARAM 0) ONE sks make_system_keybag CHAINED (> 0x12 TAG 0x0d TYPE 0x04 DATA 0x00840000, 0x84-byte A12; same gate as allow_sks=5, loaded_handle plugged in by the kernel from the load_keybag reply then re-digested), listen, VERDICTs (load_keybag handle/REFUS, make_system_keybag marqué system/REFUS), then the 0x73; 8 (J13 create_keybag SWEEP) = as 3 (getcap+set_env), then SKIPPING perform_operation, null_d_key AND load_keybag, a SWEEP of create_keybag: userspace writes create_keybag records ONE BY ONE (each a (class, field2) pair of the sweep list, 0x80-byte A12, same A12 content gate check_createkeybag as allow_sks=5), the kernel sends each with the INCREMENTING transaction counter as the mailbox TYPE (get_capabilities=1, set_env=2, swept creates=3,4,5,… modulo 256; the counter is NOT in the digested OOL body, no re-digest), reads the reply paired on that current counter, and on PARAM != 0 (e.g. -0xb) RE-ARMS for the NEXT record with the next counter (no SAVE; a failed create is benign, VU J9-J12), on PARAM == 0 STOPS the sweep (reads the handle at OOL B +0x6c, never chains make_system, never creates more than ONE keybag); RUNNABLE with no secret userland value (class/field2 are free); NOT RUNNABLE without the required userland values (uuid, class, type; allow_sks=6/7 need only uuid, type); nothing else ever to 0x12/0x17/0x0a",
         },
         allow_sbio_bio: u32 {
             default: 0,
@@ -183,7 +183,7 @@ mod drv {
     use crate::sks_ipc::{self, GetcapGate};
     use crate::sks_setenv::{self, SetenvGate};
     use crate::sks_nulldkey::{self, NulldkeyGate};
-    use crate::sks_keybag::{self, CreatekeybagGate, LoadkeybagGate, MskbGate, MskbStandaloneGate};
+    use crate::sks_keybag::{self, CreatekeybagGate, CreatekeybagSweepGate, LoadkeybagGate, MskbGate, MskbStandaloneGate};
     use crate::sbio_gate::{self, EvtHdr, Step, EVT_HDR, EVT_MAX, KIND_BIO_REPLY, KIND_NOTIFY, KIND_REPLY, KIND_SPONT, MAX_REPLY};
     use crate::word::{Dir, Msg, Word};
     use crate::xart::{is_save, EP_XART, OP_EP_ANNOUNCE, OP_FWBOOT};
@@ -508,6 +508,11 @@ mod drv {
     /// perform_operation ET null_d_key. Mêmes états : seul `WaitReq` accepte la 4e écriture de /dev/sep_sks, seul
     /// `ReqReady` arme la porte `CreatekeybagGate` pour UN mot ; `Done` = résultat lisible. Le handle rendu par la réponse
     /// (OOL B +0x6c) est mémorisé pour `make_system_keybag`.
+    ///
+    /// J13 (allow_sks=8) : le BALAYAGE de `create_keybag` réutilise cette même machine à états, en boucle. À chaque
+    /// échec (réponse PARAM ≠ 0) le fil du probe RÉ-ARME (`WaitReq`) pour l'enregistrement suivant ; au 1er succès
+    /// (PARAM 0) il s'ARRÊTE (`Done`, `ckb_sweep_done`), sans enchaîner `make_system_keybag`. Le verrou de sûreté est le
+    /// STOP-au-1er-succès : jamais plus d'UN keybag créé. `ckb_sweep_fresh` = un résultat d'itération est prêt à lire.
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     enum CkbPhase {
         Off,
@@ -710,6 +715,20 @@ mod drv {
         /// `create_keybag` a RÉPONDU PARAM 0 et rendu un handle (OOL B +0x6c), prérequis du make_system_keybag.
         ckb_replied_ok: bool,
         ckb_handle: u32,
+        // --- J13 (allow_sks=8), BALAYAGE de create_keybag ---
+        /// Un résultat d'itération du balayage (`ckb_out`) est prêt et pas encore lu par l'espace utilisateur. La porte
+        /// d'écriture refuse (EAGAIN) tant qu'il est vrai : lockstep strict write→send→reply→read→ré-arm.
+        ckb_sweep_fresh: bool,
+        /// Balayage terminé (1er succès PARAM 0, ou liste épuisée/calme) : `WaitReq` n'accepte plus d'enregistrement.
+        ckb_sweep_done: bool,
+        /// Nombre d'enregistrements create_keybag envoyés pendant le balayage (journal).
+        ckb_sweep_n: u32,
+        /// Compteur de transaction (TYPE) du create en cours/suivant du balayage : le compteur global du SEP incrémente
+        /// à chaque appel (get_capabilities = 1, set_env = 2, puis chaque create balayé = 3, 4, 5, … modulo 256). Init
+        /// `CKB_TXN` (3). Sert à construire le mot ET à apparier sa réponse ; absent du corps OOL (pas de re-digest).
+        ckb_sweep_txn: u8,
+        /// Porte d'envoi du create balayé (admet exactement `createkeybag_word_txn(ckb_sweep_txn)`), ré-armée par essai.
+        sks_ckb_sweep_gate: CreatekeybagSweepGate,
         // --- J12 (allow_sks=7), load_keybag (0x03) puis make_system_keybag chaîné (0x0d) ---
         sks_lkb: LkbPhase,
         /// Requête load_keybag validée (`sks_keybag::check_loadkeybag`), copiée dans A12 au moment de l'envoi.
@@ -806,6 +825,11 @@ mod drv {
                 ckb_out: [0; sks_ipc::OUT_SIZE],
                 ckb_replied_ok: false,
                 ckb_handle: 0,
+                ckb_sweep_fresh: false,
+                ckb_sweep_done: false,
+                ckb_sweep_n: 0,
+                ckb_sweep_txn: sks_keybag::CKB_TXN,
+                sks_ckb_sweep_gate: CreatekeybagSweepGate::closed(),
                 sks_lkb: LkbPhase::Off,
                 sks_lkb_req: [0; sks_keybag::LKB_LEN],
                 sks_lkb_gate: LoadkeybagGate::closed(),
@@ -1174,7 +1198,14 @@ mod drv {
             // J10 : réponse au create_keybag (TAG bit 7, TYPE 0x03) → instantané de B12. Jamais de réponse, jamais de Halted.
             if w.ep == EP_SKS && core.sks_ckb == CkbPhase::Sent {
                 core.sks_ckb_rx_after = core.sks_ckb_rx_after.saturating_add(1);
-                if core.sks_ckb_reply.is_none() && sks_keybag::is_createkeybag_reply(&w) {
+                // J10 (allow_sks=5) : appariement par TYPE fixe CKB_TXN. J13 (allow_sks=8) : appariement par le compteur
+                // de transaction COURANT du balayage (3, 4, 5, …), car le TYPE incrémente à chaque create.
+                let matched = if param_allow_sks() == 8 {
+                    sks_keybag::is_createkeybag_reply_txn(&w, core.ckb_sweep_txn)
+                } else {
+                    sks_keybag::is_createkeybag_reply(&w)
+                };
+                if core.sks_ckb_reply.is_none() && matched {
                     if let Some(bufs) = self.ks_ool.as_ref() {
                         let mut snap = [0u8; sks_ipc::OUT_SNAP];
                         self.read_b8(&bufs[KS_SKS].1, &mut snap);
@@ -1582,6 +1613,7 @@ mod drv {
                             || (param_allow_sks() >= 3 && core.sks_se == SePhase::ReqReady && core.ks_open[KS_SKS] && core.sks_se_gate.admit(&w))
                             || (param_allow_sks() == 4 && core.sks_ndk == NdkPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_ndk_gate.admit(&w))
                             || (param_allow_sks() == 5 && core.sks_ckb == CkbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_ckb_gate.admit(&w))
+                            || (param_allow_sks() == 8 && core.sks_ckb == CkbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_ckb_sweep_gate.admit(&w))
                             || ((param_allow_sks() == 5 || param_allow_sks() == 7) && core.sks_mskb == MskbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_mskb_gate.admit(&w))
                             || (param_allow_sks() == 6 && core.sks_mskb == MskbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_mskb_std_gate.admit(&w))
                             || (param_allow_sks() == 7 && core.sks_lkb == LkbPhase::ReqReady && core.ks_open[KS_SKS] && core.sks_lkb_gate.admit(&w))
@@ -1763,6 +1795,7 @@ mod drv {
                 self.sks_loadkeybag_finish(&mut core);
                 self.sks_mskb_finish(&mut core);
                 self.sks_mskb_std_finish(&mut core);
+                self.sks_sweep_finish(&mut core);
                 r?;
                 Instant::<Monotonic>::now()
             } else {
@@ -1996,6 +2029,11 @@ mod drv {
             // ACCEPTÉ ; on SAUTE perform_operation, null_d_key ET create_keybag.
             if param_allow_sks() == 7 {
                 self.sks_loadkeybag_run(core, &bufs[KS_SKS].0, &bufs[KS_SKS].1)?;
+            }
+            // J13 : le BALAYAGE de create_keybag (class/field2 variés, un par un), une fois le set_env ACCEPTÉ ; on SAUTE
+            // perform_operation, null_d_key ET load_keybag. STOP au 1er succès (jamais plus d'UN keybag).
+            if param_allow_sks() == 8 {
+                self.sks_keybag_sweep_run(core, &bufs[KS_SKS].0, &bufs[KS_SKS].1)?;
             }
             dev_info!(
                 self.dev,
@@ -2844,6 +2882,221 @@ mod drv {
                 }
             }
             self.cv.notify_all();
+        }
+
+        /// J13 (allow_sks=8) : BALAYAGE de `create_keybag`. Lancé seulement si le set_env a été ACCEPTÉ ; on SAUTE
+        /// perform_operation, null_d_key ET load_keybag. L'espace utilisateur (`sks_setenv`) écrit des `create_keybag`
+        /// UN PAR UN (chacun un couple (class, field2) de sa liste de balayage) dans `/dev/sep_sks` ; pour chacun : la
+        /// porte `check_createkeybag` le valide, on l'ENVOIE, on lit la réponse appariée (instantané de B12), puis selon
+        /// la réponse. ÉCHEC (PARAM ≠ 0, p.ex. −0xb) ou SILENCE : on journalise et on RÉ-ARME (`WaitReq`) pour
+        /// l'enregistrement suivant, aucun SAVE attendu (un create échoué est bénin, VU J9-J12). SUCCÈS (PARAM 0) : on
+        /// lit le handle (OOL B +0x6c), on journalise « create sweep SUCCÈS … » et on STOPPE — pas de ré-armement, pas de
+        /// `make_system_keybag` (jamais plus d'UN keybag créé), puis le 0x73. Liste épuisée (plus d'écriture pendant
+        /// `KS_REQ_WAIT_MS`) : `WaitReq` → terminal, aucun keybag créé, puis le 0x73.
+        /// Lockstep : `ckb_sweep_fresh` tient un résultat non lu ; la porte d'écriture refuse tant qu'il est vrai (la
+        /// lecture de /dev/sep_sks le consomme et réveille ce fil). Fail-closed sur incohérence (A12 relu ≠ requête).
+        fn sks_keybag_sweep_run(&self, core: &mut MutexGuard<'_, Core>, a12: &Ool, b12: &Ool) -> Result {
+            if !core.se_accepted_ok {
+                dev_info!(self.dev, "sks create_keybag (balayage) : set_env non ACCEPTÉ (état 0) : rien envoyé à 0x12\n");
+                core.sks_ckb = CkbPhase::Done;
+                core.ckb_sweep_done = true;
+                self.cv.notify_all();
+                return Ok(());
+            }
+            dev_info!(
+                self.dev,
+                "sks create_keybag BALAYAGE : /dev/sep_sks attend des create_keybag UN PAR UN ({:#x} o ; class+field2 variés) ; STOP au 1er PARAM 0 (jamais plus d'UN keybag)\n",
+                sks_keybag::CKB_LEN
+            );
+            loop {
+                // (Ré-)armement : on attend l'enregistrement suivant. La porte d'écriture refuse tant que le résultat
+                // précédent n'est pas lu (`ckb_sweep_fresh`), donc on ne peut pas écraser `ckb_out`.
+                core.sks_ckb = CkbPhase::WaitReq;
+                core.sks_ckb_reply = None;
+                core.sks_ckb_snap = [0; sks_ipc::OUT_SNAP];
+                self.cv.notify_all();
+                let t0 = Instant::<Monotonic>::now();
+                while core.sks_ckb == CkbPhase::WaitReq {
+                    if core.state != State::Running {
+                        return Err(EIO);
+                    }
+                    if t0.elapsed().as_millis() >= KS_REQ_WAIT_MS {
+                        dev_info!(
+                            self.dev,
+                            "sks create_keybag BALAYAGE : plus d'écriture en {} ms (liste épuisée) : terminé, {} essai(s), aucun keybag créé\n",
+                            KS_REQ_WAIT_MS, core.ckb_sweep_n
+                        );
+                        core.sks_ckb = CkbPhase::Done;
+                        core.ckb_sweep_done = true;
+                        self.cv.notify_all();
+                        return Ok(());
+                    }
+                    if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                        dev_warn!(self.dev, "signal pendant l'attente d'un enregistrement de balayage : arrêt du balayage\n");
+                        core.sks_ckb = CkbPhase::Done;
+                        core.ckb_sweep_done = true;
+                        self.cv.notify_all();
+                        return Err(EINTR);
+                    }
+                }
+                if core.sks_ckb != CkbPhase::ReqReady {
+                    return Err(EIO);
+                }
+                // Envoi de l'enregistrement (identique au chemin allow_sks=5, mais la porte est ré-armée à neuf).
+                let req = core.sks_ckb_req;
+                let f = match sks_keybag::check_createkeybag(&req) {
+                    Ok(f) => f,
+                    Err(_) => {
+                        self.halt(core, "requête create_keybag (balayage) invalide au moment de l'envoi (bug)", None);
+                        return Err(EIO);
+                    }
+                };
+                if a12.len() < sks_keybag::CKB_LEN {
+                    return Err(EINVAL);
+                }
+                let mut back = [0u8; sks_keybag::CKB_LEN];
+                // SAFETY: `a12` est une allocation cohérente de `a12.len()` (0x8000) octets, vivante (tenue par `self`) ;
+                // on écrit puis relit `CKB_LEN <= a12.len()` octets (contrôlé ci-dessus). Le SEP ne lit A12 qu'après le
+                // mot envoyé ci-dessous ; seul ce fil écrit A12, sous `core`. La réponse de l'itération précédente est
+                // déjà arrivée (lockstep) avant tout nouvel envoi, donc réécrire A12 ici est sûr.
+                unsafe {
+                    let dst = a12.as_mut_ptr().cast::<u8>();
+                    core::ptr::copy_nonoverlapping(req.as_ptr(), dst, req.len());
+                    for (i, x) in back.iter_mut().enumerate() {
+                        *x = core::ptr::read_volatile(dst.add(i));
+                    }
+                }
+                if back != req || sks_keybag::check_createkeybag(&back).is_err() {
+                    self.halt(core, "A12 relu ≠ requête create_keybag (balayage) validée", None);
+                    return Err(EIO);
+                }
+                let (class, field2) = (f.class, f.field2);
+                // Le compteur de transaction (TYPE) incrémente à chaque create : 3 (après getcap=1, set_env=2), puis
+                // 4, 5, … Le corps A12 est identique (le compteur n'est pas dans l'OOL : pas de re-digest). La porte
+                // d'envoi est ré-armée à neuf pour le mot EXACT de CE compteur (anti-rejeu respecté).
+                let ty = core.ckb_sweep_txn;
+                dma_wmb();
+                core.sks_ckb_sweep_gate = CreatekeybagSweepGate::closed();
+                core.sks_ckb_sweep_gate.arm(ty);
+                self.send_running(core, sks_keybag::createkeybag_word_txn(ty), "sks create_keybag (balayage)")?;
+                core.sks_ckb = CkbPhase::Sent;
+                core.ckb_sweep_n = core.ckb_sweep_n.saturating_add(1);
+                dev_info!(
+                    self.dev,
+                    "sks create_keybag balayage n°{} > EP 0x12 TAG 0x01 TYPE {:#04x} (compteur de transaction) PARAM 0x00 DATA 0x00800000 ; A12 = {:#x} o (class {:#010x}, field2 {:#010x})\n",
+                    core.ckb_sweep_n, ty, sks_keybag::CKB_LEN, class, field2
+                );
+                // Écoute de la réponse appariée (écourtée dès qu'elle arrive).
+                let t0 = Instant::<Monotonic>::now();
+                let mut seen = core.sks_ckb_rx_after;
+                let mut dumps = 0u32;
+                while t0.elapsed().as_millis() < KS_LISTEN_MS && core.state == State::Running && core.sks_ckb_reply.is_none() {
+                    if let CondVarTimeoutResult::Signal { .. } = self.cv.wait_interruptible_timeout(core, msecs_to_jiffies(SBIO_POLL_MS)) {
+                        dev_warn!(self.dev, "signal pendant l'écoute d'une réponse de balayage : arrêt du balayage\n");
+                        core.ckb_sweep_done = true;
+                        return Err(EINTR);
+                    }
+                    if core.sks_ckb_rx_after != seen && dumps < KS_DUMP_LIMIT {
+                        seen = core.sks_ckb_rx_after;
+                        dumps += 1;
+                        self.dump_ool(b12, "B12 après un mot (create_keybag balayage)", "sks ");
+                    }
+                }
+                if core.state != State::Running {
+                    return Err(EIO);
+                }
+                // Verdict de CETTE itération, posé pour l'espace utilisateur (un enregistrement OUT_SIZE).
+                let (kind, raw) = match core.sks_ckb_reply {
+                    None => (sks_ipc::OUT_SILENCE, 0),
+                    Some(r) => (sks_ipc::OUT_REPLIED, r),
+                };
+                core.ckb_out = sks_ipc::encode_outcome(kind, raw, &core.sks_ckb_snap);
+                core.ckb_sweep_fresh = true;
+                let success = kind == sks_ipc::OUT_REPLIED && sks_keybag::reply_word(&Word::decode(raw)).status == 0;
+                if success {
+                    let handle = sks_keybag::reply_handle(&core.sks_ckb_snap).unwrap_or(0);
+                    core.ckb_replied_ok = true;
+                    core.ckb_handle = handle;
+                    core.sks_ckb = CkbPhase::Done;
+                    core.ckb_sweep_done = true;
+                    dev_info!(
+                        self.dev,
+                        "create sweep SUCCÈS class={:#010x} field2={:#010x} handle={:#010x} (PARAM 0 ; lu à OOL B +0x6c, DÉDUIT) : {:#018x} ; STOP (pas de make_system, jamais plus d'UN keybag)\n",
+                        class, field2, handle, raw
+                    );
+                    self.cv.notify_all();
+                    return Ok(());
+                }
+                let status = if kind == sks_ipc::OUT_REPLIED { i64::from(sks_keybag::reply_word(&Word::decode(raw)).status) } else { 0 };
+                if kind == sks_ipc::OUT_REPLIED {
+                    dev_info!(
+                        self.dev,
+                        "create sweep (class={:#010x}, field2={:#010x}) → PARAM={} (échec ; {:#018x}) ; ré-armement pour l'enregistrement suivant\n",
+                        class, field2, status, raw
+                    );
+                } else {
+                    dev_info!(
+                        self.dev,
+                        "create sweep (class={:#010x}, field2={:#010x}) → SILENCE (aucune réponse appariée en {} ms) ; ré-armement pour l'enregistrement suivant\n",
+                        class, field2, KS_LISTEN_MS
+                    );
+                }
+                // Le prochain create portera le compteur de transaction suivant (modulo 256).
+                core.ckb_sweep_txn = core.ckb_sweep_txn.wrapping_add(1);
+                self.cv.notify_all();
+                // Boucle : le haut ré-arme `WaitReq`. La porte d'écriture reste fermée tant que `ckb_sweep_fresh` (le
+                // résultat de CETTE itération) n'est pas lu, ce qui garantit le lockstep.
+            }
+        }
+
+        /// J13 : clôture du balayage (idempotent), réveil d'un lecteur bloqué. Sûreté : si le balayage n'a pas atteint un
+        /// état terminal par ses chemins normaux (erreur ou boot sans balayage), on marque `ckb_sweep_done`.
+        fn sks_sweep_finish(&self, core: &mut Core) {
+            if param_allow_sks() != 8 || core.ckb_sweep_done {
+                return;
+            }
+            core.ckb_sweep_done = true;
+            dev_info!(
+                self.dev,
+                "VERDICT sks create_keybag BALAYAGE : terminé ({} essai(s) ; {})\n",
+                core.ckb_sweep_n, if core.ckb_replied_ok { "SUCCÈS (1 keybag créé)" } else { "aucun PARAM 0, aucun keybag créé" }
+            );
+            self.cv.notify_all();
+        }
+
+        /// J13 : écriture d'un enregistrement de balayage (create_keybag 0x80 o) pour allow_sks=8. Acceptée seulement en
+        /// `CkbPhase::WaitReq` ET quand le résultat précédent a été lu (`!ckb_sweep_fresh`) : lockstep. Refus de la porte
+        /// = rien envoyé, pas de Halted. EALREADY une fois le balayage terminé ; EAGAIN tant que le noyau n'est pas prêt.
+        fn sks_submit_sweep(&self, req: &[u8]) -> Result {
+            let mut core = self.core.lock();
+            if core.state != State::Running {
+                return Err(EIO);
+            }
+            if param_allow_sks() != 8 {
+                return Err(EINVAL);
+            }
+            if core.ckb_sweep_done {
+                return Err(EALREADY);
+            }
+            if core.sks_ckb != CkbPhase::WaitReq || core.ckb_sweep_fresh {
+                return Err(EAGAIN);
+            }
+            let f = match sks_keybag::check_createkeybag(req) {
+                Ok(f) => f,
+                Err(e) => {
+                    dev_err!(self.dev, "sks create_keybag (balayage) : requête refusée par la porte ({}) : rien envoyé\n", why(&e));
+                    return Err(EINVAL);
+                }
+            };
+            core.sks_ckb_req.copy_from_slice(req);
+            core.sks_ckb = CkbPhase::ReqReady;
+            dev_info!(
+                self.dev,
+                "sks create_keybag balayage : enregistrement accepté (class {:#010x}, field2 {:#010x}, horodatage {} µs)\n",
+                f.class, f.field2, f.fields.ts_us
+            );
+            self.cv.notify_all();
+            Ok(())
         }
 
         /// J12 (allow_sks=7) : voie identité par `load_keybag`. Lancée seulement si le set_env a été ACCEPTÉ ; on SAUTE
@@ -4097,6 +4350,37 @@ mod drv {
         //               `MskbPhase::Done` (le 3e enregistrement est make_system standalone, ndk_out/ckb_out jamais remplis).
         fn read_iter(kiocb: Kiocb<'_, Arc<SepData>>, iov: &mut IovIterDest<'_>) -> Result<usize> {
             let me = kiocb.file();
+            // J13 (allow_sks=8) : lecture PAR ITÉRATION du balayage. Chaque lecture bloque jusqu'au verdict de
+            // l'enregistrement create_keybag en cours et rend UN enregistrement (OUT_SIZE). Elle consomme le résultat
+            // (`ckb_sweep_fresh` → false) et réveille le fil du balayage pour qu'il ré-arme (sur échec). Une lecture
+            // après la fin du balayage sans résultat frais rend 0 o.
+            if param_allow_sks() == 8 {
+                let need = sks_ipc::OUT_SIZE;
+                if iov.len() < need {
+                    return Err(EINVAL);
+                }
+                let mut core = me.core.lock();
+                loop {
+                    if core.state == State::Halted {
+                        return Err(EIO);
+                    }
+                    if core.ckb_sweep_fresh {
+                        let rec = core.ckb_out;
+                        core.ckb_sweep_fresh = false;
+                        me.cv.notify_all();
+                        if iov.copy_to_iter(&rec) != rec.len() {
+                            return Err(EFAULT);
+                        }
+                        return Ok(rec.len());
+                    }
+                    if core.ckb_sweep_done {
+                        return Ok(0);
+                    }
+                    if me.cv.wait_interruptible(&mut core) {
+                        return Err(ERESTARTSYS);
+                    }
+                }
+            }
             let records = match param_allow_sks() {
                 5 | 7 => 4,
                 4 | 6 => 3,
@@ -4163,7 +4447,9 @@ mod drv {
             let keybag = (n == sks_keybag::CKB_LEN || n == sks_keybag::MSKB_LEN) && param_allow_sks() == 5;
             let mskb_std = n == sks_keybag::MSKB_LEN && param_allow_sks() == 6;
             let loadkeybag = (n == sks_keybag::LKB_LEN || n == sks_keybag::MSKB_LEN) && param_allow_sks() == 7;
-            if !(getcap || setenv || nulldkey || keybag || mskb_std || loadkeybag) {
+            // J13 : balayage create_keybag (0x80 o, un enregistrement par couple class/field2) pour allow_sks=8.
+            let sweep = n == sks_keybag::CKB_LEN && param_allow_sks() == 8;
+            if !(getcap || setenv || nulldkey || keybag || mskb_std || loadkeybag || sweep) {
                 return Err(EINVAL);
             }
             let mut buf = KVec::with_capacity(n, GFP_KERNEL)?;
@@ -4180,6 +4466,8 @@ mod drv {
                 me.sks_submit_mskb_std(&buf)?;
             } else if loadkeybag {
                 me.sks_submit_loadkeybag(&buf)?;
+            } else if sweep {
+                me.sks_submit_sweep(&buf)?;
             } else {
                 me.sks_submit_keybag(&buf)?;
             }
@@ -4324,6 +4612,7 @@ mod drv {
                                 // moment. Échec de création → le fil du probe n'aura aucune requête : rien envoyé à 0x12.
                                 if param_allow_sks() >= 2 {
                                     let tool = match param_allow_sks() {
+                                        8 => "sks_setenv run --sweep (J13 : BALAYAGE create_keybag, class/field2 variés, STOP au 1er PARAM 0)",
                                         6 => "sks_setenv run --mskb --uuid … --type … (J11 : make_system_keybag STANDALONE)",
                                         5 => "sks_setenv run --keybag --uuid … --class … --type … (J10 : create_keybag puis make_system_keybag)",
                                         4 => "sks_setenv run (J9c : null_d_key en 3e écriture)",
@@ -4356,6 +4645,7 @@ mod drv {
                                     data.sks_createkeybag_finish(&mut c);
                                     data.sks_mskb_finish(&mut c);
                                     data.sks_mskb_std_finish(&mut c);
+                                    data.sks_sweep_finish(&mut c);
                                 }
                             }
                             Err(e) => dev_err!(dev, "0x13 non servi : {:?} (état {:?})\n", e, data.state()),
@@ -4378,10 +4668,10 @@ mod drv {
             pdev: &'bound platform::Device<device::Core<'_>>,
             _info: Option<&'bound Self::IdInfo>,
         ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
-            if param_allow_sks() > 7
+            if param_allow_sks() > 8
                 || (param_allow_sks() != 0 && (!param_allow_sbio() || param_sbio_open() != 1 || param_allow_relay()))
             {
-                dev_err!(pdev, "allow_sks vaut 0..7 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
+                dev_err!(pdev, "allow_sks vaut 0..8 ; allow_sks>=1 exige allow_sbio=1, sbio_open=1 et allow_sbio_relay=0 : refus\n");
                 return Err(EINVAL);
             }
             if (param_allow_xart() && param_allow_boot() == 0)

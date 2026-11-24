@@ -8,11 +8,13 @@
 //!   sks_setenv build-loadkeybag LKB [CHAMPS] [--out FILE]  builds the 0x74-byte load_keybag request (J12, offline)
 //!   sks_setenv check-getcap|check-setenv|check-nulldkey|check-createkeybag|check-loadkeybag|check-mskb [--mskb] FILE  applies the kernel gate (offline)
 //!   sks_setenv decode [--mskb|--loadkeybag] FILE    decodes a combined outcome record from /dev/sep_sks (offline)
-//!   sks_setenv run [CHAMPS] [--cpx N] [--nulldkey | --keybag KB | --mskb MKB | --loadkeybag LKB] [--dev P] [--wait-s N] [--out-dir DIR]
+//!   sks_setenv run [CHAMPS] [--cpx N] [--nulldkey | --keybag KB | --mskb MKB | --loadkeybag LKB | --sweep] [--dev P] [--wait-s N] [--out-dir DIR]
 //!       waits for /dev/sep_sks, writes get_capabilities, then set_env, then (with --nulldkey, sep_native allow_sks=4)
 //!       null_d_key, OR (with --keybag, allow_sks=5) create_keybag then make_system_keybag, OR (with --mskb,
 //!       allow_sks=6) a STANDALONE make_system_keybag, OR (with --loadkeybag, allow_sks=7) load_keybag then a
-//!       CHAINED make_system_keybag, then reads/decodes verdicts.
+//!       CHAINED make_system_keybag, OR (with --sweep, allow_sks=8) a SWEEP of create_keybag over the built-in
+//!       (class, field2) list (one write + one read per pair, STOP at the first PARAM 0), then reads/decodes verdicts.
+//!       --sweep needs NO secret userland value (create_keybag carries no uuid; class/field2 are the free fields swept).
 //! LKB (the J12 load_keybag userland values): REQUIRED --uuid HEX32 and --type N ONLY (no create_keybag → no --class).
 //!     Optional: --handle-y N (u64, OOL 0x58, default 0). load_keybag returns a handle (reply PARAM 0) that the kernel
 //!     plugs into the chained make_system_keybag, OR refuses (PARAM != 0 → a pre-existing identity is required).
@@ -30,15 +32,16 @@
 //!     --handle-y N (u64, OOL 0x58, default 0). The loaded_handle is sent AS IS (the kernel does NOT finalize in J11).
 //!     AMBIGUITY (`docs/applekeystored_identity.md` §6.2/§6.4): §6 does not say which of create_keybag's two u32
 //!     (0x60/0x64) is the class enum — if the SEP rejects, swap --class and --field2.
-//! Exit code: run without --nulldkey/--keybag/--mskb/--loadkeybag → 0 = set_env ACCEPTÉ ; --nulldkey → 0 = null_d_key
-//!            RÉPONDU ; --keybag / --mskb / --loadkeybag → 0 = make_system_keybag marqué system ; 1 = any other final
-//!            verdict ; 2 = usage/file/device.
+//! Exit code: run without --nulldkey/--keybag/--mskb/--loadkeybag/--sweep → 0 = set_env ACCEPTÉ ; --nulldkey → 0 =
+//!            null_d_key RÉPONDU ; --keybag / --mskb / --loadkeybag → 0 = make_system_keybag marqué system ; --sweep →
+//!            0 = one create_keybag returned a handle (PARAM 0), 1 = all pairs failed ; 1 = any other final verdict ;
+//!            2 = usage/file/device.
 use sep_proto::sks_ipc;
 use sep_proto::sks_keybag::{self as proto_kb, UUID_LEN};
 use sep_proto::sks_nulldkey as proto_nd;
 use sep_proto::sks_setenv as proto_se;
 use sks_setenv::{
-    createkeybag_verdict, describe_createkeybag, describe_createkeybag_verdict, describe_getcap,
+    createkeybag_sweep_verdict, createkeybag_verdict, describe_createkeybag, describe_createkeybag_verdict, describe_getcap,
     describe_getcap_verdict, describe_loadkeybag, describe_loadkeybag_verdict, describe_mskb, describe_mskb_standalone,
     describe_mskb_std_verdict, describe_mskb_verdict, describe_nulldkey, describe_nulldkey_verdict, describe_setenv,
     describe_setenv_verdict, getcap_fields, getcap_verdict, keybag_fields, loadkeybag_verdict, mskb_std_verdict,
@@ -111,6 +114,9 @@ struct Opts {
     mskb: bool,
     /// J12 (allow_sks=7): emit load_keybag (uuid → handle) then a CHAINED make_system_keybag. Requires only uuid+type.
     loadkeybag: bool,
+    /// J13 (allow_sks=8): SWEEP create_keybag over (class, field2) pairs, one by one, STOP at the first PARAM 0. Needs
+    /// NO secret userland value (class/field2 are free, enumerated from the built-in sweep list).
+    sweep: bool,
     uuid: Option<[u8; UUID_LEN]>,
     class: Option<u32>,
     field2: u32,
@@ -185,6 +191,7 @@ fn parse(args: &[String]) -> Result<Opts, String> {
         keybag: false,
         mskb: false,
         loadkeybag: false,
+        sweep: false,
         uuid: None,
         class: None,
         field2: 0,
@@ -223,6 +230,7 @@ fn parse(args: &[String]) -> Result<Opts, String> {
             "--keybag" => o.keybag = true,
             "--mskb" => o.mskb = true,
             "--loadkeybag" => o.loadkeybag = true,
+            "--sweep" => o.sweep = true,
             "--uuid" => o.uuid = Some(parse_uuid(&val()?)?),
             "--class" => o.class = Some(u32::try_from(num(&val()?)?).map_err(|_| "class > u32".to_string())?),
             "--field2" => o.field2 = u32::try_from(num(&val()?)?).map_err(|_| "field2 > u32".to_string())?,
@@ -269,6 +277,54 @@ fn build_nulldkey(o: &Opts) -> Result<[u8; proto_nd::NULLDKEY_LEN], String> {
 fn build_createkeybag(o: &Opts) -> Result<[u8; proto_kb::CKB_LEN], String> {
     let kb = keybag_userland(o)?;
     Ok(proto_kb::encode_createkeybag(&keybag_fields(ts_us(o)?, o.uniqueid, o.uid, o.cdhash), kb.handle_y, kb.class, kb.field2))
+}
+
+/// J13 sweep list of `field2` (OOL 0x64) values, in the order to try. Negative patterns first (reverse hint « <= -10 »
+/// in `docs/applekeystored_identity.md` §6.4), then small positives, then -1/-2. These are GUESSES: the real meaning of
+/// create_keybag's two u32 (0x60/0x64) is NOT pinned down at the binary (§6.2), so the sweep tries both fields free.
+const SWEEP_FIELD2: [u32; 10] = [
+    0xFFFF_FFF6, // -10
+    0xFFFF_FFF5, // -11
+    0xFFFF_FFF4, // -12
+    0xFFFF_FFF3, // -13
+    1,
+    2,
+    3,
+    4,
+    0xFFFF_FFFF, // -1
+    0xFFFF_FFFE, // -2
+];
+/// J13 sweep list of `class` (OOL 0x60) values. 4 classes × 10 field2 = 40 pairs.
+const SWEEP_CLASS: [u32; 4] = [1, 2, 3, 4];
+
+/// J13: the sweep pairs, in order (field2 outer so the most-likely negative field2 values are tried across all classes
+/// first). Each item is `(class, field2)`.
+fn sweep_pairs() -> Vec<(u32, u32)> {
+    let mut v = Vec::with_capacity(SWEEP_FIELD2.len() * SWEEP_CLASS.len());
+    for &field2 in &SWEEP_FIELD2 {
+        for &class in &SWEEP_CLASS {
+            v.push((class, field2));
+        }
+    }
+    v
+}
+
+/// J13: builds one create_keybag sweep record for the given (class, field2). create_keybag carries NO uuid (it takes a
+/// class), so the sweep needs NO secret userland value; `handle_y` is the usual default (0, a fresh create has no parent
+/// session handle). The kernel gate (`check_createkeybag`) accepts any class/field2 (they are free).
+fn build_createkeybag_sweep(o: &Opts, class: u32, field2: u32) -> Result<[u8; proto_kb::CKB_LEN], String> {
+    Ok(proto_kb::encode_createkeybag(&keybag_fields(ts_us(o)?, o.uniqueid, o.uid, o.cdhash), o.handle_y, class, field2))
+}
+
+/// J13: one-line verdict for a sweep iteration.
+fn describe_sweep_line(n: usize, class: u32, field2: u32, v: &sks_setenv::CreatekeybagVerdict, raw: u64) -> String {
+    use sks_setenv::CreatekeybagVerdict as V;
+    match v {
+        V::Handle(h) => format!("create sweep n°{n} (class={class:#010x}, field2={field2:#010x}) → SUCCÈS PARAM=0 handle={h:#010x} mot {raw:#018x}\n"),
+        V::Refus(r) => format!("create sweep n°{n} (class={class:#010x}, field2={field2:#010x}) → ÉCHEC ({r}) mot {raw:#018x}\n"),
+        V::Silence => format!("create sweep n°{n} (class={class:#010x}, field2={field2:#010x}) → SILENCE\n"),
+        V::NotSent => format!("create sweep n°{n} (class={class:#010x}, field2={field2:#010x}) → NON ENVOYÉ\n"),
+    }
 }
 
 fn build_mskb(o: &Opts) -> Result<[u8; proto_kb::MSKB_LEN], String> {
@@ -349,8 +405,8 @@ fn write_request(
 
 /// `run`: returns the exit code.
 fn run(o: &Opts) -> Result<i32, String> {
-    if [o.keybag, o.nulldkey, o.mskb, o.loadkeybag].iter().filter(|x| **x).count() > 1 {
-        return Err("--keybag, --nulldkey, --mskb et --loadkeybag sont exclusifs".into());
+    if [o.keybag, o.nulldkey, o.mskb, o.loadkeybag, o.sweep].iter().filter(|x| **x).count() > 1 {
+        return Err("--keybag, --nulldkey, --mskb, --loadkeybag et --sweep sont exclusifs".into());
     }
     // Fail fast: the required userland values must all be present BEFORE touching the device.
     if o.keybag {
@@ -387,6 +443,48 @@ fn run(o: &Opts) -> Result<i32, String> {
             log(&describe_setenv(&se)?);
             save(&o.out_dir, "sks_setenv_request.bin", &se);
         }
+    }
+    // 2bis) SWEEP create_keybag (--sweep, allow_sks=8): once set_env was ACCEPTÉ, SKIPPING perform_operation,
+    //       null_d_key AND load_keybag. Writes create_keybag records ONE BY ONE ((class, field2) from the sweep list),
+    //       reading ONE outcome per write (lockstep), and STOPS at the first PARAM 0 (success) or when the list is
+    //       exhausted / the kernel no longer expects a record. create_keybag carries no uuid, so NO secret is needed.
+    if o.sweep {
+        if !se_accepted {
+            return Err("set_env non ACCEPTÉ : balayage create_keybag impossible (rien envoyé)".into());
+        }
+        let pairs = sweep_pairs();
+        log(&format!("balayage create_keybag : {} couple(s) (class, field2) à essayer, STOP au 1er PARAM 0", pairs.len()));
+        for (i, (class, field2)) in pairs.iter().copied().enumerate() {
+            let n = i + 1;
+            let label = format!("create_keybag balayage n°{n} (class={class:#010x} field2={field2:#010x})");
+            let accepted = write_request(&mut f, &mut || build_createkeybag_sweep(o, class, field2).map(|b| b.to_vec()), deadline, &label)?;
+            if !accepted {
+                log("le noyau n'attend plus de create_keybag (balayage terminé côté noyau : succès antérieur ou liste close) : arrêt");
+                return Ok(1);
+            }
+            save(&o.out_dir, &format!("sks_sweep_{n:02}_c{class:08x}_f{field2:08x}_request.bin"), &build_createkeybag_sweep(o, class, field2)?);
+            // Read ONE per-iteration outcome record (blocks until the kernel got the paired reply / silence).
+            let mut rec = vec![0u8; sks_ipc::OUT_SIZE];
+            let nr = f.read(&mut rec).map_err(|e| format!("lecture du verdict balayage n°{n} : {e}"))?;
+            if nr == 0 {
+                log("balayage terminé côté noyau (lecture vide) : arrêt");
+                return Ok(1);
+            }
+            if nr < sks_ipc::OUT_SIZE {
+                return Err(format!("verdict balayage n°{n} trop court ({nr} o < {} o) : /dev/sep_sks pas en mode allow_sks=8", sks_ipc::OUT_SIZE));
+            }
+            save(&o.out_dir, &format!("sks_sweep_{n:02}_c{class:08x}_f{field2:08x}_outcome.bin"), &rec);
+            // Verdict ty-agnostique : le compteur de transaction incrémente par create (3, 4, 5, …), et le noyau a déjà
+            // apparié la réponse sur ce compteur ; côté outil on ne vérifie pas le TYPE exact.
+            let (v, raw, _snap) = createkeybag_sweep_verdict(&rec)?;
+            print!("{}", describe_sweep_line(n, class, field2, &v, raw));
+            if let sks_setenv::CreatekeybagVerdict::Handle(h) = v {
+                log(&format!("BALAYAGE SUCCÈS : class={class:#010x} field2={field2:#010x} → handle={h:#010x} (STOP, aucun make_system, 1 keybag)"));
+                return Ok(0);
+            }
+        }
+        log("balayage terminé : tous les couples ont échoué (aucun PARAM 0) ; le noyau passe au 0x73 (aucun keybag créé)");
+        return Ok(1);
     }
     // 3) null_d_key (--nulldkey, allow_sks=4): the kernel accepts it only once set_env was ACCEPTÉ; the two
     //    perform_operation (txn3/txn5) are SKIPPED.
